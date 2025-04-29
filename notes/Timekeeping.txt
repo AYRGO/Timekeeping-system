@@ -32,6 +32,19 @@ Check rest day overtime (if working on a supposed rest day).
 If on approved leave, no time-in required.
 
 
+Admin Side:
+Employee Assign Schedule
+employee list
+leave request approval
+leave request list
+time log list
+
+
+employee Side:
+time log created
+leave request
+
+
 
 CREATE TABLE employees (
     id INT PRIMARY KEY,
