@@ -1,0 +1,138 @@
+TIMEKEEPING SYSTEM — Master Plan
+Core Tables
+
+Table	Purpose
+employees	Employee master list (personal data, etc.)
+work_schedules	Standard shift templates (e.g., 7AM–4PM, 9AM–6PM)
+employee_work_schedule	Assigns a work schedule to each employee (start date, end date)
+time_logs	Records actual time-in and time-out per day
+Requests and Approvals
+
+Request Table	Action after Approval	Purpose
+schedule_change_requests	Updates employee’s permanent schedule (employee_work_schedule)	Permanent schedule change
+schedule_exception_requests	Inserts into schedule_exceptions	Special one-day schedule change
+leave_requests	Updates status (Approved/Rejected)	Vacation, sick, emergency leaves
+overtime_requests	Updates status (Approved/Rejected)	Overtime after shift
+rest_day_overtime_requests	Updates status (Approved/Rejected)	Overtime during rest day
+Special Table
+
+Table	Purpose
+schedule_exceptions	One-day schedule override (based on schedule_exception_requests)
+System Behavior (During Time In/Time Out)
+Check if schedule_exceptions exists for today.
+
+If yes → follow exception schedule.
+
+If no exception, use assigned schedule from employee_work_schedule.
+
+Check approved overtime requests (for late log-outs).
+
+Check rest day overtime (if working on a supposed rest day).
+
+If on approved leave, no time-in required.
+
+
+
+CREATE TABLE employees (
+    id INT PRIMARY KEY,
+    fname VARCHAR(255),
+    lname VARCHAR(255),
+    email VARCHAR(255),
+    contact VARCHAR(255),
+    position VARCHAR(255),
+    status ENUM('active', 'inactive'),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE work_schedules (
+    id INT PRIMARY KEY,
+    name VARCHAR(255),
+    time_in TIME,
+    time_out TIME
+);
+
+CREATE TABLE employee_work_schedule (
+    id INT PRIMARY KEY,
+    employee_id INT,
+    work_schedule_id INT,
+    effective_date DATE,
+    FOREIGN KEY (employee_id) REFERENCES employees(id),
+    FOREIGN KEY (work_schedule_id) REFERENCES work_schedules(id)
+);
+
+CREATE TABLE time_logs (
+    id INT PRIMARY KEY,
+    employee_id INT,
+    log_date DATE,
+    time_in TIME,
+    time_out TIME,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+CREATE TABLE schedule_change_requests (
+    id INT PRIMARY KEY,
+    employee_id INT,
+    requested_schedule_id INT,
+    reason TEXT,
+    status ENUM('pending', 'approved', 'rejected'),
+    requested_effective_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id),
+    FOREIGN KEY (requested_schedule_id) REFERENCES work_schedules(id)
+);
+
+CREATE TABLE schedule_exception_requests (
+    id INT PRIMARY KEY,
+    employee_id INT,
+    requested_time_in TIME,
+    requested_time_out TIME,
+    exception_date DATE,
+    reason TEXT,
+    status ENUM('pending', 'approved', 'rejected'),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+CREATE TABLE schedule_exceptions (
+    id INT PRIMARY KEY,
+    employee_id INT,
+    exception_date DATE,
+    time_in TIME,
+    time_out TIME,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+CREATE TABLE leave_requests (
+    id INT PRIMARY KEY,
+    employee_id INT,
+    leave_type ENUM('VL', 'SL', 'Emergency', 'Other'),
+    start_date DATE,
+    end_date DATE,
+    reason TEXT,
+    status ENUM('pending', 'approved', 'rejected'),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+CREATE TABLE overtime_requests (
+    id INT PRIMARY KEY,
+    employee_id INT,
+    ot_date DATE,
+    expected_time_out TIME,
+    reason TEXT,
+    status ENUM('pending', 'approved', 'rejected'),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+CREATE TABLE rest_day_overtime_requests (
+    id INT PRIMARY KEY,
+    employee_id INT,
+    rest_day_date DATE,
+    expected_time_in TIME,
+    expected_time_out TIME,
+    reason TEXT,
+    status ENUM('pending', 'approved', 'rejected'),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
