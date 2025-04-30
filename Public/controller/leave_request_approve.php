@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE leave_requests SET status = ? WHERE id = ?");
         $stmt->execute([$status, $request_id]);
 
-        header('Location: ../module/leave_request_approval.php');
+        header('Location: ../module/leave_request_request.php');
         exit;
     } else {
         echo "Error: Missing or invalid 'id' or 'action' in POST request.";
