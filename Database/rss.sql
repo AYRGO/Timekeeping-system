@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 29, 2025 at 04:10 PM
+-- Generation Time: Apr 30, 2025 at 09:48 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- PHP Version: 8.0.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -125,10 +125,7 @@ CREATE TABLE `employee_work_schedule` (
 --
 
 INSERT INTO `employee_work_schedule` (`id`, `employee_id`, `work_schedule_id`, `effective_date`) VALUES
-(1, 1, 1, '2025-04-29'),
-(2, 2, 1, '2025-04-29'),
-(3, 3, 1, '2025-04-29'),
-(4, 3, 1, '2025-04-29');
+(1, 1, 2, '2025-04-30');
 
 -- --------------------------------------------------------
 
@@ -181,6 +178,14 @@ CREATE TABLE `overtime_requests` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `overtime_requests`
+--
+
+INSERT INTO `overtime_requests` (`id`, `employee_id`, `ot_date`, `expected_time_out`, `reason`, `status`, `created_at`) VALUES
+(1, 1, '2025-04-30', '08:55:00', 'test', 'approved', '2025-04-29 23:55:15'),
+(2, 4, '2025-04-30', '09:09:00', 'test', 'rejected', '2025-04-30 00:09:21');
+
 -- --------------------------------------------------------
 
 --
@@ -198,6 +203,20 @@ CREATE TABLE `rest_day_overtime_requests` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `rest_day_overtime_requests`
+--
+
+INSERT INTO `rest_day_overtime_requests` (`id`, `employee_id`, `rest_day_date`, `expected_time_in`, `expected_time_out`, `reason`, `status`, `created_at`) VALUES
+(1, 1, '2025-05-03', '07:00:00', '09:00:00', 'test', 'approved', '2025-04-30 00:17:50'),
+(2, 1, '2025-05-03', '12:18:00', '16:18:00', 'test', 'rejected', '2025-04-30 00:18:17'),
+(3, 1, '2025-05-03', '12:18:00', '16:18:00', 'test', 'approved', '2025-04-30 00:26:49'),
+(4, 1, '2025-04-23', '08:26:00', '08:26:00', 'test\r\n', 'approved', '2025-04-30 00:27:04'),
+(5, 1, '2025-04-23', '08:26:00', '08:26:00', 'test\r\n', 'approved', '2025-04-30 00:27:53'),
+(6, 1, '2025-04-30', '01:27:00', '01:28:00', '1', 'rejected', '2025-04-30 00:28:03'),
+(7, 1, '2025-04-30', '01:27:00', '01:28:00', '1', 'rejected', '2025-04-30 00:28:21'),
+(8, 1, '2025-05-01', '10:28:00', '01:28:00', 'test', 'rejected', '2025-04-30 00:28:31');
+
 -- --------------------------------------------------------
 
 --
@@ -214,6 +233,14 @@ CREATE TABLE `schedule_change_requests` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `schedule_change_requests`
+--
+
+INSERT INTO `schedule_change_requests` (`id`, `employee_id`, `requested_schedule_id`, `reason`, `status`, `requested_effective_date`, `created_at`) VALUES
+(4, 1, 1, 'test', 'approved', '2025-04-30', '2025-04-30 02:27:52'),
+(5, 1, 2, 'test', 'approved', '2025-04-30', '2025-04-30 02:30:38');
+
 -- --------------------------------------------------------
 
 --
@@ -227,6 +254,13 @@ CREATE TABLE `schedule_exceptions` (
   `time_in` time DEFAULT NULL,
   `time_out` time DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `schedule_exceptions`
+--
+
+INSERT INTO `schedule_exceptions` (`id`, `employee_id`, `exception_date`, `time_in`, `time_out`) VALUES
+(1, 1, '2025-05-03', '07:00:00', '16:43:00');
 
 -- --------------------------------------------------------
 
@@ -244,6 +278,13 @@ CREATE TABLE `schedule_exception_requests` (
   `status` enum('pending','approved','rejected') DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `schedule_exception_requests`
+--
+
+INSERT INTO `schedule_exception_requests` (`id`, `employee_id`, `requested_time_in`, `requested_time_out`, `exception_date`, `reason`, `status`, `created_at`) VALUES
+(1, 1, '07:00:00', '16:43:00', '2025-05-03', 'test', 'approved', '2025-04-30 05:43:08');
 
 -- --------------------------------------------------------
 
@@ -371,13 +412,43 @@ ALTER TABLE `work_schedules`
 -- AUTO_INCREMENT for table `employee_work_schedule`
 --
 ALTER TABLE `employee_work_schedule`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `leave_requests`
 --
 ALTER TABLE `leave_requests`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
+-- AUTO_INCREMENT for table `overtime_requests`
+--
+ALTER TABLE `overtime_requests`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `rest_day_overtime_requests`
+--
+ALTER TABLE `rest_day_overtime_requests`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT for table `schedule_change_requests`
+--
+ALTER TABLE `schedule_change_requests`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT for table `schedule_exceptions`
+--
+ALTER TABLE `schedule_exceptions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `schedule_exception_requests`
+--
+ALTER TABLE `schedule_exception_requests`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `time_logs`
