@@ -1,4 +1,5 @@
 TIMEKEEPING SYSTEM — Master Plan
+
 Core Tables
 
 Table	Purpose
@@ -6,6 +7,7 @@ employees	Employee master list (personal data, etc.)
 work_schedules	Standard shift templates (e.g., 7AM–4PM, 9AM–6PM)
 employee_work_schedule	Assigns a work schedule to each employee (start date, end date)
 time_logs	Records actual time-in and time-out per day
+
 Requests and Approvals
 
 Request Table	Action after Approval	Purpose
@@ -14,11 +16,14 @@ schedule_exception_requests	Inserts into schedule_exceptions	Special one-day sch
 leave_requests	Updates status (Approved/Rejected)	Vacation, sick, emergency leaves
 overtime_requests	Updates status (Approved/Rejected)	Overtime after shift
 rest_day_overtime_requests	Updates status (Approved/Rejected)	Overtime during rest day
+
 Special Table
 
 Table	Purpose
 schedule_exceptions	One-day schedule override (based on schedule_exception_requests)
+
 System Behavior (During Time In/Time Out)
+
 Check if schedule_exceptions exists for today.
 
 If yes → follow exception schedule.
