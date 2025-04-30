@@ -32,6 +32,12 @@ Check rest day overtime (if working on a supposed rest day).
 If on approved leave, no time-in required.
 
 
+When the employee logs in for the day, the system will check for any **schedule exceptions**.
+- If the **schedule exception** exists for the day, use the new time-in and time-out from `schedule_exceptions`.
+- If there is no exception, use the employee's regular schedule from `employee_work_schedule`.
+- If the employee has an approved **overtime request**, the system will also check and allow extended time-in/out.
+
+
 Admin Side:
 Employee Assign Schedule
 employee list
@@ -41,8 +47,11 @@ time log list
 
 
 employee Side:
-time log created
-leave request
+time log create
+leave request create
+rest day overtime create 
+schedule change request create
+schedule exception request create
 
 
 
