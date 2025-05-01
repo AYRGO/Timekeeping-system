@@ -8,7 +8,6 @@ if (!$employee_id) {
     exit;
 }
 
-$current_time = date("H:i");
 $current_date = date("Y-m-d");
 
 // Fetch today's time log
@@ -18,6 +17,10 @@ $time_log = $stmt->fetch();
 
 $time_in = $time_log['time_in'] ?? null;
 $time_out = $time_log['time_out'] ?? null;
+
+// Initialize work_start_time and work_end_time
+$work_start_time = null;
+$work_end_time = null;
 
 // Step 1: Check for schedule exception
 $exception_stmt = $pdo->prepare("SELECT * FROM schedule_exceptions WHERE employee_id = ? AND exception_date = ?");
@@ -42,8 +45,7 @@ if ($schedule_exception) {
 
     if ($overtime && isset($work_end_time)) {
         // Extend end time by overtime hours
-        $end_plus = date("H:i", strtotime($work_end_time) + ($overtime['hours'] * 3600));
-        $work_end_time = $end_plus;
+        $work_end_time = date("H:i", strtotime($work_end_time) + ($overtime['hours'] * 3600));
     }
 }
 
@@ -51,8 +53,26 @@ $can_time_in = !$time_in;
 $can_time_out = $time_in && !$time_out;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Use system time for time-in and time-out logs
+    $current_time = date("H:i:s"); // This gets the current system time
+
+    // Convert both current time and work schedule times to timestamps for accurate comparison
+    $current_timestamp = strtotime($current_time);
+    $start_timestamp = $work_start_time ? strtotime($work_start_time) : null;
+    $end_timestamp = $work_end_time ? strtotime($work_end_time) : null;
+
+    // Debug output for current time and schedule time
+    echo "Current time: $current_time<br>";
+    echo "Work start time: $work_start_time<br>";
+    echo "Current timestamp: $current_timestamp<br>";
+    echo "Start timestamp: $start_timestamp<br>";
+
+    // Time-in logic
     if (isset($_POST['time_in']) && $can_time_in) {
-        $is_late_in = ($work_start_time && $current_time > $work_start_time) ? 1 : 0;
+        // Check if the employee is late
+        $is_late_in = ($start_timestamp && $current_timestamp > $start_timestamp) ? 1 : 0;
+
+        // Insert time log entry
         $insert = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out, is_late_in) VALUES (?, ?, ?, ?, ?)");
         $insert->execute([$employee_id, $current_date, $current_time, null, $is_late_in]);
 
@@ -60,8 +80,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // Time-out logic
     if (isset($_POST['time_out']) && $can_time_out) {
-        $is_early_out = ($work_end_time && $current_time < $work_end_time) ? 1 : 0;
+        // Check if the employee is early
+        $is_early_out = ($end_timestamp && $current_timestamp < $end_timestamp) ? 1 : 0;
+
+        // Update time log entry
         $update = $pdo->prepare("UPDATE time_logs SET time_out = ?, is_early_out = ? WHERE employee_id = ? AND log_date = ?");
         $update->execute([$current_time, $is_early_out, $employee_id, $current_date]);
 
@@ -70,6 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
