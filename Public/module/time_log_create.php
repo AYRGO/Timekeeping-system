@@ -152,23 +152,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h2 class="text-xl sm:text-2xl font-bold text-[#2F9C95] mb-4 text-center">Requests & Navigation</h2>
             <div class="space-y-3 sm:space-y-4 text-base sm:text-lg">
                 
-                <a href="schedule-change-request.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
+                <a href="schedule_change_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
                     Schedule Change Request
                 </a>
-                <a href="schedule-exception-request.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
+                <a href="schedule_exception_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
                     Schedule Exception Request
                 </a>
-                <a href="rest-day-overtime.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
+                <a href="rest_day_overtime_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
                     Rest Day Overtime Request
                 </a>
-                <a href="overtime-request.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
+                <a href="overtime_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
                     Overtime Request
                 </a>
-                <a href="leave-request.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
+                <a href="leave_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
                     Leave Request
                 </a>
 
-                <a href="logout.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
+                <a href="../employee/logout.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
                     Logout
                 </a>
             </div>
