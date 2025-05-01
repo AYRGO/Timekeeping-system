@@ -90,91 +90,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         window.onload = updateClock;
     </script>
 </head>
-<body class="bg-[#A3F7B5] min-h-screen overflow-y-auto flex flex-col items-center justify-start px-4 py-6">
-    <div class="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl space-y-4 sm:space-y-6">
+<body class="bg-[#A3F7B5] min-h-screen flex flex-col items-center justify-start px-4 py-10">
+  <div class="w-full max-w-7xl space-y-10 px-4 sm:px-6 md:px-10 lg:px-20 xl:px-40 2xl:px-60">
 
-        <!-- Manual Time Log Box -->
-        <div class="bg-white shadow-lg rounded-2xl p-4 sm:p-6 w-full border-t-8 border-[#40C9A2]">
-            <div class="text-center text-xl sm:text-2xl font-semibold text-[#2F9C95] mb-4 sm:mb-6" id="clock"></div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-[#2F9C95] mb-4 sm:mb-6 text-center">Manual Time Log</h1>
+    <!-- Manual Time Log Box -->
+    <div class="bg-white shadow-xl rounded-2xl p-6 sm:p-8 border-t-8 border-[#40C9A2]">
+      <div id="clock" class="text-center text-3xl sm:text-4xl md:text-5xl font-semibold text-[#2F9C95] mb-4 sm:mb-6"></div>
+      <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-[#2F9C95] text-center mb-6">Manual Time Log</h1>
 
-            <form method="POST" class="space-y-5 text-lg">
-                <?php if (!$time_in): ?>
-                    <?php if ($can_time_in): ?>
-                        <button 
-                            type="submit" 
-                            name="time_in" 
-                            class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200 text-lg"
-                        >
-                            Log Time In
-                        </button>
-                    <?php else: ?>
-                        <button 
-                            type="button" 
-                            disabled 
-                            class="w-full bg-gray-300 text-gray-600 font-semibold py-3 px-6 rounded-xl cursor-not-allowed text-lg"
-                        >
-                            Cannot Log In - Outside Scheduled Hours
-                        </button>
-                    <?php endif; ?>
-                <?php else: ?>
-                    <button 
-                        type="button" 
-                        disabled 
-                        class="w-full bg-gray-300 text-gray-600 font-semibold py-3 px-6 rounded-xl cursor-not-allowed text-lg"
-                    >
-                        Already Logged In
-                    </button>
-                <?php endif; ?>
+      <form method="POST" class="space-y-5 text-lg">
+        <?php if (!$time_in): ?>
+          <?php if ($can_time_in): ?>
+            <button 
+              type="submit" 
+              name="time_in" 
+              class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-5 rounded-xl transition duration-200 text-2xl"
+            >
+              Log Time In
+            </button>
+          <?php else: ?>
+            <button 
+              type="button" 
+              disabled 
+              class="w-full bg-gray-300 text-gray-600 font-medium py-4 rounded-xl cursor-not-allowed text-lg"
+            >
+              Cannot Log In - Outside Scheduled Hours
+            </button>
+          <?php endif; ?>
+        <?php else: ?>
+          <button 
+            type="button" 
+            disabled 
+            class="w-full bg-gray-300 text-gray-600 font-medium py-4 rounded-xl cursor-not-allowed text-lg"
+          >
+            Already Logged In
+          </button>
+        <?php endif; ?>
 
-                <?php if ($time_in && !$time_out): ?>
-                    <button 
-                        type="submit" 
-                        name="time_out" 
-                        class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200 text-lg"
-                    >
-                        Log Time Out
-                    </button>
-                <?php elseif ($time_out): ?>
-                    <button 
-                        type="button" 
-                        disabled 
-                        class="w-full bg-gray-300 text-gray-600 font-semibold py-3 px-6 rounded-xl cursor-not-allowed text-lg"
-                    >
-                        Already Logged Out
-                    </button>
-                <?php endif; ?>
-            </form>
-        </div>
-
-        <!-- Action Links Box -->
-        <div class="bg-white shadow-lg rounded-2xl p-4 sm:p-6 w-full border-t-8 border-[#40C9A2]">
-            <h2 class="text-xl sm:text-2xl font-bold text-[#2F9C95] mb-4 text-center">Requests & Navigation</h2>
-            <div class="space-y-3 sm:space-y-4 text-base sm:text-lg">
-                
-                <a href="schedule_change_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
-                    Schedule Change Request
-                </a>
-                <a href="schedule_exception_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
-                    Schedule Exception Request
-                </a>
-                <a href="rest_day_overtime_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
-                    Rest Day Overtime Request
-                </a>
-                <a href="overtime_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
-                    Overtime Request
-                </a>
-                <a href="leave_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
-                    Leave Request
-                </a>
-
-                <a href="../employee/logout.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200">
-                    Logout
-                </a>
-            </div>
-        </div>
-
+        <?php if ($time_in && !$time_out): ?>
+          <button 
+            type="submit" 
+            name="time_out" 
+            class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-4 rounded-xl transition duration-200 text-lg"
+          >
+            Log Time Out
+          </button>
+        <?php elseif ($time_out): ?>
+          <button 
+            type="button" 
+            disabled 
+            class="w-full bg-gray-300 text-gray-600 font-medium py-4 rounded-xl cursor-not-allowed text-lg"
+          >
+            Already Logged Out
+          </button>
+        <?php endif; ?>
+      </form>
     </div>
 
+    <!-- Action Links Box -->
+    <div class="bg-white shadow-xl rounded-2xl p-6 sm:p-8 border-t-8 border-[#40C9A2]">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-[#2F9C95] mb-6 text-center">Requests & Navigation</h2>
+      
+      <div class="space-y-4 text-base sm:text-lg">
+        <a href="schedule_change_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white text-xl sm:text-2xl font-semibold py-4 rounded-xl transition duration-200">
+          Schedule Change Request
+        </a>
+        <a href="schedule_exception_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white text-xl sm:text-2xl font-semibold py-4 rounded-xl transition duration-200">
+          Schedule Exception Request
+        </a>
+        <a href="rest_day_overtime_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white text-xl sm:text-2xl font-semibold py-4 rounded-xl transition duration-200">
+          Rest Day Overtime Request
+        </a>
+        <a href="overtime_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white text-xl sm:text-2xl font-semibold py-4 rounded-xl transition duration-200">
+          Overtime Request
+        </a>
+        <a href="leave_request_create.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white text-xl sm:text-2xl font-semibold py-4 rounded-xl transition duration-200">
+          Leave Request
+        </a>
+        <a href="../employee/logout.php" class="block text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white text-xl sm:text-2xl font-semibold py-4 rounded-xl transition duration-200">
+          Logout
+        </a>
+      </div>
+    </div>
+    
+  </div>
 </body>
+
 </html>
