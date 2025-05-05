@@ -1,8 +1,9 @@
 <?php
 session_start();
 include('../config/db.php');
+date_default_timezone_set('Asia/Manila'); // Ensure timezone is correctly set
 
-$employee_id = $_SESSION['employee']['id'];
+$employee_id = $_SESSION['employee']['id'] ?? null;
 if (!$employee_id) {
     header("Location: ../employee/login.php");
     exit;
@@ -10,17 +11,33 @@ if (!$employee_id) {
 
 $current_date = date("Y-m-d");
 
-// Fetch today's time log
-$stmt = $pdo->prepare("SELECT * FROM time_logs WHERE employee_id = ? AND log_date = CURDATE() LIMIT 1");
-$stmt->execute([$employee_id]);
+// Fetch today's time log (so we know if they already timed in or out)
+$stmt = $pdo->prepare("SELECT * FROM time_logs WHERE employee_id = ? AND log_date = ?");
+$stmt->execute([$employee_id, $current_date]);
 $time_log = $stmt->fetch();
 
-$time_in = $time_log['time_in'] ?? null;
-$time_out = $time_log['time_out'] ?? null;
+$time_in = null;
+$time_out = null;
 
-// Initialize work_start_time and work_end_time
-$work_start_time = null;
-$work_end_time = null;
+if ($time_log) {
+    $time_in = $time_log['time_in'];
+    $time_out = $time_log['time_out'];
+}
+
+// Get employee's current applicable work schedule (latest effective date)
+$schedule_stmt = $pdo->prepare("
+    SELECT ws.time_in AS start_time, ws.time_out AS end_time 
+    FROM employee_work_schedule ews
+    JOIN work_schedules ws ON ews.work_schedule_id = ws.id
+    WHERE ews.employee_id = ? 
+    ORDER BY ews.effective_date DESC 
+    LIMIT 1
+");
+$schedule_stmt->execute([$employee_id]);
+$work_schedule = $schedule_stmt->fetch();
+
+$work_start_time = $work_schedule['start_time'] ?? null;
+$work_end_time   = $work_schedule['end_time'] ?? null;
 
 // Step 1: Check for schedule exception
 $exception_stmt = $pdo->prepare("SELECT * FROM schedule_exceptions WHERE employee_id = ? AND exception_date = ?");
@@ -30,62 +47,44 @@ $schedule_exception = $exception_stmt->fetch();
 if ($schedule_exception) {
     $work_start_time = $schedule_exception['start_time'];
     $work_end_time = $schedule_exception['end_time'];
-} else {
-    // Step 2: Fallback to regular schedule
-    $schedule_stmt = $pdo->prepare("SELECT * FROM employee_work_schedule WHERE employee_id = ? LIMIT 1");
-    $schedule_stmt->execute([$employee_id]);
-    $work_schedule = $schedule_stmt->fetch();
-    $work_start_time = $work_schedule['start_time'] ?? null;
-    $work_end_time   = $work_schedule['end_time'] ?? null;
-
-    // Step 3: Check for approved overtime request
-    $overtime_stmt = $pdo->prepare("SELECT * FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status = 'approved' LIMIT 1");
-    $overtime_stmt->execute([$employee_id, $current_date]);
-    $overtime = $overtime_stmt->fetch();
-
-    if ($overtime && isset($work_end_time)) {
-        // Extend end time by overtime hours
-        $work_end_time = date("H:i", strtotime($work_end_time) + ($overtime['hours'] * 3600));
-    }
 }
 
+// Step 2: Check for approved overtime request
+$overtime_stmt = $pdo->prepare("SELECT * FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status = 'approved' LIMIT 1");
+$overtime_stmt->execute([$employee_id, $current_date]);
+$overtime = $overtime_stmt->fetch();
+
+if ($overtime && $work_end_time) {
+    // Extend end time by overtime hours
+    $work_end_time = date("H:i", strtotime($work_end_time) + ($overtime['hours'] * 3600));
+}
+
+// Determine if employee can log time in or out
 $can_time_in = !$time_in;
 $can_time_out = $time_in && !$time_out;
 
+// Handle Time Log Form
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Use system time for time-in and time-out logs
-    $current_time = date("H:i:s"); // This gets the current system time
-
-    // Convert both current time and work schedule times to timestamps for accurate comparison
+    $current_time = date("H:i:s");
     $current_timestamp = strtotime($current_time);
     $start_timestamp = $work_start_time ? strtotime($work_start_time) : null;
     $end_timestamp = $work_end_time ? strtotime($work_end_time) : null;
 
-    // Debug output for current time and schedule time
-    echo "Current time: $current_time<br>";
-    echo "Work start time: $work_start_time<br>";
-    echo "Current timestamp: $current_timestamp<br>";
-    echo "Start timestamp: $start_timestamp<br>";
-
-    // Time-in logic
+    // Handle Time-In
     if (isset($_POST['time_in']) && $can_time_in) {
-        // Check if the employee is late
         $is_late_in = ($start_timestamp && $current_timestamp > $start_timestamp) ? 1 : 0;
 
-        // Insert time log entry
-        $insert = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out, is_late_in) VALUES (?, ?, ?, ?, ?)");
-        $insert->execute([$employee_id, $current_date, $current_time, null, $is_late_in]);
+        $insert = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out, is_late_in, is_early_out) VALUES (?, ?, ?, ?, ?, ?)");
+        $insert->execute([$employee_id, $current_date, $current_time, null, $is_late_in, 0]);
 
         header("Location: time_log_create.php");
         exit;
     }
 
-    // Time-out logic
+    // Handle Time-Out
     if (isset($_POST['time_out']) && $can_time_out) {
-        // Check if the employee is early
         $is_early_out = ($end_timestamp && $current_timestamp < $end_timestamp) ? 1 : 0;
 
-        // Update time log entry
         $update = $pdo->prepare("UPDATE time_logs SET time_out = ?, is_early_out = ? WHERE employee_id = ? AND log_date = ?");
         $update->execute([$current_time, $is_early_out, $employee_id, $current_date]);
 
@@ -103,20 +102,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Manual Time Log</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        function updateClock() {
-            const clock = document.getElementById("clock");
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            clock.textContent = `${hours}:${minutes}:${seconds}`;
-        }
+    function updateClock() {
+        const clock = document.getElementById("clock");
+        const now = new Date();
+        let hours = now.getHours();
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
 
-        setInterval(updateClock, 1000);
-        window.onload = updateClock;
-    </script>
+        hours = hours % 12;
+        hours = hours ? hours : 12; // 0 should be 12
+        const formattedHours = String(hours).padStart(2, '0');
+
+        clock.textContent = `${formattedHours}:${minutes}:${seconds} ${ampm}`;
+    }
+
+    setInterval(updateClock, 1000);
+    window.onload = updateClock;
+</script>
+
 </head>
-<body class="bg-[#A3F7B5] min-h-screen overflow-y-auto flex flex-col items-center justify-start px-4 py-6">
+<body class="bg-[#A3F7B5] min-h-screen overflow-y-auto flex flex-col items-center px-4 py-6">
     <div class="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl space-y-4 sm:space-y-6">
 
         <!-- Manual Time Log Box -->
