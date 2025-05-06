@@ -28,25 +28,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Employee Login</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Employee Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h2>Login</h2>
+<body class="bg-[#A3F7B5] min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-sm sm:max-w-md md:max-w-lg bg-white rounded-2xl shadow-lg border-t-8 border-[#40C9A2] p-6 sm:p-8 space-y-6">
+
+    <div class="text-center">
+      <h1 class="text-3xl font-bold text-[#2F9C95]">Employee Login</h1>
+    </div>
 
     <?php if ($error): ?>
-        <p style="color:red;"><?= $error ?></p>
+      <p class="text-red-600 text-center font-medium"><?= $error ?></p>
     <?php endif; ?>
 
-    <form method="POST">
-        <label>Username:</label><br>
-        <input type="text" name="username" required><br><br>
+    <form method="POST" class="space-y-4 text-base">
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Username:</label>
+        <input 
+          type="text" 
+          name="username" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        />
+      </div>
 
-        <label>Password:</label><br>
-        <input type="password" name="password" required><br><br>
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Password:</label>
+        <input 
+          type="password" 
+          name="password" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        />
+      </div>
 
-        <button type="submit">Login</button>
+      <button 
+        type="submit" 
+        class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200"
+      >
+        Login
+      </button>
     </form>
+    
+  </div>
+
 </body>
 </html>
