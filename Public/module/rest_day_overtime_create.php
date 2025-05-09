@@ -1,15 +1,22 @@
 <?php
+session_start();
 include('../config/db.php');
+
+// Ensure employee is logged in
+$employee_id = $_SESSION['employee']['id'] ?? null;
+if (!$employee_id) {
+    header("Location: ../employee/login.php");
+    exit;
+}
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $employee_id = $_POST['employee_id'] ?? null;
     $rest_day_date = $_POST['rest_day_date'] ?? null;
     $expected_time_in = $_POST['expected_time_in'] ?? null;
     $expected_time_out = $_POST['expected_time_out'] ?? null;
     $reason = $_POST['reason'] ?? null;
 
-    if ($employee_id && $rest_day_date && $expected_time_in && $expected_time_out && $reason) {
+    if ($rest_day_date && $expected_time_in && $expected_time_out && $reason) {
         $stmt = $pdo->prepare("
             INSERT INTO rest_day_overtime_requests 
             (employee_id, rest_day_date, expected_time_in, expected_time_out, reason, status, created_at) 
@@ -25,31 +32,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Submit Rest Day Overtime Request</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Submit Rest Day Overtime Request</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h1>Rest Day Overtime Request Form</h1>
-    <form method="POST">
-        <label>Employee ID:</label><br>
-        <input type="number" name="employee_id" required><br><br>
+<body class="bg-[#A3F7B5] min-h-screen flex items-center justify-center px-4 py-8 sm:py-12">
 
-        <label>Rest Day Date:</label><br>
-        <input type="date" name="rest_day_date" required><br><br>
+  <div class="w-full max-w-xl bg-white shadow-xl rounded-2xl border-t-8 border-[#40C9A2] p-6 sm:p-8 space-y-6">
 
-        <label>Expected Time In:</label><br>
-        <input type="time" name="expected_time_in" required><br><br>
+    <h1 class="text-2xl sm:text-3xl font-bold text-center text-[#2F9C95]">Rest Day Overtime Request</h1>
 
-        <label>Expected Time Out:</label><br>
-        <input type="time" name="expected_time_out" required><br><br>
+    <form method="POST" class="space-y-5 text-base sm:text-lg">
 
-        <label>Reason:</label><br>
-        <textarea name="reason" required></textarea><br><br>
+      <!-- Hidden Employee ID -->
+      <input type="hidden" name="employee_id" value="<?= htmlspecialchars($employee_id) ?>">
 
-        <button type="submit">Submit Request</button>
+      <!-- Rest Day Date -->
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Rest Day Date:</label>
+        <input 
+          type="date" 
+          name="rest_day_date" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        />
+      </div>
+
+      <!-- Expected Time In -->
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Expected Time In:</label>
+        <input 
+          type="time" 
+          name="expected_time_in" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        />
+      </div>
+
+      <!-- Expected Time Out -->
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Expected Time Out:</label>
+        <input 
+          type="time" 
+          name="expected_time_out" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        />
+      </div>
+
+      <!-- Reason -->
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Reason:</label>
+        <textarea 
+          name="reason" 
+          rows="4" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        ></textarea>
+      </div>
+
+      <!-- Submit Button -->
+      <button 
+        type="submit" 
+        class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 rounded-xl transition duration-200 text-lg"
+      >
+        Submit Request
+      </button>
     </form>
 
-    <p><a href="rest_day_overtime_approval.php">← View Pending Requests</a></p>
+    <!-- Link to View Requests -->
+    <p class="text-center mt-4">
+      <a href="rest_day_overtime_approval.php" class="text-[#2F9C95] font-medium underline hover:text-[#40C9A2]">
+        ← View Pending Requests
+      </a>
+    </p>
+
+  </div>
+
 </body>
 </html>

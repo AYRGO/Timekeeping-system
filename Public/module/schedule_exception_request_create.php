@@ -1,8 +1,13 @@
 <?php
+session_start();
 include('../config/db.php');
 
-// Dummy employee ID for now since no session
-$employee_id = 1; // Replace with session-based ID in production
+// Ensure employee is logged in
+$employee_id = $_SESSION['employee']['id'] ?? null;
+if (!$employee_id) {
+    header("Location: ../employee/login.php");
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $exception_date = $_POST['exception_date'] ?? null;
@@ -21,33 +26,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Schedule Exception Request</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Schedule Exception Request</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h2>Schedule Exception Request</h2>
+<body class="bg-[#A3F7B5] min-h-screen flex items-center justify-center px-4 py-8 sm:py-12">
 
+  <div class="w-full max-w-xl bg-white shadow-xl rounded-2xl border-t-8 border-[#40C9A2] p-6 sm:p-8 space-y-6">
+
+    <h1 class="text-2xl sm:text-3xl font-bold text-center text-[#2F9C95]">Schedule Exception Request</h1>
+
+    <!-- Feedback Messages -->
     <?php if (!empty($success)): ?>
-        <p style="color: green;"><?= $success ?></p>
+      <p class="text-green-600 font-medium text-center"><?= $success ?></p>
     <?php elseif (!empty($error)): ?>
-        <p style="color: red;"><?= $error ?></p>
+      <p class="text-red-600 font-medium text-center"><?= $error ?></p>
     <?php endif; ?>
 
-    <form method="POST">
-        <label>Exception Date:</label><br>
-        <input type="date" name="exception_date" required><br><br>
+    <form method="POST" class="space-y-5 text-base sm:text-lg">
 
-        <label>Requested Time In:</label><br>
-        <input type="time" name="requested_time_in" required><br><br>
+      <!-- Exception Date -->
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Exception Date:</label>
+        <input 
+          type="date" 
+          name="exception_date" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        />
+      </div>
 
-        <label>Requested Time Out:</label><br>
-        <input type="time" name="requested_time_out" required><br><br>
+      <!-- Requested Time In -->
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Requested Time In:</label>
+        <input 
+          type="time" 
+          name="requested_time_in" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        />
+      </div>
 
-        <label>Reason:</label><br>
-        <textarea name="reason" rows="4" cols="40" required></textarea><br><br>
+      <!-- Requested Time Out -->
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Requested Time Out:</label>
+        <input 
+          type="time" 
+          name="requested_time_out" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        />
+      </div>
 
-        <button type="submit">Submit Request</button>
+      <!-- Reason -->
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Reason:</label>
+        <textarea 
+          name="reason" 
+          rows="4" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        ></textarea>
+      </div>
+
+      <!-- Submit Button -->
+      <button 
+        type="submit" 
+        class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 rounded-xl transition duration-200 text-lg"
+      >
+        Submit Request
+      </button>
+
     </form>
+  </div>
+
 </body>
 </html>
