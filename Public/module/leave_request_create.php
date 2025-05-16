@@ -2,12 +2,13 @@
 session_start();
 include('../config/db.php');
 
-// Ensure employee is logged in
 $employee_id = $_SESSION['employee']['id'] ?? null;
 if (!$employee_id) {
     header("Location: ../employee/login.php");
     exit;
 }
+
+$error_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $leave_type = $_POST['leave_type'];
@@ -15,14 +16,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $end_date = $_POST['end_date'];
     $reason = $_POST['reason'];
 
+    // Calculate requested days (inclusive)
+    $start = new DateTime($start_date);
+    $end = new DateTime($end_date);
+    $diff = $start->diff($end);
+    $requested_days = $diff->days + 1;
+
+    // Leave types that use credits
+    $valid_leave_types = ['VL', 'SL', 'SPL', 'Half_SL', 'Half_VL'];
+
+    if (in_array($leave_type, $valid_leave_types)) {
+        $stmt = $pdo->prepare("SELECT balance FROM leave_credits WHERE employee_id = ? AND leave_type = ? AND year = ?");
+        $stmt->execute([$employee_id, $leave_type, date('Y')]);
+        $credit = $stmt->fetchColumn();
+
+        if ($credit === false || $credit < $requested_days) {
+            $error_message = "You do not have enough leave credits for this request.";
+        }
+    }
+
+    if (empty($error_message)) {
     $stmt = $pdo->prepare("
         INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason, status)
         VALUES (?, ?, ?, ?, ?, 'Pending')
     ");
     $stmt->execute([$employee_id, $leave_type, $start_date, $end_date, $reason]);
 
+    // Deduct leave credits
+    if (in_array($leave_type, $valid_leave_types)) {
+        $deduction = $requested_days;
+
+        // Special case for half-day types
+        if ($leave_type === 'Half_SL' || $leave_type === 'Half_VL') {
+            $deduction = 0.5 * $requested_days;
+        } elseif ($leave_type === 'SPL') {
+            $deduction = $requested_days; // SPL fixed limit, but still uses credits
+        }
+
+        $deduct = $pdo->prepare("
+            UPDATE leave_credits 
+            SET balance = balance - ? 
+            WHERE employee_id = ? AND leave_type = ? AND year = ?
+        ");
+        $deduct->execute([$deduction, $employee_id, $leave_type, date('Y')]);
+    }
+
     header("Location: ../views/leave_request_list.php");
     exit;
+}
 }
 ?>
 
@@ -40,6 +81,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <h1 class="text-2xl sm:text-3xl font-bold text-center text-[#2F9C95]">Leave Request Form</h1>
 
+    <?php if (!empty($error_message)): ?>
+      <div class="mb-4 p-4 text-red-700 bg-red-100 rounded">
+        <?= htmlspecialchars($error_message) ?>
+      </div>
+    <?php endif; ?>
+
     <form method="POST" class="space-y-5 text-base sm:text-lg">
 
       <!-- Leave Type -->
@@ -51,10 +98,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
         >
           <option value="">-- Select Type --</option>
-          <option value="VL">Vacation Leave</option>
-          <option value="SL">Sick Leave</option>
-          <option value="Emergency">Emergency</option>
-          <option value="Other">Other</option>
+          <option value="VL" <?= (isset($leave_type) && $leave_type == 'VL') ? 'selected' : '' ?>>Vacation Leave</option>
+          <option value="SL" <?= (isset($leave_type) && $leave_type == 'SL') ? 'selected' : '' ?>>Sick Leave</option>
+          <option value="SPL" <?= (isset($leave_type) && $leave_type == 'SPL') ? 'selected' : '' ?>>Solo Parent Leave</option>
+          <option value="Half_SL" <?= (isset($leave_type) && $leave_type == 'Half_SL') ? 'selected' : '' ?>>Half Day Sick Leave</option>
+          <option value="Half_VL" <?= (isset($leave_type) && $leave_type == 'Half_VL') ? 'selected' : '' ?>>Half Day Vacation Leave</option>
+          <option value="Maternity" <?= (isset($leave_type) && $leave_type == 'Maternity') ? 'selected' : '' ?>>Maternity Leave</option>
+          <option value="Paternity" <?= (isset($leave_type) && $leave_type == 'Paternity') ? 'selected' : '' ?>>Paternity Leave</option>
+          <option value="LWOP" <?= (isset($leave_type) && $leave_type == 'LWOP') ? 'selected' : '' ?>>Leave Without Pay</option>
         </select>
       </div>
 
@@ -64,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <input 
           type="date" 
           name="start_date" 
+          value="<?= htmlspecialchars($start_date ?? '') ?>" 
           required 
           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
         />
@@ -75,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <input 
           type="date" 
           name="end_date" 
+          value="<?= htmlspecialchars($end_date ?? '') ?>" 
           required 
           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
         />
@@ -88,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           rows="4" 
           required 
           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
-        ></textarea>
+        ><?= htmlspecialchars($reason ?? '') ?></textarea>
       </div>
 
       <!-- Submit -->
