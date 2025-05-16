@@ -98,45 +98,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Manual Time Log</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
+  <meta charset="UTF-8">
+  <title>Manual Time Log</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
     function updateClock() {
-        const clock = document.getElementById("clock");
-        const now = new Date();
-        let hours = now.getHours();
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
+      const clock = document.getElementById("clock");
+      const now = new Date();
+      let hours = now.getHours();
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
 
-        hours = hours % 12;
-        hours = hours ? hours : 12; // 0 should be 12
-        const formattedHours = String(hours).padStart(2, '0');
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const formattedHours = String(hours).padStart(2, '0');
 
-        clock.textContent = `${formattedHours}:${minutes}:${seconds} ${ampm}`;
+      clock.textContent = `${formattedHours}:${minutes}:${seconds} ${ampm}`;
     }
 
     setInterval(updateClock, 1000);
     window.onload = updateClock;
-</script>
-
+  </script>
 </head>
-<body>
-  <div>
+<body class="bg-[#A3F7B5] min-h-screen flex flex-col items-center justify-start px-4 py-8 sm:py-12">
+
+  <div class="w-full max-w-3xl space-y-10">
 
     <!-- Manual Time Log Box -->
-    <div>
-      <div></div>
-      <h1>Manual Time Log</h1>
+    <div class="bg-white shadow-xl rounded-2xl border-t-8 border-[#40C9A2] p-6 sm:p-8 space-y-6">
+      <div id="clock" class="text-center text-3xl sm:text-4xl font-bold text-[#2F9C95]"></div>
+      <h1 class="text-2xl sm:text-3xl font-bold text-center text-[#2F9C95]">Manual Time Log</h1>
 
-      <form method="POST">
+      <form method="POST" class="space-y-5">
         <?php if (!$time_in): ?>
           <?php if ($can_time_in): ?>
             <button 
               type="submit" 
               name="time_in" 
-              class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-4 sm:py-5 rounded-xl transition duration-200 text-lg sm:text-xl"
+              class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-4 rounded-xl transition duration-200 text-lg sm:text-xl"
             >
               Log Time In
             </button>
@@ -153,6 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <button 
             type="button" 
             disabled 
+            class="w-full bg-gray-300 text-gray-600 font-medium py-4 rounded-xl cursor-not-allowed text-base sm:text-lg"
           >
             Already Logged In
           </button>
@@ -162,6 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <button 
             type="submit" 
             name="time_out" 
+            class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-4 rounded-xl transition duration-200 text-base sm:text-lg"
           >
             Log Time Out
           </button>
@@ -169,6 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <button 
             type="button" 
             disabled 
+            class="w-full bg-gray-300 text-gray-600 font-medium py-4 rounded-xl cursor-not-allowed text-base sm:text-lg"
           >
             Already Logged Out
           </button>
@@ -177,31 +181,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <!-- Action Links Box -->
-    <div>
-      <h2>Requests & Navigation</h2>
-      
+    <div class="bg-white shadow-xl rounded-2xl border-t-8 border-[#40C9A2] p-6 sm:p-8">
+      <h2 class="text-2xl sm:text-3xl font-bold text-[#2F9C95] text-center mb-6">Requests & Navigation</h2>
+
       <div class="space-y-4 text-base sm:text-lg">
-        <a href="schedule_change_request_create.php">
+        <a href="schedule_change_request_create.php" class="block w-full text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 rounded-xl transition duration-200">
           Schedule Change Request
         </a>
-        <a href="schedule_exception_request_create.php">
+        <a href="schedule_exception_request_create.php" class="block w-full text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 rounded-xl transition duration-200">
           Schedule Exception Request
         </a>
-        <a href="rest_day_overtime_create.php">
+        <a href="rest_day_overtime_create.php" class="block w-full text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 rounded-xl transition duration-200">
           Rest Day Overtime Request
         </a>
-        <a href="overtime_request_create.php">
+        <a href="overtime_request_create.php" class="block w-full text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 rounded-xl transition duration-200">
           Overtime Request
         </a>
-        <a href="leave_request_create.php">
+        <a href="leave_request_create.php" class="block w-full text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 rounded-xl transition duration-200">
           Leave Request
         </a>
-        <a href="../employee/logout.php">
+        <a href="../employee/logout.php" class="block w-full text-center bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 rounded-xl transition duration-200">
           Logout
         </a>
       </div>
     </div>
 
   </div>
+
 </body>
 </html>

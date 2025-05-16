@@ -35,19 +35,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <title>Employee Login</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-[#A3F7B5] min-h-screen flex items-center justify-center px-4">
+<body class="bg-[#A3F7B5] min-h-screen flex items-center justify-center px-4 py-8 sm:py-12">
 
-  <div class="w-full max-w-sm sm:max-w-md md:max-w-lg bg-white rounded-2xl shadow-lg border-t-8 border-[#40C9A2] p-6 sm:p-8 space-y-6">
+  <div class="w-full max-w-sm sm:max-w-md md:max-w-lg bg-white rounded-2xl shadow-xl border-t-8 border-[#40C9A2] p-6 sm:p-8 space-y-6">
 
     <div class="text-center">
-      <h1 class="text-3xl font-bold text-[#2F9C95]">Employee Login</h1>
+      <h1 class="text-2xl sm:text-3xl font-bold text-[#2F9C95]">Employee Login</h1>
     </div>
 
-    <?php if ($error): ?>
-      <p class="text-red-600 text-center font-medium"><?= $error ?></p>
+    <?php if (!empty($error)): ?>
+      <p class="text-red-600 text-center font-medium"><?= htmlspecialchars($error) ?></p>
     <?php endif; ?>
 
-    <form method="POST" class="space-y-4 text-base">
+    <form method="POST" class="space-y-5 text-base sm:text-lg">
+
+      <!-- Username -->
       <div>
         <label class="block text-[#2F9C95] font-semibold mb-1">Username:</label>
         <input 
@@ -58,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         />
       </div>
 
+      <!-- Password -->
       <div>
         <label class="block text-[#2F9C95] font-semibold mb-1">Password:</label>
         <input 
@@ -68,13 +71,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         />
       </div>
 
+      <!-- Submit Button -->
       <button 
         type="submit" 
-        class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 px-6 rounded-xl transition duration-200"
+        class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-3 rounded-xl transition duration-200 text-lg"
       >
         Login
       </button>
     </form>
+
+    <!-- Optional Footer Link -->
+    <p class="text-center text-sm text-[#2F9C95]">
+      <a href="../index.php" class="underline hover:text-[#40C9A2]">
+        ← Back to homepage
+      </a>
+    </p>
     
   </div>
 
