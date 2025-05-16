@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $deduct->execute([$deduction, $employee_id, $leave_type, date('Y')]);
     }
 
-    header("Location: ../views/leave_request_list.php");
+    header("Location: time_log_create.php?success=1");
     exit;
 }
 }
