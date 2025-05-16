@@ -92,8 +92,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
-?>
 
+// --- Leave Balance Fetch ---
+$stmt = $pdo->prepare("SELECT leave_type, balance FROM leave_credits WHERE employee_id = ?");
+$stmt->execute([$employee_id]);
+
+$balances = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$stmt = $pdo->prepare("SELECT leave_type, SUM(DATEDIFF(end_date, start_date) + 1) as used_days
+                       FROM leave_requests
+                       WHERE employee_id = ? AND status = 'approved' AND YEAR(start_date) = ?
+                       GROUP BY leave_type");
+
+$leave_types = ['VL', 'SL', 'SPL', 'Half_VL', 'Half_SL'];
+$balance_display = [];
+foreach ($leave_types as $type) {
+    $bal = 0;
+    $carry = 0;
+    foreach ($balances as $row) {
+        if ($row['leave_type'] === $type) {
+            $bal = $row['balance'];
+            break;
+        }
+    }
+    $used_days = $used[$type] ?? 0;
+    $balance_display[] = [
+        'type' => $type,
+        'available' => $bal,
+        'used' => $used_days,
+    ];
+}
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -125,6 +154,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="bg-[#A3F7B5] min-h-screen flex flex-col items-center justify-start px-4 py-8 sm:py-12">
 
   <div class="w-full max-w-3xl space-y-10">
+
+    <!-- Leave Balance Box -->
+    <div class="bg-white shadow-xl rounded-2xl border-t-8 border-[#40C9A2] p-6 sm:p-8">
+      <h2 class="text-2xl sm:text-3xl font-bold text-[#2F9C95] text-center mb-6">Leave Balances</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-left text-sm sm:text-base text-gray-700">
+          <thead>
+            <tr>
+              <th class="py-2 px-4">Type</th>
+              <th class="py-2 px-4">Available</th>
+              <th class="py-2 px-4">Used This Year</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($balance_display as $row): ?>
+            <tr class="border-t">
+              <td class="py-2 px-4 font-semibold"><?= htmlspecialchars($row['type']) ?></td>
+              <td class="py-2 px-4"><?= $row['available'] ?></td>
+              <td class="py-2 px-4"><?= $row['used'] ?></td>
+            </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
     <!-- Manual Time Log Box -->
     <div class="bg-white shadow-xl rounded-2xl border-t-8 border-[#40C9A2] p-6 sm:p-8 space-y-6">
