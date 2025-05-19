@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 01, 2025 at 01:34 AM
+-- Generation Time: May 19, 2025 at 08:40 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- PHP Version: 8.0.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -20,6 +20,25 @@ SET time_zone = "+00:00";
 --
 -- Database: `rss`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `admin`
+--
+
+CREATE TABLE `admin` (
+  `id` int(11) NOT NULL,
+  `admin_username` varchar(100) NOT NULL,
+  `admin_password` varchar(100) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `admin`
+--
+
+INSERT INTO `admin` (`id`, `admin_username`, `admin_password`) VALUES
+(1, 'admin_hr', 'rss_admin');
 
 -- --------------------------------------------------------
 
@@ -132,13 +151,348 @@ INSERT INTO `employee_work_schedule` (`id`, `employee_id`, `work_schedule_id`, `
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `leave_credits`
+--
+
+CREATE TABLE `leave_credits` (
+  `id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `leave_type` enum('VL','SL','SPL','Half_SL','Half_VL') NOT NULL,
+  `balance` decimal(5,2) DEFAULT 0.00,
+  `year` year(4) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `leave_credits`
+--
+
+INSERT INTO `leave_credits` (`id`, `employee_id`, `leave_type`, `balance`, `year`) VALUES
+(1, 1, 'SL', 0.26, '2025'),
+(2, 1, 'VL', 0.75, '2025'),
+(3, 1, 'SPL', 7.00, '2025'),
+(4, 1, 'Half_SL', 1.00, '2025'),
+(5, 1, 'Half_VL', 1.50, '2025'),
+(6, 2, 'SL', 1.26, '2025'),
+(7, 2, 'VL', 3.75, '2025'),
+(8, 2, 'SPL', 7.00, '2025'),
+(9, 2, 'Half_SL', 1.50, '2025'),
+(10, 2, 'Half_VL', 1.50, '2025'),
+(11, 3, 'SL', 1.26, '2025'),
+(12, 3, 'VL', 3.75, '2025'),
+(13, 3, 'SPL', 7.00, '2025'),
+(14, 3, 'Half_SL', 1.50, '2025'),
+(15, 3, 'Half_VL', 1.50, '2025'),
+(16, 4, 'SL', 1.26, '2025'),
+(17, 4, 'VL', 3.75, '2025'),
+(18, 4, 'SPL', 7.00, '2025'),
+(19, 4, 'Half_SL', 1.50, '2025'),
+(20, 4, 'Half_VL', 1.50, '2025'),
+(21, 5, 'SL', 1.26, '2025'),
+(22, 5, 'VL', 3.75, '2025'),
+(23, 5, 'SPL', 7.00, '2025'),
+(24, 5, 'Half_SL', 1.50, '2025'),
+(25, 5, 'Half_VL', 1.50, '2025'),
+(26, 6, 'SL', 1.26, '2025'),
+(27, 6, 'VL', 3.75, '2025'),
+(28, 6, 'SPL', 7.00, '2025'),
+(29, 6, 'Half_SL', 1.50, '2025'),
+(30, 6, 'Half_VL', 1.50, '2025'),
+(31, 7, 'SL', 1.26, '2025'),
+(32, 7, 'VL', 3.75, '2025'),
+(33, 7, 'SPL', 7.00, '2025'),
+(34, 7, 'Half_SL', 1.50, '2025'),
+(35, 7, 'Half_VL', 1.50, '2025'),
+(36, 8, 'SL', 1.26, '2025'),
+(37, 8, 'VL', 3.75, '2025'),
+(38, 8, 'SPL', 7.00, '2025'),
+(39, 8, 'Half_SL', 1.50, '2025'),
+(40, 8, 'Half_VL', 1.50, '2025'),
+(41, 9, 'SL', 1.26, '2025'),
+(42, 9, 'VL', 3.75, '2025'),
+(43, 9, 'SPL', 7.00, '2025'),
+(44, 9, 'Half_SL', 1.50, '2025'),
+(45, 9, 'Half_VL', 1.50, '2025'),
+(46, 10, 'SL', 1.26, '2025'),
+(47, 10, 'VL', 3.75, '2025'),
+(48, 10, 'SPL', 7.00, '2025'),
+(49, 10, 'Half_SL', 1.50, '2025'),
+(50, 10, 'Half_VL', 1.50, '2025'),
+(51, 11, 'SL', 1.26, '2025'),
+(52, 11, 'VL', 3.75, '2025'),
+(53, 11, 'SPL', 7.00, '2025'),
+(54, 11, 'Half_SL', 1.50, '2025'),
+(55, 11, 'Half_VL', 1.50, '2025'),
+(56, 12, 'SL', 1.26, '2025'),
+(57, 12, 'VL', 3.75, '2025'),
+(58, 12, 'SPL', 7.00, '2025'),
+(59, 12, 'Half_SL', 1.50, '2025'),
+(60, 12, 'Half_VL', 1.50, '2025'),
+(61, 13, 'SL', 1.26, '2025'),
+(62, 13, 'VL', 3.75, '2025'),
+(63, 13, 'SPL', 7.00, '2025'),
+(64, 13, 'Half_SL', 1.50, '2025'),
+(65, 13, 'Half_VL', 1.50, '2025'),
+(66, 15, 'SL', 1.26, '2025'),
+(67, 15, 'VL', 3.75, '2025'),
+(68, 15, 'SPL', 7.00, '2025'),
+(69, 15, 'Half_SL', 1.50, '2025'),
+(70, 15, 'Half_VL', 1.50, '2025'),
+(71, 16, 'SL', 1.26, '2025'),
+(72, 16, 'VL', 3.75, '2025'),
+(73, 16, 'SPL', 7.00, '2025'),
+(74, 16, 'Half_SL', 1.50, '2025'),
+(75, 16, 'Half_VL', 1.50, '2025'),
+(76, 17, 'SL', 1.26, '2025'),
+(77, 17, 'VL', 3.75, '2025'),
+(78, 17, 'SPL', 7.00, '2025'),
+(79, 17, 'Half_SL', 1.50, '2025'),
+(80, 17, 'Half_VL', 1.50, '2025'),
+(81, 18, 'SL', 1.26, '2025'),
+(82, 18, 'VL', 3.75, '2025'),
+(83, 18, 'SPL', 7.00, '2025'),
+(84, 18, 'Half_SL', 1.50, '2025'),
+(85, 18, 'Half_VL', 1.50, '2025'),
+(86, 20, 'SL', 1.26, '2025'),
+(87, 20, 'VL', 3.75, '2025'),
+(88, 20, 'SPL', 7.00, '2025'),
+(89, 20, 'Half_SL', 1.50, '2025'),
+(90, 20, 'Half_VL', 1.50, '2025'),
+(91, 21, 'SL', 1.26, '2025'),
+(92, 21, 'VL', 3.75, '2025'),
+(93, 21, 'SPL', 7.00, '2025'),
+(94, 21, 'Half_SL', 1.50, '2025'),
+(95, 21, 'Half_VL', 1.50, '2025'),
+(96, 22, 'SL', 1.26, '2025'),
+(97, 22, 'VL', 3.75, '2025'),
+(98, 22, 'SPL', 7.00, '2025'),
+(99, 22, 'Half_SL', 1.50, '2025'),
+(100, 22, 'Half_VL', 1.50, '2025'),
+(101, 24, 'SL', 1.26, '2025'),
+(102, 24, 'VL', 3.75, '2025'),
+(103, 24, 'SPL', 7.00, '2025'),
+(104, 24, 'Half_SL', 1.50, '2025'),
+(105, 24, 'Half_VL', 1.50, '2025'),
+(106, 25, 'SL', 1.26, '2025'),
+(107, 25, 'VL', 3.75, '2025'),
+(108, 25, 'SPL', 7.00, '2025'),
+(109, 25, 'Half_SL', 1.50, '2025'),
+(110, 25, 'Half_VL', 1.50, '2025'),
+(111, 26, 'SL', 1.26, '2025'),
+(112, 26, 'VL', 3.75, '2025'),
+(113, 26, 'SPL', 7.00, '2025'),
+(114, 26, 'Half_SL', 1.50, '2025'),
+(115, 26, 'Half_VL', 1.50, '2025'),
+(116, 27, 'SL', 1.26, '2025'),
+(117, 27, 'VL', 3.75, '2025'),
+(118, 27, 'SPL', 7.00, '2025'),
+(119, 27, 'Half_SL', 1.50, '2025'),
+(120, 27, 'Half_VL', 1.50, '2025'),
+(121, 28, 'SL', 1.26, '2025'),
+(122, 28, 'VL', 3.75, '2025'),
+(123, 28, 'SPL', 7.00, '2025'),
+(124, 28, 'Half_SL', 1.50, '2025'),
+(125, 28, 'Half_VL', 1.50, '2025'),
+(126, 29, 'SL', 1.26, '2025'),
+(127, 29, 'VL', 3.75, '2025'),
+(128, 29, 'SPL', 7.00, '2025'),
+(129, 29, 'Half_SL', 1.50, '2025'),
+(130, 29, 'Half_VL', 1.50, '2025'),
+(131, 30, 'SL', 1.26, '2025'),
+(132, 30, 'VL', 3.75, '2025'),
+(133, 30, 'SPL', 7.00, '2025'),
+(134, 30, 'Half_SL', 1.50, '2025'),
+(135, 30, 'Half_VL', 1.50, '2025'),
+(136, 31, 'SL', 1.26, '2025'),
+(137, 31, 'VL', 3.75, '2025'),
+(138, 31, 'SPL', 7.00, '2025'),
+(139, 31, 'Half_SL', 1.50, '2025'),
+(140, 31, 'Half_VL', 1.50, '2025'),
+(141, 33, 'SL', 1.26, '2025'),
+(142, 33, 'VL', 3.75, '2025'),
+(143, 33, 'SPL', 7.00, '2025'),
+(144, 33, 'Half_SL', 1.50, '2025'),
+(145, 33, 'Half_VL', 1.50, '2025'),
+(146, 34, 'SL', 1.26, '2025'),
+(147, 34, 'VL', 3.75, '2025'),
+(148, 34, 'SPL', 7.00, '2025'),
+(149, 34, 'Half_SL', 1.50, '2025'),
+(150, 34, 'Half_VL', 1.50, '2025'),
+(151, 35, 'SL', 1.26, '2025'),
+(152, 35, 'VL', 3.75, '2025'),
+(153, 35, 'SPL', 7.00, '2025'),
+(154, 35, 'Half_SL', 1.50, '2025'),
+(155, 35, 'Half_VL', 1.50, '2025'),
+(156, 36, 'SL', 1.26, '2025'),
+(157, 36, 'VL', 3.75, '2025'),
+(158, 36, 'SPL', 7.00, '2025'),
+(159, 36, 'Half_SL', 1.50, '2025'),
+(160, 36, 'Half_VL', 1.50, '2025'),
+(161, 37, 'SL', 1.26, '2025'),
+(162, 37, 'VL', 3.75, '2025'),
+(163, 37, 'SPL', 7.00, '2025'),
+(164, 37, 'Half_SL', 1.50, '2025'),
+(165, 37, 'Half_VL', 1.50, '2025'),
+(166, 38, 'SL', 1.26, '2025'),
+(167, 38, 'VL', 3.75, '2025'),
+(168, 38, 'SPL', 7.00, '2025'),
+(169, 38, 'Half_SL', 1.50, '2025'),
+(170, 38, 'Half_VL', 1.50, '2025'),
+(171, 41, 'SL', 1.26, '2025'),
+(172, 41, 'VL', 3.75, '2025'),
+(173, 41, 'SPL', 7.00, '2025'),
+(174, 41, 'Half_SL', 1.50, '2025'),
+(175, 41, 'Half_VL', 1.50, '2025'),
+(176, 43, 'SL', 1.26, '2025'),
+(177, 43, 'VL', 3.75, '2025'),
+(178, 43, 'SPL', 7.00, '2025'),
+(179, 43, 'Half_SL', 1.50, '2025'),
+(180, 43, 'Half_VL', 1.50, '2025'),
+(181, 46, 'SL', 1.26, '2025'),
+(182, 46, 'VL', 3.75, '2025'),
+(183, 46, 'SPL', 7.00, '2025'),
+(184, 46, 'Half_SL', 1.50, '2025'),
+(185, 46, 'Half_VL', 1.50, '2025'),
+(186, 47, 'SL', 1.26, '2025'),
+(187, 47, 'VL', 3.75, '2025'),
+(188, 47, 'SPL', 7.00, '2025'),
+(189, 47, 'Half_SL', 1.50, '2025'),
+(190, 47, 'Half_VL', 1.50, '2025'),
+(191, 49, 'SL', 1.26, '2025'),
+(192, 49, 'VL', 3.75, '2025'),
+(193, 49, 'SPL', 7.00, '2025'),
+(194, 49, 'Half_SL', 1.50, '2025'),
+(195, 49, 'Half_VL', 1.50, '2025'),
+(196, 50, 'SL', 1.26, '2025'),
+(197, 50, 'VL', 3.75, '2025'),
+(198, 50, 'SPL', 7.00, '2025'),
+(199, 50, 'Half_SL', 1.50, '2025'),
+(200, 50, 'Half_VL', 1.50, '2025'),
+(201, 52, 'SL', 1.26, '2025'),
+(202, 52, 'VL', 3.75, '2025'),
+(203, 52, 'SPL', 7.00, '2025'),
+(204, 52, 'Half_SL', 1.50, '2025'),
+(205, 52, 'Half_VL', 1.50, '2025'),
+(206, 53, 'SL', 1.26, '2025'),
+(207, 53, 'VL', 3.75, '2025'),
+(208, 53, 'SPL', 7.00, '2025'),
+(209, 53, 'Half_SL', 1.50, '2025'),
+(210, 53, 'Half_VL', 1.50, '2025'),
+(211, 55, 'SL', 1.26, '2025'),
+(212, 55, 'VL', 3.75, '2025'),
+(213, 55, 'SPL', 7.00, '2025'),
+(214, 55, 'Half_SL', 1.50, '2025'),
+(215, 55, 'Half_VL', 1.50, '2025'),
+(216, 56, 'SL', 1.26, '2025'),
+(217, 56, 'VL', 3.75, '2025'),
+(218, 56, 'SPL', 7.00, '2025'),
+(219, 56, 'Half_SL', 1.50, '2025'),
+(220, 56, 'Half_VL', 1.50, '2025'),
+(221, 57, 'SL', 1.26, '2025'),
+(222, 57, 'VL', 3.75, '2025'),
+(223, 57, 'SPL', 7.00, '2025'),
+(224, 57, 'Half_SL', 1.50, '2025'),
+(225, 57, 'Half_VL', 1.50, '2025'),
+(226, 58, 'SL', 1.26, '2025'),
+(227, 58, 'VL', 3.75, '2025'),
+(228, 58, 'SPL', 7.00, '2025'),
+(229, 58, 'Half_SL', 1.50, '2025'),
+(230, 58, 'Half_VL', 1.50, '2025'),
+(231, 59, 'SL', 1.26, '2025'),
+(232, 59, 'VL', 3.75, '2025'),
+(233, 59, 'SPL', 7.00, '2025'),
+(234, 59, 'Half_SL', 1.50, '2025'),
+(235, 59, 'Half_VL', 1.50, '2025'),
+(236, 60, 'SL', 1.26, '2025'),
+(237, 60, 'VL', 3.75, '2025'),
+(238, 60, 'SPL', 7.00, '2025'),
+(239, 60, 'Half_SL', 1.50, '2025'),
+(240, 60, 'Half_VL', 1.50, '2025'),
+(241, 61, 'SL', 1.26, '2025'),
+(242, 61, 'VL', 3.75, '2025'),
+(243, 61, 'SPL', 7.00, '2025'),
+(244, 61, 'Half_SL', 1.50, '2025'),
+(245, 61, 'Half_VL', 1.50, '2025'),
+(246, 62, 'SL', 1.26, '2025'),
+(247, 62, 'VL', 3.75, '2025'),
+(248, 62, 'SPL', 7.00, '2025'),
+(249, 62, 'Half_SL', 1.50, '2025'),
+(250, 62, 'Half_VL', 1.50, '2025'),
+(251, 63, 'SL', 1.26, '2025'),
+(252, 63, 'VL', 3.75, '2025'),
+(253, 63, 'SPL', 7.00, '2025'),
+(254, 63, 'Half_SL', 1.50, '2025'),
+(255, 63, 'Half_VL', 1.50, '2025'),
+(256, 64, 'SL', 1.26, '2025'),
+(257, 64, 'VL', 3.75, '2025'),
+(258, 64, 'SPL', 7.00, '2025'),
+(259, 64, 'Half_SL', 1.50, '2025'),
+(260, 64, 'Half_VL', 1.50, '2025'),
+(261, 65, 'SL', 1.26, '2025'),
+(262, 65, 'VL', 3.75, '2025'),
+(263, 65, 'SPL', 7.00, '2025'),
+(264, 65, 'Half_SL', 1.50, '2025'),
+(265, 65, 'Half_VL', 1.50, '2025'),
+(266, 66, 'SL', 1.26, '2025'),
+(267, 66, 'VL', 3.75, '2025'),
+(268, 66, 'SPL', 7.00, '2025'),
+(269, 66, 'Half_SL', 1.50, '2025'),
+(270, 66, 'Half_VL', 1.50, '2025'),
+(271, 67, 'SL', 1.26, '2025'),
+(272, 67, 'VL', 3.75, '2025'),
+(273, 67, 'SPL', 7.00, '2025'),
+(274, 67, 'Half_SL', 1.50, '2025'),
+(275, 67, 'Half_VL', 1.50, '2025'),
+(276, 68, 'SL', 1.26, '2025'),
+(277, 68, 'VL', 3.75, '2025'),
+(278, 68, 'SPL', 7.00, '2025'),
+(279, 68, 'Half_SL', 1.50, '2025'),
+(280, 68, 'Half_VL', 1.50, '2025'),
+(281, 69, 'SL', 1.26, '2025'),
+(282, 69, 'VL', 3.75, '2025'),
+(283, 69, 'SPL', 7.00, '2025'),
+(284, 69, 'Half_SL', 1.50, '2025'),
+(285, 69, 'Half_VL', 1.50, '2025'),
+(286, 70, 'SL', 1.26, '2025'),
+(287, 70, 'VL', 3.75, '2025'),
+(288, 70, 'SPL', 7.00, '2025'),
+(289, 70, 'Half_SL', 1.50, '2025'),
+(290, 70, 'Half_VL', 1.50, '2025'),
+(291, 71, 'SL', 1.26, '2025'),
+(292, 71, 'VL', 3.75, '2025'),
+(293, 71, 'SPL', 7.00, '2025'),
+(294, 71, 'Half_SL', 1.50, '2025'),
+(295, 71, 'Half_VL', 1.50, '2025'),
+(296, 1001, 'SL', 0.26, '2025'),
+(297, 1001, 'VL', 2.75, '2025'),
+(298, 1001, 'SPL', 7.00, '2025'),
+(299, 1001, 'Half_SL', 1.50, '2025'),
+(300, 1001, 'Half_VL', 1.50, '2025'),
+(301, 1002, 'SL', 1.26, '2025'),
+(302, 1002, 'VL', 3.75, '2025'),
+(303, 1002, 'SPL', 7.00, '2025'),
+(304, 1002, 'Half_SL', 1.50, '2025'),
+(305, 1002, 'Half_VL', 1.50, '2025'),
+(306, 1003, 'SL', 1.26, '2025'),
+(307, 1003, 'VL', 3.75, '2025'),
+(308, 1003, 'SPL', 7.00, '2025'),
+(309, 1003, 'Half_SL', 1.50, '2025'),
+(310, 1003, 'Half_VL', 1.50, '2025'),
+(311, 1004, 'SL', 1.26, '2025'),
+(312, 1004, 'VL', 3.75, '2025'),
+(313, 1004, 'SPL', 7.00, '2025'),
+(314, 1004, 'Half_SL', 1.50, '2025'),
+(315, 1004, 'Half_VL', 1.50, '2025');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `leave_requests`
 --
 
 CREATE TABLE `leave_requests` (
   `id` int(11) NOT NULL,
   `employee_id` int(11) DEFAULT NULL,
-  `leave_type` enum('VL','SL','Emergency','Other') DEFAULT NULL,
+  `leave_type` enum('VL','SL','SPL','Half_SL','Half_VL','LWOP','Maternity','Paternity') DEFAULT NULL,
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
   `reason` text DEFAULT NULL,
@@ -151,18 +505,15 @@ CREATE TABLE `leave_requests` (
 --
 
 INSERT INTO `leave_requests` (`id`, `employee_id`, `leave_type`, `start_date`, `end_date`, `reason`, `status`, `created_at`) VALUES
-(1, 1, '', '2025-05-13', '2025-05-13', 'Test', 'approved', '2025-04-29 12:34:24'),
-(2, 1, '', '2025-05-13', '2025-05-13', 'Test', 'approved', '2025-04-29 12:36:21'),
-(3, 1, '', '2025-05-13', '2025-05-13', 'Test', 'approved', '2025-04-29 12:36:24'),
-(4, 1, '', '2025-05-13', '2025-05-13', 'Test', 'approved', '2025-04-29 12:37:40'),
-(5, 2, '', '2025-04-25', '2025-04-25', 'test', 'approved', '2025-04-29 12:39:13'),
-(6, 2, '', '2025-04-25', '2025-04-25', 'test', 'approved', '2025-04-29 12:40:32'),
-(7, 2, '', '2025-04-01', '2025-04-08', 'test', 'approved', '2025-04-29 12:40:48'),
-(8, 2, '', '2025-04-01', '2025-04-08', 'test', 'approved', '2025-04-29 12:41:23'),
-(9, 2, 'Emergency', '2025-04-10', '2025-04-10', 'test', 'approved', '2025-04-29 12:42:16'),
-(10, 1, '', '2025-05-02', '2025-05-02', 'test', 'rejected', '2025-04-29 12:43:53'),
-(11, 1, '', '2025-05-01', '2025-05-01', 'test', 'rejected', '2025-04-29 12:47:54'),
-(12, 1, 'VL', '2025-05-01', '2025-05-01', 'test', 'rejected', '2025-04-29 12:50:16');
+(1, 1, 'VL', '2025-05-16', '2025-05-16', 'test', 'pending', '2025-05-16 06:44:44'),
+(2, 1, 'Maternity', '2025-05-16', '2025-05-16', 'test', 'pending', '2025-05-16 06:45:48'),
+(3, 1, 'VL', '2025-05-16', '2025-05-16', 'test', 'pending', '2025-05-16 06:45:59'),
+(4, 1, 'VL', '2025-05-16', '2025-05-16', 'test', 'pending', '2025-05-16 06:50:45'),
+(5, 1, 'VL', '2025-05-16', '2025-05-17', 'test', 'pending', '2025-05-16 06:54:01'),
+(6, 1001, 'SL', '2025-05-16', '2025-05-16', 'Test', 'pending', '2025-05-16 07:32:11'),
+(7, 1001, 'VL', '2025-05-16', '2025-05-16', 'Test', 'pending', '2025-05-16 07:32:22'),
+(8, 1, 'SL', '2025-05-17', '2025-05-17', 'tesdt', 'pending', '2025-05-16 07:48:02'),
+(9, 1, 'Half_SL', '2025-05-23', '2025-05-23', 'test', 'pending', '2025-05-16 07:51:07');
 
 -- --------------------------------------------------------
 
@@ -241,7 +592,8 @@ CREATE TABLE `schedule_change_requests` (
 
 INSERT INTO `schedule_change_requests` (`id`, `employee_id`, `requested_schedule_id`, `reason`, `status`, `requested_effective_date`, `created_at`) VALUES
 (4, 1, 1, 'test', 'approved', '2025-04-30', '2025-04-30 02:27:52'),
-(5, 1, 2, 'test', 'approved', '2025-04-30', '2025-04-30 02:30:38');
+(5, 1, 2, 'test', 'approved', '2025-04-30', '2025-04-30 02:30:38'),
+(6, 1, 1, 'New location', 'pending', '2025-05-15', '2025-05-09 05:47:51');
 
 -- --------------------------------------------------------
 
@@ -286,7 +638,10 @@ CREATE TABLE `schedule_exception_requests` (
 --
 
 INSERT INTO `schedule_exception_requests` (`id`, `employee_id`, `requested_time_in`, `requested_time_out`, `exception_date`, `reason`, `status`, `created_at`) VALUES
-(1, 1, '07:00:00', '16:43:00', '2025-05-03', 'test', 'approved', '2025-04-30 05:43:08');
+(1, 1, '07:00:00', '16:43:00', '2025-05-03', 'test', 'approved', '2025-04-30 05:43:08'),
+(2, 1, '20:52:00', '07:52:00', '2025-05-10', 'We have a trip tomorrow morning', 'pending', '2025-05-09 05:53:03'),
+(3, 1, '20:52:00', '07:52:00', '2025-05-10', 'We have a trip tomorrow morning', 'pending', '2025-05-09 05:54:19'),
+(4, 1, '15:54:00', '22:55:00', '2025-05-15', 'Test', 'pending', '2025-05-09 05:55:08');
 
 -- --------------------------------------------------------
 
@@ -299,8 +654,18 @@ CREATE TABLE `time_logs` (
   `employee_id` int(11) DEFAULT NULL,
   `log_date` date DEFAULT NULL,
   `time_in` time DEFAULT NULL,
-  `time_out` time DEFAULT NULL
+  `time_out` time DEFAULT NULL,
+  `is_late_in` tinyint(1) DEFAULT 0,
+  `is_early_out` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `time_logs`
+--
+
+INSERT INTO `time_logs` (`id`, `employee_id`, `log_date`, `time_in`, `time_out`, `is_late_in`, `is_early_out`) VALUES
+(1, 1, '2025-05-16', '15:26:07', '15:26:17', 1, 1),
+(2, 1001, '2025-05-16', '15:30:05', NULL, 0, 0);
 
 -- --------------------------------------------------------
 
@@ -328,6 +693,12 @@ INSERT INTO `work_schedules` (`id`, `name`, `time_in`, `time_out`) VALUES
 --
 
 --
+-- Indexes for table `admin`
+--
+ALTER TABLE `admin`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `employees`
 --
 ALTER TABLE `employees`
@@ -340,6 +711,13 @@ ALTER TABLE `employee_work_schedule`
   ADD PRIMARY KEY (`id`),
   ADD KEY `employee_id` (`employee_id`),
   ADD KEY `work_schedule_id` (`work_schedule_id`);
+
+--
+-- Indexes for table `leave_credits`
+--
+ALTER TABLE `leave_credits`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `employee_id` (`employee_id`);
 
 --
 -- Indexes for table `leave_requests`
@@ -402,16 +780,28 @@ ALTER TABLE `work_schedules`
 --
 
 --
+-- AUTO_INCREMENT for table `admin`
+--
+ALTER TABLE `admin`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT for table `employee_work_schedule`
 --
 ALTER TABLE `employee_work_schedule`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
+-- AUTO_INCREMENT for table `leave_credits`
+--
+ALTER TABLE `leave_credits`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=316;
+
+--
 -- AUTO_INCREMENT for table `leave_requests`
 --
 ALTER TABLE `leave_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `overtime_requests`
@@ -429,7 +819,7 @@ ALTER TABLE `rest_day_overtime_requests`
 -- AUTO_INCREMENT for table `schedule_change_requests`
 --
 ALTER TABLE `schedule_change_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `schedule_exceptions`
@@ -441,13 +831,13 @@ ALTER TABLE `schedule_exceptions`
 -- AUTO_INCREMENT for table `schedule_exception_requests`
 --
 ALTER TABLE `schedule_exception_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `time_logs`
 --
 ALTER TABLE `time_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `work_schedules`
@@ -465,6 +855,12 @@ ALTER TABLE `work_schedules`
 ALTER TABLE `employee_work_schedule`
   ADD CONSTRAINT `employee_work_schedule_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`),
   ADD CONSTRAINT `employee_work_schedule_ibfk_2` FOREIGN KEY (`work_schedule_id`) REFERENCES `work_schedules` (`id`);
+
+--
+-- Constraints for table `leave_credits`
+--
+ALTER TABLE `leave_credits`
+  ADD CONSTRAINT `leave_credits_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`);
 
 --
 -- Constraints for table `leave_requests`
