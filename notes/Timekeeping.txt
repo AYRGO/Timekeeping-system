@@ -43,6 +43,25 @@ When the employee logs in for the day, the system will check for any **schedule 
 - If the employee has an approved **overtime request**, the system will also check and allow extended time-in/out.
 
 
+
+Our Goal:
+You want to generate monthly attendance reports like this:
+
+Name	May 1	May 2	May 3	May 4	...
+Ced	VL	Present	VL	VL	
+
+With statuses like:
+Present → if time-in and time-out are logged.
+
+VL / SL / SPL → if on approved leave.
+
+Rest Day → if it's a scheduled day off.
+
+Absent → if no logs and not on leave or rest day.
+
+
+
+
 Admin Side:
 Employee Assign Schedule
 employee list
