@@ -1,7 +1,8 @@
-<?php 
+<?php
+include('../config/db.php');
 session_start();
 
-// 🚫 Prevent browser from caching this page
+//Prevent browser from caching this page
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
@@ -11,8 +12,6 @@ if (!isset($_SESSION['admin'])) {
     header("Location: ../admin/login.php");
     exit;
 }
-
-include('../config/db.php');
 
 $stmt = $pdo->query("SELECT * FROM employees ORDER BY id ASC");
 $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
