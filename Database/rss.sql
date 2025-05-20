@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 19, 2025 at 08:40 AM
+-- Generation Time: May 20, 2025 at 09:59 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -39,6 +39,28 @@ CREATE TABLE `admin` (
 
 INSERT INTO `admin` (`id`, `admin_username`, `admin_password`) VALUES
 (1, 'admin_hr', 'rss_admin');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `approved_overtime_schedule`
+--
+
+CREATE TABLE `approved_overtime_schedule` (
+  `id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `ot_date` date NOT NULL,
+  `extended_time_out` time NOT NULL,
+  `reason` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `approved_overtime_schedule`
+--
+
+INSERT INTO `approved_overtime_schedule` (`id`, `employee_id`, `ot_date`, `extended_time_out`, `reason`, `created_at`) VALUES
+(1, 1, '2025-05-20', '19:49:00', 'test', '2025-05-20 06:24:52');
 
 -- --------------------------------------------------------
 
@@ -123,7 +145,7 @@ INSERT INTO `employees` (`id`, `fname`, `lname`, `email`, `contact`, `position`,
 (69, 'Trisha Mae Adriano', 'McGregor', 'trisha_mcgregor@yahoo.com', '486-881-956-00000', 'Renovation Draftsman', 'active', '2025-04-29 14:02:24', 'trisha mae adriano.mcgregor', 'biv1r'),
 (70, 'John Michael Comprado', 'Briones', 'jamenabriones14@gmail.com', '620-743-947-000', 'Commercial Estimator', 'active', '2025-04-29 14:02:24', 'john michael comprado.briones', 'w1g89'),
 (71, 'Precious Zahra Cortez', 'Cabusao', 'zahracortez95@gmail.com', '326-526-766-000', 'Hydraulics Estimator', 'active', '2025-04-29 14:02:24', 'precious zahra cortez.cabusao', 'dwzgl'),
-(1001, 'Neil Anthony', 'Costello', 'Neil.Costelloe@resourcestaff.com.ph', NULL, 'General Manager', 'active', '2024-05-19 16:00:00', 'neil anthony.costello', 'ypv9h'),
+(1001, 'Neil Anthony', 'Costelloe', 'Neil.Costelloe@resourcestaff.com.ph', NULL, 'General Manager', 'active', '2024-05-19 16:00:00', 'neil anthony.costelloe', 'ypv9h'),
 (1002, 'Cristina Miranda', 'Pangan', 'Tina.Pangan@resourcestaff.com.ph', '0915 056 1780', 'Executive Assistant to the General Manager', 'active', '2024-03-31 16:00:00', 'cristina miranda.pangan', '85ivt'),
 (1003, 'Rica Joy Viray', 'Tolomia', NULL, '0917 389 7962', 'TA/HR Specialist', 'active', '2024-08-11 16:00:00', 'rica joy viray.tolomia', 'gojwd'),
 (1004, 'Johsua Torninos', 'Dimla', NULL, '0933 430 3081', 'Facilities and Admin Support', 'active', '2024-09-29 16:00:00', 'johsua torninos.dimla', 'r9em0');
@@ -505,12 +527,12 @@ CREATE TABLE `leave_requests` (
 --
 
 INSERT INTO `leave_requests` (`id`, `employee_id`, `leave_type`, `start_date`, `end_date`, `reason`, `status`, `created_at`) VALUES
-(1, 1, 'VL', '2025-05-16', '2025-05-16', 'test', 'pending', '2025-05-16 06:44:44'),
-(2, 1, 'Maternity', '2025-05-16', '2025-05-16', 'test', 'pending', '2025-05-16 06:45:48'),
-(3, 1, 'VL', '2025-05-16', '2025-05-16', 'test', 'pending', '2025-05-16 06:45:59'),
+(1, 1, 'VL', '2025-05-18', '2025-05-19', 'test', 'approved', '2025-05-16 06:44:44'),
+(2, 1, 'Maternity', '2025-05-22', '2025-05-24', 'test', 'approved', '2025-05-16 06:45:48'),
+(3, 1, 'VL', '2025-05-16', '2025-05-16', 'test', 'approved', '2025-05-16 06:45:59'),
 (4, 1, 'VL', '2025-05-16', '2025-05-16', 'test', 'pending', '2025-05-16 06:50:45'),
 (5, 1, 'VL', '2025-05-16', '2025-05-17', 'test', 'pending', '2025-05-16 06:54:01'),
-(6, 1001, 'SL', '2025-05-16', '2025-05-16', 'Test', 'pending', '2025-05-16 07:32:11'),
+(6, 1001, 'SL', '2025-05-16', '2025-05-16', 'Test', 'approved', '2025-05-16 07:32:11'),
 (7, 1001, 'VL', '2025-05-16', '2025-05-16', 'Test', 'pending', '2025-05-16 07:32:22'),
 (8, 1, 'SL', '2025-05-17', '2025-05-17', 'tesdt', 'pending', '2025-05-16 07:48:02'),
 (9, 1, 'Half_SL', '2025-05-23', '2025-05-23', 'test', 'pending', '2025-05-16 07:51:07');
@@ -537,7 +559,8 @@ CREATE TABLE `overtime_requests` (
 
 INSERT INTO `overtime_requests` (`id`, `employee_id`, `ot_date`, `expected_time_out`, `reason`, `status`, `created_at`) VALUES
 (1, 1, '2025-04-30', '08:55:00', 'test', 'approved', '2025-04-29 23:55:15'),
-(2, 4, '2025-04-30', '09:09:00', 'test', 'rejected', '2025-04-30 00:09:21');
+(2, 4, '2025-04-30', '09:09:00', 'test', 'rejected', '2025-04-30 00:09:21'),
+(4, 1, '2025-05-20', '19:49:00', 'test', 'approved', '2025-05-20 05:46:26');
 
 -- --------------------------------------------------------
 
@@ -665,7 +688,10 @@ CREATE TABLE `time_logs` (
 
 INSERT INTO `time_logs` (`id`, `employee_id`, `log_date`, `time_in`, `time_out`, `is_late_in`, `is_early_out`) VALUES
 (1, 1, '2025-05-16', '15:26:07', '15:26:17', 1, 1),
-(2, 1001, '2025-05-16', '15:30:05', NULL, 0, 0);
+(2, 1001, '2025-05-16', '15:30:05', NULL, 0, 0),
+(3, 1, '2025-04-30', '09:00:00', '26:00:00', 0, 0),
+(4, 1, '2025-05-20', '14:56:09', '14:56:10', 1, 1),
+(5, 1001, '2025-05-20', '15:05:14', '15:05:41', 0, 0);
 
 -- --------------------------------------------------------
 
@@ -696,6 +722,12 @@ INSERT INTO `work_schedules` (`id`, `name`, `time_in`, `time_out`) VALUES
 -- Indexes for table `admin`
 --
 ALTER TABLE `admin`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `approved_overtime_schedule`
+--
+ALTER TABLE `approved_overtime_schedule`
   ADD PRIMARY KEY (`id`);
 
 --
@@ -786,6 +818,12 @@ ALTER TABLE `admin`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `approved_overtime_schedule`
+--
+ALTER TABLE `approved_overtime_schedule`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT for table `employee_work_schedule`
 --
 ALTER TABLE `employee_work_schedule`
@@ -807,7 +845,7 @@ ALTER TABLE `leave_requests`
 -- AUTO_INCREMENT for table `overtime_requests`
 --
 ALTER TABLE `overtime_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `rest_day_overtime_requests`
@@ -837,7 +875,7 @@ ALTER TABLE `schedule_exception_requests`
 -- AUTO_INCREMENT for table `time_logs`
 --
 ALTER TABLE `time_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `work_schedules`
