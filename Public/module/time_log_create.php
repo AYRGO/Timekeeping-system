@@ -54,9 +54,22 @@ $overtime_stmt = $pdo->prepare("SELECT * FROM overtime_requests WHERE employee_i
 $overtime_stmt->execute([$employee_id, $current_date]);
 $overtime = $overtime_stmt->fetch();
 
-if ($overtime && $work_end_time) {
-    // Extend end time by overtime hours
-    $work_end_time = date("H:i", strtotime($work_end_time) + ($overtime['hours'] * 3600));
+if ($overtime && $overtime['expected_time_out']) {
+    $work_end_time = $overtime['expected_time_out'];
+}
+
+// Step 3: Check for approved Rest Day Overtime
+$rest_day_ot_stmt = $pdo->prepare("
+    SELECT * FROM rest_day_overtime_requests 
+    WHERE employee_id = ? AND rest_day_date = ? AND status = 'approved' LIMIT 1
+");
+$rest_day_ot_stmt->execute([$employee_id, $current_date]);
+$rest_day_ot = $rest_day_ot_stmt->fetch();
+
+if ($rest_day_ot) {
+    // Override the schedule with expected time in/out from rest day OT
+    $work_start_time = $rest_day_ot['expected_time_in'];
+    $work_end_time = $rest_day_ot['expected_time_out'];
 }
 
 // Determine if employee can log time in or out
@@ -158,8 +171,8 @@ foreach ($leave_types as $type) {
     <!-- Leave Balance Box -->
     <div class="bg-white shadow-xl rounded-2xl border-t-8 border-[#40C9A2] p-6 sm:p-8">
       <h2 class="text-2xl sm:text-3xl font-bold text-[#2F9C95] text-center mb-6">Leave Balances</h2>
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-left text-sm sm:text-base text-gray-700">
+        <div class="overflow-x-auto">
+         <table class="min-w-full text-left text-sm sm:text-base text-gray-700">
           <thead>
             <tr>
               <th class="py-2 px-4">Type</th>
