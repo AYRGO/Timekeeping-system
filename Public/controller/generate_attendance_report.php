@@ -63,6 +63,8 @@ foreach ($dateHeaders as $headerDate) {
     $sheet->setCellValue($cell, date('M j', strtotime($headerDate)));
     $colIndex++;
 }
+
+// Apply background color to header row (light blue)
 $highestColumnIndex = $colIndex - 1;
 $headerRange = 'A1:' . Coordinate::stringFromColumnIndex($highestColumnIndex) . '1';
 $sheet->getStyle($headerRange)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
