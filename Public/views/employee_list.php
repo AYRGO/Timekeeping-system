@@ -72,6 +72,9 @@ function sort_link($column, $label) {
         <a href="employee-create.php" class="bg-[#0fe0fc] hover:bg-[#65adad] text-white font-semibold py-2 px-4 rounded-xl transition duration-200 text-sm sm:text-base">
           + Add New Employee
         </a>
+        <a href="../controller/generate_attendance_report.php" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-xl transition duration-200 text-sm sm:text-base">
+          Generate Attendance Report
+        </a>
         <a href="../admin/logout.php" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-xl transition duration-200 text-sm sm:text-base">
           Logout
         </a>
