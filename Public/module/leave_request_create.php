@@ -43,26 +43,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$employee_id, $leave_type, $start_date, $end_date, $reason]);
 
     // Deduct leave credits
-    if (in_array($leave_type, $valid_leave_types)) {
-        $deduction = $requested_days;
+$stmt = $pdo->prepare("
+    INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason, status)
+    VALUES (?, ?, ?, ?, ?, 'Pending')
+");
+$stmt->execute([$employee_id, $leave_type, $start_date, $end_date, $reason]);
 
-        // Special case for half-day types
-        if ($leave_type === 'Half_SL' || $leave_type === 'Half_VL') {
-            $deduction = 0.5 * $requested_days;
-        } elseif ($leave_type === 'SPL') {
-            $deduction = $requested_days; // SPL fixed limit, but still uses credits
-        }
+// Do NOT deduct leave credits yet — only deduct upon admin approval
 
-        $deduct = $pdo->prepare("
-            UPDATE leave_credits 
-            SET balance = balance - ? 
-            WHERE employee_id = ? AND leave_type = ? AND year = ?
-        ");
-        $deduct->execute([$deduction, $employee_id, $leave_type, date('Y')]);
-    }
-
-    header("Location: time_log_create.php?success=1");
-    exit;
+header("Location: time_log_create.php?success=1");
+exit;
 }
 }
 ?>
