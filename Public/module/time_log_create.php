@@ -109,19 +109,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // --- Leave Balance Fetch ---
 $stmt = $pdo->prepare("SELECT leave_type, balance FROM leave_credits WHERE employee_id = ?");
 $stmt->execute([$employee_id]);
-
 $balances = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch used leave days
 $stmt = $pdo->prepare("SELECT leave_type, SUM(DATEDIFF(end_date, start_date) + 1) as used_days
                        FROM leave_requests
                        WHERE employee_id = ? AND status = 'approved' AND YEAR(start_date) = ?
                        GROUP BY leave_type");
 
+$current_year = date('Y'); // Needed for the query parameter
+$stmt->execute([$employee_id, $current_year]);
+$used_result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Build associative array for used leaves
+$used = [];
+foreach ($used_result as $row) {
+    $used[$row['leave_type']] = $row['used_days'];
+}
+
 $leave_types = ['VL', 'SL', 'SPL', 'Half_VL', 'Half_SL'];
 $balance_display = [];
 foreach ($leave_types as $type) {
     $bal = 0;
-    $carry = 0;
     foreach ($balances as $row) {
         if ($row['leave_type'] === $type) {
             $bal = $row['balance'];
