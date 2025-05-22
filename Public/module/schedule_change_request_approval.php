@@ -16,43 +16,65 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Schedule Change Requests</title>
+  <meta charset="UTF-8">
+  <title>Schedule Change Requests</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h1>Pending Schedule Change Requests</h1>
+<body class="bg-[#f0fdfc] min-h-screen px-4 py-8 flex flex-col items-center">
 
-    <table border="1" cellpadding="6" cellspacing="0">
-        <tr>
-            <th>ID</th>
-            <th>Employee</th>
-            <th>Requested Schedule</th>
-            <th>Effective Date</th>
-            <th>Reason</th>
-            <th>Actions</th>
-        </tr>
+  <div class="w-full max-w-6xl bg-white shadow-xl rounded-2xl border-t-8 border-[#0fe0fc] p-6 sm:p-8 space-y-6">
 
-        <?php if (count($requests) > 0): ?>
+    <div class="flex justify-between items-center flex-wrap gap-2">
+      <h1 class="text-2xl sm:text-3xl font-bold text-[#2F9C95]">Pending Schedule Change Requests</h1>
+      <a href="../views/employee_list.php" class="text-sm sm:text-base text-[#2F9C95] hover:underline">← Back to Employee List</a>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 text-sm sm:text-base">
+        <thead class="bg-[#0fe0fc] text-white">
+          <tr>
+            <th class="px-4 py-3 text-left font-semibold">ID</th>
+            <th class="px-4 py-3 text-left font-semibold">Employee</th>
+            <th class="px-4 py-3 text-left font-semibold">Requested Schedule</th>
+            <th class="px-4 py-3 text-left font-semibold">Effective Date</th>
+            <th class="px-4 py-3 text-left font-semibold">Reason</th>
+            <th class="px-4 py-3 text-left font-semibold">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <?php if (count($requests) > 0): ?>
             <?php foreach ($requests as $req): ?>
-                <tr>
-                    <td><?= $req['id'] ?></td>
-                    <td><?= htmlspecialchars($req['fname'] . ' ' . $req['lname']) ?></td>
-                    <td><?= htmlspecialchars($req['schedule_name']) ?></td>
-                    <td><?= htmlspecialchars($req['requested_effective_date']) ?></td>
-                    <td><?= htmlspecialchars($req['reason']) ?></td>
-                    <td>
-                    <a href="../controller/schedule_change_request_approve.php?id=<?= $req['id'] ?>&action=approve">Approve</a>
-<a href="../controller/schedule_change_request_approve.php?id=<?= $req['id'] ?>&action=reject">Reject</a>
-
-                    </td>
-                </tr>
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3"><?= $req['id'] ?></td>
+                <td class="px-4 py-3"><?= htmlspecialchars($req['fname'] . ' ' . $req['lname']) ?></td>
+                <td class="px-4 py-3"><?= htmlspecialchars($req['schedule_name']) ?></td>
+                <td class="px-4 py-3"><?= htmlspecialchars($req['requested_effective_date']) ?></td>
+                <td class="px-4 py-3"><?= htmlspecialchars($req['reason']) ?></td>
+                <td class="px-4 py-3 space-x-2">
+                  <a href="../controller/schedule_change_request_approve.php?id=<?= $req['id'] ?>&action=approve"
+                     class="inline-block text-white bg-green-500 hover:bg-green-600 font-medium py-1 px-3 rounded-md text-sm">
+                    Approve
+                  </a>
+                  <a href="../controller/schedule_change_request_approve.php?id=<?= $req['id'] ?>&action=reject"
+                     class="inline-block text-white bg-red-500 hover:bg-red-600 font-medium py-1 px-3 rounded-md text-sm">
+                    Reject
+                  </a>
+                </td>
+              </tr>
             <?php endforeach; ?>
-        <?php else: ?>
-            <tr><td colspan="6">No pending requests.</td></tr>
-        <?php endif; ?>
-    </table>
+          <?php else: ?>
+            <tr>
+              <td colspan="6" class="text-center px-4 py-6 text-gray-500">No pending requests.</td>
+            </tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
 
-    <p><a href="../views/employee_list.php">← Back to Employee List</a></p>
+  </div>
+
 </body>
 </html>
