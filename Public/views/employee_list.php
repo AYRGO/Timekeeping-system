@@ -66,23 +66,88 @@ function sort_link($column, $label) {
     
   <div class="w-full max-w-6xl bg-white rounded-2xl shadow-xl border-t-8 border-[#00ffff] p-6 sm:p-8 space-y-6">
 
-    <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
-      <h1 class="text-2xl sm:text-3xl font-bold text-[#2F9C95]">Employees</h1>
-      <div class="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0">
-        <a href="employee-create.php" class="bg-[#0fe0fc] hover:bg-[#65adad] text-white font-semibold py-2 px-4 rounded-xl transition duration-200 text-sm sm:text-base">
-          + Add New Employee
-        </a>
-         <a href="../controller/generate_overtime_report.php" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-xl transition duration-200 text-sm sm:text-base">
-          Generate Overtime Report
-        </a>
-        <a href="../controller/generate_attendance_report.php" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-xl transition duration-200 text-sm sm:text-base">
-          Generate Attendance Report
-        </a>
-        <a href="../admin/logout.php" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-xl transition duration-200 text-sm sm:text-base">
-          Logout
-        </a>
-      </div>
-    </div>
+   <!-- ✅ Unified Admin + Approval Actions with Consistent Responsive Design -->
+<div class="flex flex-col gap-4 w-full">
+
+  <!-- Admin Actions -->
+  <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+    <h1 class="text-2xl sm:text-3xl font-bold text-[#2F9C95]">Employees</h1>
+
+    <!-- <div class="flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto">
+    </div> -->
+  </div>
+
+  <!-- Approval Buttons -->
+  <div class="flex flex-col sm:flex-row flex-wrap gap-2">
+    <!-- Add Employee -->
+      <a href="employee-create.php" class="flex items-center gap-2 w-full sm:w-auto bg-[#0fe0fc] hover:bg-[#65adad] text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Add Employee
+      </a>
+
+      <!-- Overtime Report -->
+      <a href="../controller/generate_overtime_report.php" class="flex items-center gap-2 w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6h6v6m2 4H7a2 2 0 01-2-2V5a2 2 0 012-2h5.5a1 1 0 01.7.3l5.5 5.5a1 1 0 01.3.7V19a2 2 0 01-2 2z" />
+        </svg>
+        Overtime Report
+      </a>
+
+      <!-- Attendance Report -->
+      <a href="../controller/generate_attendance_report.php" class="flex items-center gap-2 w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16h8M8 12h8M8 8h8M5 20h14a2 2 0 002-2V4a2 2 0 00-2-2H5a2 2 0 00-2 2v16a2 2 0 002 2z" />
+        </svg>
+        Attendance Report
+      </a>
+    <a href="../module/overtime_request_approval.php" class="flex items-center gap-2 w-full sm:w-auto bg-cyan-500 hover:bg-cyan-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      Overtime Approvals
+    </a>
+
+    <a href="../module/leave_request_approval.php" class="flex items-center gap-2 w-full sm:w-auto bg-sky-500 hover:bg-sky-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+      Leave Approvals
+    </a>
+
+    <a href="../module/rest_day_overtime_approval.php" class="flex items-center gap-2 w-full sm:w-auto bg-teal-500 hover:bg-teal-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582M20 20v-5h-.581M20 4a9 9 0 00-16 0M4 20a9 9 0 0016 0" />
+      </svg>
+      Rest Day OT Approvals
+    </a>
+
+    <a href="../module/schedule_change_request_approval.php" class="flex items-center gap-2 w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m2 0a2 2 0 002-2V6a2 2 0 00-2-2h-2.5a2 2 0 00-2 2v4a2 2 0 002 2zM9 16H7a2 2 0 01-2-2v-1m0-4V6a2 2 0 012-2h2.5a2 2 0 012 2v4a2 2 0 01-2 2z" />
+      </svg>
+      Schedule Change Approvals
+    </a>
+
+    <a href="../module/schedule_exception_request_approval.php" class="flex items-center gap-2 w-full sm:w-auto bg-rose-500 hover:bg-rose-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M4.93 4.93a10 10 0 0114.14 0 10 10 0 010 14.14 10 10 0 01-14.14 0 10 10 0 010-14.14z" />
+      </svg>
+      Schedule Exception Approvals
+    </a>
+    
+       <!-- Logout -->
+      <a href="../admin/logout.php" class="flex items-center gap-2 w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6-4v1m0 6v1m-6-5h.01" />
+        </svg>
+        Logout
+      </a>
+  </div>
+</div>
+
+
 
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200 text-sm sm:text-base">
