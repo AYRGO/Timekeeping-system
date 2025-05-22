@@ -7,8 +7,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
-$month = date('n'); // current month (1-12)
-$year = date('Y');  // current year (e.g., 2025)
+$month = date('n');
+$year = date('Y');
 $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 
 $dateHeaders = [];
@@ -16,88 +16,156 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
     $dateHeaders[] = date('Y-m-d', strtotime("$year-$month-$day"));
 }
 
+// Fetch employee list
 $stmt = $pdo->query("SELECT id, fname, lname FROM employees ORDER BY lname ASC");
 $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch approved overtime (Regular)
-$otStmt = $pdo->prepare("SELECT * FROM overtime_requests WHERE status = 'approved' AND ot_date BETWEEN :start AND :end");
+// Fetch work schedule mappings
+$scheduleStmt = $pdo->query("
+    SELECT ews.employee_id, ews.effective_date, ws.time_out 
+    FROM employee_work_schedule ews
+    JOIN work_schedules ws ON ews.work_schedule_id = ws.id
+");
+$schedules = $scheduleStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$workMap = [];
+foreach ($schedules as $sched) {
+    $workMap[$sched['employee_id']][$sched['effective_date']] = $sched['time_out'];
+}
+
+// Fetch approved regular OT
+$otStmt = $pdo->prepare("
+    SELECT aos.employee_id, aos.ot_date, aos.extended_time_out 
+    FROM approved_overtime_schedule aos 
+    WHERE aos.ot_date BETWEEN :start AND :end
+");
 $otStmt->execute([
     'start' => "$year-$month-01",
     'end' => "$year-$month-$daysInMonth"
 ]);
-$otRequests = $otStmt->fetchAll(PDO::FETCH_ASSOC);
+$otRecords = $otStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch approved rest day overtime
-$rdotStmt = $pdo->prepare("SELECT * FROM rest_day_overtime_requests WHERE status = 'approved' AND rest_day_date BETWEEN :start AND :end");
+// Fetch approved RDOT
+$rdotStmt = $pdo->prepare("
+    SELECT employee_id, rest_day_date, expected_time_in, expected_time_out
+    FROM rest_day_overtime_requests
+    WHERE status = 'Approved' AND rest_day_date BETWEEN :start AND :end
+");
 $rdotStmt->execute([
     'start' => "$year-$month-01",
     'end' => "$year-$month-$daysInMonth"
 ]);
-$rdotRequests = $rdotStmt->fetchAll(PDO::FETCH_ASSOC);
+$rdotRecords = $rdotStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Map overtime
+// Combine OT + RDOT into one map
 $otMap = [];
-foreach ($otRequests as $ot) {
-    $otMap[$ot['employee_id']][$ot['ot_date']] = 6; // Regular OT hours
-}
-foreach ($rdotRequests as $rdot) {
-    $otMap[$rdot['employee_id']][$rdot['rest_day_date']] = 6; // Rest Day OT hours
+
+foreach ($otRecords as $ot) {
+    $emp_id = $ot['employee_id'];
+    $date = $ot['ot_date'];
+    $extended_out = $ot['extended_time_out'];
+
+    $effective_dates = array_keys($workMap[$emp_id] ?? []);
+    rsort($effective_dates);
+
+    $schedule_out = null;
+    foreach ($effective_dates as $eff_date) {
+        if ($eff_date <= $date) {
+            $schedule_out = $workMap[$emp_id][$eff_date];
+            break;
+        }
+    }
+
+    if ($schedule_out) {
+        $scheduled = new DateTime($schedule_out);
+        $extended = new DateTime($extended_out);
+        $interval = $scheduled->diff($extended);
+        $hours = $interval->h + ($interval->i / 60);
+
+        if ($hours > 0) {
+            $otMap[$emp_id][$date] = [
+                'hours' => $hours,
+                'is_rdot' => false
+            ];
+        }
+    }
 }
 
+foreach ($rdotRecords as $rdot) {
+    $emp_id = $rdot['employee_id'];
+    $date = $rdot['rest_day_date'];
+    $time_in = $rdot['expected_time_in'];
+    $time_out = $rdot['expected_time_out'];
+
+    if ($time_in && $time_out) {
+        $start = new DateTime($time_in);
+        $end = new DateTime($time_out);
+        $interval = $start->diff($end);
+        $hours = $interval->h + ($interval->i / 60);
+
+        if ($hours > 0) {
+            $otMap[$emp_id][$date] = [
+                'hours' => $hours,
+                'is_rdot' => true
+            ];
+        }
+    }
+}
+
+// Create spreadsheet
 $spreadsheet = new Spreadsheet();
-/** @var \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet */
 $sheet = $spreadsheet->getActiveSheet();
 
-// Header row
+// Headers
 $sheet->setCellValue('A1', 'Name');
 $colIndex = 2;
 foreach ($dateHeaders as $date) {
-    $cell = Coordinate::stringFromColumnIndex($colIndex) . '1';
-    $sheet->setCellValue($cell, date('M d, Y', strtotime($date)));
-    $colIndex++;
-}
-
-$extraHeaders = ['TOTAL REG OT', 'TOTAL RDOT', 'TOTAL RH OT', 'TOTAL RH + RDOT', 'Special Holiday'];
-foreach ($extraHeaders as $header) {
     $cell = Coordinate::stringFromColumnIndex($colIndex++) . '1';
-    $sheet->setCellValue($cell, $header);
+    $sheet->setCellValue($cell, date('M d', strtotime($date)));
 }
+$sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex++) . '1', 'TOTAL OT HRS');
+$sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . '1', 'TOTAL RDOT HRS');
 
-// Style header
-$highestColumn = $sheet->getHighestColumn();
-$sheet->getStyle("A1:{$highestColumn}1")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D9E1F2');
-$sheet->getStyle("A1:{$highestColumn}1")->getFont()->setBold(true);
+// Style headers
+$highestCol = Coordinate::stringFromColumnIndex($colIndex);
+$sheet->getStyle("A1:{$highestCol}1")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D9E1F2');
+$sheet->getStyle("A1:{$highestCol}1")->getFont()->setBold(true);
 
-// Fill employee rows
+// Fill data rows
 $row = 2;
 foreach ($employees as $emp) {
     $sheet->setCellValue("A{$row}", "{$emp['lname']}, {$emp['fname']}");
-    $totalReg = 0;
-    $totalRD = 0;
-
+    $totalOT = 0;
+    $totalRDOT = 0;
     $col = 2;
+
     foreach ($dateHeaders as $date) {
-        $value = '';
-        if (!empty($otMap[$emp['id']][$date])) {
-            $value = $otMap[$emp['id']][$date];
-            $totalReg += $value; // For now treat all OT as regular
-        }
         $cell = Coordinate::stringFromColumnIndex($col++) . $row;
-        $sheet->setCellValue($cell, $value);
+
+        if (isset($otMap[$emp['id']][$date])) {
+            $entry = $otMap[$emp['id']][$date];
+            $hours = number_format($entry['hours'], 2);
+            $label = $entry['is_rdot'] ? "RDOT: $hours" : $hours;
+            $sheet->setCellValue($cell, $label);
+
+            if ($entry['is_rdot']) {
+                $totalRDOT += $entry['hours'];
+            } else {
+                $totalOT += $entry['hours'];
+            }
+        } else {
+            $sheet->setCellValue($cell, '');
+        }
     }
 
-    // Totals
-    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col++) . $row, number_format($totalReg, 2));
-    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col++) . $row, number_format($totalRD, 2));
-    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col++) . $row, ''); // RH OT
-    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col++) . $row, ''); // RH + RDOT
-    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col++) . $row, ''); // Special Holiday
+    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col++) . $row, number_format($totalOT, 2));
+    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col) . $row, number_format($totalRDOT, 2));
     $row++;
 }
 
-// Output file
+// Output
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-header('Content-Disposition: attachment;filename="Overtime_Report_May_2025.xlsx"');
+header('Content-Disposition: attachment;filename="Overtime_Report_' . date('F_Y') . '.xlsx"');
 header('Cache-Control: max-age=0');
 
 $writer = new Xlsx($spreadsheet);
