@@ -145,8 +145,8 @@ exit;
     </form>
 
     <p class="text-center mt-4">
-      <a href="../views/leave_request_list.php" class="text-[#2F9C95] font-medium underline hover:text-[#40C9A2]">
-        ← Back to Leave List
+      <a href="time_log_create.php" class="text-[#2F9C95] font-medium underline hover:text-[#40C9A2]">
+        ← Back to timekeeping
       </a>
     </p>
 

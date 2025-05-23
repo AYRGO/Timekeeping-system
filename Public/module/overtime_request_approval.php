@@ -1,3 +1,18 @@
+<?php
+include('../config/db.php');
+
+// Fetch pending overtime requests
+$stmt = $pdo->query("
+    SELECT o.id, o.ot_date, o.expected_time_out, o.reason, o.status, 
+           e.fname, e.lname
+    FROM overtime_requests o
+    JOIN employees e ON o.employee_id = e.id
+    WHERE o.status = 'pending'
+");
+
+$overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
