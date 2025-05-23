@@ -51,7 +51,7 @@ function sort_link($column, $label) {
     $newOrder = ($currentSort === $column && $currentOrder === 'asc') ? 'desc' : 'asc';
     $arrow = ($currentSort === $column) ? ($currentOrder === 'asc' ? ' ▲' : ' ▼') : '';
 
-    return "<a href=\"?sort=$column&order=$newOrder&page=$page\" class=\"hover:underline\">$label$arrow</a>";
+    return "<a href=\"?sort=$column&order=$newOrder&page=$page\" class=\"hover:underline inline-block whitespace-nowrap\">$label$arrow</a>";
 }
 ?>
 <!DOCTYPE html>

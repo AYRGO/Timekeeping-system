@@ -1,5 +1,20 @@
 <?php
+session_start();
+
+// Prevent browser from caching this page
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+
+if (!isset($_SESSION['admin'])) {
+    header("Location: ../admin/login.php");
+    exit;
+}
+
 include('../config/db.php');
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
 // Check if form is submitted via POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -36,11 +51,11 @@ $stmt = $pdo->query("
 
 $leave_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Debug: Check if leave requests are fetched correctly
-if (empty($leave_requests)) {
-    echo "No pending leave requests found.";
-    exit;
-}
+// // Debug: Check if leave requests are fetched correctly
+// if (empty($leave_requests)) {
+//     echo "No pending leave requests found.";
+//     // exit;
+// }
 ?>
 
 <!DOCTYPE html>

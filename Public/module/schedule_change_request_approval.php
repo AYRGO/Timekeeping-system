@@ -1,4 +1,21 @@
 <?php
+session_start();
+
+// Prevent browser from caching this page
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+
+// Admin session check
+if (!isset($_SESSION['admin'])) {
+    header("Location: ../admin/login.php");
+    exit;
+}
+
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 include('../config/db.php');
 
 // Fetch pending schedule change requests
@@ -10,7 +27,6 @@ $stmt = $pdo->query("
     JOIN work_schedules ws ON scr.requested_schedule_id = ws.id
     WHERE scr.status = 'pending'
 ");
-
 
 $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
