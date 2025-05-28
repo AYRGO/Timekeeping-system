@@ -80,7 +80,7 @@ function sort_link($column, $label) {
   <!-- Approval Buttons -->
   <div class="flex flex-col sm:flex-row flex-wrap gap-2">
     <!-- Add Employee -->
-      <a href="employee-create.php" class="flex items-center gap-2 w-full sm:w-auto bg-[#0fe0fc] hover:bg-[#65adad] text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+      <a href="../module/employee_create.php" class="flex items-center gap-2 w-full sm:w-auto bg-[#0fe0fc] hover:bg-[#65adad] text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
@@ -198,3 +198,4 @@ function sort_link($column, $label) {
 
 </body>
 </html>
+
