@@ -207,11 +207,12 @@ foreach ($leave_types as $type) {
       <div id="clock" class="text-center text-3xl sm:text-4xl font-bold text-[#2F9C95]"></div>
       <h1 class="text-2xl sm:text-3xl font-bold text-center text-[#2F9C95]">Manual Time Log</h1>
 
-      <form method="POST" class="space-y-5">
+      <form method="POST" class="space-y-5" onsubmit="return confirmLog(this);">
         <?php if (!$time_in): ?>
           <?php if ($can_time_in): ?>
             <button 
-              type="submit" 
+              type="submit"
+              id="btn-time-in" 
               name="time_in" 
               class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-4 rounded-xl transition duration-200 text-lg sm:text-xl"
             >
@@ -240,6 +241,7 @@ foreach ($leave_types as $type) {
           <button 
             type="submit" 
             name="time_out" 
+            id="btn-time-out"
             class="w-full bg-[#40C9A2] hover:bg-[#2F9C95] text-white font-semibold py-4 rounded-xl transition duration-200 text-base sm:text-lg"
           >
             Log Time Out
@@ -254,6 +256,22 @@ foreach ($leave_types as $type) {
           </button>
         <?php endif; ?>
       </form>
+      <script>
+  function confirmLog(form) {
+    const timeInBtn = form.querySelector('button[name="time_in"]');
+    const timeOutBtn = form.querySelector('button[name="time_out"]');
+
+    if (document.activeElement === timeInBtn) {
+      return confirm("Are you sure you want to log your Time In?");
+    }
+
+    if (document.activeElement === timeOutBtn) {
+      return confirm("Are you sure you want to log your Time Out?");
+    }
+
+    return true; // default fallback
+  }
+</script>
     </div>
 
     <!-- Action Links Box -->
