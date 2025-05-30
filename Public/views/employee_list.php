@@ -86,6 +86,13 @@ function sort_link($column, $label) {
         </svg>
         Add Employee
       </a>
+      <!-- Assign Schedule -->
+<a href="../module/employee_assign_schedule.php" class="flex items-center gap-2 w-full sm:w-auto bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
+  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h8M8 16h6M8 8h6" />
+  </svg>
+  Assign Schedule
+</a>
 
       <!-- Overtime Report -->
       <a href="../controller/generate_overtime_report.php" class="flex items-center gap-2 w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 text-base">
