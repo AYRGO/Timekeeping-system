@@ -10,14 +10,17 @@ if (!$employee_id) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $exception_date = $_POST['exception_date'] ?? null;
+    $start_date = $_POST['start_date'] ?? null;
+    $end_date = $_POST['end_date'] ?? null;
     $requested_time_in = $_POST['requested_time_in'] ?? null;
     $requested_time_out = $_POST['requested_time_out'] ?? null;
     $reason = $_POST['reason'] ?? null;
 
-    if ($exception_date && $requested_time_in && $requested_time_out && $reason) {
-        $stmt = $pdo->prepare("INSERT INTO schedule_exception_requests (employee_id, exception_date, requested_time_in, requested_time_out, reason, status) VALUES (?, ?, ?, ?, ?, 'pending')");
-        $stmt->execute([$employee_id, $exception_date, $requested_time_in, $requested_time_out, $reason]);
+    if ($start_date && $end_date && $requested_time_in && $requested_time_out && $reason) {
+        $stmt = $pdo->prepare("INSERT INTO schedule_exception_requests 
+            (employee_id, start_date, end_date, requested_time_in, requested_time_out, reason, status, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())");
+        $stmt->execute([$employee_id, $start_date, $end_date, $requested_time_in, $requested_time_out, $reason]);
         $success = "Request submitted successfully.";
     } else {
         $error = "Please complete all fields.";
@@ -39,7 +42,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <h1 class="text-2xl sm:text-3xl font-bold text-center text-[#2F9C95]">Schedule Exception Request</h1>
 
-    <!-- Feedback Messages -->
     <?php if (!empty($success)): ?>
       <p class="text-green-600 font-medium text-center"><?= $success ?></p>
     <?php elseif (!empty($error)): ?>
@@ -48,12 +50,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <form method="POST" class="space-y-5 text-base sm:text-lg">
 
-      <!-- Exception Date -->
+      <!-- Start Date -->
       <div>
-        <label class="block text-[#2F9C95] font-semibold mb-1">Exception Date:</label>
+        <label class="block text-[#2F9C95] font-semibold mb-1">Start Date:</label>
         <input 
           type="date" 
-          name="exception_date" 
+          name="start_date" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
+        />
+      </div>
+
+      <!-- End Date -->
+      <div>
+        <label class="block text-[#2F9C95] font-semibold mb-1">End Date:</label>
+        <input 
+          type="date" 
+          name="end_date" 
           required 
           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#40C9A2]"
         />
@@ -102,8 +115,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     </form>
 
-    
-    <!-- back -->
     <p class="text-center mt-4">
       <a href="time_log_create.php" class="text-[#2F9C95] font-medium underline hover:text-[#40C9A2]">
         ← Back to timekeeping
