@@ -218,12 +218,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <section aria-label="Requests and navigation" class="pt-4 border-t border-gray-200">
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Requests &amp; Navigation</h2>
       <ul class="flex flex-wrap gap-4 justify-center">
-        <li>
+        <!-- <li>
           <a href="schedule_exception_request_create.php"
             class="inline-block px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
             Schedule Change Request
           </a>
-        </li>
+        </li> -->
         <li>
           <a href="../employee/logout.php"
             class="inline-block px-5 py-2 rounded-lg border border-red-600 text-red-600 font-semibold hover:bg-red-50 transition focus:outline-none focus:ring-2 focus:ring-red-400">
