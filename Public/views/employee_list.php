@@ -81,12 +81,36 @@ function sort_link($column, $label) {
         Add Employee
       </a>
 
-      <a href="../controller/generate_attendance_report.php"
-        class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
-        Attendance Report
-      </a>
-    </div>
-   </div>
+     <!-- Trigger Button -->
+<button onclick="document.getElementById('dateModal').classList.remove('hidden')"
+  class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
+  Attendance Report
+</button>
+
+<!-- Modal -->
+<div id="dateModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden z-50">
+  <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+    <h2 class="text-lg font-semibold mb-4 text-gray-700">Select Date Range</h2>
+    <form action="../controller/generate_attendance_report.php" method="get" class="space-y-4">
+      <div>
+        <label for="start_date" class="block text-sm font-medium text-gray-600">Start Date</label>
+        <input type="date" name="start_date" id="start_date" required
+               class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring focus:ring-blue-200" />
+      </div>
+      <div>
+        <label for="end_date" class="block text-sm font-medium text-gray-600">End Date</label>
+        <input type="date" name="end_date" id="end_date" required
+               class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring focus:ring-blue-200" />
+      </div>
+      <div class="flex justify-end gap-2 pt-4">
+        <button type="button" onclick="document.getElementById('dateModal').classList.add('hidden')"
+          class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+        <button type="submit"
+          class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Generate</button>
+      </div>
+    </form>
+  </div>
+</div>
 
     <div class="overflow-x-auto">
       <table class="w-full border-collapse border border-gray-300 text-left text-sm">
