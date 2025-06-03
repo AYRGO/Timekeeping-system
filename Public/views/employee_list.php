@@ -81,49 +81,9 @@ function sort_link($column, $label) {
         Add Employee
       </a>
 
-      <!-- <a href="../module/employee_assign_schedule.php"
-        class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
-        Assign Schedule
-      </a>
-
-      <a href="../controller/generate_overtime_report.php"
-        class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
-        Overtime Report
-      </a> -->
-
       <a href="../controller/generate_attendance_report.php"
         class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
         Attendance Report
-      </a>
-
-      <!-- <a href="../module/overtime_request_approval.php"
-        class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
-        Overtime Approvals
-      </a>
-
-      <a href="../module/leave_request_approval.php"
-        class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
-        Leave Approvals
-      </a>
-
-      <a href="../module/rest_day_overtime_approval.php"
-        class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
-        Rest Day OT Approvals
-      </a>
-
-      <a href="../module/schedule_change_request_approval.php"
-        class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
-        Schedule Change Approvals
-      </a>
-
-      <a href="../module/schedule_exception_request_approval.php"
-        class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">
-        Schedule Exception Approvals
-      </a> -->
-      
-      <a href="../admin/logout.php"
-        class="px-5 py-2 rounded-lg border border-red-600 text-red-600 font-semibold hover:bg-red-50 transition focus:outline-none focus:ring-2 focus:ring-red-400">
-        Logout
       </a>
     </div>
    </div>
@@ -166,17 +126,26 @@ function sort_link($column, $label) {
       </table>
     </div>
 
-    <!-- Pagination -->
-    <div class="pt-6 border-t border-gray-200 flex justify-center space-x-2">
-      <nav aria-label="Pagination">
-        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-          <a href="?page=<?= $i ?>&sort=<?= $sort ?>&order=<?= $order ?>"
-             class="px-3 py-1 rounded-md border border-gray-300 text-gray-700 hover:bg-blue-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 <?= $i === $page ? 'bg-blue-600 text-white border-blue-600' : '' ?>">
-            <?= $i ?>
-          </a>
-        <?php endfor; ?>
-      </nav>
-    </div>
+ <!-- Pagination + Logout -->
+<div class="pt-6 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+  
+  <!-- Pagination -->
+  <nav class="flex flex-wrap gap-2" aria-label="Pagination">
+    <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+      <a href="?page=<?= $i ?>&sort=<?= $sort ?>&order=<?= $order ?>"
+         class="px-3 py-1 rounded-md border border-gray-300 text-gray-700 hover:bg-blue-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 <?= $i === $page ? 'bg-blue-600 text-white border-blue-600' : '' ?>">
+        <?= $i ?>
+      </a>
+    <?php endfor; ?>
+  </nav>
+
+  <!-- Logout Button -->
+  <a href="../admin/logout.php"
+     class="px-5 py-2 rounded-lg border border-red-600 text-red-600 font-semibold hover:bg-red-50 transition focus:outline-none focus:ring-2 focus:ring-red-400 self-start sm:self-auto">
+    Logout
+  </a>
+
+</div>
 
   </div>
 

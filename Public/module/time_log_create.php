@@ -216,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 
     <section aria-label="Requests and navigation" class="pt-4 border-t border-gray-200">
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">Requests &amp; Navigation</h2>
+      <!-- <h2 class="text-lg font-semibold text-gray-900 mb-3">Requests &amp; Navigation</h2> -->
       <ul class="flex flex-wrap gap-4 justify-center">
         <!-- <li>
           <a href="schedule_exception_request_create.php"
