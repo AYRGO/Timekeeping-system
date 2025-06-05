@@ -9,15 +9,13 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-// Load employees
-$stmt = $pdo->query("SELECT id, fname, lname FROM employees ORDER BY id ASC");
-$employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Get search and sorting parameters
+$search = $_GET['search'] ?? '';
+$sortField = $_GET['sort'] ?? 'log_date';
+$sortOrder = strtoupper($_GET['order'] ?? 'ASC');
 
-// Map Employee IDs to Names
-$employeeNames = [];
-foreach ($employees as $emp) {
-    $employeeNames[$emp['id']] = $emp['fname'] . ' ' . $emp['lname'];
-}
+// Validate sort order
+$sortOrder = ($sortOrder === 'DESC') ? 'DESC' : 'ASC';
 
 // Get date range from query parameters or default to current month
 $startDate = $_GET['start_date'] ?? null;
@@ -34,9 +32,22 @@ if ($startDate && $endDate) {
     $end = "$year-$month-$daysInMonth";
 }
 
-// Fetch time logs
-$logStmt = $pdo->prepare("SELECT * FROM time_logs WHERE log_date BETWEEN :start AND :end ORDER BY log_date ASC");
-$logStmt->execute(['start' => $start, 'end' => $end]);
+// Build SQL with optional search and sorting
+$sql = "SELECT tl.*, e.fname, e.lname, e.company FROM time_logs tl JOIN employees e ON tl.employee_id = e.id WHERE tl.log_date BETWEEN :start AND :end";
+$params = [
+    'start' => $start,
+    'end' => $end
+];
+
+if (!empty($search)) {
+    $sql .= " AND (e.fname LIKE :search OR e.lname LIKE :search OR e.company LIKE :search)";
+    $params['search'] = "%$search%";
+}
+
+$sql .= " ORDER BY $sortField $sortOrder";
+
+$logStmt = $pdo->prepare($sql);
+$logStmt->execute($params);
 $timeLogs = $logStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Create spreadsheet
@@ -56,39 +67,42 @@ $logo->setOffsetY(5);
 $logo->setWorksheet($sheet);
 
 // Report Title
-$sheet->mergeCells('A3:D3');
+$sheet->mergeCells('A3:E3');
 $sheet->setCellValue('A3', "Time Logs Report ($start to $end)");
 $sheet->getStyle('A3')->getFont()->setBold(true)->setSize(14);
 $sheet->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 $sheet->getRowDimension(3)->setRowHeight(25);
 
 // Table Header
-$headers = ['Log Date', 'Employee Name', 'Time In', 'Time Out'];
+$headers = ['Log Date', 'Employee Name', 'Company', 'Time In', 'Time Out'];
 $sheet->fromArray($headers, NULL, 'A4');
 
 // Style header
-$headerStyle = $sheet->getStyle('A4:D4');
+$headerStyle = $sheet->getStyle('A4:E4');
 $headerStyle->getFont()->setBold(true)->setSize(12);
 $headerStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFCCE5FF');
 $headerStyle->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 $headerStyle->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
+// Enable filtering and freeze header
+$sheet->setAutoFilter('A4:E4');
+$sheet->freezePane('A5');
+
 // Fill Data
 $row = 5;
 foreach ($timeLogs as $log) {
-    $empName = $employeeNames[$log['employee_id']] ?? 'Unknown';
+    $empName = $log['fname'] . ' ' . $log['lname'];
     $sheet->setCellValue("A{$row}", $log['log_date']);
     $sheet->setCellValue("B{$row}", $empName);
-
-    $sheet->setCellValue("C{$row}", !empty($log['time_in']) ? date('h:i A', strtotime($log['time_in'])) : '');
-    $sheet->setCellValue("D{$row}", !empty($log['time_out']) ? date('h:i A', strtotime($log['time_out'])) : '');
-
-    $sheet->getStyle("A{$row}:D{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+    $sheet->setCellValue("C{$row}", $log['company']);
+    $sheet->setCellValue("D{$row}", !empty($log['time_in']) ? date('h:i A', strtotime($log['time_in'])) : '');
+    $sheet->setCellValue("E{$row}", !empty($log['time_out']) ? date('h:i A', strtotime($log['time_out'])) : '');
+    $sheet->getStyle("A{$row}:E{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $row++;
 }
 
 // Auto-size Columns
-foreach (range('A', 'D') as $col) {
+foreach (range('A', 'E') as $col) {
     $sheet->getColumnDimension($col)->setAutoSize(true);
 }
 
