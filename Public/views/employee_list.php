@@ -1,16 +1,38 @@
 <?php
-include('../config/db.php');
+// Secure session cookie params (set before session_start)
+session_set_cookie_params([
+    'lifetime' => 0,            // Session cookie lasts until browser closes
+    'path' => '/',
+    'domain' => '',             // Change this if needed
+    'secure' => isset($_SERVER['HTTPS']),  // true if using HTTPS
+    'httponly' => true,
+    'samesite' => 'Lax'         // Helps protect against CSRF
+]);
+
 session_start();
 
-// Prevent browser from caching this page
-header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-header("Cache-Control: post-check=0, pre-check=0", false);
-header("Pragma: no-cache");
+// Session inactivity timeout (30 minutes)
+$timeout = 1800; // seconds
+if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY']) > $timeout) {
+    session_unset();
+    session_destroy();
+    header("Location: ../admin/login.php");
+    exit;
+}
+$_SESSION['LAST_ACTIVITY'] = time();
 
+// Check if admin logged in
 if (!isset($_SESSION['admin'])) {
     header("Location: ../admin/login.php");
     exit;
 }
+
+// CSRF token generation
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+include('../config/db.php');
 
 // Sorting
 $sort = $_GET['sort'] ?? 'id';
@@ -42,7 +64,7 @@ $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Sorting helper
+// Sorting helper function
 function sort_link($column, $label) {
     $currentSort = $_GET['sort'] ?? 'id';
     $currentOrder = $_GET['order'] ?? 'asc';
@@ -134,15 +156,22 @@ function sort_link($column, $label) {
               <td class="border border-gray-300 px-4 py-2"><?= htmlspecialchars($emp['contact']) ?></td>
               <td class="border border-gray-300 px-4 py-2"><?= htmlspecialchars($emp['position']) ?></td>
               <td class="border border-gray-300 px-4 py-2"><?= htmlspecialchars($emp['status']) ?></td>
-              <td class="border border-gray-300 px-4 py-2 flex gap-2">
+              <td class="border border-gray-300 px-4 py-2 flex gap-2 items-center">
+
                 <a href="employee-edit.php?id=<?= $emp['id'] ?>"
                    class="text-blue-600 font-semibold hover:underline focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-2 py-1">
                   Edit
                 </a>
-                <a href="employee-delete.php?id=<?= $emp['id'] ?>"
-                   class="text-red-600 font-semibold hover:underline focus:outline-none focus:ring-1 focus:ring-red-300 rounded px-2 py-1">
-                  Delete
-                </a>
+
+                <!-- Secure Delete form -->
+                <form method="POST" action="employee-delete.php" onsubmit="return confirm('Are you sure you want to delete this employee?');" class="inline">
+                  <input type="hidden" name="id" value="<?= $emp['id'] ?>">
+                  <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                  <button type="submit" class="text-red-600 font-semibold hover:underline focus:outline-none focus:ring-1 focus:ring-red-300 rounded px-2 py-1 bg-transparent border-0 cursor-pointer">
+                    Delete
+                  </button>
+                </form>
+
               </td>
             </tr>
           <?php endforeach; ?>

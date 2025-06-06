@@ -8,25 +8,38 @@ if (isset($_SESSION['admin'])) {
     exit;
 }
 
+// Generate CSRF token if not present
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
-
-    $stmt = $pdo->prepare("SELECT * FROM admin WHERE admin_username = ?");
-    $stmt->execute([$username]);
-    $admin = $stmt->fetch();
-
-    if ($admin && $admin['admin_password'] === $password) {
-        $_SESSION['admin'] = [
-            'id' => $admin['id'],
-            'username' => $admin['admin_username']
-        ];
-        header("Location: ../views/employee_list.php");
-        exit;
+    // CSRF token check
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        $error = "Invalid CSRF token.";
     } else {
-        $error = "Invalid admin username or password.";
+        $username = $_POST['username'] ?? '';
+        $password = $_POST['password'] ?? '';
+
+        $stmt = $pdo->prepare("SELECT * FROM admin WHERE admin_username = ?");
+        $stmt->execute([$username]);
+        $admin = $stmt->fetch();
+
+        // Plain text password check (not recommended for production)
+        if ($admin && $admin['admin_password'] === $password) {
+            session_regenerate_id(true);
+            $_SESSION['admin'] = [
+                'id' => $admin['id'],
+                'username' => $admin['admin_username']
+            ];
+            unset($_SESSION['csrf_token']); // optional
+            header("Location: ../views/employee_list.php");
+            exit;
+        } else {
+            $error = "Invalid admin username or password.";
+        }
     }
 }
 ?>
@@ -43,21 +56,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   <div class="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-md p-8 sm:p-10 space-y-6">
 
-    <!-- Header -->
     <div class="text-center">
       <h1 class="text-2xl sm:text-3xl font-semibold text-gray-800">Admin Login</h1>
       <p class="text-sm text-gray-500 mt-1">Enter your credentials to continue</p>
     </div>
 
-    <!-- Error Message -->
     <?php if (!empty($error)): ?>
       <p class="text-red-600 text-center font-medium"><?= htmlspecialchars($error) ?></p>
     <?php endif; ?>
 
-    <!-- Login Form -->
     <form method="POST" class="space-y-5">
 
-      <!-- Username -->
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
         <input 
@@ -65,10 +76,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           name="username" 
           required 
           class="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400"
+          autocomplete="username"
         />
       </div>
 
-      <!-- Password -->
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
         <input 
@@ -76,10 +87,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           name="password" 
           required 
           class="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-sky-400"
+          autocomplete="current-password"
         />
       </div>
 
-      <!-- Submit Button -->
       <button 
         type="submit" 
         class="w-full bg-sky-500 hover:bg-sky-600 text-white font-medium py-2.5 rounded-md transition duration-200 shadow"
@@ -87,11 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Login
       </button>
     </form>
-
-    <!-- Back Link
-    <p class="text-center text-sm text-gray-500">
-      <a href="../index.php" class="hover:underline hover:text-sky-600 transition">← Back to homepage</a>
-    </p> -->
 
   </div>
 

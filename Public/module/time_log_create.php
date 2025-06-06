@@ -3,115 +3,129 @@ session_start();
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
+// Secure session regeneration (you can also do this right after login)
+if (!isset($_SESSION['regenerated'])) {
+    session_regenerate_id(true);
+    $_SESSION['regenerated'] = true;
+}
+
 $employee_id = $_SESSION['employee']['id'] ?? null;
 if (!$employee_id) {
     header("Location: ../employee/login.php");
     exit;
 }
 
-// Fetch employee user details (now including company)
-$user_stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company FROM employees WHERE id = ?");
-$user_stmt->execute([$employee_id]);
-$user = $user_stmt->fetch();
+try {
+    // Fetch employee user details
+    $user_stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company FROM employees WHERE id = ?");
+    $user_stmt->execute([$employee_id]);
+    $user = $user_stmt->fetch();
 
-$fname = $user['fname'] ?? '';
-$lname = $user['lname'] ?? '';
-$email = $user['email'] ?? '';
-$contact = $user['contact'] ?? '';
-$position = $user['position'] ?? '';
-$company = $user['company'] ?? '';
+    $fname = $user['fname'] ?? '';
+    $lname = $user['lname'] ?? '';
+    $email = $user['email'] ?? '';
+    $contact = $user['contact'] ?? '';
+    $position = $user['position'] ?? '';
+    $company = $user['company'] ?? '';
 
-$current_date = date("Y-m-d");
+    $current_date = date("Y-m-d");
 
-// Fetch today's time log
-$stmt = $pdo->prepare("SELECT * FROM time_logs WHERE employee_id = ? AND log_date = ?");
-$stmt->execute([$employee_id, $current_date]);
-$time_log = $stmt->fetch();
+    // Fetch today's time log
+    $stmt = $pdo->prepare("SELECT * FROM time_logs WHERE employee_id = ? AND log_date = ?");
+    $stmt->execute([$employee_id, $current_date]);
+    $time_log = $stmt->fetch();
 
-$time_in = null;
-$time_out = null;
+    $time_in = $time_log['time_in'] ?? null;
+    $time_out = $time_log['time_out'] ?? null;
 
-if ($time_log) {
-    $time_in = $time_log['time_in'];
-    $time_out = $time_log['time_out'];
-}
+    // Check for schedule exception
+    $exception_stmt = $pdo->prepare("SELECT * FROM schedule_exceptions WHERE employee_id = ? AND start_date = ?");
+    $exception_stmt->execute([$employee_id, $current_date]);
+    $schedule_exception = $exception_stmt->fetch();
 
-// Step 1: Check for schedule exception FIRST
-$exception_stmt = $pdo->prepare("SELECT * FROM schedule_exceptions WHERE employee_id = ? AND start_date = ?");
-$exception_stmt->execute([$employee_id, $current_date]);
-$schedule_exception = $exception_stmt->fetch();
+    if ($schedule_exception) {
+        $work_start_time = $schedule_exception['start_time'];
+        $work_end_time = $schedule_exception['end_time'];
+    } else {
+        $schedule_stmt = $pdo->prepare("
+            SELECT ws.time_in AS start_time, ws.time_out AS end_time 
+            FROM employee_work_schedule ews
+            JOIN work_schedules ws ON ews.work_schedule_id = ws.id
+            WHERE ews.employee_id = ? 
+            ORDER BY ews.effective_date DESC 
+            LIMIT 1
+        ");
+        $schedule_stmt->execute([$employee_id]);
+        $work_schedule = $schedule_stmt->fetch();
 
-if ($schedule_exception) {
-    $work_start_time = $schedule_exception['start_time'];
-    $work_end_time = $schedule_exception['end_time'];
-} else {
-    $schedule_stmt = $pdo->prepare("
-        SELECT ws.time_in AS start_time, ws.time_out AS end_time 
-        FROM employee_work_schedule ews
-        JOIN work_schedules ws ON ews.work_schedule_id = ws.id
-        WHERE ews.employee_id = ? 
-        ORDER BY ews.effective_date DESC 
-        LIMIT 1
-    ");
-    $schedule_stmt->execute([$employee_id]);
-    $work_schedule = $schedule_stmt->fetch();
-
-    $work_start_time = $work_schedule['start_time'] ?? null;
-    $work_end_time   = $work_schedule['end_time'] ?? null;
-}
-
-// Step 2: Check for approved overtime request
-$overtime_stmt = $pdo->prepare("SELECT * FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status = 'approved' LIMIT 1");
-$overtime_stmt->execute([$employee_id, $current_date]);
-$overtime = $overtime_stmt->fetch();
-
-if ($overtime && $overtime['expected_time_out']) {
-    $work_end_time = $overtime['expected_time_out'];
-}
-
-// Step 3: Check for approved Rest Day Overtime
-$rest_day_ot_stmt = $pdo->prepare("
-    SELECT * FROM rest_day_overtime_requests 
-    WHERE employee_id = ? AND rest_day_date = ? AND status = 'approved' LIMIT 1
-");
-$rest_day_ot_stmt->execute([$employee_id, $current_date]);
-$rest_day_ot = $rest_day_ot_stmt->fetch();
-
-if ($rest_day_ot) {
-    $work_start_time = $rest_day_ot['expected_time_in'];
-    $work_end_time = $rest_day_ot['expected_time_out'];
-}
-
-$can_time_in = !$time_in;
-$can_time_out = $time_in && !$time_out;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $current_time = date("H:i:s");
-    $current_timestamp = strtotime($current_time);
-    $start_timestamp = $work_start_time ? strtotime($work_start_time) : null;
-    $end_timestamp = $work_end_time ? strtotime($work_end_time) : null;
-
-    if (isset($_POST['time_in']) && $can_time_in) {
-        $is_late_in = ($start_timestamp && $current_timestamp > $start_timestamp) ? 1 : 0;
-
-        $insert = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out, is_late_in, is_early_out) VALUES (?, ?, ?, ?, ?, ?)");
-        $insert->execute([$employee_id, $current_date, $current_time, null, $is_late_in, 0]);
-
-        header("Location: time_log_create.php");
-        exit;
+        $work_start_time = $work_schedule['start_time'] ?? null;
+        $work_end_time   = $work_schedule['end_time'] ?? null;
     }
 
-    if (isset($_POST['time_out']) && $can_time_out) {
-        $is_early_out = ($end_timestamp && $current_timestamp < $end_timestamp) ? 1 : 0;
+    // Approved overtime
+    $overtime_stmt = $pdo->prepare("SELECT * FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status = 'approved' LIMIT 1");
+    $overtime_stmt->execute([$employee_id, $current_date]);
+    $overtime = $overtime_stmt->fetch();
 
-        $update = $pdo->prepare("UPDATE time_logs SET time_out = ?, is_early_out = ? WHERE employee_id = ? AND log_date = ?");
-        $update->execute([$current_time, $is_early_out, $employee_id, $current_date]);
-
-        header("Location: time_log_create.php");
-        exit;
+    if ($overtime && $overtime['expected_time_out']) {
+        $work_end_time = $overtime['expected_time_out'];
     }
+
+    // Rest day OT
+    $rest_day_ot_stmt = $pdo->prepare("SELECT * FROM rest_day_overtime_requests WHERE employee_id = ? AND rest_day_date = ? AND status = 'approved' LIMIT 1");
+    $rest_day_ot_stmt->execute([$employee_id, $current_date]);
+    $rest_day_ot = $rest_day_ot_stmt->fetch();
+
+    if ($rest_day_ot) {
+        $work_start_time = $rest_day_ot['expected_time_in'];
+        $work_end_time = $rest_day_ot['expected_time_out'];
+    }
+
+    $can_time_in = !$time_in;
+    $can_time_out = $time_in && !$time_out;
+
+    // Generate CSRF token
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+            die("Invalid CSRF token");
+        }
+
+        $current_time = date("H:i:s");
+        $current_timestamp = strtotime($current_time);
+        $start_timestamp = $work_start_time ? strtotime($work_start_time) : null;
+        $end_timestamp = $work_end_time ? strtotime($work_end_time) : null;
+
+        if (isset($_POST['time_in']) && $can_time_in) {
+            $is_late_in = ($start_timestamp && $current_timestamp > $start_timestamp) ? 1 : 0;
+
+            $insert = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out, is_late_in, is_early_out) VALUES (?, ?, ?, ?, ?, ?)");
+            $insert->execute([$employee_id, $current_date, $current_time, null, $is_late_in, 0]);
+
+            header("Location: time_log_create.php");
+            exit;
+        }
+
+        if (isset($_POST['time_out']) && $can_time_out) {
+            $is_early_out = ($end_timestamp && $current_timestamp < $end_timestamp) ? 1 : 0;
+
+            $update = $pdo->prepare("UPDATE time_logs SET time_out = ?, is_early_out = ? WHERE employee_id = ? AND log_date = ?");
+            $update->execute([$current_time, $is_early_out, $employee_id, $current_date]);
+
+            header("Location: time_log_create.php");
+            exit;
+        }
+    }
+} catch (Exception $e) {
+    // You can also log this to a file if needed
+    error_log("Error in time_log_create.php: " . $e->getMessage());
+    die("Sorry, something went wrong. Please try again later.");
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
@@ -172,6 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h1 class="text-2xl font-bold text-gray-900 text-center">Manual Time Log</h1>
 
     <form method="POST" onsubmit="return confirmLog(this);" class="flex flex-col gap-4">
+      <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
       <?php if (!$time_in): ?>
         <?php if ($can_time_in): ?>
           <button type="submit" name="time_in"
