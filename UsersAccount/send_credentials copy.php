@@ -17,22 +17,11 @@ try {
     foreach ($employees as $emp) {
         $mail = new PHPMailer(true);
 
-        // SMTP Settings
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'it.resourcestaff@gmail.com';
-        $mail->Password   = 'fqbr ocgu jcfh jwdy';  // App password
-        $mail->SMTPSecure = 'tls';
-        $mail->Port       = 587;
-
+        // Prepare email (no SMTP setup since we won't send)
         $mail->setFrom('it.resourcestaff@gmail.com', 'MailBot - IT Support Specialist');
         $mail->isHTML(true);
-
-        // Send to the employee's own email
         $mail->addAddress($emp['personal_email'], $emp['fname'] . ' ' . $emp['lname']);
 
-        // Email body (same content — do not edit)
         $body = <<<HTML
 <div style="font-family: Arial, sans-serif; color: #333; padding: 20px; line-height: 1.6;">
   <img src="https://timekeeping-system.resourcestaffonline.com/asset/RSS-logo-colour.png" alt="Company Logo" style="max-width: 150px; margin-bottom: 20px;" />
@@ -54,10 +43,10 @@ try {
 
   <p style="margin-top: 20px;">
     You can log in via the following link:<br>
-    <a href="https://timekeeping-system.resourcestaffonline.com/employee/login.php" style="color: #1e40af;">https://timekeeping-system.resourcestaffonline.com/employee/login</a>
+    <a href="https://your-domain.com/login" style="color: #1e40af;">https://your-domain.com/login</a>
   </p>
 
-  <p>If you have any issues accessing the platform, please do not hesitate to reach out me.</p>
+  <p>If you have any issues accessing the platform, please do not hesitate to reach out to our IT support team.</p>
 
   <p style="margin-top: 10px;">Cheers,</p>
 
@@ -85,12 +74,10 @@ HTML;
         $mail->Subject = 'Welcome to Resourcestaff Time-keeping System';
         $mail->Body    = $body;
 
-        try {
-            $mail->send();
-            echo "✅ Email sent to: {$emp['personal_email']} ({$emp['fname']} {$emp['lname']})\n";
-        } catch (Exception $e) {
-            echo "❌ Failed to send to {$emp['personal_email']}: {$mail->ErrorInfo}\n";
-        }
+        // Instead of sending, just output the email content:
+        echo "<h2>Email preview for {$emp['fname']} {$emp['lname']} ({$emp['personal_email']})</h2>";
+        echo $mail->Body;
+        echo "<hr style='border:1px solid #ccc; margin:40px 0;'>";
     }
 } catch (PDOException $e) {
     echo "Database Error: " . $e->getMessage();

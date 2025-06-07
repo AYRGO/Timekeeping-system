@@ -1,11 +1,10 @@
 <?php
-// Secure session configuration BEFORE session_start
+// Secure session settings
 session_set_cookie_params([
     'secure' => true,
     'httponly' => true,
     'samesite' => 'Strict'
 ]);
-
 session_start();
 
 include('../config/db.php');
@@ -15,17 +14,27 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Initialize error message
-$error = '';
+// Server-side mobile block (user agent + screen width cookie)
+function isMobileDevice() {
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    return preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i', $ua);
+}
 
-// Brute-force protection config
+$screenWidth = $_COOKIE['screen_width'] ?? 1200;
+if (isMobileDevice() || $screenWidth < 1024) {
+    die("<h2 style='text-align:center; padding-top:60px;'>Access denied on mobile devices.<br>Please use a desktop or laptop computer.</h2>");
+}
+
+// Brute-force protection
 $max_attempts = 5;
 $lockout_time = 300; // 5 minutes
+$error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
+    // CSRF check
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         die("Invalid CSRF token.");
     }
@@ -39,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Too many failed login attempts. Try again after 5 minutes.");
     }
 
+    // Query DB
     $stmt = $pdo->prepare("SELECT * FROM employees WHERE username = ?");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
@@ -68,31 +78,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/x-icon" href="../asset/RSS-logo-colour.png" />
   <title>Employee Login</title>
   <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- Block mobile using screen width & user agent -->
   <script>
+    document.cookie = "screen_width=" + window.innerWidth + "; path=/";
+
     function isProbablyMobile() {
-      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
-      const highDPI = window.devicePixelRatio && window.devicePixelRatio > 1.3;
-      const screenTooSmall = Math.min(window.innerWidth, window.innerHeight) < 768;
-      const uaMobile = /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-      let isRealMobile = false;
-
-      if (navigator.userAgentData) {
-        isRealMobile = navigator.userAgentData.mobile;
-      }
-
-      return hasTouch || highDPI || screenTooSmall || uaMobile || isRealMobile;
+      const ua = navigator.userAgent;
+      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isSmall = window.innerWidth <= 1024;
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+      return isMobileUA || isTouch || isSmall;
     }
 
     if (isProbablyMobile()) {
       document.documentElement.innerHTML = `
         <div style="text-align:center;padding-top:60px;font-family:sans-serif;">
-          <h2>Access denied on mobile or touch-enabled devices.</h2>
-          <p>Please use a real desktop or laptop computer.</p>
+          <h2>Access denied on mobile devices.</h2>
+          <p>Please use a desktop or laptop computer.</p>
         </div>`;
-      throw new Error("Blocked mobile/touch device");
+      throw new Error("Blocked mobile device");
     }
   </script>
 
@@ -120,9 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </noscript>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-
   <div class="w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-200 p-8 sm:p-10 space-y-6">
-
     <!-- Header -->
     <div class="text-center">
       <h1 class="text-2xl sm:text-3xl font-semibold text-gray-800">Employee Login</h1>
@@ -164,8 +170,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Login
       </button>
     </form>
-
   </div>
-
 </body>
 </html>

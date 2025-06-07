@@ -158,7 +158,7 @@ function sort_link($column, $label) {
               <td class="border border-gray-300 px-4 py-2"><?= htmlspecialchars($emp['status']) ?></td>
               <td class="border border-gray-300 px-4 py-2 flex gap-2 items-center">
 
-                <a href="employee-edit.php?id=<?= $emp['id'] ?>"
+                <a href="../controller/employee-edit.php?id=<?= $emp['id'] ?>"
                    class="text-blue-600 font-semibold hover:underline focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-2 py-1">
                   Edit
                 </a>
