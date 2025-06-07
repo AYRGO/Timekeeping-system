@@ -5,32 +5,34 @@ use PHPMailer\PHPMailer\Exception;
 require '../vendor/autoload.php'; // PHPMailer autoload
 require '../Public/config/db.php';
 
-// Fetch employees with valid emails
-$query = $pdo->query("SELECT fname, lname, email, username, password FROM employees WHERE email IS NOT NULL AND email != ''");
-$employees = $query->fetchAll(PDO::FETCH_ASSOC);
-
-if (!$employees) {
-    die("No employees found with valid email.");
-}
-
-$mail = new PHPMailer(true);
-
 try {
+    // Fetch only one employee to test (you can pick any, or dummy data)
+    $query = $pdo->query("SELECT fname, lname, personal_email, username, password FROM employees WHERE personal_email IS NOT NULL AND personal_email != '' LIMIT 1");
+    $emp = $query->fetch(PDO::FETCH_ASSOC);
+
+    if (!$emp) {
+        die("No employee found with valid personal email.");
+    }
+
+    $mail = new PHPMailer(true);
+
     // SMTP Settings
     $mail->isSMTP();
-    $mail->Host       = 'smtp.yourmailserver.com';
+    $mail->Host       = 'smtp.gmail.com';
     $mail->SMTPAuth   = true;
-    $mail->Username   = 'your_email@example.com';
-    $mail->Password   = 'your_password';
+    $mail->Username   = 'it.resourcestaff@gmail.com';
+    $mail->Password   = 'fqbr ocgu jcfh jwdy';  // Your app password
     $mail->SMTPSecure = 'tls';
     $mail->Port       = 587;
 
-    $mail->setFrom('your_email@example.com', 'ResourceStaff Management');
+    $mail->setFrom('it.resourcestaff@gmail.com', 'MailBot - IT Support Specialist');
     $mail->isHTML(true); // Enable HTML
 
-foreach ($employees as $emp) {
-    // Build email body content
-   $body = <<<HTML
+    // Override recipient to your own email for testing
+    $mail->addAddress('cedrickarnigo1723@gmail.com', 'Cedrick Arnigo');
+
+    // Build email body content exactly as before, with employee data from DB
+    $body = <<<HTML
 <div style="font-family: Arial, sans-serif; color: #333; padding: 20px; line-height: 1.6;">
   <img src="../Public/asset/RSS-logo-colour.png" alt="Company Logo" style="max-width: 150px; margin-bottom: 20px;" />
 
@@ -54,17 +56,10 @@ foreach ($employees as $emp) {
     <a href="https://your-domain.com/login" style="color: #1e40af;">https://your-domain.com/login</a>
   </p>
 
-    <!-- QR Code Section
-  <div style="margin: 20px 0;">
-    <p style="margin-bottom: 5px;">Scan the QR code to access the login page:</p>
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://your-domain.com/login" alt="QR Code" />
-  </div> -->
-
   <p>If you have any issues accessing the platform, please do not hesitate to reach out to our IT support team.</p>
 
   <p style="margin-top: 10px;">Cheers,</p>
 
-  <!-- Signature Block -->
   <table style="margin-top: 30px; font-family: Arial, sans-serif; color: #333;">
     <tr>
       <td style="vertical-align: top; padding-right: 10px;">
@@ -86,14 +81,15 @@ foreach ($employees as $emp) {
 </div>
 HTML;
 
+    $mail->Subject = 'Welcome to Resourcestaff Time-keeping System';
+    $mail->Body = $body;
 
-    // Output the email to browser instead of sending
-    echo $body;
-    break; // Remove this line if you want to preview all employee emails
-}
-    echo "All credentials have been sent successfully.";
+    $mail->send();
+
+    echo "Test email has been sent successfully to cedrickarnigo1723@gmail.com";
+
 } catch (Exception $e) {
-    echo "Failed to send: {$mail->ErrorInfo}";
+    echo "Failed to send email: {$mail->ErrorInfo}";
 } catch (PDOException $e) {
     echo "Database Error: " . $e->getMessage();
 }
