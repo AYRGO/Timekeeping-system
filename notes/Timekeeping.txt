@@ -334,3 +334,6 @@ i provided the wroong code this is the new one
 
 can we add a employee add and employee assign schedule button?? looks like the div with a lot buttons is very populative right now what i want is put this 2 button to the best area while keeping the consistency of being responsiveness
 
+
+
+#Recommendation from team member - Change Password
