@@ -54,8 +54,15 @@ try {
 
   <p style="margin-top: 20px;">
     You can log in via the following link:<br>
-    <a href="https://timekeeping-system.resourcestaffonline.com/employee/login.php" style="color: #1e40af;">https://timekeeping-system.resourcestaffonline.com/employee/login</a>
+    <a href="https://timekeeping-system.resourcestaffonline.com/employee/login" style="color: #1e40af;">https://timekeeping-system.resourcestaffonline.com/employee/login</a>
   </p>
+
+   <p style="margin-top: 20px;">
+  To help you get started, please watch the tutorial video below:<br>
+  <a href="https://www.dropbox.com/scl/fi/wdyyl97noof3qd0nzxp6m/Timekeeping-System-Tutorial.mp4?rlkey=xnq5kg6urn9qv5kqc3l5o41j7&st=n5uij8ze&dl=0" style="color: #1e40af;" target="_blank">
+    📽️ Watch Tutorial Video
+  </a>
+</p>
 
   <p>If you have any issues accessing the platform, please do not hesitate to reach out me.</p>
 

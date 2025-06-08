@@ -45,6 +45,12 @@ try {
     You can log in via the following link:<br>
     <a href="https://your-domain.com/login" style="color: #1e40af;">https://your-domain.com/login</a>
   </p>
+  <p style="margin-top: 20px;">
+  To help you get started, please watch the tutorial video below:<br>
+  <a href="https://www.dropbox.com/scl/fi/wdyyl97noof3qd0nzxp6m/Timekeeping-System-Tutorial.mp4?rlkey=xnq5kg6urn9qv5kqc3l5o41j7&st=n5uij8ze&dl=0" style="color: #1e40af;" target="_blank">
+    📽️ Watch Tutorial Video
+  </a>
+</p>
 
   <p>If you have any issues accessing the platform, please do not hesitate to reach out to our IT support team.</p>
 
