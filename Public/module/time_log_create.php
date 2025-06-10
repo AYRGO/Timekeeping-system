@@ -3,7 +3,6 @@ session_start();
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
-// Secure session regeneration (you can also do this right after login)
 if (!isset($_SESSION['regenerated'])) {
     session_regenerate_id(true);
     $_SESSION['regenerated'] = true;
@@ -16,8 +15,7 @@ if (!$employee_id) {
 }
 
 try {
-    // Fetch employee user details
-    $user_stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company FROM employees WHERE id = ?");
+    $user_stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company, profile_picture FROM employees WHERE id = ?");
     $user_stmt->execute([$employee_id]);
     $user = $user_stmt->fetch();
 
@@ -27,10 +25,10 @@ try {
     $contact = $user['contact'] ?? '';
     $position = $user['position'] ?? '';
     $company = $user['company'] ?? '';
+    $profile_picture = $user['profile_picture'] ?? null;
 
     $current_date = date("Y-m-d");
 
-    // Fetch today's time log
     $stmt = $pdo->prepare("SELECT * FROM time_logs WHERE employee_id = ? AND log_date = ?");
     $stmt->execute([$employee_id, $current_date]);
     $time_log = $stmt->fetch();
@@ -38,7 +36,6 @@ try {
     $time_in = $time_log['time_in'] ?? null;
     $time_out = $time_log['time_out'] ?? null;
 
-    // Check for schedule exception
     $exception_stmt = $pdo->prepare("SELECT * FROM schedule_exceptions WHERE employee_id = ? AND start_date = ?");
     $exception_stmt->execute([$employee_id, $current_date]);
     $schedule_exception = $exception_stmt->fetch();
@@ -62,7 +59,6 @@ try {
         $work_end_time   = $work_schedule['end_time'] ?? null;
     }
 
-    // Approved overtime
     $overtime_stmt = $pdo->prepare("SELECT * FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status = 'approved' LIMIT 1");
     $overtime_stmt->execute([$employee_id, $current_date]);
     $overtime = $overtime_stmt->fetch();
@@ -71,7 +67,6 @@ try {
         $work_end_time = $overtime['expected_time_out'];
     }
 
-    // Rest day OT
     $rest_day_ot_stmt = $pdo->prepare("SELECT * FROM rest_day_overtime_requests WHERE employee_id = ? AND rest_day_date = ? AND status = 'approved' LIMIT 1");
     $rest_day_ot_stmt->execute([$employee_id, $current_date]);
     $rest_day_ot = $rest_day_ot_stmt->fetch();
@@ -84,7 +79,6 @@ try {
     $can_time_in = !$time_in;
     $can_time_out = $time_in && !$time_out;
 
-    // Generate CSRF token
     if (empty($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
@@ -101,34 +95,27 @@ try {
 
         if (isset($_POST['time_in']) && $can_time_in) {
             $is_late_in = ($start_timestamp && $current_timestamp > $start_timestamp) ? 1 : 0;
-
             $insert = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out, is_late_in, is_early_out) VALUES (?, ?, ?, ?, ?, ?)");
             $insert->execute([$employee_id, $current_date, $current_time, null, $is_late_in, 0]);
-
             header("Location: time_log_create.php");
             exit;
         }
 
         if (isset($_POST['time_out']) && $can_time_out) {
             $is_early_out = ($end_timestamp && $current_timestamp < $end_timestamp) ? 1 : 0;
-
             $update = $pdo->prepare("UPDATE time_logs SET time_out = ?, is_early_out = ? WHERE employee_id = ? AND log_date = ?");
             $update->execute([$current_time, $is_early_out, $employee_id, $current_date]);
-
             header("Location: time_log_create.php");
             exit;
         }
     }
 } catch (Exception $e) {
-    // You can also log this to a file if needed
     error_log("Error in time_log_create.php: " . $e->getMessage());
     die("Sorry, something went wrong. Please try again later.");
 }
 ?>
-
-
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Manual Time Log</title>
@@ -142,95 +129,65 @@ try {
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const seconds = String(now.getSeconds()).padStart(2, '0');
       const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      const formattedHours = String(hours).padStart(2, '0');
-      clock.textContent = `${formattedHours}:${minutes}:${seconds} ${ampm}`;
+      hours = hours % 12 || 12;
+      clock.textContent = `${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
     }
     setInterval(updateClock, 1000);
     window.onload = updateClock;
-
-    function confirmLog(form) {
-      const timeInBtn = form.querySelector('button[name="time_in"]');
-      const timeOutBtn = form.querySelector('button[name="time_out"]');
-      if (document.activeElement === timeInBtn) {
-        return confirm("Are you sure you want to log your Time In?");
-      }
-      if (document.activeElement === timeOutBtn) {
-        return confirm("Are you sure you want to log your Time Out?");
-      }
-      return true;
-    }
   </script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #28c197, #00bdd6);
+    }
+  </style>
 </head>
-<body class="bg-gray-50 flex justify-center items-start min-h-screen py-10 px-4">
+<body class="flex justify-center items-start min-h-screen py-10 px-4 text-white">
+  <main class="bg-white text-gray-900 max-w-3xl w-full rounded-2xl shadow-xl p-8 flex flex-col gap-8">
+    <section class="flex items-start gap-6 bg-gray-100 p-6 rounded-xl shadow-inner">
+      <div class="flex flex-col items-center w-48">
+        <?php if (!empty($profile_picture)): ?>
+          <img src="../uploads/profile_images/<?php echo htmlspecialchars($profile_picture); ?>" 
+               alt="Profile Picture" class="w-24 h-24 rounded-full mb-2 object-cover shadow" />
+        <?php else: ?>
+          <div class="w-24 h-24 bg-gray-300 rounded-full mb-2 flex items-center justify-center text-4xl text-white font-bold">
+            👤
+          </div>
+        <?php endif; ?>
 
-  <main class="bg-white max-w-md w-full rounded-2xl shadow-lg p-8 flex flex-col gap-8">
+        <form action="/Timekeeping-system/Public/module/upload_profile.php" method="POST" enctype="multipart/form-data" class="flex flex-col gap-2 items-center">
+          <input type="file" name="profile_picture" accept="image/*" required class="text-xs w-full">
+          <button type="submit" class="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700">Upload</button>
+        </form>
 
-    <!-- User Info -->
-    <section aria-label="User details" class="bg-gray-100 p-6 rounded-xl shadow-inner">
-      <h3 class="text-xl font-semibold text-gray-800 mb-2">
-        <?php echo htmlspecialchars($fname . ' ' . $lname); ?>
-      </h3>
-      <p class="text-gray-600"><span class="font-medium">Position:</span> <?php echo htmlspecialchars($position); ?></p>
-      <p class="text-gray-600"><span class="font-medium">Company:</span> <?php echo htmlspecialchars($company); ?></p>
-      <p class="text-gray-600"><span class="font-medium">Email:</span> <?php echo htmlspecialchars($email); ?></p>
-      <p class="text-gray-600"><span class="font-medium">Contact:</span> <?php echo htmlspecialchars($contact); ?></p>
+        <h3 class="text-md font-bold text-center mt-2"><?php echo htmlspecialchars($fname . ' ' . $lname); ?></h3>
+      </div>
+
+      <div class="flex-1 grid gap-2">
+        <p><span class="font-medium">Position:</span> <?php echo htmlspecialchars($position); ?></p>
+        <p><span class="font-medium">Company:</span> <?php echo htmlspecialchars($company); ?></p>
+        <p><span class="font-medium">Email:</span> <?php echo htmlspecialchars($email); ?></p>
+        <p><span class="font-medium">Contact:</span> <?php echo htmlspecialchars($contact); ?></p>
+      </div>
     </section>
 
-    <!-- Clock -->
-    <h2 id="clock" class="font-mono text-4xl font-bold text-blue-700 text-center select-none">
-      --:--:--
-    </h2>
+    <h2 id="clock" class="font-mono text-4xl font-bold text-center text-blue-600 select-none">--:--:--</h2>
+    <h1 class="text-2xl font-bold text-center text-gray-900">Manual Time Log</h1>
 
-    <h1 class="text-2xl font-bold text-gray-900 text-center">Manual Time Log</h1>
-
-    <form method="POST" onsubmit="return confirmLog(this);" class="flex flex-col gap-4">
+    <form method="POST" class="flex flex-col gap-4">
       <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-      <?php if (!$time_in): ?>
-        <?php if ($can_time_in): ?>
-          <button type="submit" name="time_in"
-            class="w-full py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition focus:outline-none focus:ring-4 focus:ring-blue-300">
-            Log Time In
-          </button>
-        <?php else: ?>
-          <button type="button" disabled
-            class="w-full py-3 rounded-lg bg-gray-400 text-gray-200 font-semibold cursor-not-allowed" aria-disabled="true">
-            Cannot Log In - Already Logged
-          </button>
-        <?php endif; ?>
-      <?php else: ?>
-        <button type="button" disabled
-          class="w-full py-3 rounded-lg bg-gray-400 text-gray-200 font-semibold cursor-not-allowed" aria-disabled="true">
-          Already Logged In
-        </button>
-      <?php endif; ?>
 
-      <?php if ($time_in && !$time_out): ?>
-        <button type="submit" name="time_out"
-          class="w-full py-3 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition focus:outline-none focus:ring-4 focus:ring-green-300">
-          Log Time Out
-        </button>
-      <?php elseif ($time_out): ?>
-        <button type="button" disabled
-          class="w-full py-3 rounded-lg bg-gray-400 text-gray-200 font-semibold cursor-not-allowed" aria-disabled="true">
-          Already Logged Out
-        </button>
+      <?php if (!$time_in && $can_time_in): ?>
+        <button type="submit" name="time_in" class="bg-black text-white py-3 rounded hover:bg-gray-800">Log Time In</button>
+      <?php elseif ($time_in && !$time_out): ?>
+        <button type="submit" name="time_out" class="bg-black text-white py-3 rounded hover:bg-gray-800">Log Time Out</button>
+      <?php else: ?>
+        <button type="button" disabled class="bg-gray-400 text-gray-200 py-3 rounded">Already Logged</button>
       <?php endif; ?>
     </form>
 
-    <section aria-label="Requests and navigation" class="pt-4 border-t border-gray-200">
-      <ul class="flex flex-wrap gap-4 justify-center">
-        <li>
-          <a href="../employee/logout.php"
-            class="inline-block px-5 py-2 rounded-lg border border-red-600 text-red-600 font-semibold hover:bg-red-50 transition focus:outline-none focus:ring-2 focus:ring-red-400">
-            Logout
-          </a>
-        </li>
-      </ul>
-    </section>
-
+    <div class="text-center pt-4 border-t">
+      <a href="../employee/logout.php" class="text-red-600 font-semibold hover:underline">Logout</a>
+    </div>
   </main>
-
 </body>
 </html>
