@@ -56,7 +56,7 @@ try {
         $work_schedule = $schedule_stmt->fetch();
 
         $work_start_time = $work_schedule['start_time'] ?? null;
-        $work_end_time   = $work_schedule['end_time'] ?? null;
+        $work_end_time = $work_schedule['end_time'] ?? null;
     }
 
     $overtime_stmt = $pdo->prepare("SELECT * FROM overtime_requests WHERE employee_id = ? AND ot_date = ? AND status = 'approved' LIMIT 1");
@@ -111,7 +111,7 @@ try {
     }
 } catch (Exception $e) {
     error_log("Error in time_log_create.php: " . $e->getMessage());
-    die("Sorry, something went wrong. Please try again later.");
+    die("Something went wrong. Try again.");
 }
 ?>
 <!DOCTYPE html>
@@ -120,7 +120,36 @@ try {
   <meta charset="UTF-8" />
   <title>Manual Time Log</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #00c6a7, #1e90ff);
+    }
+    .custom-file-input {
+      opacity: 0;
+      position: absolute;
+      cursor: pointer;
+    }
+    .overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      border-radius: 9999px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .relative:hover .overlay {
+      opacity: 1;
+    }
+  </style>
   <script>
     function updateClock() {
       const clock = document.getElementById("clock");
@@ -135,58 +164,91 @@ try {
     setInterval(updateClock, 1000);
     window.onload = updateClock;
   </script>
-  <style>
-    body {
-      background: linear-gradient(135deg, #28c197, #00bdd6);
-    }
-  </style>
 </head>
-<body class="flex justify-center items-start min-h-screen py-10 px-4 text-white">
-  <main class="bg-white text-gray-900 max-w-3xl w-full rounded-2xl shadow-xl p-8 flex flex-col gap-8">
-    <section class="flex items-start gap-6 bg-gray-100 p-6 rounded-xl shadow-inner">
-      <div class="flex flex-col items-center w-48">
-        <?php if (!empty($profile_picture)): ?>
-          <img src="../uploads/profile_images/<?php echo htmlspecialchars($profile_picture); ?>" 
-               alt="Profile Picture" class="w-24 h-24 rounded-full mb-2 object-cover shadow" />
-        <?php else: ?>
-          <div class="w-24 h-24 bg-gray-300 rounded-full mb-2 flex items-center justify-center text-4xl text-white font-bold">
-            👤
-          </div>
-        <?php endif; ?>
+<body class="min-h-screen flex items-center justify-center p-6 text-white">
 
-        <form action="/Timekeeping-system/Public/module/upload_profile.php" method="POST" enctype="multipart/form-data" class="flex flex-col gap-2 items-center">
-          <input type="file" name="profile_picture" accept="image/*" required class="text-xs w-full">
-          <button type="submit" class="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700">Upload</button>
+  <main class="bg-white text-gray-900 max-w-4xl w-full rounded-2xl shadow-2xl p-8 space-y-8">
+
+    <!-- Title -->
+    <h1 class="text-2xl md:text-3xl font-bold tracking-widest uppercase text-center text-black">Manual Time Log</h1>
+
+    <!-- Grid Container -->
+    <div class="flex flex-col md:flex-row gap-8">
+      
+      <!-- Left: Profile & Clock -->
+      <div class="flex-1 flex flex-col items-center space-y-4">
+        <form id="uploadForm" action="upload_profile.php" method="POST" enctype="multipart/form-data">
+          <div class="relative w-28 h-28">
+            <?php if (!empty($profile_picture)): ?>
+              <img src="../uploads/profile_images/<?php echo htmlspecialchars($profile_picture); ?>" class="w-28 h-28 rounded-full object-cover shadow" />
+            <?php else: ?>
+              <div class="w-28 h-28 bg-gray-300 rounded-full flex items-center justify-center text-3xl text-white">👤</div>
+            <?php endif; ?>
+            <div class="overlay cursor-pointer" onclick="document.getElementById('fileInput').click();">Change</div>
+            <input type="file" id="fileInput" name="profile_picture" accept="image/*" class="custom-file-input" onchange="document.getElementById('uploadForm').submit();">
+          </div>
         </form>
 
-        <h3 class="text-md font-bold text-center mt-2"><?php echo htmlspecialchars($fname . ' ' . $lname); ?></h3>
+        <h2 class="text-xl font-semibold"><?php echo htmlspecialchars($fname . ' ' . $lname); ?></h2>
+        <div class="text-2xl font-mono font-bold text-blue-600" id="clock">--:--:--</div>
+
+        <!-- Basic Info -->
+        <div class="bg-gray-50 rounded-lg p-4 shadow w-full text-sm space-y-1">
+          <div><span class="font-semibold text-gray-700">Email:</span> <?php echo htmlspecialchars($email); ?></div>
+          <div><span class="font-semibold text-gray-700">Contact:</span> <?php echo htmlspecialchars($contact); ?></div>
+          <div><span class="font-semibold text-gray-700">Company:</span> <?php echo htmlspecialchars($company); ?></div>
+          <div><span class="font-semibold text-gray-700">Position:</span> <?php echo htmlspecialchars($position); ?></div>
+        </div>
       </div>
 
-      <div class="flex-1 grid gap-2">
-        <p><span class="font-medium">Position:</span> <?php echo htmlspecialchars($position); ?></p>
-        <p><span class="font-medium">Company:</span> <?php echo htmlspecialchars($company); ?></p>
-        <p><span class="font-medium">Email:</span> <?php echo htmlspecialchars($email); ?></p>
-        <p><span class="font-medium">Contact:</span> <?php echo htmlspecialchars($contact); ?></p>
+      <!-- Right: Time Log + Leave -->
+      <div class="flex-1 flex flex-col justify-between space-y-6">
+
+        <!-- Time Log Box -->
+        <div class="bg-gray-100 text-gray-800 p-6 rounded-lg shadow-md space-y-4">
+          <h2 class="text-lg font-semibold text-center">Today's Time Log</h2>
+          <div class="text-center space-y-2">
+            <div><strong>Time In:</strong> <?php echo $time_in ? date("h:i A", strtotime($time_in)) : '—'; ?></div>
+            <div><strong>Time Out:</strong> <?php echo $time_out ? date("h:i A", strtotime($time_out)) : '—'; ?></div>
+          </div>
+
+          <!-- Time In/Out Buttons -->
+          <form method="POST" class="w-full">
+            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+            <?php if (!$time_in && $can_time_in): ?>
+              <button type="submit" name="time_in" class="bg-green-600 text-white font-semibold py-2 w-full rounded-md hover:bg-green-700">Log Time In</button>
+            <?php elseif ($time_in && !$time_out): ?>
+              <button type="submit" name="time_out" class="bg-yellow-600 text-white font-semibold py-2 w-full rounded-md hover:bg-yellow-700">Log Time Out</button>
+            <?php else: ?>
+              <button type="button" disabled class="bg-gray-400 text-white font-semibold py-2 w-full rounded-md">Already Logged</button>
+            <?php endif; ?>
+          </form>
+        </div>
+
+        <!-- Leave Request -->
+        <div class="bg-gray-100 text-gray-800 p-6 rounded-lg shadow-md space-y-3">
+          <h2 class="text-lg font-semibold text-center">Request Leave</h2>
+          <form>
+            <select class="w-full p-2 rounded-md border border-gray-300 bg-white text-gray-800">
+              <option disabled selected>Select Leave Type</option>
+              <option>Sick Leave</option>
+              <option>Vacation Leave</option>
+              <option>Maternity Leave</option>
+              <option>Paternity Leave</option>
+              <option>Solo Parent Leave</option>
+              <option>Halfday Leave</option>
+              <option>Halfday Sick Leave</option>
+            </select>
+            <button type="button" disabled class="mt-3 bg-blue-400 text-white px-4 py-2 rounded-md w-full cursor-not-allowed">Submit</button>
+          </form>
+        </div>
+
+        <!-- Logout -->
+        <div class="text-center">
+          <a href="../employee/logout.php" class="bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800 font-semibold">Logout</a>
+        </div>
+
       </div>
-    </section>
-
-    <h2 id="clock" class="font-mono text-4xl font-bold text-center text-blue-600 select-none">--:--:--</h2>
-    <h1 class="text-2xl font-bold text-center text-gray-900">Manual Time Log</h1>
-
-    <form method="POST" class="flex flex-col gap-4">
-      <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-
-      <?php if (!$time_in && $can_time_in): ?>
-        <button type="submit" name="time_in" class="bg-black text-white py-3 rounded hover:bg-gray-800">Log Time In</button>
-      <?php elseif ($time_in && !$time_out): ?>
-        <button type="submit" name="time_out" class="bg-black text-white py-3 rounded hover:bg-gray-800">Log Time Out</button>
-      <?php else: ?>
-        <button type="button" disabled class="bg-gray-400 text-gray-200 py-3 rounded">Already Logged</button>
-      <?php endif; ?>
-    </form>
-
-    <div class="text-center pt-4 border-t">
-      <a href="../employee/logout.php" class="text-red-600 font-semibold hover:underline">Logout</a>
     </div>
   </main>
 </body>

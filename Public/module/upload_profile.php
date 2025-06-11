@@ -26,14 +26,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
         mkdir($upload_dir, 0755, true);
     }
 
+    $stmt = $pdo->prepare("SELECT profile_picture FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $old = $stmt->fetchColumn();
+
+    if ($old && file_exists($upload_dir . $old)) {
+        unlink($upload_dir . $old);
+    }
+
     $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = 'profile_' . $employee_id . '.' . $ext;
+    $filename = 'profile_' . $employee_id . '_' . time() . '.' . $ext;
     $destination = $upload_dir . $filename;
 
     if (move_uploaded_file($file['tmp_name'], $destination)) {
         $stmt = $pdo->prepare("UPDATE employees SET profile_picture = ? WHERE id = ?");
         $stmt->execute([$filename, $employee_id]);
-        header("Location: ../time_log_create.php?upload=success");
+        header("Location: time_log_create.php");
         exit;
     } else {
         die("Failed to upload file.");
