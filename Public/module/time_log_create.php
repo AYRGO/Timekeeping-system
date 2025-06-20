@@ -19,6 +19,7 @@ if (empty($_SESSION['csrf_token'])) {
 }
 
 try {
+    // Fetch employee details
     $stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company, profile_picture FROM employees WHERE id = ?");
     $stmt->execute([$employee_id]);
     $user = $stmt->fetch();
@@ -31,15 +32,43 @@ try {
     $company = $user['company'] ?? '';
     $profile_picture = $user['profile_picture'] ?? null;
 
+    // Current time log
     $current_date = date("Y-m-d");
     $stmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs WHERE employee_id = ? AND log_date = ?");
     $stmt->execute([$employee_id, $current_date]);
     $time_log = $stmt->fetch();
     $time_in = $time_log['time_in'] ?? null;
     $time_out = $time_log['time_out'] ?? null;
-
     $can_time_in = true;
 
+    // Fetch all available work schedules
+    $stmt = $pdo->prepare("SELECT id, time_in, time_out, day_of_week FROM work_schedules");
+    $stmt->execute();
+    $work_schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Fetch employee's saved schedule
+    $saved_schedule = [];
+    $stmt = $pdo->prepare("SELECT ws.id, ws.day_of_week, ws.time_in, ws.time_out 
+                          FROM employee_schedules es
+                          JOIN work_schedules ws ON es.work_schedule_id = ws.id
+                          WHERE es.employee_id = ?");
+    $stmt->execute([$employee_id]);
+    $saved_schedule = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Group schedule by day
+    $grouped_schedule = [];
+    foreach ($saved_schedule as $sched) {
+        $grouped_schedule[$sched['day_of_week']] = [
+            'id' => $sched['id'],
+            'time_in' => $sched['time_in'],
+            'time_out' => $sched['time_out']
+        ];
+    }
+
+    // Default days of week
+    $days_of_week = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+    // Handle form submissions
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['time_in']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
             $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) VALUES (?, ?, ?)");
@@ -47,12 +76,14 @@ try {
             header("Location: time_log_create.php");
             exit;
         }
+        
         if (isset($_POST['time_out']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
             $stmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE employee_id = ? AND log_date = ?");
             $stmt->execute([date("H:i:s"), $employee_id, $current_date]);
             header("Location: time_log_create.php");
             exit;
         }
+        
         if (isset($_POST['leaveType']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
             $leaveType = $_POST['leaveType'];
             $leaveDates = $_POST['leaveDates'];
@@ -62,9 +93,42 @@ try {
             header("Location: time_log_create.php?leave=success");
             exit;
         }
+        
+        if (isset($_POST['update_schedule']) && hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            // Clear existing schedule
+            $stmt = $pdo->prepare("DELETE FROM employee_schedules WHERE employee_id = ?");
+            $stmt->execute([$employee_id]);
+            
+            // Insert new schedule selections
+            $selected_days = $_POST['schedule_days'] ?? [];
+            $default_schedule_id = 4; // Default schedule ID
+            
+            foreach ($selected_days as $day) {
+                $schedule_id = $default_schedule_id;
+                foreach ($work_schedules as $ws) {
+                    if ($ws['day_of_week'] === $day) {
+                        $schedule_id = $ws['id'];
+                        break;
+                    }
+                }
+                
+                $stmt = $pdo->prepare("INSERT INTO employee_schedules (employee_id, work_schedule_id, effective_date) VALUES (?, ?, ?)");
+                $stmt->execute([$employee_id, $schedule_id, $current_date]);
+            }
+            
+            header("Location: time_log_create.php?schedule=updated");
+            exit;
+        }
+
+        // Handle logout
+        if (isset($_POST['logout'])) {
+            session_destroy();
+            header("Location: ../employee/login.php");
+            exit;
+        }
     }
 } catch (Exception $e) {
-    die("Something went wrong.");
+    die("Error: " . $e->getMessage());
 }
 ?>
 <!DOCTYPE html>
@@ -86,6 +150,8 @@ try {
         .profile-img:hover .overlay { opacity: 1; }
         .overlay { transition: opacity 0.3s; opacity: 0; }
         .fixed-box { max-height: 400px; overflow-y: auto; }
+        .schedule-day { transition: all 0.2s ease; }
+        .schedule-day:hover { transform: translateY(-2px); }
     </style>
 </head>
 <body class="flex min-h-screen overflow-x-hidden">
@@ -104,16 +170,27 @@ try {
             <span class="text-xl"><i class="fas fa-file-alt"></i></span>
             <span class="text-lg">Leave</span>
         </a>
+        <a href="#" onclick="showSection('scheduleView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-green-600 transition duration-200">
+            <span class="text-xl"><i class="fas fa-calendar-alt"></i></span>
+            <span class="text-lg">Schedule</span>
+        </a>
     </nav>
     <div class="border-t border-gray-600 mt-6 pt-4">
-        <a href="#" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-green-600 transition duration-200">
-            <span class="text-xl"><i class="fas fa-cog"></i></span>
-            <span class="text-lg">General Settings</span>
-        </a>
+        <div class="flex flex-col space-y-4">
+            <a href="#" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-green-600 transition duration-200">
+                <span class="text-xl"><i class="fas fa-cog"></i></span>
+                <span class="text-lg">Settings</span>
+            </a>
+            <form method="POST" class="w-full">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                <button type="submit" name="logout" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-green-600 transition duration-200 w-full text-left">
+                    <span class="text-xl"><i class="fas fa-sign-out-alt"></i></span>
+                    <span class="text-lg">Logout</span>
+                </button>
+            </form>
+        </div>
     </div>
 </aside>
-
-
 
 <!-- Main Content -->
 <main class="flex-1 p-10 overflow-auto">
@@ -124,11 +201,12 @@ try {
                 <div class="flex items-center space-x-3 mt-2">
                     <span class="text-4xl md:text-5xl font-mono font-bold text-green-700" id="clock">--:--:--</span>
                 </div>
-                <p class="text-gray-500 text-sm mt-2">Here’s your time log and profile summary.</p>
+                <p class="text-gray-500 text-sm mt-2">Here's your time log and profile summary.</p>
             </div>
         </div>
+        
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Profile -->
+            <!-- Profile Card -->
             <div class="bg-white p-6 rounded-lg shadow space-y-4 fixed-box">
                 <div class="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-600 profile-img">
                     <?php if ($profile_picture): ?>
@@ -151,9 +229,9 @@ try {
                 </div>
             </div>
 
-            <!-- Time Log -->
+            <!-- Time Log Card -->
             <div class="bg-white p-6 rounded-lg shadow space-y-4 col-span-2 fixed-box">
-                <h2 class="text-lg font-semibold">Today’s Time Log</h2>
+                <h2 class="text-lg font-semibold">Today's Time Log</h2>
                 <div class="grid grid-cols-2 gap-4 text-center">
                     <div class="bg-green-100 p-4 rounded">
                         <p class="text-gray-500">Time In</p>
@@ -176,7 +254,82 @@ try {
                 </form>
             </div>
         </div>
+
+        <!-- Schedule Display -->
+        <div class="mt-6 bg-white p-6 rounded-lg shadow">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">Your Work Schedule</h2>
+                <button onclick="showSection('scheduleView')" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                    <i class="fas fa-edit mr-1"></i> Edit Schedule
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="px-4 py-2 text-left">Day</th>
+                            <th class="px-4 py-2 text-left">Time In</th>
+                            <th class="px-4 py-2 text-left">Time Out</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($saved_schedule)): ?>
+                            <?php foreach ($saved_schedule as $schedule): ?>
+                                <tr>
+                                    <td class="border px-4 py-2"><?= htmlspecialchars($schedule['day_of_week']) ?></td>
+                                    <td class="border px-4 py-2"><?= date("h:i A", strtotime($schedule['time_in'])) ?></td>
+                                    <td class="border px-4 py-2"><?= date("h:i A", strtotime($schedule['time_out'])) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="3" class="border px-4 py-2 text-center text-gray-500">
+                                    No schedule set yet. <a href="#" onclick="showSection('scheduleView');" class="text-blue-500">Set your schedule</a>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
+
+    <!-- Request Change Schedule View -->
+<div id="scheduleView" class="hidden">
+    <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow">
+        <h2 class="text-xl font-semibold mb-4">Request Change of Work Schedule</h2>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+            <input type="hidden" name="request_change_schedule" value="1">
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2">Effective Dates</label>
+                <input type="text" name="schedule_days" id="scheduleDays" class="w-full p-2 border border-gray-300 rounded-md" placeholder="Choose effective dates" required>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Current Default Work Hours</label>
+                <div class="bg-gray-100 p-4 rounded">
+                    <?php 
+                    // Get current default schedule (ID 4)
+                    $current_schedule = null;
+                    foreach ($work_schedules as $ws) {
+                        if ($ws['id'] == 4) {
+                            $current_schedule = $ws;
+                            break;
+                        }
+                    }
+                    ?>
+                    <p class="text-sm"><?= $current_schedule ? date("g:i A", strtotime($current_schedule['time_in'])) . ' to ' . date("g:i A", strtotime($current_schedule['time_out'])) : 'Not set' ?></p>
+                    <p class="text-xs text-gray-500 mt-1">This is your current default schedule</p>
+                </div>
+            </div>
+            
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Submit Request</button>
+        </form>
+    </div>
+</div>
 
     <!-- Request Leave View -->
     <div id="requestView" class="hidden">
@@ -232,6 +385,7 @@ window.onload = updateClock;
 function showSection(id) {
     document.getElementById('dashboardView').classList.add('hidden');
     document.getElementById('requestView').classList.add('hidden');
+    document.getElementById('scheduleView').classList.add('hidden');
     document.getElementById(id).classList.remove('hidden');
 }
 
@@ -248,7 +402,7 @@ function closeLeaveModal() {
 }
 
 // AJAX form submission for leave request
-document.getElementById("leaveRequestForm").addEventListener("submit", function (e) {
+document.getElementById("leaveRequestForm").addEventListener("submit", function(e) {
     e.preventDefault();
     const formData = new FormData(this);
 
@@ -269,7 +423,30 @@ document.getElementById("leaveRequestForm").addEventListener("submit", function 
         console.error(err);
     });
 });
-</script>
 
+// Display success messages for schedule updates and leave requests
+window.onload = function() {
+    <?php if (isset($_GET['schedule']) && $_GET['schedule'] === 'updated'): ?>
+        setTimeout(() => {
+            alert('Your schedule has been updated successfully!');
+            showSection('dashboardView');
+        }, 500);
+    <?php elseif (isset($_GET['leave']) && $_GET['leave'] === 'success'): ?>
+        setTimeout(() => {
+            alert('Your leave request has been submitted!');
+            showSection('dashboardView');
+        }, 500);
+    <?php endif; ?>
+};
+</script>
+<script>
+flatpickr("#scheduleDays", { 
+    mode: "multiple", 
+    dateFormat: "Y-m-d", 
+    onChange: function(selectedDates) {
+        // You can handle the selected dates here if needed
+    }
+});
+</script>
 </body>
 </html>
