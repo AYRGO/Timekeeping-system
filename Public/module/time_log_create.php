@@ -103,40 +103,39 @@ try {
             exit;
         }
 
-        // Change Schedule Request (multi-date)
+        // Schedule Change Request using date range (Flatpickr)
         if (isset($_POST['submit_schedule_change'])) {
             $requested_schedule_id = $_POST['requested_schedule_id'] ?? null;
             $reason = trim($_POST['reason'] ?? '');
-            $dates_raw = $_POST['requested_effective_date'] ?? '';
+            $date_range = trim($_POST['date_range'] ?? '');
 
-            // Validate and split dates
-            $dates_array = array_map('trim', explode(',', $dates_raw));
-            $valid_dates = [];
-
-            foreach ($dates_array as $date) {
-                $d = DateTime::createFromFormat('Y-m-d', $date);
-                if ($d && $d->format('Y-m-d') === $date) {
-                    $valid_dates[] = $date;
-                }
+            // Format must be: YYYY-MM-DD to YYYY-MM-DD
+            if (empty($date_range) || strpos($date_range, ' to ') === false) {
+                die("Invalid effective date format. Please use YYYY-MM-DD to YYYY-MM-DD.");
             }
 
-            if (empty($valid_dates)) {
-                die("Invalid effective date format. Please use YYYY-MM-DD or comma-separated dates.");
+            [$start_date_raw, $end_date_raw] = explode(' to ', $date_range);
+            $start_date = date('Y-m-d', strtotime($start_date_raw));
+            $end_date = date('Y-m-d', strtotime($end_date_raw));
+
+            // Final date format check
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date) || 
+                !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date)) {
+                die("Invalid date format. Use YYYY-MM-DD.");
             }
 
+            // Insert the request
             $stmt = $pdo->prepare("INSERT INTO schedule_change_requests 
-                (employee_id, requested_schedule_id, reason, status, requested_effective_date, created_at)
-                VALUES (?, ?, ?, 'pending', ?, NOW())");
+                (employee_id, requested_schedule_id, reason, status, start_date, end_date, created_at)
+                VALUES (?, ?, ?, 'pending', ?, ?, NOW())");
 
-            foreach ($valid_dates as $date) {
-                $stmt->execute([$employee_id, $requested_schedule_id, $reason, $date]);
-            }
+            $stmt->execute([$employee_id, $requested_schedule_id, $reason, $start_date, $end_date]);
 
             header("Location: time_log_create.php?schedule_change=success");
             exit;
         }
 
-        // Update Schedule
+        // Update Schedule (assign same work hours to all days)
         if (isset($_POST['update_schedule']) || isset($_POST['request_change_schedule'])) {
             $stmt = $pdo->prepare("DELETE FROM employee_schedules WHERE employee_id = ?");
             $stmt->execute([$employee_id]);
@@ -168,337 +167,443 @@ try {
 ?>
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>RSS Dashboard</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSS - Employee Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet"
-     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family:'Poppins',sans-serif; background:#F4F6FA; overflow-x:hidden; }
-        .sidebar { background-color:rgb(24,136,43); }
-        .sidebar a { color:#ffffffb3; }
-        .sidebar a.active, .sidebar a:hover { color:#fff; }
-        .profile-img:hover .overlay { opacity:1; }
-        .overlay { transition: opacity .3s; opacity:0; }
-        .fixed-box { max-height:400px; overflow-y:auto; }
-        .schedule-day:hover { transform:translateY(-2px); transition:.2s ease; }
+        :root {
+            --primary: #2e7d32;
+            --primary-light: #60ad5e;
+            --primary-dark: #005005;
+            --secondary: #ff8f00;
+            --accent: #00c853;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-item:hover {
+            background-color: rgba(46, 125, 50, 0.1);
+        }
+        
+        .sidebar-item.active {
+            background-color: rgba(46, 125, 50, 0.2);
+            border-left: 4px solid var(--primary);
+        }
+        
+        .card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background-color: #e0e0e0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background-color: var(--primary);
+            transition: width 0.5s ease;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Attendance Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .attendance-success {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .attendance-success i {
+            font-size: 3rem;
+            color: #2e7d32;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
-<body class="flex min-h-screen overflow-x-hidden">
-
-<aside class="sidebar w-48 bg-green-800 text-white p-6 flex flex-col">
-    <div class="mb-10 text-center">
-        <img src="../asset/RSS-logo-colour.png" alt="RSS Logo"
-         class="w-24 mx-auto mb-2">
-    </div>
-    <nav class="flex-1 space-y-4">
-        <a href="#" onclick="showSection('dashboardView');"
-         class="flex items-center space-x-2 p-2 rounded-lg hover:bg-green-600">
-            <span class="text-xl"><i class="fas fa-tachometer-alt"></i></span>
-            <span class="text-lg">Dashboard</span>
-        </a>
-        <a href="#" onclick="showSection('requestView');"
-         class="flex items-center space-x-2 p-2 rounded-lg hover:bg-green-600">
-            <span class="text-xl"><i class="fas fa-file-alt"></i></span>
-            <span class="text-lg">Leave</span>
-        </a>
-        <a href="#" onclick="showSection('scheduleView');"
-         class="flex items-center space-x-2 p-2 rounded-lg hover:bg-green-600">
-            <span class="text-xl"><i class="fas fa-calendar-alt"></i></span>
-            <span class="text-lg">Schedule</span>
-        </a>
-    </nav>
-    <div class="border-t border-gray-600 mt-6 pt-4">
-        <div class="flex flex-col space-y-4">
-            <a href="#" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-green-600">
-                <span class="text-xl"><i class="fas fa-cog"></i></span>
-                <span class="text-lg">Settings</span>
-            </a>
-            <form method="POST" class="w-full">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <button type="submit" name="logout"
-                 class="flex items-center space-x-2 p-2 rounded-lg hover:bg-green-600 w-full text-left">
-                    <span class="text-xl"><i class="fas fa-sign-out-alt"></i></span>
-                    <span class="text-lg">Logout</span>
-                </button>
-            </form>
-        </div>
-    </div>
-</aside>
-
-<main class="flex-1 p-10 overflow-auto">
-    <div id="dashboardView">
-        <div class="flex flex-col md:flex-row justify-between mb-4">
-            <div>
-                <h1 class="text-3xl font-bold">
-                    Welcome back, <?= htmlspecialchars($fname) ?> 👋
-                </h1>
-                <div class="mt-2">
-                    <span class="text-4xl font-mono font-bold text-green-700" id="clock">--:--:--</span>
-                </div>
-                <p class="text-gray-500 text-sm mt-2">
-                    Here's your time log and profile summary.
-                </p>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Profile -->
-            <div class="bg-white p-6 rounded-lg shadow fixed-box space-y-4">
-                <div class="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-600 profile-img">
-                    <?php if ($profile_picture): ?>
-                        <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>"
-                         class="w-full h-full object-cover">
-                    <?php else: ?>
-                        <div class="w-full h-full bg-gray-300 flex items-center justify-center text-4xl text-white">
-                            👤
-                        </div>
-                    <?php endif; ?>
-                    <div class="absolute inset-0 bg-black bg-opacity-50 overlay flex items-center justify-center cursor-pointer"
-                     onclick="document.getElementById('fileInput').click()">
-                        Change
-                    </div>
-                    <form action="upload_profile.php" method="POST"
-                     enctype="multipart/form-data">
-                        <input type="file" id="fileInput" name="profile_picture"
-                         class="hidden" onchange="this.form.submit()">
-                    </form>
-                </div>
-
-                <div class="text-center">
-                    <h2 class="text-xl font-semibold"><?= htmlspecialchars($fname . ' ' . $lname) ?></h2>
-                    <p class="text-gray-500">
-                        <?= htmlspecialchars($position) ?> @ <?= htmlspecialchars($company) ?>
-                    </p>
-                </div>
-
-                <div class="text-sm text-gray-600 space-y-1">
-                    <p><strong>Email:</strong> <?= htmlspecialchars($email) ?></p>
-                    <p><strong>Contact:</strong> <?= htmlspecialchars($contact) ?></p>
-                </div>
-            </div>
-
-            <!-- Time Log -->
-            <div class="bg-white p-6 rounded-lg shadow fixed-box space-y-4 col-span-2">
-                <h2 class="text-lg font-semibold">Today's Time Log</h2>
-                <div class="grid grid-cols-2 gap-4 text-center">
-                    <div class="bg-green-100 p-4 rounded">
-                        <p class="text-gray-500">Time In</p>
-                        <p class="text-2xl font-bold">
-                            <?= $time_in ? date("h:i A", strtotime($time_in)) : '—'; ?>
-                        </p>
-                    </div>
-                    <div class="bg-yellow-100 p-4 rounded">
-                        <p class="text-gray-500">Time Out</p>
-                        <p class="text-2xl font-bold">
-                            <?= $time_out ? date("h:i A", strtotime($time_out)) : '—'; ?>
-                        </p>
-                    </div>
-                </div>
-                <form method="POST">
-                    <input type="hidden" name="csrf_token"
-                     value="<?= $_SESSION['csrf_token'] ?>">
-                    <?php if (!$time_in): ?>
-                        <button type="submit" name="time_in"
-                         class="w-full mt-4 bg-green-600 text-white py-2 rounded hover:bg-green-700">
-                            Log Time In
-                        </button>
-                    <?php elseif ($time_in && !$time_out): ?>
-                        <button type="submit" name="time_out"
-                         class="w-full mt-4 bg-yellow-600 text-white py-2 rounded hover:bg-yellow-700">
-                            Log Time Out
-                        </button>
-                    <?php else: ?>
-                        <button type="button" disabled
-                         class="w-full mt-4 bg-gray-400 text-white py-2 rounded">Already Logged</button>
-                    <?php endif; ?>
-                </form>
-            </div>
-        </div>
-
-      <!-- Schedule Display -->
-<div class="mt-6 bg-white p-6 rounded-lg shadow">
-    <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-semibold">Your Work Schedule</h2>
-        <button onclick="showSection('scheduleView')" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
-            <i class="fas fa-edit mr-1"></i> Edit Schedule
-        </button>
-    </div>
-    
-    <div class="overflow-x-auto">
-        <table class="w-full">
-            <thead>
-                <tr class="bg-gray-100">
-                    <th class="px-4 py-2 text-left">Day</th>
-                    <th class="px-4 py-2 text-left">Time In</th>
-                    <th class="px-4 py-2 text-left">Time Out</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php 
-                // Array to map numeric day values to day names
-                $daysOfWeek = [
-                    0 => 'Sunday',
-                    1 => 'Monday',
-                    2 => 'Tuesday',
-                    3 => 'Wednesday',
-                    4 => 'Thursday',
-                    5 => 'Friday',
-                    6 => 'Saturday'
-                ];
-
-                // Initialize an array to hold the schedule for the week
-                $weeklySchedule = array_fill(0, 7, ['time_in' => null, 'time_out' => null]);
-
-                // Populate the weekly schedule with saved data
-                if (!empty($saved_schedule)) {
-                    foreach ($saved_schedule as $schedule) {
-                        $dayIndex = (int)$schedule['day_of_week'];
-                        if (array_key_exists($dayIndex, $weeklySchedule)) {
-                            $weeklySchedule[$dayIndex] = [
-                                'time_in' => $schedule['time_in'],
-                                'time_out' => $schedule['time_out']
-                            ];
-                        }
-                    }
-                }
-
-                // Display the schedule for each day of the week
-                foreach ($weeklySchedule as $dayIndex => $times): ?>
-                    <tr>
-                        <td class="border px-4 py-2"><?= htmlspecialchars($daysOfWeek[$dayIndex]) ?></td>
-                        <td class="border px-4 py-2">
-                            <?= $times['time_in'] ? date("h:i A", strtotime($times['time_in'])) : 'Not Scheduled' ?>
-                        </td>
-                        <td class="border px-4 py-2">
-                            <?= $times['time_out'] ? date("h:i A", strtotime($times['time_out'])) : 'Not Scheduled' ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
+<body class="flex h-screen overflow-hidden">
+    <!-- Sidebar Navigation -->
+    <div class="sidebar w-64 bg-white shadow-md flex flex-col">
+     <!-- Minimalist Logo Version -->
+<div class="py-5 flex items-center justify-center border-b border-gray-100">
+    <img src="../asset/RSS-logo-colour.png" alt="RSS Logo"
+         class="h-14 w-auto transition-all hover:scale-130">
 </div>
 
+        <!-- User Profile -->
+<div class="p-4 flex items-center border-b relative">
+    <div class="w-12 h-12 rounded-full overflow-hidden bg-green-100 flex items-center justify-center mr-3 relative">
+        <?php if ($profile_picture): ?>
+            <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover">
+        <?php else: ?>
+            <div class="w-full h-full bg-gray-300 flex items-center justify-center text-2xl text-white">👤</div>
+        <?php endif; ?>
 
-    </div>
+        <!-- Overlay for change button, only visible on hover -->
+        <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center cursor-pointer text-xs text-white opacity-0 hover:opacity-100 transition"
+             onclick="document.getElementById('fileInput').click()">
+            Change
+        </div>
 
-  <!-- Request Change Schedule -->
-<div id="scheduleView" class="hidden">
-    <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow">
-        <h2 class="text-xl font-semibold mb-4">Request Change of Work Schedule</h2>
-        <form method="POST">
-            <!-- CSRF Token -->
-            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-            <input type="hidden" name="submit_schedule_change" value="1">
-
-            <!-- Effective Dates -->
-            <div class="mb-4">
-                <label for="requested_effective_date" class="block text-sm font-medium mb-2">
-                    Effective Dates <span class="text-gray-500 text-xs">(Format: YYYY-MM-DD, comma-separated)</span>
-                </label>
-                <input type="text" name="requested_effective_date" id="requested_effective_date"
-                       class="w-full p-2 border rounded"
-                       placeholder="e.g. 2025-07-01,2025-07-02"
-                       required>
-            </div>
-
-            <!-- New Work Hours -->
-            <div class="mb-4">
-                <label for="requested_schedule_id" class="block text-sm font-medium mb-2">
-                    New Work Hours
-                </label>
-                <select name="requested_schedule_id" id="requested_schedule_id"
-                        class="w-full p-2 border rounded" required>
-                    <option value="" disabled selected>Select new work hours</option>
-                    <?php 
-                    $allowed = [4, 5, 6, 7];
-                    foreach ($work_schedules as $ws):
-                        if (in_array($ws['id'], $allowed)):
-                    ?>
-                        <option value="<?= $ws['id'] ?>">
-                            <?= date("g:i A", strtotime($ws['time_in'])) ?> to <?= date("g:i A", strtotime($ws['time_out'])) ?>
-                        </option>
-                    <?php 
-                        endif;
-                    endforeach;
-                    ?>
-                </select>
-            </div>
-
-            <!-- Reason -->
-            <div class="mb-4">
-                <label for="reason" class="block text-sm font-medium mb-2">Reason for Change</label>
-                <textarea name="reason" id="reason" rows="3"
-                          class="w-full p-2 border rounded"
-                          placeholder="Explain your reason for the schedule change" required></textarea>
-            </div>
-
-            <!-- Submit Button -->
-            <button type="submit"
-                class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
-                Submit Request
-            </button>
+        <!-- File input form -->
+        <form action="upload_profile.php" method="POST" enctype="multipart/form-data">
+            <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
         </form>
     </div>
+
+    <div>
+        <p class="font-semibold text-base"><?= htmlspecialchars($fname . ' ' . $lname) ?></p>
+        <p class="text-sm text-gray-500">Role: <?= htmlspecialchars($position) ?></p>
+    </div>
 </div>
 
+        <!-- Main Navigation -->
+        <nav class="flex-1 overflow-y-auto">
+            <ul class="py-2">
+                <li>
+                    <a href="#" class="sidebar-item active flex items-center p-3 text-gray-700">
+                        <i class="fas fa-tachometer-alt w-6 text-center mr-2 text-green-700"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="sidebar-item flex items-center p-3 text-gray-700">
+                        <i class="fas fa-calendar-alt w-6 text-center mr-2"></i>
+                        <span>Leave Management</span>
+                        <span class="notification-badge bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-auto">3</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="sidebar-item flex items-center p-3 text-gray-700">
+                        <i class="fas fa-exchange-alt w-6 text-center mr-2"></i>
+                        <span>Schedule Changes</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="sidebar-item flex items-center p-3 text-gray-700">
+                        <i class="fas fa-user-check w-6 text-center mr-2"></i>
+                        <span>Attendance</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="sidebar-item flex items-center p-3 text-gray-700">
+                        <i class="fas fa-file-alt w-6 text-center mr-2"></i>
+                        <span>Documents</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="sidebar-item flex items-center p-3 text-gray-700">
+                        <i class="fas fa-chart-line w-6 text-center mr-2"></i>
+                        <span>Performance</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="sidebar-item flex items-center p-3 text-gray-700">
+                        <i class="fas fa-money-bill-wave w-6 text-center mr-2"></i>
+                        <span>Payroll</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="sidebar-item flex items-center p-3 text-gray-700">
+                        <i class="fas fa-cog w-6 text-center mr-2"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        
+        <!-- Footer -->
+        <div class="p-4 border-t text-center text-sm text-gray-500">
+            <p>RSS v2.1.0</p>
+            <p>© 2023 Recruitment Sprout System</p>
+        </div>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="flex-1 overflow-y-auto">
+        <!-- Top Navigation -->
+        <header class="bg-white shadow-sm p-4 flex justify-between items-center">
+            <h2 class="text-xl font-semibold text-gray-800">Employee Dashboard</h2>
+            <div class="flex items-center space-x-4">
+                <div class="relative">
+                    <button class="p-2 rounded-full hover:bg-gray-100">
+                        <i class="fas fa-bell text-gray-600"></i>
+                        <span class="notification-badge bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">5</span>
+                    </button>
+                </div>
+                <div class="relative">
+                    <button class="p-2 rounded-full hover:bg-gray-100">
+                        <i class="fas fa-envelope text-gray-600"></i>
+                        <span class="notification-badge bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">2</span>
+                    </button>
+                </div>
+                <div class="border-l pl-4">
+                    <button class="flex items-center">
+                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mr-2">
+                            <i class="fas fa-user text-green-700"></i>
+                        </div>
+                        <span class="font-medium"><?= htmlspecialchars($fname) ?></span>
+                        <i class="fas fa-chevron-down ml-2 text-gray-500"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Dashboard Content -->
+        <main class="p-6">
+            <!-- Welcome Banner -->
+            <div class="bg-gradient-to-r from-green-600 to-green-800 rounded-xl p-6 text-white mb-6 shadow-lg">
+                <div class="flex justify-between items-center">
+                    <div>
+                         <h1 class="text-3xl font-bold">Welcome back, <?= htmlspecialchars($fname) ?> 👋</h1>
+                        <p class="mb-4">You have 3 pending tasks to complete today.</p>
+                        <button class="bg-white text-green-800 px-4 py-2 rounded-md font-medium hover:bg-opacity-90 transition">View Tasks</button>
+                    </div>
+                    <div class="hidden md:block">
+                        <img src="https://cdn-icons-png.flaticon.com/512/1903/1903162.png" alt="HR Illustration" class="h-32">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="card bg-white rounded-lg p-6 shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-gray-500">Available Leave</p>
+                            <h3 class="text-2xl font-bold mt-1">12 days</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                            <i class="fas fa-umbrella-beach text-green-700 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 60%;"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">60% of annual leave remaining</p>
+                    </div>
+                </div>
+                
+                <div class="card bg-white rounded-lg p-6 shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-gray-500">Upcoming Payday</p>
+                            <h3 class="text-2xl font-bold mt-1">May 15</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                            <i class="fas fa-money-bill-wave text-blue-700 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-sm text-gray-600">5 days remaining</p>
+                    </div>
+                </div>
+                
+                <div class="card bg-white rounded-lg p-6 shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-gray-500">Pending Requests</p>
+                            <h3 class="text-2xl font-bold mt-1">3</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                            <i class="fas fa-clock text-yellow-700 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-sm text-gray-600">2 leave, 1 schedule change</p>
+                    </div>
+                </div>
+                
+                <div class="card bg-white rounded-lg p-6 shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-gray-500">Performance Score</p>
+                            <h3 class="text-2xl font-bold mt-1">4.2/5</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                            <i class="fas fa-star text-purple-700 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="flex">
+                            <i class="fas fa-star text-yellow-400"></i>
+                            <i class="fas fa-star text-yellow-400"></i>
+                            <i class="fas fa-star text-yellow-400"></i>
+                            <i class="fas fa-star text-yellow-400"></i>
+                            <i class="fas fa-star-half-alt text-yellow-400"></i>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Last reviewed: Apr 28</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content Sections -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Column -->
+                <div class="lg:col-span-2 space-y-6"> <!-- Quick Actions -->
+        <div class="bg-white rounded-lg p-6 shadow-sm">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <i class="fas fa-bolt text-yellow-500 mr-2"></i>
+                Quick Actions
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button onclick="showSection('requestView')" class="flex flex-col items-center justify-center p-4 rounded-lg bg-green-50 hover:bg-green-100 transition">
+                    <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                        <i class="fas fa-calendar-plus text-green-700"></i>
+                    </div>
+                    <span class="text-sm font-medium">Request Leave</span>
+                </button>
+                <button onclick="showSection('scheduleView')" class="flex flex-col items-center justify-center p-4 rounded-lg bg-blue-50 hover:bg-blue-100 transition">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                        <i class="fas fa-exchange-alt text-blue-700"></i>
+                    </div>
+                    <span class="text-sm font-medium">Change Schedule</span>
+                </button>
+                <button id="attendanceBtn" class="flex flex-col items-center justify-center p-4 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition">
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
+                        <i class="fas fa-user-check text-indigo-700"></i>
+                    </div>
+                    <span class="text-sm font-medium">Mark Attendance</span>
+                </button>
+                <button class="flex flex-col items-center justify-center p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition">
+                    <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+                        <i class="fas fa-file-upload text-purple-700"></i>
+                    </div>
+                    <span class="text-sm font-medium">Submit Document</span>
+                </button>
+                <button class="flex flex-col items-center justify-center p-4 rounded-lg bg-orange-50 hover:bg-orange-100 transition">
+                    <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center mb-2">
+                        <i class="fas fa-question-circle text-orange-700"></i>
+                    </div>
+                    <span class="text-sm font-medium">HR Support</span>
+                </button>
+            </div>
+        </div>
 
-    <!-- Request Leave -->
-    <div id="requestView" class="hidden">
-        <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow">
+        <!-- Hidden Sections -->
+        <div id="requestView" class="hidden mt-6">
             <h2 class="text-xl font-semibold mb-4">Request Leave</h2>
-            <form id="sickLeaveForm">
-                <input type="hidden" name="csrf_token"
-                 value="<?= $_SESSION['csrf_token'] ?>">
+            <form id="leaveRequestForm">
                 <label class="block text-sm mb-1">Leave Type</label>
-                <select id="leaveTypeDropdown" name="leaveType"
-                 class="w-full border p-2 rounded mb-4" onchange="openLeaveModal()" required>
+                <select id="leaveTypeDropdown" name="leaveType" class="w-full border p-2 rounded mb-4" required>
                     <option value="" selected disabled>Select type</option>
-                    <?php
-                    $types = ['sick','vacation','paternity','maternity',
-                              'solo_parent','halfday','halfday_sick'];
-                    foreach ($types as $t): ?>
-                    <option value="<?= $t ?>"><?= ucfirst(str_replace('_',' ',$t)) ?></option>
-                    <?php endforeach; ?>
+                    <option value="sick">Sick Leave</option>
+                    <option value="vacation">Vacation Leave</option>
+                    <option value="paternity">Paternity Leave</option>
+                    <option value="maternity">Maternity Leave</option>
                 </select>
+                <label class="block text-sm mb-1">Leave Dates</label>
+                <input type="text" name="leaveDates" id="leaveDates" class="w-full p-2 border rounded mb-4" placeholder="Choose date range" required>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Submit Request</button>
+            </form>
+        </div>
+
+        <div id="scheduleView" class="hidden mt-6">
+            <h2 class="text-xl font-semibold mb-4">Request Change of Work Schedule</h2>
+            <form id="scheduleChangeForm">
+                <label class="block text-sm mb-1">New Work Hours</label>
+                <select name="requested_schedule_id" id="requested_schedule_id" class="w-full p-2 border rounded" required>
+                    <option value="" disabled selected>Select new work hours</option>
+                    <option value="1">9:00 AM to 5:00 PM</option>
+                    <option value="2">10:00 AM to 6:00 PM</option>
+                </select>
+                <label class="block text-sm mb-1">Reason for Change</label>
+                <textarea name="reason" id="reason" rows="3" class="w-full p-2 border rounded" placeholder="Explain your reason for the schedule change" required></textarea>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Submit Request</button>
             </form>
         </div>
     </div>
-</main>
 
-<!-- Leave Modal -->
-<div id="leaveModal" class="hidden fixed inset-0
- bg-black bg-opacity-50 flex justify-center items-center z-50">
-    <form method="POST" class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md space-y-4"
-     id="leaveRequestForm">
-        <h2 class="text-xl font-bold">Select Leave Dates</h2>
-        <input type="hidden" name="csrf_token"
-         value="<?= $_SESSION['csrf_token'] ?>">
-        <input type="hidden" name="leaveType" id="hiddenLeaveType">
-        <input type="text" name="leaveDates" id="leaveDates"
-         class="w-full p-2 border rounded" placeholder="Choose date range" required>
-        <textarea name="reason" placeholder="Optional reason..."
-         class="w-full p-2 border rounded"></textarea>
-        <div class="flex justify-end space-x-2 pt-4">
-            <button type="button" onclick="closeLeaveModal()"
-             class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">
-                Cancel
-            </button>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white
-             rounded hover:bg-blue-700">
-                Submit
-            </button>
-        </div>
-    </form>
-</div>
+    <script>
+        function showSection(sectionId) {
+            // Hide all sections
+            document.getElementById('requestView').classList.add('hidden');
+            document.getElementById('scheduleView').classList.add('hidden');
+
+            // Show the selected section
+            document.getElementById(sectionId).classList.remove('hidden');
+        }
+
+        // Handle leave form submission via AJAX
+        document.getElementById("leaveRequestForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            // Add your AJAX logic here
+            alert("Leave request submitted!");
+            this.reset();
+            showSection('scheduleView'); // Optionally switch to another section
+        });
+
+        // Handle schedule change form submission via AJAX
+        document.getElementById("scheduleChangeForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            // Add your AJAX logic here
+            alert("Schedule change request submitted!");
+            this.reset();
+            showSection('requestView'); // Optionally switch to another section
+        });
+    </script>
+</body>
+</html>
+
+                   
 
 <script>
 flatpickr("#leaveDates", { mode:"range", dateFormat:"Y-m-d" });
@@ -564,14 +669,20 @@ window.onload = function(){
     <?php endif; ?>
 };
 </script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        flatpickr("#requested_effective_date", {
-            mode: "multiple",
-            dateFormat: "Y-m-d", // <== only numbers like 2025-12-23
-            altInput: false       // disables human-readable format
-        });
-    });
+flatpickr("#date_range", {
+    mode: "range",
+    dateFormat: "Y-m-d"
+});
 </script>
 </body>
 </html>
+
+
+
+
+
+

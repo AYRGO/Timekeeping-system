@@ -4,7 +4,7 @@ include('../config/db.php');
 
 // Redirect if already logged in
 if (isset($_SESSION['admin'])) {
-    header("Location: ../views/employee_list.php");
+    header("Location: ../views/admin_homepage.php");
     exit;
 }
 
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'username' => $admin['admin_username']
             ];
             unset($_SESSION['csrf_token']); // optional
-            header("Location: ../views/employee_list.php");
+            header("Location: ../views/admin_homepage.php");
             exit;
         } else {
             $error = "Invalid admin username or password.";
