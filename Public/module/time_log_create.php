@@ -301,6 +301,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());
 }
+// Handle Overtime RequEST
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_overtime'])) {
+    require '../config/db.php';
+
+    $employee_id = $_SESSION['employee']['id'] ?? null;
+    $date = trim($_POST['overtime_date'] ?? '');
+    $start_time = trim($_POST['start_time'] ?? '');
+    $end_time = trim($_POST['end_time'] ?? '');
+    $reason = trim($_POST['reason'] ?? '');
+
+    if (!$employee_id || !$date || !$start_time || !$end_time) {
+        header("Location: time_log_create.php?overtime=invalid_input");
+        exit;
+    }
+
+    // Validate time order
+    if (strtotime($start_time) >= strtotime($end_time)) {
+        header("Location: time_log_create.php?overtime=invalid_time_order");
+        exit;
+    }
+
+    // Optional file upload
+    $attachmentPath = null;
+    if (isset($_FILES['attachment_ot']) && $_FILES['attachment_ot']['error'] === UPLOAD_ERR_OK) {
+        $allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+        $fileTmp = $_FILES['attachment_ot']['tmp_name'];
+        $fileType = mime_content_type($fileTmp);
+        $fileName = $_FILES['attachment_ot']['name'];
+
+        if (in_array($fileType, $allowedTypes)) {
+            $uploadDir = '../uploads/overtime_attachments/';
+            if (!file_exists($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $ext = pathinfo($fileName, PATHINFO_EXTENSION);
+            $safeName = uniqid('ot_') . '.' . $ext;
+            $targetPath = $uploadDir . $safeName;
+
+            if (move_uploaded_file($fileTmp, $targetPath)) {
+                $attachmentPath = $safeName;
+            }
+        }
+    }
+
+    // Insert into DB
+    $stmt = $pdo->prepare("INSERT INTO overtime_requests 
+        (employee_id, date, start_time, end_time, reason, status, attachment_ot, created_at)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, NOW())");
+
+    $stmt->execute([
+        $employee_id,
+        $date,
+        $start_time,
+        $end_time,
+        $reason,
+        $attachmentPath
+    ]);
+
+    header("Location: time_log_create.php?overtime=success");
+    exit;
+}
+
+
+
+
 ?>
 
 
@@ -381,20 +447,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment
         <!-- Navigation Links -->
         <nav class="flex-1 space-y-4">
             <a href="#" onclick="showSection('dashboardView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-                <span class="text-xl"><i class="fas fa-tachometer-alt"></i></span>
-                <span class="text-lg">Home</span>
+            <span class="text-xl"><i class="fas fa-tachometer-alt"></i></span>
+            <span class="text-lg">Home</span>
             </a>
             <a href="#" onclick="showSection('newsFeedView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-                <span class="text-xl"><i class="fas fa-newspaper"></i></span>
-                <span class="text-lg">News Feed</span>
+            <span class="text-xl"><i class="fas fa-newspaper"></i></span>
+            <span class="text-lg">News Feed</span>
             </a>
             <a href="#" onclick="showSection('scheduleView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-                <span class="text-xl"><i class="fas fa-calendar-alt"></i></span>
-                <span class="text-lg">Request Change Schedule</span>
+            <span class="text-xl"><i class="fas fa-calendar-alt"></i></span>
+            <span class="text-lg">Request Change Schedule</span>
             </a>
             <a href="#" onclick="showSection('requestView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-                <span class="text-xl"><i class="fas fa-plane-departure"></i></span>
-                <span class="text-lg">Request Leave</span>
+            <span class="text-xl"><i class="fas fa-plane-departure"></i></span>
+            <span class="text-lg">Request Leave</span>
+            </a>
+            <a href="#" onclick="showSection('overtimeRequestView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+            <span class="text-xl"><i class="fas fa-clock"></i></span>
+            <span class="text-lg">Request Overtime</span>
             </a>
 
         </nav>
@@ -741,6 +811,80 @@ $announcementCount = $stmt->fetchColumn();
     </form>
   </div>
 </div>
+<!-- Request Overtime -->
+<div id="overtimeRequestView" class="hidden mt-32">
+    <div class="flex justify-center items-center min-h-[60vh] px-4">
+        <div class="max-w-xl w-full bg-white p-6 rounded-xl shadow-lg border border-green-200">
+
+            <!-- Confirmation Messages -->
+            <?php if (isset($_GET['overtime']) && $_GET['overtime'] === 'success'): ?>
+                <div class="mb-4 p-4 rounded bg-green-100 text-green-800 font-semibold text-center border border-green-300">
+                    ✅ Overtime request submitted successfully!
+                </div>
+            <?php elseif (isset($_GET['overtime']) && $_GET['overtime'] === 'invalid_time_order'): ?>
+                <div class="mb-4 p-4 rounded bg-red-100 text-red-800 font-semibold text-center border border-red-300">
+                    ⚠️ End time must be after start time.
+                </div>
+            <?php elseif (isset($_GET['overtime']) && $_GET['overtime'] === 'invalid_input'): ?>
+                <div class="mb-4 p-4 rounded bg-red-100 text-red-800 font-semibold text-center border border-red-300">
+                    ❌ Missing or invalid data. Please try again.
+                </div>
+            <?php endif; ?>
+
+            <!-- Header -->
+            <div class="bg-blue-600 p-4 rounded-lg mb-6 shadow">
+                <h2 class="text-2xl font-semibold text-center text-white">Request Overtime</h2>
+            </div>
+
+            <!-- Form -->
+            <form method="POST" action="time_log_create.php" enctype="multipart/form-data" class="space-y-5">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
+                <input type="hidden" name="submit_overtime" value="1">
+
+                <!-- Date -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" name="overtime_date" required
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <!-- Start Time -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <input type="time" name="start_time" required
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <!-- End Time -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <input type="time" name="end_time" required
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <!-- Reason -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+                    <textarea name="reason" rows="3" placeholder="Enter reason..."
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+
+                <!-- Attachment (optional) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Attachment</label>
+                    <input type="file" name="attachment_ot" accept=".pdf,.jpg,.jpeg,.png"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <!-- Submit -->
+                <button type="submit"
+                    class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition duration-200 font-semibold text-lg">
+                    Submit Overtime Request
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
 
 
 
@@ -945,14 +1089,20 @@ document.addEventListener("DOMContentLoaded", function () {
     // Show alerts based on query parameters
     const urlParams = new URLSearchParams(window.location.search);
     const alerts = {
-        leave_request: {
-            success: "Leave request submitted successfully!",
-            invalid_dates: "Invalid leave date range submitted."
-        },
-        schedule_change: {
-            success: "Schedule change request submitted successfully!"
-        }
-    };
+    leave_request: {
+        success: "Leave request submitted successfully!",
+        invalid_dates: "Invalid leave date range submitted."
+    },
+    schedule_change: {
+        success: "Schedule change request submitted successfully!"
+    },
+    overtime: {
+        success: "Overtime request submitted successfully!",
+        invalid_time_order: "End time must be after start time.",
+        invalid_input: "Missing or invalid data. Please try again."
+    }
+};
+
 
     for (const [key, messages] of Object.entries(alerts)) {
         const value = urlParams.get(key);
@@ -962,9 +1112,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Remove query parameters from URL after alert
-    if (urlParams.has('leave_request') || urlParams.has('schedule_change')) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
+    if (['leave_request', 'schedule_change', 'overtime'].some(key => urlParams.has(key))) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
 
     // Clock updater for all clock elements
     function updateAllClocks() {
@@ -985,7 +1135,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // Section toggle
 function showSection(id) {
-    ['dashboardView', 'requestView', 'scheduleView', 'attendanceView', 'profileView' , 'newsFeedView']
+    ['dashboardView', 'requestView', 'scheduleView', 'attendanceView', 'profileView' , 'newsFeedView', 'overtimeRequestView']
         .forEach(x => document.getElementById(x)?.classList.add('hidden'));
     document.getElementById(id)?.classList.remove('hidden');
 }
@@ -1025,6 +1175,14 @@ function openEditModal() {
 function closeEditModal() {
     document.getElementById('edit-profile-modal').classList.add('hidden');
 }
+
+    setTimeout(() => {
+        const alerts = document.querySelectorAll('.mb-4.p-4');
+        alerts.forEach(alert => {
+            alert.style.opacity = '0';
+            setTimeout(() => alert.remove(), 500);
+        });
+    }, 5000);
 </script>
 <!--Start of Tawk.to Script-->
 <script type="text/javascript">
