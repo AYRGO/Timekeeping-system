@@ -9,34 +9,47 @@ $stmt = $pdo->query("
     ORDER BY t.log_date DESC, t.time_in ASC
 ");
 $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+include('header.php');
 ?>
 
-<html>
-<head><title>Time Logs</title></head>
-<body>
-<h1>Time Logs</h1>
+<div class="max-w-7xl mx-auto mt-10 px-4">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Time Logs</h1>
+        <a href="../module/time_log_create.php"
+           class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+            + Add Time Log
+        </a>
+    </div>
 
-<a href="../module/time_log_create.php">Add Time Log</a>
-<table border="1" cellpadding="5" cellspacing="0">
-    <tr>
-        <th>ID</th>
-        <th>Employee</th>
-        <th>Date</th>
-        <th>Time In</th>
-        <th>Time Out</th>
-    </tr>
+    <div class="overflow-x-auto bg-white shadow rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time In</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time Out</th>
+            </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+            <?php foreach ($logs as $log): ?>
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= $log['id'] ?></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($log['fname'] . ' ' . $log['lname']) ?></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($log['log_date']) ?></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($log['time_in']) ?></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($log['time_out']) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 
-    <?php foreach ($logs as $log): ?>
-    <tr>
-        <td><?= $log['id'] ?></td>
-        <td><?= htmlspecialchars($log['fname'] . ' ' . $log['lname']) ?></td>
-        <td><?= htmlspecialchars($log['log_date']) ?></td>
-        <td><?= htmlspecialchars($log['time_in']) ?></td>
-        <td><?= htmlspecialchars($log['time_out']) ?></td>
-    </tr>
-    <?php endforeach; ?>
-</table>
+    <div class="mt-6">
+        <a href="employee_list.php" class="text-blue-600 hover:underline text-sm">← Back to Employee List</a>
+    </div>
+</div>
 
-<p><a href="../views/employee_list.php">← Back to Employee List</a></p>
-</body>
-</html>
+<?php include('footer.php'); ?>
