@@ -6,7 +6,8 @@ include '../config/db.php';
 $totalEmployees = $pdo->query("SELECT COUNT(*) FROM employees")->fetchColumn();
 $pendingLeaves = $pdo->query("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'")->fetchColumn();
 $pendingSchedules = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE status = 'pending'")->fetchColumn();
-
+$stmt = $pdo->query("SELECT COUNT(*) FROM overtime_requests WHERE status = 'Pending'");
+$pendingOT = $stmt->fetchColumn();
 // Late clock-ins logic (e.g., after 9:15 AM)
 $today = date('Y-m-d');
 $lateClockins = $pdo->prepare("
@@ -49,23 +50,29 @@ $lateCount = $lateClockins->fetchColumn();
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-10">
             <?php
             $cards = [
-                [
-                    "title" => "Total Employees",
-                    "value" => $totalEmployees,
-                    "icon" => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zM13 7a4 4 0 11-8 0 4 4 0 018 0z" />',
-                    "link" => "employee_list.php"
-                ],
-                [
-                    "title" => "Pending Leave Requests",
-                    "value" => $pendingLeaves,
-                    "icon" => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />',
-                    "link" => "leave_request_list.php"
-                ],
+    [
+        "title" => "Total Employees",
+        "value" => $totalEmployees,
+        "icon" => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zM13 7a4 4 0 11-8 0 4 4 0 018 0z" />',
+        "link" => "employee_list.php"
+    ],
+    [
+        "title" => "Pending Leave Requests",
+        "value" => $pendingLeaves,
+        "icon" => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />',
+        "link" => "leave_request_list.php"
+    ],
     [
         "title" => "Pending Schedule Requests",
         "value" => $pendingSchedules,
         "icon" => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />',
         "link" => "schedule_request.php"
+    ],
+    [
+        "title" => "Pending OT Requests",
+        "value" => $pendingOT,
+        "icon" => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />',
+        "link" => "ot_request.php"
     ],
 ];
 
