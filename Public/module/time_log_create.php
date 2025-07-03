@@ -554,26 +554,39 @@ $announcementCount = $stmt->fetchColumn();
         </div>
     </div>
 
-    <!-- Action Button -->
-    <form method="POST" class="mt-6">
-        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-        <?php if (!$time_in): ?>
-            <button type="submit" name="time_in"
-                class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
-                Log Time In
-            </button>
-        <?php elseif ($time_in && !$time_out): ?>
-            <button type="submit" name="time_out"
-                class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
-                Log Time Out
-            </button>
-        <?php else: ?>
-            <button type="button" disabled
-                class="w-full bg-gray-300 text-white font-semibold py-3 px-4 rounded-xl cursor-not-allowed">
-                Already Logged
-            </button>
-        <?php endif; ?>
-    </form>
+<!-- Action Button -->
+<form method="POST" class="mt-6">
+    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+
+    <?php if (!$time_in): ?>
+        <button type="submit" name="time_in"
+            onclick="return confirm('Are you sure you want to log Time In?')"
+            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
+            Log Time In
+        </button>
+    
+    <?php elseif ($time_in && !$time_out): ?>
+        <button type="submit" name="time_out"
+            onclick="return confirm('Are you sure you want to log Time Out?')"
+            class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
+            Log Time Out
+        </button>
+    <?php else: ?>
+        <button type="button" disabled
+            class="w-full bg-gray-300 text-white font-semibold py-3 px-4 rounded-xl cursor-not-allowed">
+            Already Logged
+        </button>
+    <?php endif; ?>
+
+    <!-- Request Time Adjustment as Centered Simple Text Link -->
+    <!--<div class="mt-2 text-center">-->
+    <!--    <a href="request_time_adjustment.php"-->
+    <!--       onclick="return confirm('Are you requesting a time adjustment because you forgot to time in?')"-->
+    <!--       class="text-sm text-blue-600 hover:underline">-->
+    <!--        Request Time Adjustment-->
+    <!--    </a>-->
+    <!--</div>-->
+</form>
 </div>
 
 
