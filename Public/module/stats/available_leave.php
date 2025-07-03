@@ -68,8 +68,8 @@ $icon_color = match ($leave_status) {
             <?php endif; ?>
         </div>
                     
-       <div class="w-12 h-12 rounded-full bg-<?= $icon_color ?>-100 flex items-center justify-center">
-            <i class="fas fa-umbrella-beach text-<?= $icon_color ?>-700 text-2xl"></i>
+    <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+            <i class="fas fa-umbrella-beach text-green-700 text-2xl"></i>
         </div>
     </div>
 </div>
