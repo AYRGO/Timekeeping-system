@@ -301,68 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());
 }
-// Handle Overtime RequEST
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_overtime'])) {
-    require '../config/db.php';
 
-    $employee_id = $_SESSION['employee']['id'] ?? null;
-    $date = trim($_POST['overtime_date'] ?? '');
-    $start_time = trim($_POST['start_time'] ?? '');
-    $end_time = trim($_POST['end_time'] ?? '');
-    $reason = trim($_POST['reason'] ?? '');
-
-    if (!$employee_id || !$date || !$start_time || !$end_time) {
-        header("Location: time_log_create.php?overtime=invalid_input");
-        exit;
-    }
-
-    // Validate time order
-    if (strtotime($start_time) >= strtotime($end_time)) {
-        header("Location: time_log_create.php?overtime=invalid_time_order");
-        exit;
-    }
-
-    // Optional file upload
-    $attachmentPath = null;
-    if (isset($_FILES['attachment_ot']) && $_FILES['attachment_ot']['error'] === UPLOAD_ERR_OK) {
-        $allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-        $fileTmp = $_FILES['attachment_ot']['tmp_name'];
-        $fileType = mime_content_type($fileTmp);
-        $fileName = $_FILES['attachment_ot']['name'];
-
-        if (in_array($fileType, $allowedTypes)) {
-            $uploadDir = '../uploads/overtime_attachments/';
-            if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-
-            $ext = pathinfo($fileName, PATHINFO_EXTENSION);
-            $safeName = uniqid('ot_') . '.' . $ext;
-            $targetPath = $uploadDir . $safeName;
-
-            if (move_uploaded_file($fileTmp, $targetPath)) {
-                $attachmentPath = $safeName;
-            }
-        }
-    }
-
-    // Insert into DB
-    $stmt = $pdo->prepare("INSERT INTO overtime_requests 
-        (employee_id, date, start_time, end_time, reason, status, attachment_ot, created_at)
-        VALUES (?, ?, ?, ?, ?, 'pending', ?, NOW())");
-
-    $stmt->execute([
-        $employee_id,
-        $date,
-        $start_time,
-        $end_time,
-        $reason,
-        $attachmentPath
-    ]);
-
-    header("Location: time_log_create.php?overtime=success");
-    exit;
-}
 
 $today = date('Y-m-d');
 $overtimeEligible = false;
@@ -600,79 +539,7 @@ $announcementCount = $stmt->fetchColumn();
         </div>
     </div>
     
-    <!-- Today's Attendance - Enhanced Sprout Style -->
-<div class="bg-white rounded-2xl shadow-lg p-6 w-full md:w-2/3 mx-auto border border-gray-200">
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-        <h3 class="text-2xl font-semibold text-gray-800 flex items-center">
-            <i class="fas fa-user-clock mr-3 text-green-500 bg-green-100 p-2 rounded-full"></i>
-            Today's Time Log
-        </h3>
-        <span id="dashboardClock" class="text-sm font-mono text-gray-500 tracking-wide">--:--:-- --</span>
-    </div>
-
-    <!-- Time Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <!-- Time In -->
-        <div class="flex items-center p-5 rounded-xl border border-green-200 bg-green-50 shadow-inner hover:shadow transition">
-            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr from-green-300 to-green-500 text-white mr-4">
-                <i class="fas fa-sign-in-alt"></i>
-            </div>
-            <div>
-                <p class="text-sm text-gray-600">Time In</p>
-                <p class="text-xl font-bold text-gray-800">
-                    <?= $time_in ? date("h:i A", strtotime($time_in)) : '—'; ?>
-                </p>
-            </div>
-        </div>
-
-        <!-- Time Out -->
-        <div class="flex items-center p-5 rounded-xl border border-yellow-200 bg-yellow-50 shadow-inner hover:shadow transition">
-            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-300 to-yellow-500 text-white mr-4">
-                <i class="fas fa-sign-out-alt"></i>
-            </div>
-            <div>
-                <p class="text-sm text-gray-600">Time Out</p>
-                <p class="text-xl font-bold text-gray-800">
-                    <?= $time_out ? date("h:i A", strtotime($time_out)) : '—'; ?>
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Action Button -->
-    <form method="POST" class="mt-6">
-        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-        <?php if (!$time_in): ?>
-            <button type="submit" name="time_in"
-                class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
-                Log Time In
-            </button>
-        <?php elseif ($time_in && !$time_out): ?>
-            <button type="submit" name="time_out"
-                class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
-                Log Time Out
-            </button>
-        <?php else: ?>
-            <button type="button" disabled
-                class="w-full bg-gray-300 text-white font-semibold py-3 px-4 rounded-xl cursor-not-allowed">
-                Already Logged
-            </button>
-        <?php endif; ?>
-    </form>
-
-    <!-- Request Adjustment Link -->
-    <div class="mt-4 text-center">
-        <a href="request_time_adjustment.php"
-           onclick="return confirm('Are you requesting a time adjustment because you forgot to time in?')"
-           class="text-sm text-blue-600 hover:underline">
-            Request Time Adjustment
-        </a>
-    </div>
-</div>
-
-
-
+<?php include 'today_attendance_card.php'; ?>
 
 </div>
 </div>
@@ -837,62 +704,8 @@ $announcementCount = $stmt->fetchColumn();
     </form>
   </div>
 </div>
-<?php include 'overtime_request_view.php'; ?>
 
 
-
-<!-- Attendance View -->
-<div id="attendanceView" class="hidden mt-32 px-4">
-    <div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-md space-y-8">
-        <h2 class="text-3xl font-bold text-gray-800 text-center">Today's Attendance</h2>
-
-        <!-- Current Time -->
-        <div class="flex justify-center items-center text-gray-700 text-lg md:text-xl">
-            <span class="font-semibold">Current Time:</span>
-            <span id="clock" class="ml-3 font-mono tracking-widest text-gray-800">--:--:-- --</span>
-        </div>
-
-        <!-- Time Log Section -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Time In -->
-            <div class="bg-green-100 p-6 rounded-lg text-center shadow-md hover:shadow-lg transition">
-                <p class="text-sm text-gray-600">Time In</p>
-                <p class="text-3xl font-bold text-green-700">
-                    <?= $time_in ? date("h:i A", strtotime($time_in)) : '—'; ?>
-                </p>
-            </div>
-
-            <!-- Time Out -->
-            <div class="bg-yellow-100 p-6 rounded-lg text-center shadow-md hover:shadow-lg transition">
-                <p class="text-sm text-gray-600">Time Out</p>
-                <p class="text-3xl font-bold text-yellow-700">
-                    <?= $time_out ? date("h:i A", strtotime($time_out)) : '—'; ?>
-                </p>
-            </div>
-        </div>
-
-        <!-- Action Button -->
-        <form method="POST" class="flex justify-center">
-            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-            <?php if (!$time_in): ?>
-                <button type="submit" name="time_in"
-                    class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition duration-200 w-full max-w-xs">
-                    Log Time In
-                </button>
-            <?php elseif ($time_in && !$time_out): ?>
-                <button type="submit" name="time_out"
-                    class="bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 transition duration-200 w-full max-w-xs">
-                    Log Time Out
-                </button>
-            <?php else: ?>
-                <button type="button" disabled
-                    class="bg-gray-400 text-white px-6 py-3 rounded-lg w-full max-w-xs">
-                    Already Logged
-                </button>
-            <?php endif; ?>
-        </form>
-    </div>
-</div>
 
 <!-- News Feed View -->
 <div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-4xl mx-auto">
