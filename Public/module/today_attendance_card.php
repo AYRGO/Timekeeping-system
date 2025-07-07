@@ -11,6 +11,15 @@ if (!$employee_id) {
     exit;
 }
 
+    // Check if OT already requested today
+$otRequested = false;
+$today = date('Y-m-d');
+$checkStmt = $pdo->prepare("SELECT COUNT(*) FROM overtime_requests WHERE employee_id = ? AND date = ?");
+$checkStmt->execute([$employee_id, $today]);
+if ($checkStmt->fetchColumn() > 0) {
+    $otRequested = true;
+}
+
 $overtimeDetected = false; // default value to avoid warning
 
 // Optional: set $time_in and $time_out if not yet set
@@ -133,19 +142,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_overtime'])) {
             </div>
 
             <?php if ($overtimeDetected): ?>
-            <div class="p-5 rounded-xl border border-red-300 bg-red-100 shadow-inner flex flex-col gap-3 animate-pulse-slow">
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-clock text-red-600 text-lg"></i>
-                    <h4 class="text-lg font-bold text-red-700">Overtime Alert</h4>
-                </div>
-                <p class="text-sm text-red-700">
-                    You've worked <strong><?= htmlspecialchars($workingDuration) ?></strong>, which exceeds the 8-hour limit.
-                </p>
-                <button type="button" onclick="loadOvertimeRequest()" class="mt-3 inline-flex items-center text-sm text-red-600 hover:underline font-medium focus:outline-none">
-                    ➕ Request Overtime
-                </button>
-            </div>
-            <?php endif; ?>
+<div class="p-5 rounded-xl border border-red-300 bg-red-100 shadow-inner flex flex-col gap-3 animate-pulse-slow">
+    <div class="flex items-center gap-2">
+        <i class="fas fa-clock text-red-600 text-lg"></i>
+        <h4 class="text-lg font-bold text-red-700">Overtime Alert</h4>
+    </div>
+    <p class="text-sm text-red-700">
+        You've worked <strong><?= htmlspecialchars($workingDuration) ?></strong>, which exceeds the 8-hour limit.
+    </p>
+    <?php if (!$otRequested): ?>
+    <button type="button" onclick="loadOvertimeRequest()" class="mt-3 inline-flex items-center text-sm text-red-600 hover:underline font-medium focus:outline-none">
+        ➕ Request Overtime
+    </button>
+    <?php else: ?>
+    <span class="mt-3 inline-flex items-center text-sm text-gray-400 font-medium">
+        OT Request already submitted today.
+    </span>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
         </div>
 
         <!-- Action Button -->
@@ -266,9 +281,10 @@ function hideOTModal() {
 }
 
     </script>
+
 <script>
 function setNow(field) {
-    const now = Math.floor(Date.now() / 1000);
+    const now = Math.floor(Date.now() / 1000); // UNIX timestamp
     document.getElementById(field).value = now;
 
     const formatted = new Intl.DateTimeFormat('en-US', {
@@ -278,6 +294,11 @@ function setNow(field) {
 
     document.getElementById(field + '_display').textContent = formatted;
 
+    // Save the value and date in localStorage
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem(`${field}_set_date`, today);
+    localStorage.setItem(`${field}_value`, now);
+
     // Disable the button after setting
     const button = document.querySelector(`[onclick="setNow('${field}')"]`);
     if (button) {
@@ -285,10 +306,29 @@ function setNow(field) {
         button.classList.remove('bg-blue-600', 'bg-yellow-600', 'hover:bg-blue-700', 'hover:bg-yellow-700');
         button.classList.add('bg-gray-400', 'cursor-not-allowed');
     }
+}
 
-    // Store clicked date in localStorage
+function restoreOTFields() {
+    const fields = ['start_ot', 'end_ot'];
     const today = new Date().toISOString().split('T')[0];
-    localStorage.setItem(`${field}_set_date`, today);
+
+    fields.forEach(field => {
+        const setDate = localStorage.getItem(`${field}_set_date`);
+        const value = localStorage.getItem(`${field}_value`);
+        if (setDate === today && value) {
+            // Restore hidden input value
+            const input = document.getElementById(field);
+            if (input) input.value = value;
+
+            // Restore display
+            const formatted = new Intl.DateTimeFormat('en-US', {
+                dateStyle: 'short',
+                timeStyle: 'medium'
+            }).format(new Date(value * 1000));
+            const display = document.getElementById(field + '_display');
+            if (display) display.textContent = formatted;
+        }
+    });
 }
 
 function applyOTButtonState() {
@@ -324,9 +364,11 @@ function resetLocalStorageDaily() {
     const today = new Date().toISOString().split('T')[0];
 
     if (lastReset !== today) {
-        // New day = reset OT buttons
-        localStorage.removeItem('start_ot_set_date');
-        localStorage.removeItem('end_ot_set_date');
+        // New day = reset OT buttons and values
+        ['start_ot', 'end_ot'].forEach(field => {
+            localStorage.removeItem(`${field}_set_date`);
+            localStorage.removeItem(`${field}_value`);
+        });
         localStorage.setItem('last_reset', today);
     }
 }
@@ -335,9 +377,14 @@ function loadOvertimeRequest() {
     document.getElementById('endOTModal').classList.remove('hidden');
 }
 
+function hideOTModal() {
+    document.getElementById('endOTModal').classList.add('hidden');
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    resetOTButtonStorageDaily();
+    resetLocalStorageDaily();
+    restoreOTFields();
     applyOTButtonState();
 });
 </script>
