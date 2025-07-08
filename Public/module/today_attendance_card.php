@@ -1,15 +1,18 @@
+
 <?php
 
 date_default_timezone_set('Asia/Manila');
 
-$time_in = isset($time_in) ? date('H:i:s', strtotime($time_in)) : null;
-$time_out = isset($time_out) ? date('H:i:s', strtotime($time_out)) : null;
 // Make sure user is logged in
 $employee_id = $_SESSION['employee']['id'] ?? null;
 if (!$employee_id) {
     echo "<script>alert('User not logged in.'); location.href='../employee/login.php';</script>";
     exit;
 }
+
+// Prepare today's time in/out
+$time_in = isset($time_in) ? date('H:i:s', strtotime($time_in)) : null;
+$time_out = isset($time_out) ? date('H:i:s', strtotime($time_out)) : null;
 
 // Check if OT already requested today
 $otRequested = false;
@@ -52,10 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_overtime'])) {
         echo "<script>alert('End OT must be after Start OT.'); window.history.back();</script>";
         exit;
     }
-
-    $start_dt = DateTime::createFromFormat('U', $start_ot);
-    $end_dt = DateTime::createFromFormat('U', $end_ot);
-    $duration_hours = round(($end_ot - $start_ot) / 3600, 2);
+$tz = new DateTimeZone('Asia/Manila');
+$start_dt = (new DateTime('@' . $start_ot))->setTimezone($tz);
+$end_dt = (new DateTime('@' . $end_ot))->setTimezone($tz);
 
     // Upload handling
     if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
@@ -80,17 +82,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_overtime'])) {
         exit;
     }
 
-    // Insert into DB
+    // Insert into DB (duration_hours is now a generated column in MySQL)
     $stmt = $pdo->prepare("INSERT INTO overtime_requests (
-        employee_id, date, start_time, end_time, duration_hours, reason, status, attachment_ot, created_at, time_in, time_out
-    ) VALUES (?, ?, ?, ?, ?, ?, 'Pending', ?, NOW(), ?, ?)");
+        employee_id, date, start_time, end_time, reason, status, attachment_ot, created_at, time_in, time_out
+    ) VALUES (?, ?, ?, ?, ?, 'Pending', ?, NOW(), ?, ?)");
 
     $success = $stmt->execute([
         $employee_id,
         $start_dt->format('Y-m-d'),
         $start_dt->format('H:i:s'),
         $end_dt->format('H:i:s'),
-        $duration_hours,
         $reason,
         $attachmentPath,
         $time_in,
@@ -102,10 +103,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_overtime'])) {
             // Clear OT localStorage for this user after successful submission
             const EMPLOYEE_ID = " . json_encode($employee_id) . ";
             ['start_ot', 'end_ot'].forEach(field => {
-                localStorage.removeItem(`${EMPLOYEE_ID}_${field}_set_date`);
-                localStorage.removeItem(`${EMPLOYEE_ID}_${field}_value`);
+                localStorage.removeItem(EMPLOYEE_ID + '_' + field + '_set_date');
+                localStorage.removeItem(EMPLOYEE_ID + '_' + field + '_value');
             });
-            localStorage.removeItem(`${EMPLOYEE_ID}_last_reset`);
+            localStorage.removeItem(EMPLOYEE_ID + '_last_reset');
             alert('OT request submitted successfully.');
             location.href='time_log_create.php';
         </script>";
@@ -128,50 +129,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_overtime'])) {
     </div>
 
     <!-- Time Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-<?= $overtimeDetected ? '3' : '2' ?> gap-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
+        <!-- Time In -->
         <div class="flex items-center p-5 rounded-xl border border-green-200 bg-green-50 shadow-inner hover:shadow transition">
             <div class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr from-green-300 to-green-500 text-white mr-4">
                 <i class="fas fa-sign-in-alt"></i>
             </div>
             <div>
                 <p class="text-sm text-gray-600">Time In</p>
-                <p class="text-xl font-bold text-gray-800"><?= $time_in ? date("h:i A", strtotime($time_in)) : '—'; ?></p>
+                <p class="text-2xl font-extrabold text-gray-900"><?= $time_in ? date("h:i A", strtotime($time_in)) : '—'; ?></p>
             </div>
         </div>
 
+        <!-- Time Out -->
         <div class="flex items-center p-5 rounded-xl border border-yellow-200 bg-yellow-50 shadow-inner hover:shadow transition">
             <div class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-300 to-yellow-500 text-white mr-4">
                 <i class="fas fa-sign-out-alt"></i>
             </div>
             <div>
                 <p class="text-sm text-gray-600">Time Out</p>
-                <p class="text-xl font-bold text-gray-800"><?= $time_out ? date("h:i A", strtotime($time_out)) : '—'; ?></p>
+                <p class="text-2xl font-extrabold text-gray-900"><?= $time_out ? date("h:i A", strtotime($time_out)) : '—'; ?></p>
             </div>
         </div>
-
-        <?php if ($overtimeDetected): ?>
-        <div class="p-5 rounded-xl border border-red-300 bg-red-100 shadow-inner flex flex-col gap-3 animate-pulse-slow">
-            <div class="flex items-center gap-2">
-                <i class="fas fa-clock text-red-600 text-lg"></i>
-                <h4 class="text-lg font-bold text-red-700">Overtime Alert</h4>
-            </div>
-            <p class="text-sm text-red-700">
-                You've worked <strong><?= htmlspecialchars($workingDuration) ?></strong>, which exceeds the 8-hour limit.
-            </p>
-            <?php if (!$otRequested): ?>
-            <button type="button" onclick="loadOvertimeRequest()" class="mt-3 inline-flex items-center text-sm text-red-600 hover:underline font-medium focus:outline-none">
-                ➕ Request Overtime
-            </button>
-            <?php else: ?>
-            <span class="mt-3 inline-flex items-center text-sm text-gray-400 font-medium">
-                OT Request already submitted today.
-            </span>
-            <?php endif; ?>
-        </div>
-        <?php endif; ?>
     </div>
 
-    <!-- Action Button -->
+    <!-- Overtime Alert -->
+    <?php if ($overtimeDetected): ?>
+    <div class="flex items-center gap-3 p-3 rounded-lg border border-red-300 bg-red-50 shadow-sm mb-4">
+        <i class="fas fa-clock text-red-600 text-lg"></i>
+        <div>
+            <span class="font-semibold text-red-700">Overtime Alert:</span>
+            <span class="text-sm text-red-700">
+                You've worked <strong><?= htmlspecialchars($workingDuration) ?></strong>, which exceeds the 8-hour limit.
+            </span>
+            <?php if (!$otRequested): ?>
+                <button type="button" onclick="loadOvertimeRequest()" class="ml-2 text-sm text-red-600 hover:underline font-medium focus:outline-none">
+                    ➕ Request Overtime
+                </button>
+            <?php else: ?>
+                <span class="ml-2 text-sm text-gray-400 font-medium">
+                    OT Request already submitted today.
+                </span>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>   <!-- Action Button -->
     <form method="POST" class="mt-6">
         <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
         <?php if (!$time_in): ?>

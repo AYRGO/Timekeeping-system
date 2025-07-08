@@ -131,6 +131,115 @@ foreach ($leave_results as $leave) {
         }
     }
 
+
+    // --- Time Adjustment Requests ---
+$adjust_stmt = $pdo->prepare("
+    SELECT id, log_date, status, reason, created_at, notified
+    FROM time_adjustment_requests 
+    WHERE employee_id = ?
+    ORDER BY created_at DESC
+    LIMIT 5
+");
+$adjust_stmt->execute([$current_user_id]);
+$adjust_results = $adjust_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($adjust_results as $adjustment) {
+    $status = ucfirst(strtolower($adjustment['status']));
+    $date = date('F j', strtotime($adjustment['log_date']));
+    $message = "Time adjustment request for <strong>$date</strong> was <strong>$status</strong>.";
+
+    if (strtolower($adjustment['status']) === 'declined' && !empty($adjustment['reason'])) {
+        $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($adjustment['reason']) . "</span>";
+    }
+
+    $notifications[] = ['message' => $message, 'created_at' => $adjustment['created_at']];
+
+    if (in_array(strtolower($adjustment['status']), ['approved', 'declined']) && !$adjustment['notified']) {
+        $subject = "Time Adjustment Request {$status}";
+        $body = "<p>Hi {$employee['fname']},<br>Your time adjustment request for <strong>$date</strong> was <strong>$status</strong>.</p>";
+
+        if (strtolower($adjustment['status']) === 'declined' && !empty($adjustment['reason'])) {
+            $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>";
+        }
+
+        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
+            $update = $pdo->prepare("UPDATE time_adjustment_requests SET notified = 1 WHERE id = ?");
+            $update->execute([$adjustment['id']]);
+        }
+    }
+}
+
+
+// --- Overtime Requests ---
+$ot_stmt = $pdo->prepare("
+    SELECT id, date, start_time, end_time, status, explanation, created_at, notified
+    FROM overtime_requests
+    WHERE employee_id = ?
+    ORDER BY created_at DESC
+    LIMIT 5
+");
+$ot_stmt->execute([$current_user_id]);
+$ot_results = $ot_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($ot_results as $ot) {
+    $status = ucfirst($ot['status']);
+    $date = date('F j, Y', strtotime($ot['date']));
+    $message = "Overtime request on <strong>{$date}</strong> was <strong>{$status}</strong>.";
+
+    if (strtolower($ot['status']) === 'rejected' && !empty($ot['explanation'])) {
+        $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($ot['explanation']) . "</span>";
+    }
+
+    $notifications[] = ['message' => $message, 'created_at' => $ot['created_at']];
+
+    if (in_array(strtolower($ot['status']), ['approved', 'rejected']) && !$ot['notified']) {
+        $subject = "Overtime Request $status";
+        $body = "<p>Hi {$employee['fname']},<br>Your overtime request on <strong>$date</strong> was <strong>$status</strong>.</p>";
+
+        if (!empty($ot['explanation'])) {
+            $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($ot['explanation'])) . "</p>";
+        }
+
+        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
+            $update = $pdo->prepare("UPDATE overtime_requests SET notified = 1 WHERE id = ?");
+            $update->execute([$ot['id']]);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     // Sort all notifications by newest first
     usort($notifications, function ($a, $b) {
         return strtotime($b['created_at']) - strtotime($a['created_at']);

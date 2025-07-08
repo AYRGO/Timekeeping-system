@@ -497,53 +497,15 @@ $announcementCount = $stmt->fetchColumn();
         include 'stats/pending_requests.php';
         include 'stats/schedule_tracker.php';
     ?>
-</div>
 
-<div class="flex flex-col md:flex-row gap-6 items-start md:items-stretch">
 
-    <!-- Quick Actions - Refined Style -->
-    <div class="bg-white rounded-2xl shadow-lg p-6 w-full md:w-1/2 border border-gray-200">
-        <!-- Header -->
-        <h3 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
-            <i class="fas fa-bolt text-yellow-500 bg-yellow-100 p-2 rounded-full mr-3"></i>
-            Quick Actions
-        </h3>
-
-        <!-- Actions Grid -->
-        <div class="grid grid-cols-2 gap-4">
-            <!-- Request Leave -->
-            <button onclick="showSection('requestView')" class="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-xl border border-green-100 shadow-sm hover:shadow transition">
-                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-green-300 to-green-500 text-white flex items-center justify-center mb-2">
-                    <i class="fas fa-calendar-plus"></i>
-                </div>
-                <span class="text-sm font-medium text-center text-gray-700">Request Leave</span>
-            </button>
-
-            <!-- Change Schedule -->
-            <button onclick="showSection('scheduleView')" class="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-100 shadow-sm hover:shadow transition">
-                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-300 to-blue-500 text-white flex items-center justify-center mb-2">
-                    <i class="fas fa-exchange-alt"></i>
-                </div>
-                <span class="text-sm font-medium text-center text-gray-700">Request Change Schedule</span>
-                
-            </button>
-            </button>
-
-            <!-- Profile -->
-            <button onclick="showSection('profileView')" class="flex flex-col items-center justify-center p-4 bg-yellow-50 hover:bg-yellow-100 rounded-xl border border-yellow-100 shadow-sm hover:shadow transition">
-                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 text-white flex items-center justify-center mb-2">
-                    <i class="fas fa-user"></i>
-                </div>
-                <span class="text-sm font-medium text-center text-gray-700">Profile</span>
-            </button>
-        </div>
+    <div class="flex flex-col md:flex-row gap-6 items-start md:items-stretch">
+        <?php include 'today_attendance_card.php'; ?>
+        <?php include 'recent_activity_card.php'; ?>
     </div>
-    
-<?php include 'today_attendance_card.php'; ?>
+    <?php include 'attendance-history.php'; ?>
+</div>
 
-</div>
-</div>
-</div>
      <!-- Request Change Schedule -->
 <div id="scheduleView" class="hidden mt-32">
     <div class="flex justify-center items-center min-h-[60vh] px-4">
@@ -961,6 +923,16 @@ s1.charset='UTF-8';
 s1.setAttribute('crossorigin','*');
 s0.parentNode.insertBefore(s1,s0);
 })();
+</script>
+
+<script>
+function showSection(sectionId) {
+  // Hide all sections
+  document.querySelectorAll('[id$="View"]').forEach(el => el.classList.add('hidden'));
+
+  // Show the selected section
+  document.getElementById(sectionId).classList.remove('hidden');
+}
 </script>
 <!--End of Tawk.to Script-->
 </body>
