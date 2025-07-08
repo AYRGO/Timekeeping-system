@@ -52,7 +52,12 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <br>
                                 <?= $adj['requested_time_out'] ? date('g:i A', strtotime($adj['requested_time_out'])) : '—' ?>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($adj['reason']) ?></td>
+                            <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
+    <div class="truncate hover:whitespace-normal" title="<?= htmlspecialchars($adj['reason']) ?>">
+        <?= htmlspecialchars($adj['reason']) ?>
+    </div>
+</td>
+
                             <td class="px-6 py-4 text-sm">
                                 <?php if (!empty($adj['attachment'])): ?>
                                     <a href="../uploads/time_adjustments/<?= htmlspecialchars($adj['attachment']) ?>" target="_blank" class="text-blue-600 hover:underline">View</a>

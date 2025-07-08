@@ -409,6 +409,8 @@
 
             <!-- Overtime Tab (Hidden by default) -->
             <div id="overtime-tab" class="tab-content hidden">
+
+            
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="bg-white rounded-lg shadow p-6 form-card lg:col-span-1">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4">New Overtime Request</h3>

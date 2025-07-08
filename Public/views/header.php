@@ -52,11 +52,51 @@
                 <?php endforeach; ?>
             </div>
 
-            <!-- Avatar dropdown -->
+            <!-- Logout icon with confirmation modal -->
             <div class="relative">
-                <button id="avatarBtn" class="flex items-center space-x-2 focus:outline-none">
-                    <img src="https://harley.resourcestaffonline.com/Public/asset/RSS-logo-colour.png" alt="Avatar" class="h-9 w-9 rounded-full border-2 border-white object-cover" />
+                <button id="logoutBtn" title="Logout" class="flex items-center space-x-2 focus:outline-none">
+                    <!-- Heroicons outline logout icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white hover:text-red-400 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" />
+                    </svg>
                 </button>
+            </div>
+
+            <!-- Logout Confirmation Modal -->
+            <div id="logoutModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
+                    <h2 class="text-lg font-semibold mb-4">Confirm Logout</h2>
+                    <p class="mb-6">Are you sure you want to logout?</p>
+                    <div class="flex justify-end space-x-3">
+                        <button id="cancelLogout" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
+                        <a href="../admin/logout.php" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Logout</a>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    const logoutBtn = document.getElementById('logoutBtn');
+                    const logoutModal = document.getElementById('logoutModal');
+                    const cancelLogout = document.getElementById('cancelLogout');
+
+                    logoutBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        logoutModal.classList.remove('hidden');
+                    });
+
+                    cancelLogout.addEventListener('click', () => {
+                        logoutModal.classList.add('hidden');
+                    });
+
+                    // Optional: close modal on outside click
+                    logoutModal.addEventListener('click', (e) => {
+                        if (e.target === logoutModal) {
+                            logoutModal.classList.add('hidden');
+                        }
+                    });
+                });
+            </script>
 
                 <!-- Dropdown menu -->
                 <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-2 z-50">

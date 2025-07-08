@@ -104,13 +104,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['
     $dateRange = trim($_POST['date_range']);
 
     $leaveTypeMap = [
-        'sick'         => 'SL',
-        'vacation'     => 'VL',
-        'paternity'    => 'Paternity',
+        'sick'         => 'sick',
+        'vacation'     => 'vacation',
+        'paternity'    => 'paternity',
         'maternity'    => 'Maternity',
-        'solo_parent'  => 'SPL',
-        'halfday'      => 'Half_VL',
-        'halfday_sick' => 'Half_SL',
+        'solo_parent'  => 'solo_parent',
+        'halfday'      => 'halfday',
+        'halfday_sick' => 'halfday_sick',
         'lwop'         => 'LWOP',
         'bereavement'  => 'bereavement'
     ];
@@ -383,60 +383,53 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
     <!-- Top Section: Logo and Navigation -->
     <div>
         <!-- Logo with Divider -->
-        <div class="mb-2">
+        <div class="mb-2 w-full">
             <div class="text-center mb-2">
-                <img src="../asset/RSS-logo-colour.png" alt="RSS Logo" class="w-24 mx-auto">
+            <img src="../asset/RSS-logo-colour.png" alt="RSS Logo" class="w-36 mx-auto"> <!-- Increased width from w-24 to w-36 -->
             </div>
             <hr class="border-gray-300 w-full mx-auto">
         </div>
-        <!-- Profile Section -->
-        <div class="flex items-center mb-2">
-            <img src="<?= $profile_picture ? '../uploads/profile_images/' . htmlspecialchars($profile_picture) : 'https://via.placeholder.com/40' ?>" alt="Profile" class="w-12 h-12 rounded-full object-cover border border-gray-300 mr-3">
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 space-y-4 mt-6">
+            <a href="#" onclick="showSection('dashboardView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                <span class="text-xl"><i class="fas fa-tachometer-alt"></i></span>
+                <span class="text-lg">Home</span>
+            </a>
+            <a href="#" onclick="showSection('newsFeedView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                <span class="text-xl"><i class="fas fa-newspaper"></i></span>
+                <span class="text-lg">News Feed</span>
+            </a>
+            <a href="#" onclick="showSection('scheduleView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                <span class="text-xl"><i class="fas fa-calendar-alt"></i></span>
+                <span class="text-lg">Request Change Schedule</span>
+            </a>
+            <a href="#" onclick="showSection('requestView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                <span class="text-xl"><i class="fas fa-plane-departure"></i></span>
+                <span class="text-lg">Request Leave</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Bottom Section: Divider and User Info -->
+    <div class="pt-6">
+        <hr class="border-gray-300 w-full mx-auto mb-4">
+        <div class="flex items-center">
+            <?php if ($profile_picture): ?>
+                <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" alt="Profile" class="w-12 h-12 rounded-full object-cover mr-3 border border-gray-300">
+            <?php else: ?>
+                <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xl mr-3 border border-gray-300">
+                    <?= strtoupper(substr($fname, 0, 1) . substr($lname, 0, 1)) ?>
+                </div>
+            <?php endif; ?>
             <div class="flex flex-col">
                 <span class="font-semibold text-base"><?= htmlspecialchars($fname . ' ' . $lname) ?></span>
                 <span class="text-xs text-gray-500"><?= htmlspecialchars($position) ?></span>
             </div>
         </div>
-
-        <hr class="border-gray-300 w-full mx-auto mb-6">
-        <!-- Navigation Links -->
-        <nav class="flex-1 space-y-4">
-            <a href="#" onclick="showSection('dashboardView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-            <span class="text-xl"><i class="fas fa-tachometer-alt"></i></span>
-            <span class="text-lg">Home</span>
-            </a>
-            <a href="#" onclick="showSection('newsFeedView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-            <span class="text-xl"><i class="fas fa-newspaper"></i></span>
-            <span class="text-lg">News Feed</span>
-            </a>
-            <a href="#" onclick="showSection('scheduleView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-            <span class="text-xl"><i class="fas fa-calendar-alt"></i></span>
-            <span class="text-lg">Request Change Schedule</span>
-            </a>
-            <a href="#" onclick="showSection('requestView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-            <span class="text-xl"><i class="fas fa-plane-departure"></i></span>
-            <span class="text-lg">Request Leave</span>
-            </a>
-            <a href="#" onclick="showSection('overtimeRequestView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-            <span class="text-xl"><i class="fas fa-clock"></i></span>
-            <span class="text-lg">Request Overtime</span>
-            </a>
-
-        </nav>
-    </div>
-    <!-- Bottom Section: Settings and Logout -->
-    <div class="border-t border-gray-300 mt-6 pt-4">
-        <div class="flex flex-col space-y-1">
-            <form method="POST" class="w-full">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <button type="submit" name="logout" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-red-100 w-full text-left text-red-600 font-semibold">
-                    <span class="text-xl"><i class="fas fa-sign-out-alt"></i></span>
-                    <span class="text-lg">Logout</span>
-                </button>
-            </form>
-        </div>
     </div>
 </aside>
+
 
 
 <main class="flex-1 p-10 overflow-auto">
@@ -452,14 +445,49 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
         <!-- Notification Modal -->
         <?php include 'notification_modal.php'; ?>
 
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-3 relative">
             <div class="w-px h-6 bg-gray-300 mx-2"></div>
             <span class="text-gray-700 font-medium"><?= htmlspecialchars($fname . ' ' . $lname) ?></span>
-            <button class="ml-2 text-gray-600 hover:text-gray-800 focus:outline-none">
+            <!-- Dropdown Button -->
+            <button onclick="toggleUserDropdown()" class="ml-2 text-gray-600 hover:text-gray-800 focus:outline-none">
+                <i class="fas fa-chevron-down"></i>
             </button>
+            <!-- Dropdown Menu -->
+            <div id="userDropdown" class="absolute right-0 top-12 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden">
+                <button onclick="showSection('profileView'); closeUserDropdown();" class="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-yellow-50">
+                    <i class="fas fa-user mr-2 text-yellow-500"></i> Profile
+                </button>
+                <form method="POST" class="w-full">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    <button type="submit" name="logout" class="flex items-center w-full px-4 py-2 text-red-600 hover:bg-red-50">
+                        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </header>
+<script>
+function toggleUserDropdown() {
+    const dropdown = document.getElementById('userDropdown');
+    dropdown.classList.toggle('hidden');
+    // Close dropdown when clicking outside
+    if (!dropdown.classList.contains('hidden')) {
+        document.addEventListener('click', closeDropdownOnClickOutside);
+    }
+}
+function closeUserDropdown() {
+    document.getElementById('userDropdown').classList.add('hidden');
+    document.removeEventListener('click', closeDropdownOnClickOutside);
+}
+function closeDropdownOnClickOutside(e) {
+    const dropdown = document.getElementById('userDropdown');
+    const btn = event.target.closest('button[onclick^="toggleUserDropdown"]');
+    if (!dropdown.contains(e.target) && !btn) {
+        closeUserDropdown();
+    }
+}
+</script>
 
 
 <div id="dashboardView" class="mt-20">
@@ -468,11 +496,12 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
 $stmt = $pdo->query("SELECT COUNT(announcement_id) AS total_announcements FROM announcements");
 $announcementCount = $stmt->fetchColumn();
 ?>
+
 <!-- Welcome Banner -->
-<div class="bg-gradient-to-r from-green-600 to-green-800 rounded-2xl p-10 text-white mb-8 shadow-2xl">
+<div class="rounded-2xl p-10 text-white mb-8 shadow-2xl" style="background: linear-gradient(135deg, rgb(16, 185, 72) 0%, rgb(5, 101, 211) 100%);">
     <div class="flex justify-between items-center">
         <div>
-            <h1 class="text-4xl font-bold mb-2">Welcome back, <?= htmlspecialchars($fname) ?> 👋</h1>
+            <h1 class="text-5xl font-bold mb-2">Welcome back, <?= htmlspecialchars($fname) ?> 👋</h1>
             <p class="mb-6 text-lg">
                 You have <?= (int)$announcementCount ?> announcement<?= $announcementCount == 1 ? '' : 's' ?>.
             </p>
@@ -488,16 +517,15 @@ $announcementCount = $stmt->fetchColumn();
         </div>
     </div>
 </div>
-
 <!-- Stat Cards -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 mt-[-2.5rem] relative z-10">
     <?php 
         include 'stats/available_leave.php';
         include 'stats/upcoming_payday.php';
         include 'stats/pending_requests.php';
         include 'stats/schedule_tracker.php';
     ?>
-
+</div>
 
     <div class="flex flex-col md:flex-row gap-6 items-start md:items-stretch">
         <?php include 'today_attendance_card.php'; ?>
@@ -587,32 +615,30 @@ $announcementCount = $stmt->fetchColumn();
     </div>
 </div>
 
-
-
- <!-- Profile Section -->
+<!-- Profile Section -->
 <div id="profileView" class="hidden min-h-screen bg-gray-50 py-10 px-4">
-  <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
 
-    <!-- Sidebar Info -->
-    <div class="bg-white p-6 rounded-xl shadow space-y-4">
-      <div class="flex flex-col items-center">
-        <div class="relative w-24 h-24 rounded-full overflow-hidden border-4 border-green-500">
-          <?php if ($profile_picture): ?>
-            <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover">
-          <?php else: ?>
-            <div class="w-full h-full bg-gray-300 flex items-center justify-center text-4xl text-white">👤</div>
-          <?php endif; ?>
-          <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center cursor-pointer text-xs text-white opacity-0 hover:opacity-100 transition" onclick="document.getElementById('fileInput').click()">
-            Change
-          </div>
+        <!-- Sidebar Info -->
+        <div class="bg-white p-6 rounded-xl shadow flex flex-col items-center justify-center">
+            <div class="flex flex-col items-center w-full">
+                <div class="relative w-36 h-36 rounded-full overflow-hidden border-4 border-green-500 flex items-center justify-center mx-auto">
+                    <?php if ($profile_picture): ?>
+                        <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover">
+                    <?php else: ?>
+                        <div class="w-full h-full bg-gray-300 flex items-center justify-center text-5xl text-white">👤</div>
+                    <?php endif; ?>
+                    <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center cursor-pointer text-xs text-white opacity-0 hover:opacity-100 transition" onclick="document.getElementById('fileInput').click()">
+                        Change
+                    </div>
+                </div>
+                <form action="upload_profile.php" method="POST" enctype="multipart/form-data" class="w-full flex justify-center">
+                    <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
+                </form>
+
+                <h3 class="mt-4 font-semibold text-lg text-center w-full"><?= htmlspecialchars($fname . ' ' . $lname) ?></h3>
+            </div>
         </div>
-        <form action="upload_profile.php" method="POST" enctype="multipart/form-data">
-          <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
-        </form>
-
-        <h3 class="mt-4 font-semibold text-lg text-center"><?= htmlspecialchars($fname . ' ' . $lname) ?></h3>
-      </div>
-    </div>
 
     <!-- Main Profile Info -->
     <div class="md:col-span-2 space-y-10">

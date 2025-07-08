@@ -1,15 +1,15 @@
 <?php
-// Read filter date from GET
 $filterDate = $_GET['activityDate'] ?? null;
 
-// Filter and slice notifications
 $filteredActivities = array_filter($notifications, function ($activity) use ($filterDate) {
     if (!$filterDate) return true;
     return date('Y-m-d', strtotime($activity['created_at'])) === $filterDate;
 });
 
-$recentActivities = array_slice($filteredActivities, 0, 10); // Limit to 10
+$recentActivities = array_slice($filteredActivities, 0, 10);
 ?>
+
+<!-- ✅ DO NOT TOUCH CONTAINER ABOVE THIS -->
 
 <div class="bg-white rounded-2xl shadow-lg p-6 w-full lg:w-1/2 border border-gray-200">
     <!-- Header -->
@@ -28,11 +28,10 @@ $recentActivities = array_slice($filteredActivities, 0, 10); // Limit to 10
             <button type="submit" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1 rounded">
                 Apply
             </button>
-
         </div>
     </form>
 
-    <!-- Scrollable Activity Table -->
+    <!-- Scrollable Table -->
     <div class="overflow-x-auto">
         <div class="max-h-60 overflow-y-auto rounded-md border border-gray-100">
             <table class="min-w-full divide-y divide-gray-200 text-sm">

@@ -61,7 +61,11 @@ $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td class="px-6 py-4 text-sm text-gray-900"><?= $shift ?></td>
                             <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($sr['start_date']) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($sr['end_date']) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($sr['reason'] ?? '—') ?></td>
+                            <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
+    <div class="truncate hover:whitespace-normal" title="<?= htmlspecialchars($sr['reason']) ?>">
+        <?= htmlspecialchars($sr['reason']) ?>
+    </div>
+</td>
                             <td class="px-6 py-4 text-sm">
                                 <?php if (!empty($sr['attachment_scr'])): ?>
                                     <a href="../uploads/schedule_attachments/<?= htmlspecialchars($sr['attachment_scr']) ?>" target="_blank" class="text-blue-600 hover:underline">View</a>

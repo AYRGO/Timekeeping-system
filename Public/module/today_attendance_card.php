@@ -160,7 +160,7 @@ $end_dt = (new DateTime('@' . $end_ot))->setTimezone($tz);
         <div>
             <span class="font-semibold text-red-700">Overtime Alert:</span>
             <span class="text-sm text-red-700">
-                You've worked <strong><?= htmlspecialchars($workingDuration) ?></strong>, which exceeds the 8-hour limit.
+                You've worked <strong><?= htmlspecialchars($workingDuration) ?></strong>, 
             </span>
             <?php if (!$otRequested): ?>
                 <button type="button" onclick="loadOvertimeRequest()" class="ml-2 text-sm text-red-600 hover:underline font-medium focus:outline-none">
@@ -204,67 +204,76 @@ $end_dt = (new DateTime('@' . $end_ot))->setTimezone($tz);
 </div>
 
 <!-- Overtime Request Modal -->
-<div id="endOTModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 hidden">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
-        <button class="absolute top-3 right-3 text-gray-500 hover:text-red-500"
-                onclick="document.getElementById('endOTModal').classList.add('hidden')">
-            <i class="fas fa-times text-lg"></i>
+<div id="endOTModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-all duration-200 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative border border-green-100 animate-fade-in">
+        <button class="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition"
+                onclick="document.getElementById('endOTModal').classList.add('hidden')"
+                aria-label="Close Overtime Request Modal">
+            <i class="fas fa-times text-xl"></i>
         </button>
 
-        <h3 class="text-xl font-semibold text-gray-800 mb-4">
-            <i class="fas fa-plus-circle text-green-500 mr-2"></i>Overtime Request
-        </h3>
+        <div class="flex items-center mb-6">
+            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr from-green-400 to-green-600 text-white shadow-lg mr-4">
+                <i class="fas fa-plus-circle text-2xl"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-800 tracking-tight">
+                Overtime Request
+            </h3>
+        </div>
 
         <?php if ($otRequested): ?>
-            <div class="text-red-600 font-semibold mb-4">You already submitted an OT request today.</div>
+            <div class="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 font-semibold rounded-lg px-4 py-3 mb-4">
+                <i class="fas fa-exclamation-circle"></i>
+                You already submitted an OT request today.
+            </div>
         <?php else: ?>
-        <form method="POST" enctype="multipart/form-data" class="space-y-4">
+        <form method="POST" enctype="multipart/form-data" class="space-y-5">
             <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
             <input type="hidden" name="submit_overtime" value="1">
 
             <!-- Start OT -->
             <div>
-                <label class="block text-sm font-medium text-gray-700">Start OT</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Start OT</label>
                 <div class="flex items-center gap-3">
-                    <button type="button" onclick="setNow('start_ot')" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded">
-                        ⏱ Start OT
+                    <button type="button" onclick="setNow('start_ot')" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg shadow transition font-medium focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        <i class="fas fa-stopwatch mr-1"></i> Start OT
                     </button>
-                    <span id="start_ot_display" class="text-sm text-gray-800">Not set</span>
+                    <span id="start_ot_display" class="text-sm text-gray-800 font-mono bg-gray-100 px-3 py-1 rounded">Not set</span>
                 </div>
                 <input type="hidden" id="start_ot" name="start_ot">
             </div>
 
             <!-- End OT -->
             <div>
-                <label class="block text-sm font-medium text-gray-700">End OT</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">End OT</label>
                 <div class="flex items-center gap-3">
-                    <button type="button" onclick="setNow('end_ot')" class="bg-yellow-600 hover:bg-yellow-700 text-white text-sm px-4 py-2 rounded">
-                        ⏱ End OT
+                    <button type="button" onclick="setNow('end_ot')" class="bg-yellow-500 hover:bg-yellow-600 text-white text-sm px-4 py-2 rounded-lg shadow transition font-medium focus:outline-none focus:ring-2 focus:ring-yellow-300">
+                        <i class="fas fa-stopwatch mr-1"></i> End OT
                     </button>
-                    <span id="end_ot_display" class="text-sm text-gray-800">Not set</span>
+                    <span id="end_ot_display" class="text-sm text-gray-800 font-mono bg-gray-100 px-3 py-1 rounded">Not set</span>
                 </div>
                 <input type="hidden" id="end_ot" name="end_ot">
             </div>
 
             <!-- Reason -->
             <div>
-                <label for="reason" class="block text-sm font-medium text-gray-700">Reason</label>
+                <label for="reason" class="block text-sm font-semibold text-gray-700 mb-1">Reason <span class="text-red-500">*</span></label>
                 <textarea id="reason" name="reason" rows="3" required
-                        class="mt-1 w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-sm resize-none"
-                        placeholder="Explain your reason..."></textarea>
+                        class="mt-1 w-full border border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 text-sm resize-none px-3 py-2"
+                        placeholder="Explain your reason for overtime..."></textarea>
             </div>
 
             <!-- Attachment -->
             <div>
-                <label for="attachment" class="block text-sm font-medium text-gray-700">Attachment (optional)</label>
-                <input type="file" id="attachment" name="attachment" class="mt-1 w-full text-sm text-gray-700">
+                <label for="attachment" class="block text-sm font-semibold text-gray-700 mb-1">Attachment <span class="text-gray-400 font-normal">(optional)</span></label>
+                <input type="file" id="attachment" name="attachment" class="mt-1 w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition">
             </div>
 
             <!-- Submit -->
             <div class="pt-2">
                 <button type="submit"
-                        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-md transition duration-150">
-                    Submit Overtime Request
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg transition duration-150 text-lg focus:outline-none focus:ring-2 focus:ring-green-400">
+                    <i class="fas fa-paper-plane mr-2"></i>Submit Overtime Request
                 </button>
             </div>
         </form>

@@ -46,7 +46,11 @@ $leave_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($lr['leave_type'] ?? '—') ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($lr['start_date'] ?? '—') ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($lr['end_date'] ?? '—') ?></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($lr['reason'] ?? '—') ?></td>
+                            <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
+    <div class="truncate hover:whitespace-normal" title="<?= htmlspecialchars($lr['reason']) ?>">
+        <?= htmlspecialchars($lr['reason']) ?>
+    </div>
+</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <?= htmlspecialchars(ucfirst($lr['status'] ?? 'Pending')) ?>
                             </td>

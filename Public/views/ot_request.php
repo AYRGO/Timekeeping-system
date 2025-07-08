@@ -50,7 +50,12 @@ $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td class="px-6 py-4 text-sm text-gray-900">
     <?= number_format($ot['duration_hours'], 2) ?>
 </td>
-                            <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($ot['reason'] ?? '—') ?></td>
+                            <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
+    <div class="truncate hover:whitespace-normal" title="<?= htmlspecialchars($ot['reason']) ?>">
+        <?= htmlspecialchars($ot['reason']) ?>
+    </div>
+</td>
+
                             <td class="px-6 py-4 text-sm">
                                 <?php if (!empty($ot['attachment_ot'])): ?>
                                     <a href="../uploads/overtime_attachments/<?= htmlspecialchars($ot['attachment_ot']) ?>" target="_blank" class="text-blue-600 hover:underline">View</a>

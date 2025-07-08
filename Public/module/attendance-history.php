@@ -10,17 +10,7 @@ $employee_id = $_SESSION['employee']['id'] ?? null;
 $monthFilter = $_GET['month'] ?? date('Y-m'); // e.g., "2023-09"
 $selectedMonth = date('Y-m', strtotime($monthFilter));
 
-// Fetch distinct months for dropdown
-$months_stmt = $pdo->prepare("
-    SELECT DISTINCT DATE_FORMAT(log_date, '%Y-%m') AS month
-    FROM time_logs
-    WHERE employee_id = ?
-    ORDER BY month DESC
-");
-$months_stmt->execute([$employee_id]);
-$available_months = $months_stmt->fetchAll(PDO::FETCH_COLUMN);
-
-// Fetch logs with approved time adjustments (if any)
+// Fetch attendance logs with time adjustment and overtime info
 $stmt = $pdo->prepare("
     SELECT 
         t.log_date, 
@@ -28,16 +18,35 @@ $stmt = $pdo->prepare("
         t.time_out,
         r.requested_time_in, 
         r.requested_time_out,
-        r.status AS request_status
+        r.status AS request_status,
+        o.start_time AS startOT,
+        o.end_time AS endOT,
+        o.status AS ot_status
     FROM time_logs t
-    LEFT JOIN time_adjustment_requests r 
-        ON t.employee_id = r.employee_id 
-        AND t.log_date = r.log_date 
-        AND r.status = 'approved'
+    LEFT JOIN (
+        SELECT r1.*
+        FROM time_adjustment_requests r1
+        INNER JOIN (
+            SELECT employee_id, log_date, MAX(id) AS latest_id
+            FROM time_adjustment_requests
+            WHERE status = 'approved'
+            GROUP BY employee_id, log_date
+        ) r2 ON r1.id = r2.latest_id
+    ) r ON t.employee_id = r.employee_id AND t.log_date = r.log_date
+    LEFT JOIN (
+        SELECT o1.*
+        FROM overtime_requests o1
+        INNER JOIN (
+            SELECT employee_id, date, MAX(id) AS latest_id
+            FROM overtime_requests
+            GROUP BY employee_id, date
+        ) o2 ON o1.id = o2.latest_id
+    ) o ON t.employee_id = o.employee_id AND t.log_date = o.date
     WHERE t.employee_id = ? 
         AND DATE_FORMAT(t.log_date, '%Y-%m') = ?
     ORDER BY t.log_date DESC
 ");
+
 $stmt->execute([$employee_id, $selectedMonth]);
 $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -68,6 +77,7 @@ $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time In</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours Worked</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overtime</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     </tr>
                 </thead>
@@ -110,6 +120,18 @@ $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         $badgeClass = 'bg-yellow-100 text-yellow-800';
                                     }
                                 }
+
+                                // Overtime display
+                                $overtimeStatus = strtolower($log['ot_status'] ?? '');
+                                if ($overtimeStatus === 'approved' && $log['startOT'] && $log['endOT']) {
+                                    $startOT = date('h:i A', strtotime($log['startOT']));
+                                    $endOT = date('h:i A', strtotime($log['endOT']));
+                                    $overtimeDisplay = $startOT . ' - ' . $endOT;
+                                } elseif ($overtimeStatus === 'pending') {
+                                    $overtimeDisplay = 'Pending';
+                                } else {
+                                    $overtimeDisplay = '-';
+                                }
                             ?>
                             <tr>
                                 <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= $formattedDate ?></td>
@@ -117,6 +139,7 @@ $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <td class="px-6 py-4 text-sm text-gray-500"><?= $timeInDisplay ?></td>
                                 <td class="px-6 py-4 text-sm text-gray-500"><?= $timeOutDisplay ?></td>
                                 <td class="px-6 py-4 text-sm text-gray-500"><?= $hoursWorked ?></td>
+                                <td class="px-6 py-4 text-sm text-gray-500"><?= $overtimeDisplay ?></td>
                                 <td class="px-6 py-4">
                                     <span class="px-3 py-1 text-xs font-semibold rounded-full <?= $badgeClass ?>">
                                         <?= $status ?>
@@ -126,7 +149,7 @@ $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                            <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
                                 No attendance records found for this month.
                             </td>
                         </tr>
