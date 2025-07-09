@@ -133,6 +133,35 @@ include(__DIR__ . '/header.php');
                             <img src="/Timekeeping-system/Public/views/<?= htmlspecialchars($a['image']) ?>" alt="Uploaded Image" class="rounded-lg shadow max-w-full h-auto">
                         </div>
                     <?php endif; ?>
+                        <?php
+    // Load reactions for this announcement
+    $reactionStmt = $pdo->prepare("SELECT emoji, COUNT(*) as count FROM reactions WHERE announcement_id = ? GROUP BY emoji");
+    $reactionStmt->execute([$a['announcement_id']]);
+    $reactions = $reactionStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+    // Get current user's reaction
+    $userReactionStmt = $pdo->prepare("SELECT emoji FROM reactions WHERE announcement_id = ? AND employee_id = ?");
+    $userReactionStmt->execute([$a['announcement_id'], $current_user_id]);
+    $userReaction = $userReactionStmt->fetchColumn();
+?>
+<div class="mt-4 flex items-center justify-between">
+    <div id="emoji-counts-<?= $a['announcement_id'] ?>" class="flex gap-2 flex-wrap">
+        <?php foreach ($reactions as $emoji => $count): ?>
+            <span class="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full">
+                <span class="text-xl"><?= htmlspecialchars($emoji) ?></span>
+                <span class="text-sm"><?= $count ?></span>
+            </span>
+        <?php endforeach; ?>
+    </div>
+    
+    <div>
+        <button id="react-btn-<?= $a['announcement_id'] ?>"
+                onclick="toggleEmojiPicker(<?= $a['announcement_id'] ?>)"
+                class="text-sm text-green-600 hover:text-green-800">
+            
+        </div>
+    </div>
+</div>
 
                     <!-- Delete Button -->
                     <form method="POST" class="mt-4 flex justify-end" onsubmit="return confirm('Delete this post?');">
@@ -212,6 +241,50 @@ include(__DIR__ . '/header.php');
             });
         });
     });
+
+    function toggleEmojiPicker(id) {
+    document.querySelectorAll('[id^="emoji-picker-"]').forEach(picker => {
+        if (picker.id !== `emoji-picker-${id}`) {
+            picker.classList.add('hidden');
+        }
+    });
+    const picker = document.getElementById(`emoji-picker-${id}`);
+    if (picker) picker.classList.toggle('hidden');
+}
+
+function reactTo(announcementId, emoji) {
+    fetch('react.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ announcement_id: announcementId, emoji: emoji })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const container = document.querySelector(`#emoji-counts-${announcementId}`);
+        if (container) {
+            container.innerHTML = '';
+            Object.entries(data.reactions).forEach(([emo, count]) => {
+                const span = document.createElement('span');
+                span.className = 'flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full';
+                span.innerHTML = `<span class="text-xl">${emo}</span> <span class="text-sm">${count}</span>`;
+                container.appendChild(span);
+            });
+        }
+
+        const btn = document.querySelector(`#react-btn-${announcementId}`);
+        if (btn) {
+            if (data.user_reaction) {
+                btn.innerHTML = `${data.user_reaction} Reacted`;
+            } else {
+                btn.innerHTML = 'React';
+            }
+        }
+
+        const picker = document.getElementById(`emoji-picker-${announcementId}`);
+        if (picker) picker.classList.add('hidden');
+    });
+}
+
 </script>
 
 <?php include(__DIR__ . '/footer.php'); ?>
