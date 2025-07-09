@@ -3,6 +3,8 @@ $current_user_id = $_SESSION['employee']['id'] ?? null;
 
 $stmt = $pdo->query("SELECT * FROM announcements ORDER BY created_at DESC");
 $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
 ?>
 <meta charset="UTF-8">
 <!-- Scrollable Feed Container -->
@@ -33,15 +35,18 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
             ");
             $reaction_stmt->execute([$aid]);
             $reactions = $reaction_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-
-            // Current user reaction
+            
+            // Get current user's reaction
             $user_reaction_stmt = $pdo->prepare("
                 SELECT emoji FROM reactions
                 WHERE announcement_id = ? AND employee_id = ?
+                
                 LIMIT 1
             ");
             $user_reaction_stmt->execute([$aid, $current_user_id]);
             $user_reaction = $user_reaction_stmt->fetchColumn();
+
+            
         ?>
 
         <!-- Announcement Card -->
@@ -75,49 +80,48 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php endif; ?>
 
             <!-- Emoji Totals -->
-            <div id="emoji-counts-<?= $aid ?>" class="px-5 pt-2 text-sm text-gray-500 flex flex-wrap gap-2 border-t bg-gray-50">
-                <?php foreach ($reactions as $emoji => $count): ?>
-                    <span class="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full">
-                        <span class="text-xl"><?= htmlspecialchars($emoji) ?></span>
-                        <span class="text-sm"><?= $count ?></span>
-                    </span>
-                <?php endforeach; ?>
-            </div>
+<div id="emoji-counts-<?= $aid ?>" class="px-5 pt-2 text-sm text-gray-500 flex flex-wrap gap-2 border-t bg-gray-50">
+    <?php foreach ($reactions as $emoji => $count): ?>
+        <span class="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full">
+            <span class="text-xl"><?= htmlspecialchars($emoji) ?></span>
+            <span class="text-sm"><?= $count ?></span>
+        </span>
+    <?php endforeach; ?>
+</div>
 
-            <!-- Reactions + Comments Row -->
-            <div class="flex justify-between items-center px-5 py-2 border-t bg-gray-50 text-sm text-gray-700 relative">
-                <?php
-                    $emoji_labels = ['👍' => 'Like', '❤️' => 'Love'];
-                ?>
-                <div class="relative" onmouseenter="showReactions(this)" onmouseleave="hideReactions(this)">
-                    <button id="react-btn-<?= $aid ?>"
-                            onclick="reactTo(<?= $aid ?>, null)"
-                            class="flex items-center gap-1 px-3 py-1 rounded hover:bg-green-100 transition font-medium">
-                        <?php if ($user_reaction): ?>
-                            <?= htmlspecialchars($user_reaction) ?> <?= $emoji_labels[$user_reaction] ?? 'Reacted' ?>
-                        <?php else: ?>
-                            Like
-                        <?php endif; ?>
-                    </button>
+<!-- Reactions + Comments Row -->
+<div class="flex justify-between items-center px-5 py-2 border-t bg-gray-50 text-sm text-gray-700 relative">
+    <?php
+        // Show the user's emoji or default to 👍
+        $emoji = $user_reaction ?: '👍';
+        $emoji_labels = ['👍' => 'Like', '❤️' => 'Love'];
+        $label = $emoji_labels[$emoji] ?? 'Like';
+    ?>
+    <div class="relative" onmouseenter="showReactions(this)" onmouseleave="hideReactions(this)">
+        <button id="react-btn-<?= $aid ?>"
+                class="flex items-center gap-1 px-3 py-1 rounded hover:bg-green-100 transition font-medium">
+            <?= htmlspecialchars($emoji) ?> <?= $label ?>
+        </button>
 
-                    <!-- Reaction Popup -->
-                    <div class="reaction-menu absolute left-0 bottom-full mb-2 hidden bg-white shadow-md border rounded-full px-2 py-1 gap-1 z-10 transition-all">
-                        <?php foreach (['👍', '❤️'] as $emo): ?>
-                            <button onclick="reactTo(<?= $aid ?>, '<?= $emo ?>')" 
-                                    class="hover:scale-110 transition transform px-2 py-1 rounded-full text-xl hover:bg-green-100"
-                                    title="<?= $emo ?>">
-                                <?= $emo ?>
-                            </button>
-                        <?php endforeach; ?>    
-                    </div>
-                </div>
-
-                <!-- Comment Count -->
-                <button onclick="openCommentsModal(<?= $aid ?>)"
-                        class="hover:text-green-600 transition-colors font-medium">
-                    💬 <?= $comment_count ?> Comment<?= $comment_count != 1 ? 's' : '' ?>
+        <!-- Reaction Popup (Only 2 emojis now) -->
+        <div class="reaction-menu absolute left-0 bottom-full mb-2 hidden bg-white shadow-md border rounded-full px-2 py-1 gap-1 z-10 transition-all">
+            <?php foreach (['👍', '❤️'] as $emo): ?>
+                <button onclick="reactTo(<?= $aid ?>, '<?= $emo ?>')" 
+                        class="hover:scale-110 transition transform px-2 py-1 rounded-full text-xl hover:bg-green-100"
+                        title="<?= $emo ?>">
+                    <?= $emo ?>
                 </button>
-            </div>
+            <?php endforeach; ?>    
+        </div>
+    </div>
+
+    <!-- Comment Count -->
+    <button onclick="openCommentsModal(<?= $aid ?>)"
+            class="hover:text-green-600 transition-colors font-medium">
+        💬 <?= $comment_count ?> Comment<?= $comment_count != 1 ? 's' : '' ?>
+    </button>
+</div>
+
         </div>
         <?php endforeach; ?>
     </div>
@@ -145,27 +149,34 @@ function reactTo(announcementId, emoji) {
     })
     .then(res => res.json())
     .then(data => {
-        const container = document.querySelector(`#emoji-counts-${announcementId}`);
-        if (container) {
-            container.innerHTML = '';
-            Object.entries(data.reactions).forEach(([emo, count]) => {
-                const span = document.createElement('span');
-                span.className = 'flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full';
-                span.innerHTML = `<span class="text-xl">${emo}</span> <span class="text-sm">${count}</span>`;
-                container.appendChild(span);
-            });
-        }
-
-        const btn = document.querySelector(`#react-btn-${announcementId}`);
-        if (btn) {
-            if (data.user_reaction) {
-                btn.innerHTML = `${data.user_reaction} ${data.label}`;
-            } else {
-                btn.innerHTML = 'Like';
+        if (data.success) {
+            // Update emoji counts
+            const container = document.querySelector(`#emoji-counts-${announcementId}`);
+            if (container) {
+                container.innerHTML = '';
+                Object.entries(data.reactions).forEach(([emo, count]) => {
+                    const span = document.createElement('span');
+                    span.className = 'flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full';
+                    span.innerHTML = `<span class="text-xl">${emo}</span> <span class="text-sm">${count}</span>`;
+                    container.appendChild(span);
+                });
             }
+
+            // Update the button emoji
+            const btn = document.querySelector(`#react-btn-${announcementId}`);
+            if (btn) {
+                if (data.user_reaction) {
+                    btn.innerHTML = `${data.user_reaction}`;
+                } else {
+                    btn.innerHTML = 'Like';
+                }
+            }
+        } else {
+            alert('Failed to react. Please try again.');
         }
     });
 }
+
 
 let hideTimeout;
 function showReactions(container) {
@@ -183,3 +194,4 @@ function hideReactions(container) {
     }, 300);
 }
 </script>
+
