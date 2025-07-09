@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 30, 2025 at 09:53 AM
+-- Generation Time: Jul 09, 2025 at 08:04 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -50,19 +50,17 @@ CREATE TABLE `announcements` (
   `announcement_id` int(11) NOT NULL,
   `content` text NOT NULL,
   `admin_name` varchar(100) NOT NULL,
-  `created_at` datetime DEFAULT current_timestamp()
+  `created_at` datetime DEFAULT current_timestamp(),
+  `image` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `announcements`
 --
 
-INSERT INTO `announcements` (`announcement_id`, `content`, `admin_name`, `created_at`) VALUES
-(4, 'Couple questions.\r\nIs it always heavy rain when it rains? Do the streets get flooded often?\r\nDoes it dry up quickly? (In a developed area like BGC)\r\nDo the downpours last multiple days or just strong rain for part of the day usually?\r\nDo businesses/roads shut down when a typhoon hits?\r\nHow often would internet/electricity go out due to the weather in an a developed area like BGC?', 'Admin', '2025-06-27 15:22:35'),
-(5, 'Test \r\n\r\nAnnouncement:\r\n\r\nwalang pasok', 'Admin', '2025-06-27 15:58:41'),
-(6, 'asd\r\ndsad', 'Admin', '2025-06-30 08:58:55'),
-(7, 'asd', 'Admin', '2025-06-30 08:58:57'),
-(8, 'ads\r\nsdsa', 'Admin', '2025-06-30 08:59:02');
+INSERT INTO `announcements` (`announcement_id`, `content`, `admin_name`, `created_at`, `image`) VALUES
+(15, 'test', 'Admin', '2025-07-01 11:34:49', 'uploads/img_68635759012194.25638175.png'),
+(16, 'test', 'Admin', '2025-07-01 13:22:23', NULL);
 
 -- --------------------------------------------------------
 
@@ -98,7 +96,27 @@ CREATE TABLE `comments` (
 --
 
 INSERT INTO `comments` (`comment_id`, `announcement_id`, `employee_id`, `content`, `created_at`) VALUES
-(117, 8, 1006, 'test', '2025-06-30 15:41:12');
+(121, 16, 17, 'test', '2025-07-09 10:18:57'),
+(122, 16, 1006, 'sda', '2025-07-09 12:51:00');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `emojis`
+--
+
+CREATE TABLE `emojis` (
+  `emoji` char(4) NOT NULL,
+  `label` varchar(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `emojis`
+--
+
+INSERT INTO `emojis` (`emoji`, `label`) VALUES
+('❤️', 'Love'),
+('👍', 'Like');
 
 -- --------------------------------------------------------
 
@@ -192,9 +210,9 @@ INSERT INTO `employees` (`id`, `fname`, `lname`, `email`, `personal_email`, `con
 (1003, 'Cristina Miranda', 'Pangan', 'Tina.Pangan@resourcestaff.com.ph', 'thine2miranda@gmail.com', '0915 056 1780', 'Executive Assistant to the General Manager', 'active', '2024-03-31 16:00:00', 'cristina.pangan', '85ivt', 'RSS', NULL, NULL),
 (1004, 'Rica Joy Viray', 'Tolomia', 'Rica.Tolomia@resourcestaff.com.ph', 'Rica.Tolomia@resourcestaff.com.ph', '0917 389 7962', 'TA/HR Specialist', 'active', '2024-08-11 16:00:00', 'rj.tolomia', 'gojwd', 'RSS', NULL, NULL),
 (1005, 'Johsua Torninos', 'Dimla', 'johsua.dimla1986@gmail.com', 'johsua.dimla1986@gmail.com', '0933 430 3081', 'Facilities and Admin Support', 'active', '2024-09-29 16:00:00', 'johsua.dimla', 'r9em0', 'RSS', NULL, NULL),
-(1006, 'Cedrick', 'Arnigo', 'IT@resourcestaff.com.ph', 'cedrickarnigo1723@gmail.com', '09938642974', 'IT Support Specialist', 'active', '2025-05-27 23:09:46', 'Cedrick.Arnigo', 'Gr33n$$wRf', 'RSS', NULL, NULL),
+(1006, 'Cedrick', 'Arnigo', 'IT@resourcestaff.com.ph', 'cedrickarnigo1723@gmail.com', '09938642974', 'IT Support Specialist', 'active', '2025-05-27 23:09:46', 'Cedrick.Arnigo', 'Gr33n$$wRf', 'RSS', NULL, 'profile_1006_1751960992.png'),
 (1007, 'Peach', 'Herrera', 'herrerafelicci@gmail.com', 'herrerafelicci@gmail.com', '0903323232', 'Admin', 'active', '2025-06-02 06:19:09', 'Peach.Herrera', 'Gh0920', 'RSS', NULL, 'profile_1007.jpg'),
-(1009, 'Resty', 'Nazareno', 'rjmanago@gmail.com', 'rjmanago@gmail.com', '09763659773', 'IT Intern', 'active', '2025-06-10 02:48:29', 'Kiras001', 'vosfows12', 'RSS', NULL, 'profile_1009_1749770448.jpeg');
+(1009, 'Resty James', 'Nazareno', 'rjmanago@gmail.com', 'rjmanago@gmail.com', '09763659773', 'IT Intern', 'active', '2025-06-10 02:48:29', 'Kiras001', 'vosfows12', 'RSSs', NULL, 'profile_1009_1752025010.png');
 
 -- --------------------------------------------------------
 
@@ -247,7 +265,7 @@ CREATE TABLE `leave_credits` (
 CREATE TABLE `leave_requests` (
   `id` int(11) NOT NULL,
   `employee_id` int(11) DEFAULT NULL,
-  `leave_type` enum('VL','SL','SPL','Half_SL','Half_VL','LWOP','Maternity','Paternity') DEFAULT NULL,
+  `leave_type` enum('sick','vacation','paternity','maternity','solo_parent','halfday','halfday_sick','lwop','bereavement') DEFAULT NULL,
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
   `reason` text DEFAULT NULL,
@@ -264,13 +282,17 @@ CREATE TABLE `leave_requests` (
 --
 
 INSERT INTO `leave_requests` (`id`, `employee_id`, `leave_type`, `start_date`, `end_date`, `reason`, `status`, `created_at`, `leave_dates`, `attachment_lr`, `notified`, `explanation`) VALUES
-(92, 1009, 'Maternity', '2025-06-30', '2025-07-03', 'test', 'approved', '2025-06-30 06:56:00', '', 'lr_6862350086876.jpeg', 1, NULL),
-(93, 1009, 'Paternity', '2025-06-30', '2025-07-12', 'jontis', 'rejected', '2025-06-30 07:05:08', '', 'lr_68623724e87fe.png', 0, 'test'),
-(94, 1009, 'Half_SL', '2025-06-30', '2025-07-04', 'halfday sick test', 'rejected', '2025-06-30 07:05:56', '', 'lr_68623754acbd5.png', 0, 'halfday sick dec'),
-(95, 1009, 'Half_SL', '2025-06-30', '2025-07-03', 'sundo', 'rejected', '2025-06-30 07:08:19', '', 'lr_686237e3a4bf2.png', 0, 'no sundo'),
-(96, 1009, 'SL', '2025-06-30', '2025-07-03', 'may sakit', 'rejected', '2025-06-30 07:09:36', '', 'lr_68623830734b1.png', 0, 'masakit likod'),
-(97, 1009, 'Maternity', '2025-06-30', '2025-07-03', 'tet', 'approved', '2025-06-30 07:14:35', '', 'lr_6862395b3093b.png', 1, NULL),
-(98, 1006, 'SPL', '2025-06-30', '2025-07-04', 'test', 'approved', '2025-06-30 07:26:41', '', 'lr_68623c3191af0.png', 1, NULL);
+(106, 1009, 'sick', '2025-07-07', '2025-07-07', 'test', 'approved', '2025-07-07 02:46:44', '', NULL, 0, NULL),
+(107, 1009, '', '2025-07-07', '2025-07-26', 'test', 'pending', '2025-07-07 06:56:46', '', 'lr_686b6fae1f6a2.jpeg', 0, NULL),
+(108, 1009, '', '2025-07-08', '2025-07-19', 'SADDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD', 'pending', '2025-07-08 02:55:01', '', NULL, 0, NULL),
+(109, 1009, 'paternity', '2025-07-08', '2025-07-08', 'tesssssssssssssssssssdssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss', 'pending', '2025-07-08 03:02:55', '', NULL, 0, NULL),
+(110, 1009, '', '2025-07-08', '2025-07-08', 'hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii', 'pending', '2025-07-08 03:03:29', '', NULL, 0, NULL),
+(111, 1009, 'halfday', '2025-07-08', '2025-07-08', 'asdsad', 'approved', '2025-07-08 03:08:36', '', NULL, 1, NULL),
+(112, 1009, 'bereavement', '2025-07-08', '2025-07-08', 'asdas', 'pending', '2025-07-08 03:09:19', '', NULL, 0, NULL),
+(113, 1009, 'halfday', '2025-07-08', '2025-07-08', 'test', 'approved', '2025-07-08 05:40:54', '', NULL, 1, NULL),
+(114, 1009, 'halfday', '2025-07-11', '2025-07-26', 'sdasds', 'pending', '2025-07-08 05:42:13', '', NULL, 0, NULL),
+(115, 1006, 'halfday', '2025-07-09', '2025-07-09', 'test', 'pending', '2025-07-09 01:49:06', '', NULL, 0, NULL),
+(116, 1006, 'lwop', '2025-07-09', '2025-07-09', 'asdaasda', 'pending', '2025-07-09 01:50:17', '', NULL, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -280,13 +302,53 @@ INSERT INTO `leave_requests` (`id`, `employee_id`, `leave_type`, `start_date`, `
 
 CREATE TABLE `overtime_requests` (
   `id` int(11) NOT NULL,
-  `employee_id` int(11) DEFAULT NULL,
-  `ot_date` date DEFAULT NULL,
-  `expected_time_out` time DEFAULT NULL,
-  `reason` text DEFAULT NULL,
-  `status` enum('pending','approved','rejected') DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `employee_id` int(11) NOT NULL,
+  `date` date NOT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `duration_hours` float NOT NULL,
+  `reason` text NOT NULL,
+  `status` enum('Pending','Approved','Rejected') DEFAULT 'Pending',
+  `attachment_ot` varchar(255) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `time_in` time DEFAULT NULL,
+  `time_out` time DEFAULT NULL,
+  `notified` tinyint(1) DEFAULT 0,
+  `explanation` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `overtime_requests`
+--
+
+INSERT INTO `overtime_requests` (`id`, `employee_id`, `date`, `start_time`, `end_time`, `duration_hours`, `reason`, `status`, `attachment_ot`, `created_at`, `time_in`, `time_out`, `notified`, `explanation`) VALUES
+(10, 3, '2025-07-07', '01:22:12', '01:22:19', 0, 'sad', 'Pending', NULL, '2025-07-07 09:22:21', '07:17:14', '16:17:11', 0, NULL),
+(11, 1009, '2025-07-07', '01:46:21', '01:46:27', 0, 'adasd', 'Pending', 'uploads/1751852795_0266554465.jpeg', '2025-07-07 09:46:35', '07:15:13', '16:15:14', 0, NULL),
+(13, 20, '2025-07-07', '10:10:09', '11:10:10', 0, 'asd', 'Pending', NULL, '2025-07-07 10:10:14', '07:09:24', '16:09:25', 0, NULL),
+(14, 1009, '2025-07-08', '10:23:27', '10:23:29', 0, 'test', 'Approved', NULL, '2025-07-08 10:23:34', '06:58:22', '16:01:23', 1, NULL),
+(15, 1006, '2025-07-08', '15:45:49', '15:45:59', 0, 'restyy', 'Approved', 'uploads/1751960776_Smiley.svg.png', '2025-07-08 15:46:16', '07:00:00', '16:00:00', 1, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `reactions`
+--
+
+CREATE TABLE `reactions` (
+  `id` int(11) NOT NULL,
+  `announcement_id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `emoji` varchar(10) NOT NULL,
+  `reacted_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `reactions`
+--
+
+INSERT INTO `reactions` (`id`, `announcement_id`, `employee_id`, `emoji`, `reacted_at`) VALUES
+(36, 15, 1006, '❤️', '2025-07-09 05:55:46'),
+(37, 16, 1006, '👍', '2025-07-09 05:55:48');
 
 -- --------------------------------------------------------
 
@@ -335,7 +397,15 @@ CREATE TABLE `schedule_change_requests` (
 
 INSERT INTO `schedule_change_requests` (`id`, `employee_id`, `requested_schedule_id`, `reason`, `work_schedule`, `status`, `created_at`, `start_date`, `end_date`, `confirmed_rcs`, `declined_rcs`, `work_schedule_id`, `attachment_scr`, `notified`, `explanation`) VALUES
 (75, 1009, NULL, 'test', NULL, 'Approved', '2025-06-30 07:03:53', '2025-06-30', '2025-06-30', NULL, NULL, 7, 'scr_686236d917c2c.png', 1, NULL),
-(76, 1009, NULL, 'tanatamad', NULL, 'Approved', '2025-06-30 07:10:09', '2025-06-30', '2025-07-04', NULL, NULL, 7, 'scr_6862385141b86.jpeg', 1, NULL);
+(76, 1009, NULL, 'tanatamad', NULL, 'Approved', '2025-06-30 07:10:09', '2025-06-30', '2025-07-04', NULL, NULL, 7, 'scr_6862385141b86.jpeg', 1, NULL),
+(77, 1009, NULL, '6 to 3 po', NULL, 'Declined', '2025-06-30 23:18:31', '2025-07-01', '2025-07-02', NULL, NULL, 8, 'scr_68631b47b3b62.png', 1, 'bawal'),
+(78, 1009, NULL, 'test', NULL, 'Pending', '2025-07-01 01:27:04', '2025-07-01', '2025-07-01', NULL, NULL, 7, 'scr_686339689b626.png', 0, NULL),
+(79, 1009, NULL, 'test', NULL, 'Approved', '2025-07-02 05:00:08', '2025-07-02', '2025-07-02', NULL, NULL, 6, NULL, 0, NULL),
+(80, 1009, NULL, 'test', NULL, 'Approved', '2025-07-02 05:00:38', '2025-07-02', '2025-07-02', NULL, NULL, 6, NULL, 1, NULL),
+(81, 1009, NULL, 'test', NULL, 'Approved', '2025-07-07 01:05:43', '2025-08-06', '2025-08-06', NULL, NULL, 5, NULL, 1, NULL),
+(82, 1009, NULL, 'hi po 12', NULL, 'Approved', '2025-07-08 02:33:35', '2025-07-08', '2025-07-19', NULL, NULL, 6, NULL, 1, NULL),
+(83, 1009, NULL, 'test', NULL, 'Approved', '2025-07-08 05:47:08', '2025-07-25', '2025-08-09', NULL, NULL, 4, NULL, 1, NULL),
+(84, 1009, NULL, 'test', NULL, 'Approved', '2025-07-08 05:47:43', '2025-07-26', '2025-08-09', NULL, NULL, 7, NULL, 1, NULL);
 
 -- --------------------------------------------------------
 
@@ -394,6 +464,47 @@ INSERT INTO `test_sql` (`id`, `employee_id`, `content`, `created_date`, `created
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `time_adjustment_requests`
+--
+
+CREATE TABLE `time_adjustment_requests` (
+  `id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `log_date` date NOT NULL,
+  `current_time_in` time DEFAULT NULL,
+  `current_time_out` time DEFAULT NULL,
+  `requested_time_in` time DEFAULT NULL,
+  `requested_time_out` time DEFAULT NULL,
+  `reason` text DEFAULT NULL,
+  `status` enum('Pending','Approved','Declined') DEFAULT 'Pending',
+  `submitted_at` datetime DEFAULT current_timestamp(),
+  `attachment` varchar(255) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `notified` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `time_adjustment_requests`
+--
+
+INSERT INTO `time_adjustment_requests` (`id`, `employee_id`, `log_date`, `current_time_in`, `current_time_out`, `requested_time_in`, `requested_time_out`, `reason`, `status`, `submitted_at`, `attachment`, `created_at`, `notified`) VALUES
+(1, 1009, '2025-07-02', '13:03:46', NULL, '10:27:00', '00:27:00', 'TEST', 'Pending', '2025-07-03 10:27:21', NULL, '2025-07-07 10:31:40', 0),
+(2, 1009, '2025-07-03', '10:21:30', NULL, '11:01:00', '00:01:00', 'TEST', 'Pending', '2025-07-03 11:01:53', 'uploads/attach_6865f2a1c8c246.69129186.jpeg', '2025-07-07 10:31:40', 0),
+(3, 1009, '2025-07-03', '10:21:30', NULL, '11:01:00', '00:01:00', 'TEST', 'Pending', '2025-07-03 11:06:18', 'uploads/attach_6865f3aad2b2b0.13271836.jpeg', '2025-07-07 10:31:40', 0),
+(4, 1009, '2025-07-03', '10:21:30', NULL, '11:01:00', '00:01:00', 'TEST', 'Pending', '2025-07-03 12:54:37', 'uploads/attach_68660d0d7f9bf7.17194240.jpeg', '2025-07-07 10:31:40', 0),
+(5, 1009, '2025-07-03', '10:21:30', NULL, '11:01:00', '00:01:00', 'TEST', 'Pending', '2025-07-03 12:55:51', 'uploads/attach_68660d57475d81.72712397.jpeg', '2025-07-07 10:31:40', 0),
+(6, 1009, '2025-07-03', '07:00:00', '15:00:00', '12:31:00', '14:31:00', 'test | Decline Reason: no po', 'Declined', '2025-07-03 15:32:01', NULL, '2025-07-07 10:31:40', 0),
+(7, 20, '2025-07-07', '07:09:24', '16:09:25', '10:15:00', '10:16:00', 'tetst', 'Approved', '2025-07-07 10:15:30', NULL, '2025-07-07 10:31:40', 1),
+(8, 1009, '2025-07-07', '07:15:13', '16:15:14', '09:44:00', '17:44:00', 'hii | Decline Reason: bawal rj', 'Declined', '2025-07-07 10:44:28', NULL, '2025-07-07 10:44:28', 1),
+(9, 1009, '2025-07-08', '06:58:22', '16:01:23', '10:31:00', '15:32:00', 'nalete', 'Approved', '2025-07-08 08:32:18', NULL, '2025-07-08 08:32:18', 1),
+(10, 1009, '2025-07-08', '06:58:22', '16:01:23', '16:06:00', '17:07:00', 'test', 'Pending', '2025-07-08 13:06:57', NULL, '2025-07-08 13:06:57', 0),
+(11, 1009, '2025-07-08', '06:58:22', '16:01:23', '07:00:00', '16:00:00', 'late', 'Approved', '2025-07-08 14:48:59', NULL, '2025-07-08 14:48:59', 1),
+(12, 1009, '2025-07-02', '13:03:46', NULL, '19:00:00', '16:00:00', 'try', 'Pending', '2025-07-08 15:12:03', NULL, '2025-07-08 15:12:03', 0),
+(13, 1009, '2025-07-02', '13:03:46', NULL, '07:14:00', '16:15:00', 'iris', 'Approved', '2025-07-08 15:14:39', NULL, '2025-07-08 15:14:39', 1);
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `time_logs`
 --
 
@@ -443,7 +554,25 @@ INSERT INTO `time_logs` (`id`, `employee_id`, `log_date`, `time_in`, `time_out`,
 (39, 72, '2025-06-27', '14:44:00', NULL, 0, 0),
 (40, 63, '2025-06-27', '15:54:04', '15:54:12', 0, 0),
 (41, 5, '2025-06-30', '09:24:45', '09:24:50', 0, 0),
-(42, 1006, '2025-06-30', '10:34:45', '11:46:08', 0, 0);
+(42, 1006, '2025-06-30', '10:34:45', '11:46:08', 0, 0),
+(43, 1009, '2025-07-01', '09:10:27', '09:10:29', 0, 0),
+(44, 1009, '2025-07-02', '13:03:46', NULL, 0, 0),
+(46, 1009, '2025-07-03', '07:00:00', '15:00:00', 0, 0),
+(47, 1009, '2025-07-04', '07:00:00', '16:51:39', 0, 0),
+(48, 1006, '2025-07-04', '06:59:41', '17:01:20', 0, 0),
+(49, 1009, '2025-07-07', '07:15:13', '16:15:14', 0, 0),
+(50, 1006, '2025-07-07', '08:34:39', '18:34:39', 0, 0),
+(51, 15, '2025-07-07', '07:12:20', '16:12:21', 0, 0),
+(52, 3, '2025-07-07', '07:17:14', '16:17:11', 0, 0),
+(53, 4, '2025-07-07', '07:24:34', '16:24:36', 0, 0),
+(54, 7, '2025-07-07', '07:59:26', '16:59:27', 0, 0),
+(55, 20, '2025-07-07', '07:09:24', '16:09:25', 0, 0),
+(56, 11, '2025-07-07', '14:23:29', '14:23:32', 0, 0),
+(57, 1009, '2025-07-08', '06:58:22', '16:01:23', 0, 0),
+(58, 1006, '2025-07-08', '07:00:00', '16:00:00', 0, 0),
+(59, 1009, '2025-07-09', '07:25:13', '09:47:09', 0, 0),
+(60, 17, '2025-07-09', '10:09:05', NULL, 0, 0),
+(61, 1006, '2025-07-09', '07:00:00', '16:00:00', 0, 0);
 
 -- --------------------------------------------------------
 
@@ -517,6 +646,12 @@ ALTER TABLE `comments`
   ADD KEY `employee_id` (`employee_id`);
 
 --
+-- Indexes for table `emojis`
+--
+ALTER TABLE `emojis`
+  ADD PRIMARY KEY (`emoji`);
+
+--
 -- Indexes for table `employees`
 --
 ALTER TABLE `employees`
@@ -556,7 +691,14 @@ ALTER TABLE `leave_requests`
 -- Indexes for table `overtime_requests`
 --
 ALTER TABLE `overtime_requests`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `reactions`
+--
+ALTER TABLE `reactions`
   ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_reaction` (`announcement_id`,`employee_id`,`emoji`),
   ADD KEY `employee_id` (`employee_id`);
 
 --
@@ -597,6 +739,13 @@ ALTER TABLE `test_sql`
   ADD UNIQUE KEY `unique_request` (`employee_id`,`created_date`);
 
 --
+-- Indexes for table `time_adjustment_requests`
+--
+ALTER TABLE `time_adjustment_requests`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `employee_id` (`employee_id`);
+
+--
 -- Indexes for table `time_logs`
 --
 ALTER TABLE `time_logs`
@@ -629,7 +778,7 @@ ALTER TABLE `admin`
 -- AUTO_INCREMENT for table `announcements`
 --
 ALTER TABLE `announcements`
-  MODIFY `announcement_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `announcement_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `approved_overtime_schedule`
@@ -641,7 +790,7 @@ ALTER TABLE `approved_overtime_schedule`
 -- AUTO_INCREMENT for table `comments`
 --
 ALTER TABLE `comments`
-  MODIFY `comment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=118;
+  MODIFY `comment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=123;
 
 --
 -- AUTO_INCREMENT for table `employees`
@@ -671,13 +820,19 @@ ALTER TABLE `leave_credits`
 -- AUTO_INCREMENT for table `leave_requests`
 --
 ALTER TABLE `leave_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=99;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=117;
 
 --
 -- AUTO_INCREMENT for table `overtime_requests`
 --
 ALTER TABLE `overtime_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+
+--
+-- AUTO_INCREMENT for table `reactions`
+--
+ALTER TABLE `reactions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=38;
 
 --
 -- AUTO_INCREMENT for table `rest_day_overtime_requests`
@@ -689,7 +844,7 @@ ALTER TABLE `rest_day_overtime_requests`
 -- AUTO_INCREMENT for table `schedule_change_requests`
 --
 ALTER TABLE `schedule_change_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=77;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=85;
 
 --
 -- AUTO_INCREMENT for table `schedule_exceptions`
@@ -710,10 +865,16 @@ ALTER TABLE `test_sql`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `time_adjustment_requests`
+--
+ALTER TABLE `time_adjustment_requests`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+
+--
 -- AUTO_INCREMENT for table `time_logs`
 --
 ALTER TABLE `time_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=62;
 
 --
 -- AUTO_INCREMENT for table `vacation_leaves`
@@ -765,10 +926,11 @@ ALTER TABLE `leave_requests`
   ADD CONSTRAINT `leave_requests_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`);
 
 --
--- Constraints for table `overtime_requests`
+-- Constraints for table `reactions`
 --
-ALTER TABLE `overtime_requests`
-  ADD CONSTRAINT `overtime_requests_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`);
+ALTER TABLE `reactions`
+  ADD CONSTRAINT `reactions_ibfk_1` FOREIGN KEY (`announcement_id`) REFERENCES `announcements` (`announcement_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `reactions_ibfk_2` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `rest_day_overtime_requests`
@@ -795,6 +957,12 @@ ALTER TABLE `schedule_exceptions`
 --
 ALTER TABLE `schedule_exception_requests`
   ADD CONSTRAINT `schedule_exception_requests_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`);
+
+--
+-- Constraints for table `time_adjustment_requests`
+--
+ALTER TABLE `time_adjustment_requests`
+  ADD CONSTRAINT `time_adjustment_requests_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`);
 
 --
 -- Constraints for table `time_logs`

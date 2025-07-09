@@ -349,7 +349,7 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
 
   .sidebar a.active,
   .sidebar a:hover {
-    background-color: #d1fae5; /* Light green */
+    background-color:rgb(15, 255, 131); /* Light green */
     color: #065f46; /* Dark green text for contrast */
   }
 
@@ -374,73 +374,82 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
 </style>
 
 </head>
-<div id="messageBox" class="hidden"></div>
+<body class="bg-gray-50">
+    <div class="flex h-screen overflow-hidden relative">
 
-<body class="flex min-h-screen overflow-x-hidden">
+        <!-- Sidebar -->
+       <aside id="sidebar" class="w-64 bg-white shadow-lg flex flex-col fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out fixed h-full z-40">
 
-<!-- Sidebar -->
-<aside class="sidebar w-60 bg-white text-gray-900 p-6 flex flex-col justify-between min-h-screen shadow-md">
-    <!-- Top Section: Logo and Navigation -->
-    <div>
-        <!-- Logo with Divider -->
-        <div class="mb-2 w-full">
-            <div class="text-center mb-2">
-            <img src="../asset/RSS-logo-colour.png" alt="RSS Logo" class="w-36 mx-auto"> <!-- Increased width from w-24 to w-36 -->
+
+            <!-- Logo -->
+            <div class="p-6 flex justify-center">
+                <img src="../asset/RSS-logo-colour.png" alt="RSS Logo" class="w-32">
             </div>
-            <hr class="border-gray-300 w-full mx-auto">
-        </div>
 
-        <!-- Navigation Links -->
-        <nav class="flex-1 space-y-4 mt-6">
-            <a href="#" onclick="showSection('dashboardView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-                <span class="text-xl"><i class="fas fa-tachometer-alt"></i></span>
-                <span class="text-lg">Home</span>
-            </a>
-            <a href="#" onclick="showSection('newsFeedView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-                <span class="text-xl"><i class="fas fa-newspaper"></i></span>
-                <span class="text-lg">News Feed</span>
-            </a>
-            <a href="#" onclick="showSection('scheduleView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-                <span class="text-xl"><i class="fas fa-calendar-alt"></i></span>
-                <span class="text-lg">Request Change Schedule</span>
-            </a>
-            <a href="#" onclick="showSection('requestView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
-                <span class="text-xl"><i class="fas fa-plane-departure"></i></span>
-                <span class="text-lg">Request Leave</span>
-            </a>
-        </nav>
-    </div>
+            <hr class="border-t border-gray-300 w-full mb-4">
 
-    <!-- Bottom Section: Divider and User Info -->
-    <div class="pt-6">
-        <hr class="border-gray-300 w-full mx-auto mb-4">
-        <div class="flex items-center">
-            <?php if ($profile_picture): ?>
-                <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" alt="Profile" class="w-12 h-12 rounded-full object-cover mr-3 border border-gray-300">
-            <?php else: ?>
-                <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xl mr-3 border border-gray-300">
-                    <?= strtoupper(substr($fname, 0, 1) . substr($lname, 0, 1)) ?>
+            <!-- Navigation -->
+            <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
+                <a href="#" onclick="showSection('dashboardView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
+                    <i class="fas fa-tachometer-alt text-lg"></i>
+                    <span class="text-base">Home</span>
+                </a>
+                <a href="#" onclick="showSection('newsFeedView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
+                    <i class="fas fa-newspaper text-lg"></i>
+                    <span class="text-base">News Feed</span>
+                </a>
+                <a href="#" onclick="showSection('scheduleView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
+                    <i class="fas fa-calendar-alt text-lg"></i>
+                    <span class="text-base">Request Change Schedule</span>
+                </a>
+                <a href="#" onclick="showSection('requestView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
+                    <i class="fas fa-plane-departure text-lg"></i>
+                    <span class="text-base">Request Leave</span>
+                </a>
+            </nav>
+
+           <hr class="border-t border-gray-300 w-full mt-4 mb-1">
+
+
+            <!-- User Info -->
+            <div class="px-4 py-3 flex items-center">
+                <?php if ($profile_picture): ?>
+                    <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" alt="Profile" class="w-12 h-12 rounded-full object-cover border border-gray-300 mr-3">
+                <?php else: ?>
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xl border border-gray-300 mr-3">
+                        <?= strtoupper(substr($fname, 0, 1) . substr($lname, 0, 1)) ?>
+                    </div>
+                <?php endif; ?>
+                <div class="flex flex-col">
+                    <span class="font-semibold text-sm text-gray-800"><?= htmlspecialchars($fname . ' ' . $lname) ?></span>
+                    <span class="text-xs text-gray-500"><?= htmlspecialchars($position) ?></span>
                 </div>
-            <?php endif; ?>
-            <div class="flex flex-col">
-                <span class="font-semibold text-base"><?= htmlspecialchars($fname . ' ' . $lname) ?></span>
-                <span class="text-xs text-gray-500"><?= htmlspecialchars($position) ?></span>
             </div>
-        </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+
+            <!-- Fixed Header -->
+            <header class="fixed top-0 left-0 md:left-64 w-full md:w-[calc(100%-16rem)] bg-white shadow z-50 flex items-center justify-between px-4 md:px-8 py-4">
+    <div class="flex items-center space-x-4">
+        <!-- Hamburger button -->
+    <!-- Hamburger only on mobile -->
+   <button id="hamburgerBtn" class="md:hidden text-gray-600 mr-2">
+  <i class="fas fa-bars text-xl"></i>
+</button>
+
+
+        <h1 class="text-2xl font-semibold text-gray-800">Employee Dashboard</h1>
     </div>
-</aside>
 
-
-
-<main class="flex-1 p-10 overflow-auto">
-<!-- Fixed Header -->
-<header class="fixed top-0 left-60 w-[calc(100%-15rem)] bg-white shadow z-50 flex items-center justify-between px-8 py-4">
-    <h1 class="text-2xl font-semibold text-gray-800">Employee Dashboard</h1>
-    <div class="flex items-center space-x-6">
-        <button class="relative text-gray-600 hover:text-gray-800 focus:outline-none notification-button" onclick="toggleModal()">
-            <i class="fas fa-bell text-xl"></i>
-            <span class="absolute -top-1 -right-1 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+ <div class="flex items-center space-x-6">
+      <button class="relative text-gray-600 hover:text-gray-800 focus:outline-none notification-button" onclick="toggleModal()">
+        <i class="fas fa-bell text-xl"></i>
+        <span class="absolute -top-1 -right-1 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
+      </button>
+                    
+       
 
         <!-- Notification Modal -->
         <?php include 'notification_modal.php'; ?>
@@ -489,16 +498,16 @@ function closeDropdownOnClickOutside(e) {
 }
 </script>
 
-
+<main class="flex-1 pt-20 px-8 overflow-auto">
 <div id="dashboardView" class="mt-20">
 <?php
 // Fetch the number of announcements
 $stmt = $pdo->query("SELECT COUNT(announcement_id) AS total_announcements FROM announcements");
 $announcementCount = $stmt->fetchColumn();
 ?>
-
 <!-- Welcome Banner -->
-<div class="rounded-2xl p-10 text-white mb-8 shadow-2xl" style="background: linear-gradient(135deg, rgb(16, 185, 72) 0%, rgb(5, 101, 211) 100%);">
+<div class="rounded-2xl p-10 text-white mb-8 shadow-2xl -mt-10"
+     style="background: linear-gradient(135deg, rgb(16, 185, 72) 0%, rgb(5, 101, 211) 100%);">
     <div class="flex justify-between items-center">
         <div>
             <h1 class="text-5xl font-bold mb-2">Welcome back, <?= htmlspecialchars($fname) ?> 👋</h1>
@@ -517,6 +526,7 @@ $announcementCount = $stmt->fetchColumn();
         </div>
     </div>
 </div>
+
 <!-- Stat Cards -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 mt-[-2.5rem] relative z-10">
     <?php 
@@ -535,84 +545,86 @@ $announcementCount = $stmt->fetchColumn();
 </div>
 
      <!-- Request Change Schedule -->
-<div id="scheduleView" class="hidden mt-32">
-    <div class="flex justify-center items-center min-h-[60vh] px-4">
-        <div class="max-w-xl w-full bg-white p-6 rounded-xl shadow-lg border border-green-200">
+<div id="scheduleView" class="hidden mt-12">
+  <div class="flex justify-center items-start min-h-[60vh] px-4">
+    <div class="w-full max-w-xl">
 
-            <!-- Header -->
-            <div class= "bg-green-600 p-4 rounded-lg mb-6 shadow">
-                <h2 class="text-2xl font-semibold text-center text-white">
-                    Request Change of Work Schedule
-                </h2>
-            </div>
+      <!-- Floating Green Header -->
+      <div class="bg-green-600 p-4 rounded-t-xl shadow-lg text-center">
+        <h2 class="text-2xl font-semibold text-white">
+          Request Change of Work Schedule
+        </h2>
+      </div>
 
-            <!-- Form Start -->
-            <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm" class="space-y-5">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <input type="hidden" name="submit_schedule_change" value="1">
+      <!-- Card Pulled Up Under Header -->
+      <div class="bg-white p-6 rounded-b-xl shadow-lg border border-green-200 -mt-1">
+        <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm" class="space-y-5">
+          <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+          <input type="hidden" name="submit_schedule_change" value="1">
 
-                <!-- Date Range -->
-                <div>
-                    <label for="date_range" class="block text-sm font-medium text-gray-700 mb-1">
-                        Effective Date Range
-                    </label>
-                    <input type="text" name="date_range" id="date_range"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        placeholder="Choose date range" required>
-                </div>
+          <!-- Date Range -->
+          <div>
+            <label for="date_range" class="block text-sm font-medium text-gray-700 mb-1">
+              Effective Date Range
+            </label>
+            <input type="text" name="date_range" id="date_range"
+              class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Choose date range" required>
+          </div>
 
-                <!-- New Work Hours -->
-                <div>
-                    <label for="work_schedule_id" class="block text-sm font-medium text-gray-700 mb-1">
-                        New Work Hours
-                    </label>
-                    <select name="work_schedule_id" id="work_schedule_id"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" required>
-                        <option value="" disabled selected>Select new work hours</option>
-                        <?php 
-                        $allowed = [4, 5, 6, 7, 8];
-                        foreach ($work_schedules as $ws):
-                            if (in_array($ws['id'], $allowed)):
-                        ?>
-                            <option value="<?= $ws['id'] ?>">
-                                <?= date("g:i A", strtotime($ws['time_in'])) ?> to <?= date("g:i A", strtotime($ws['time_out'])) ?>
-                            </option>
-                        <?php 
-                            endif;
-                        endforeach;
-                        ?>
-                    </select>
-                </div>
+          <!-- New Work Hours -->
+          <div>
+            <label for="work_schedule_id" class="block text-sm font-medium text-gray-700 mb-1">
+              New Work Hours
+            </label>
+            <select name="work_schedule_id" id="work_schedule_id"
+              class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              required>
+              <option value="" disabled selected>Select new work hours</option>
+              <?php 
+              $allowed = [4, 5, 6, 7, 8];
+              foreach ($work_schedules as $ws):
+                  if (in_array($ws['id'], $allowed)):
+              ?>
+                  <option value="<?= $ws['id'] ?>">
+                      <?= date("g:i A", strtotime($ws['time_in'])) ?> to <?= date("g:i A", strtotime($ws['time_out'])) ?>
+                  </option>
+              <?php 
+                  endif;
+              endforeach;
+              ?>
+            </select>
+          </div>
 
-                <!-- Reason -->
-                <div>
-                    <label for="reason" class="block text-sm font-medium text-gray-700 mb-1">
-                        Reason
-                    </label>
-                    <textarea name="reason" id="reason" rows="3"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        placeholder="Explain your reason for the schedule change" required></textarea>
-                </div>
+          <!-- Reason -->
+          <div>
+            <label for="reason" class="block text-sm font-medium text-gray-700 mb-1">
+              Reason
+            </label>
+            <textarea name="reason" id="reason" rows="3"
+              class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Explain your reason for the schedule change" required></textarea>
+          </div>
 
-                <!-- Attachment Upload -->
-                <div>
-                    <label for="attachment_scr" class="block text-sm font-medium text-gray-700 mb-1">
-                        Attachment
-                    </label>
-                    <input type="file" name="attachment_scr" id="attachment_scr" accept=".pdf,.jpg,.jpeg,.png"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                </div>
+          <!-- Attachment Upload -->
+          <div>
+            <label for="attachment_scr" class="block text-sm font-medium text-gray-700 mb-1">
+              Attachment
+            </label>
+            <input type="file" name="attachment_scr" id="attachment_scr" accept=".pdf,.jpg,.jpeg,.png"
+              class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+          </div>
 
-                <!-- Submit Button -->
-                <button type="submit"
-                    class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
-                    Submit Request
-                </button>
-            </form>
-            <!-- Form End -->
+          <!-- Submit Button -->
+          <button type="submit"
+            class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
+            Submit Request
+          </button>
+        </form>
+      </div>
 
-        </div>
     </div>
+  </div>
 </div>
 
 <!-- Profile Section -->
@@ -668,23 +680,47 @@ $announcementCount = $stmt->fetchColumn();
 <div id="edit-profile-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
   <div class="bg-white rounded-lg p-6 w-11/12 md:w-1/3">
     <h4 class="text-xl font-semibold mb-4">Edit Profile</h4>
-    <form id="edit-profile-form" method="POST" action="tess.php">
+    
+    <form id="edit-profile-form" method="POST" action="update_profile.php">
+      <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+
+      <!-- First Name -->
+      <div class="mb-4">
+        <label for="fname" class="block text-sm font-medium text-gray-700">First Name</label>
+        <input type="text" id="fname" name="fname" value="<?= htmlspecialchars($fname) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+      </div>
+
+      <!-- Last Name -->
+      <div class="mb-4">
+        <label for="lname" class="block text-sm font-medium text-gray-700">Last Name</label>
+        <input type="text" id="lname" name="lname" value="<?= htmlspecialchars($lname) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+      </div>
+
+      <!-- Email -->
       <div class="mb-4">
         <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
         <input type="email" id="email" name="email" value="<?= htmlspecialchars($email) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
       </div>
+
+      <!-- Mobile Number -->
       <div class="mb-4">
         <label for="contact" class="block text-sm font-medium text-gray-700">Mobile Number</label>
         <input type="text" id="contact" name="contact" value="<?= htmlspecialchars($contact) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
       </div>
+
+      <!-- Position -->
       <div class="mb-4">
         <label for="position" class="block text-sm font-medium text-gray-700">Position</label>
         <input type="text" id="position" name="position" value="<?= htmlspecialchars($position) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
       </div>
+
+      <!-- Company -->
       <div class="mb-4">
         <label for="company" class="block text-sm font-medium text-gray-700">Company</label>
         <input type="text" id="company" name="company" value="<?= htmlspecialchars($company) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
       </div>
+
+      <!-- Buttons -->
       <div class="flex justify-end">
         <button type="button" onclick="closeEditModal()" class="mr-2 bg-gray-300 text-gray-800 px-4 py-2 rounded-md">Cancel</button>
         <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Save Changes</button>
@@ -693,7 +729,17 @@ $announcementCount = $stmt->fetchColumn();
   </div>
 </div>
 
-
+<!-- Confirmation Modal -->
+<div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+  <div class="bg-white rounded-lg p-6 w-11/12 md:w-1/3">
+    <h4 class="text-xl font-semibold mb-4 text-gray-800">Confirm Update</h4>
+    <p class="text-gray-600 mb-6">Are you sure you want to save the changes to your profile?</p>
+    <div class="flex justify-end">
+      <button onclick="closeConfirmModal()" class="mr-2 bg-gray-300 text-gray-800 px-4 py-2 rounded-md">Cancel</button>
+      <button onclick="submitProfileForm()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Yes, Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- News Feed View -->
 <div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-4xl mx-auto">
@@ -736,76 +782,77 @@ $announcementCount = $stmt->fetchColumn();
 </div>
 
 <!-- Request Leave -->
-<div id="requestView" class="hidden mt-32">
-    <div class="flex justify-center items-center min-h-[60vh] px-4">
-        <div class="max-w-xl w-full bg-white p-6 rounded-xl shadow-lg border border-green-200">
+<div id="requestView" class="hidden mt-12">
+  <div class="flex justify-center items-start min-h-[60vh] px-4">
+    <div class="w-full max-w-xl">
 
-            <!-- Header -->
-            <div class="bg-green-600 p-4 rounded-lg mb-6 shadow">
-                <h2 class="text-2xl font-semibold text-center text-white">Request Leave</h2>
-            </div>
+      <!-- Floating Green Header Outside the Card -->
+      <div class="bg-green-600 p-4 rounded-t-xl shadow-lg text-center">
+        <h2 class="text-2xl font-semibold text-white">Request Leave</h2>
+      </div>
 
-            <!-- Form Start -->
-            <form id="leaveRequestForm" action="time_log_create.php" method="POST" enctype="multipart/form-data" class="space-y-5">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
+      <!-- Card Slightly Pulled Up -->
+      <div class="bg-white p-6 rounded-b-xl shadow-lg border border-green-200 -mt-1">
+        <form id="leaveRequestForm" action="time_log_create.php" method="POST" enctype="multipart/form-data" class="space-y-5">
+          <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
 
-                <!-- Leave Type -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Leave Type</label>
-                    <select name="leaveType" required
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                        <option value="" disabled selected>Select type</option>
-                        <?php
-                        $types = [
-                            'sick'          => 'Sick Leave (SL)',
-                            'vacation'      => 'Vacation Leave (VL)',
-                            'paternity'     => 'Paternity Leave',
-                            'maternity'     => 'Maternity Leave',
-                            'solo_parent'   => 'Solo Parent Leave (SPL)',
-                            'halfday'       => 'Half Day Vacation (Half_VL)',
-                            'halfday_sick'  => 'Half Day Sick (Half_SL)',
-                            'lwop'          => 'Leave Without Pay (LWOP)',
-                            'bereavement'   => 'Bereavement Leave',
-                        ];
-                        foreach ($types as $val => $label):
-                        ?>
-                            <option value="<?= $val ?>"><?= $label ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+          <!-- Leave Type -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Leave Type</label>
+            <select name="leaveType" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+              <option value="" disabled selected>Select type</option>
+              <?php
+              $types = [
+                'sick'          => 'Sick Leave (SL)',
+                'vacation'      => 'Vacation Leave (VL)',
+                'paternity'     => 'Paternity Leave',
+                'maternity'     => 'Maternity Leave',
+                'solo_parent'   => 'Solo Parent Leave (SPL)',
+                'halfday'       => 'Half Day Vacation (Half_VL)',
+                'halfday_sick'  => 'Half Day Sick (Half_SL)',
+                'lwop'          => 'Leave Without Pay (LWOP)',
+                'bereavement'   => 'Bereavement Leave',
+              ];
+              foreach ($types as $val => $label):
+              ?>
+                <option value="<?= $val ?>"><?= $label ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
 
-                <!-- Date Range -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Leave Dates</label>
-                    <input type="text" name="date_range" id="date_range" placeholder="Choose date range"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" required>
-                </div>
+          <!-- Date Range -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Leave Dates</label>
+            <input type="text" name="date_range" id="date_range" placeholder="Choose date range"
+              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" required>
+          </div>
 
-                <!-- Reason -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-                    <textarea name="reason" rows="3" placeholder="Enter reason..."
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
-                </div>
+          <!-- Reason -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+            <textarea name="reason" rows="3" placeholder="Enter reason..."
+              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+          </div>
 
-                <!-- Attachment -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Attachment</label>
-                    <input type="file" name="attachment_lr" accept=".pdf,.jpg,.jpeg,.png"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                </div>
+          <!-- Attachment -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Attachment</label>
+            <input type="file" name="attachment_lr" accept=".pdf,.jpg,.jpeg,.png"
+              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+          </div>
 
-                <!-- Submit -->
-                <button type="submit"
-                    class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
-                    Submit Request
-                </button>
-            </form>
+          <!-- Submit -->
+          <button type="submit"
+            class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
+            Submit Request
+          </button>
+        </form>
 
-            <!-- Message Box (for JS response) -->
-            <div id="messageBox" class="hidden mt-4 p-2 text-center text-white rounded"></div>
-        </div>
+        <!-- Message Box -->
+        <div id="messageBox" class="hidden mt-4 p-2 text-center text-white rounded"></div>
+      </div>
     </div>
+  </div>
 </div>
 
 
@@ -960,6 +1007,23 @@ function showSection(sectionId) {
   document.getElementById(sectionId).classList.remove('hidden');
 }
 </script>
+
+<script>
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    const sidebar = document.getElementById('sidebar');
+
+    hamburgerBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('-translate-x-full');
+    });
+</script>
+
+<script>
+  function toggleMobileMenu() {
+    const sidebar = document.getElementById("sidebar");
+    sidebar.classList.toggle("hidden");
+  }
+</script>
+
 <!--End of Tawk.to Script-->
 </body>
 </html>

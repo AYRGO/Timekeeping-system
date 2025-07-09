@@ -13,23 +13,24 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
 
 <div class="bg-white rounded-2xl shadow-lg p-6 w-full lg:w-1/2 border border-gray-200">
     <!-- Header -->
-    <form method="GET" class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-        <h3 class="text-2xl font-semibold text-gray-800 flex items-center">
-            <i class="fas fa-history text-blue-500 bg-blue-100 p-2 rounded-full mr-3"></i>
-            Recent Activity
-        </h3>
+ <form method="GET" class="flex flex-col md:flex-row md:items-start md:justify-between mb-6 gap-4 flex-wrap">
+    <h3 class="text-2xl font-semibold text-gray-800 flex items-center">
+        <i class="fas fa-history text-blue-500 bg-blue-100 p-2 rounded-full mr-3"></i>
+        Recent Activity
+    </h3>
 
-        <!-- Date Filter -->
-        <div class="flex items-center gap-2">
-            <label for="activityDate" class="text-sm text-gray-600 font-medium">Filter by date:</label>
-            <input type="date" id="activityDate" name="activityDate"
-                   value="<?= htmlspecialchars($filterDate) ?>"
-                   class="border rounded-md px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200">
-            <button type="submit" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1 rounded">
-                Apply
-            </button>
-        </div>
-    </form>
+    <!-- Date Filter -->
+    <div class="flex items-center gap-2 flex-wrap md:flex-nowrap">
+        <label for="activityDate" class="text-sm text-gray-600 font-medium">Filter by date:</label>
+        <input type="date" id="activityDate" name="activityDate"
+               value="<?= htmlspecialchars($filterDate) ?>"
+               class="border rounded-md px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 max-w-[160px] w-full">
+        <button type="submit" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1 rounded">
+            Apply
+        </button>
+    </div>
+</form>
+
 
     <!-- Scrollable Table -->
     <div class="overflow-x-auto">

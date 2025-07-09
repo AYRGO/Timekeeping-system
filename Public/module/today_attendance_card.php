@@ -176,22 +176,23 @@ $end_dt = (new DateTime('@' . $end_ot))->setTimezone($tz);
     <?php endif; ?>   <!-- Action Button -->
     <form method="POST" class="mt-6">
         <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-        <?php if (!$time_in): ?>
-            <button type="submit" name="time_in"
-                class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
-                Log Time In
-            </button>
-        <?php elseif ($time_in && !$time_out): ?>
-            <button type="submit" name="time_out"
-                class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
-                Log Time Out
-            </button>
-        <?php else: ?>
-            <button type="button" disabled
-                class="w-full bg-gray-300 text-white font-semibold py-3 px-4 rounded-xl cursor-not-allowed">
-                Already Logged
-            </button>
-        <?php endif; ?>
+  <?php if (!$time_in): ?>
+    <button type="button" onclick="showConfirmationModal('time_in')"
+        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
+        Log Time In
+    </button>
+<?php elseif ($time_in && !$time_out): ?>
+    <button type="button" onclick="showConfirmationModal('time_out')"
+        class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
+        Log Time Out
+    </button>
+<?php else: ?>
+    <button type="button" disabled
+        class="w-full bg-gray-300 text-white font-semibold py-3 px-4 rounded-xl cursor-not-allowed">
+        Already Logged
+    </button>
+<?php endif; ?>
+
     </form>
 
     <div class="mt-4 text-center">
@@ -200,6 +201,26 @@ $end_dt = (new DateTime('@' . $end_ot))->setTimezone($tz);
         class="text-sm text-blue-600 hover:underline">
             Request Time Adjustment
         </a>
+    </div>
+</div>
+
+<div id="confirmTimeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
+    <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm text-center border border-gray-200">
+        <h2 class="text-xl font-bold text-gray-800 mb-4" id="confirmTimeTitle">Confirm Action</h2>
+        <p class="text-gray-600 mb-6" id="confirmTimeMessage">Are you sure you want to proceed?</p>
+        <form method="POST" id="timeLogForm">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+            <input type="hidden" name="action" id="timeLogAction">
+            <div class="flex justify-center gap-4">
+                <button type="button" onclick="hideConfirmationModal()"
+                    class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium px-4 py-2 rounded">
+                    Cancel
+                </button>
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded">
+                    Confirm
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -381,6 +402,29 @@ function loadOvertimeRequest() {
 function hideOTModal() {
     document.getElementById('endOTModal').classList.add('hidden');
 }
+function showConfirmationModal(actionType) {
+    const modal = document.getElementById('confirmTimeModal');
+    const title = document.getElementById('confirmTimeTitle');
+    const message = document.getElementById('confirmTimeMessage');
+    const actionInput = document.getElementById('timeLogAction');
+
+    if (actionType === 'time_in') {
+        title.textContent = 'Confirm Time In';
+        message.textContent = 'Are you sure you want to log your Time In for today?';
+        actionInput.name = 'time_in';
+    } else if (actionType === 'time_out') {
+        title.textContent = 'Confirm Time Out';
+        message.textContent = 'Are you sure you want to log your Time Out for today?';
+        actionInput.name = 'time_out';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function hideConfirmationModal() {
+    const modal = document.getElementById('confirmTimeModal');
+    modal.classList.add('hidden');
+}
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -389,3 +433,4 @@ document.addEventListener('DOMContentLoaded', () => {
     applyOTButtonState();
 });
 </script>
+

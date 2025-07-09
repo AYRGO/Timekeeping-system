@@ -7,10 +7,21 @@ include('../config/db.php');
 
 $employee_id = $_SESSION['employee']['id'] ?? null;
 
-$monthFilter = $_GET['month'] ?? date('Y-m'); // e.g., "2023-09"
+// Get the selected month or default to current month
+$monthFilter = $_GET['month'] ?? date('Y-m');
 $selectedMonth = date('Y-m', strtotime($monthFilter));
 
-// Fetch attendance logs with time adjustment and overtime info
+// Fetch all available months the employee has logs for
+$monthStmt = $pdo->prepare("
+    SELECT DISTINCT DATE_FORMAT(log_date, '%Y-%m') AS month
+    FROM time_logs
+    WHERE employee_id = ?
+    ORDER BY month DESC
+");
+$monthStmt->execute([$employee_id]);
+$available_months = $monthStmt->fetchAll(PDO::FETCH_COLUMN);
+
+// Fetch attendance logs
 $stmt = $pdo->prepare("
     SELECT 
         t.log_date, 
@@ -46,7 +57,6 @@ $stmt = $pdo->prepare("
         AND DATE_FORMAT(t.log_date, '%Y-%m') = ?
     ORDER BY t.log_date DESC
 ");
-
 $stmt->execute([$employee_id, $selectedMonth]);
 $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>

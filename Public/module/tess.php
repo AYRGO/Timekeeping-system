@@ -1,1095 +1,1004 @@
+<?php
+session_start();
+include('../config/db.php');
+date_default_timezone_set('Asia/Manila');
+
+if (!isset($_SESSION['regenerated'])) {
+    session_regenerate_id(true);
+    $_SESSION['regenerated'] = true;
+}
+
+$employee_id = $_SESSION['employee']['id'] ?? null;
+if (!$employee_id) {
+    header("Location: ../employee/login.php");
+    exit;
+}
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+try {
+    // Fetch employee details
+    $stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company, profile_picture 
+                           FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $user = $stmt->fetch();
+
+    $fname = $user['fname'] ?? '';
+    $lname = $user['lname'] ?? '';
+    $email = $user['email'] ?? '';
+    $contact = $user['contact'] ?? '';
+    $position = $user['position'] ?? '';
+    $company = $user['company'] ?? '';
+    $profile_picture = $user['profile_picture'] ?? null;
+
+    $current_date = date("Y-m-d");
+
+    // Fetch today's time log
+    $stmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs 
+                           WHERE employee_id = ? AND log_date = ?");
+    $stmt->execute([$employee_id, $current_date]);
+    $time_log = $stmt->fetch();
+    $time_in = $time_log['time_in'] ?? null;
+    $time_out = $time_log['time_out'] ?? null;
+
+    // Work schedules
+    $stmt = $pdo->prepare("SELECT id, time_in, time_out, day_of_week FROM work_schedules");
+    $stmt->execute();
+    $work_schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Employee schedules
+    $stmt = $pdo->prepare("SELECT ws.id, ws.day_of_week, ws.time_in, ws.time_out 
+                           FROM employee_schedules es
+                           JOIN work_schedules ws ON es.work_schedule_id = ws.id
+                           WHERE es.employee_id = ?");
+    $stmt->execute([$employee_id]);
+    $saved_schedule = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $grouped_schedule = [];
+    foreach ($saved_schedule as $sched) {
+        $grouped_schedule[$sched['day_of_week']] = [
+            'id' => $sched['id'],
+            'time_in' => $sched['time_in'],
+            'time_out' => $sched['time_out']
+        ];
+    }
+
+    // Handle POST actions
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $token = $_POST['csrf_token'] ?? '';
+        if (!hash_equals($_SESSION['csrf_token'], $token)) {
+            die("Invalid CSRF token.");
+        }
+
+        // Time In
+        if (isset($_POST['time_in'])) {
+            $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) 
+                                   VALUES (?, ?, ?)");
+            $stmt->execute([$employee_id, $current_date, date("H:i:s")]);
+            header("Location: time_log_create.php");
+            exit;
+        }
+
+        // Time Out
+        if (isset($_POST['time_out'])) {
+            $stmt = $pdo->prepare("UPDATE time_logs SET time_out = ? 
+                                   WHERE employee_id = ? AND log_date = ?");
+            $stmt->execute([date("H:i:s"), $employee_id, $current_date]);
+            header("Location: time_log_create.php");
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['date_range'])) {
+            require '../config/db.php';
+
+            $employee_id = $_SESSION['employee']['id'] ?? null;
+
+            if (!$employee_id) {
+                header("Location: time_log_create.php?leave_request=unauthorized");
+                exit;
+            }
+
+            $leaveTypeInput = trim($_POST['leaveType']);
+            $reason = trim($_POST['reason'] ?? '');
+            $dateRange = trim($_POST['date_range']);
+
+            $leaveTypeMap = [
+                'sick'         => 'SL',
+                'vacation'     => 'VL',
+                'paternity'    => 'Paternity',
+                'maternity'    => 'Maternity',
+                'solo_parent'  => 'SPL',
+                'halfday'      => 'Half_VL',
+                'halfday_sick' => 'Half_SL',
+                'lwop'         => 'LWOP',
+                'bereavement'  => 'bereavement'
+            ];
+
+            if (!isset($leaveTypeMap[$leaveTypeInput])) {
+                header("Location: time_log_create.php?leave_request=invalid_type");
+                exit;
+            }
+
+            $leaveType = $leaveTypeMap[$leaveTypeInput];
+
+            // Parse date range
+            $dates = explode(' to ', $dateRange);
+            $start = isset($dates[0]) ? trim($dates[0]) : null;
+            $end = isset($dates[1]) ? trim($dates[1]) : $start;
+
+            if (!$start || !$end || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) {
+                header("Location: time_log_create.php?leave_request=invalid_dates");
+                exit;
+            }
+
+            // File upload
+            $attachmentPath = null;
+            if (isset($_FILES['attachment_lr']) && $_FILES['attachment_lr']['error'] === UPLOAD_ERR_OK) {
+                $allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+                $fileTmp = $_FILES['attachment_lr']['tmp_name'];
+                $fileType = mime_content_type($fileTmp);
+                $fileName = $_FILES['attachment_lr']['name'];
+
+                if (in_array($fileType, $allowedTypes)) {
+                    $uploadDir = '../uploads/leave_attachments/';
+                    if (!file_exists($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+
+                    $ext = pathinfo($fileName, PATHINFO_EXTENSION);
+                    $safeName = uniqid('lr_') . '.' . $ext;
+                    $targetPath = $uploadDir . $safeName;
+
+                    if (move_uploaded_file($fileTmp, $targetPath)) {
+                        $attachmentPath = $safeName;
+                    }
+                }
+            }
+
+            // Insert into DB
+            $stmt = $pdo->prepare("
+        INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason, status, created_at, attachment_lr)
+        VALUES (?, ?, ?, ?, ?, 'pending', NOW(), ?)
+    ");
+
+            $success = $stmt->execute([
+                $employee_id,
+                $leaveType,
+                $start,
+                $end,
+                $reason,
+                $attachmentPath
+            ]);
+
+            if ($success) {
+                header("Location: time_log_create.php?leave_request=success");
+                exit;
+            } else {
+                die("DB Error: " . implode(" | ", $stmt->errorInfo()));
+            }
+        }
+
+
+        /// Schedule Change Request Check
+        if (isset($_POST['submit_schedule_change'])) {
+            $employee_id = $_SESSION['employee']['id'] ?? null;
+            $work_schedule_id = $_POST['work_schedule_id'] ?? null;
+            $reason = trim($_POST['reason'] ?? '');
+            $date_range = trim($_POST['date_range'] ?? '');
+
+            if (!$employee_id || !$work_schedule_id || !is_numeric($work_schedule_id)) {
+                header("Location: time_log_create.php?schedule_change=invalid_data");
+                exit;
+            }
+
+            // Optional: Validate work_schedule_id exists
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM work_schedules WHERE id = ?");
+            $stmt->execute([$work_schedule_id]);
+            if ($stmt->fetchColumn() == 0) {
+                header("Location: time_log_create.php?schedule_change=invalid_schedule_id");
+                exit;
+            }
+
+            // Determine start and end date
+            if (strpos($date_range, ' to ') !== false) {
+                [$start_date_raw, $end_date_raw] = explode(' to ', $date_range);
+            } else {
+                $start_date_raw = $end_date_raw = $date_range;
+            }
+
+            $start_date = date('Y-m-d', strtotime($start_date_raw));
+            $end_date = date('Y-m-d', strtotime($end_date_raw));
+
+            // Handle attachment (optional)
+            $attachmentPath = null;
+            if (isset($_FILES['attachment_scr']) && $_FILES['attachment_scr']['error'] === UPLOAD_ERR_OK) {
+                $allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+                $fileTmp = $_FILES['attachment_scr']['tmp_name'];
+                $fileType = mime_content_type($fileTmp);
+                $fileName = $_FILES['attachment_scr']['name'];
+
+                if (in_array($fileType, $allowedTypes)) {
+                    $uploadDir = '../uploads/schedule_attachments/';
+                    if (!file_exists($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+
+                    $ext = pathinfo($fileName, PATHINFO_EXTENSION);
+                    $safeName = uniqid('scr_') . '.' . $ext;
+                    $targetPath = $uploadDir . $safeName;
+
+                    if (move_uploaded_file($fileTmp, $targetPath)) {
+                        $attachmentPath = $safeName;
+                    }
+                }
+            }
+
+            // Save request
+            $stmt = $pdo->prepare("INSERT INTO schedule_change_requests 
+        (employee_id, work_schedule_id, reason, status, start_date, end_date, created_at, attachment_scr)
+        VALUES (?, ?, ?, 'pending', ?, ?, NOW(), ?)");
+
+            $stmt->execute([
+                $employee_id,
+                $work_schedule_id,
+                $reason,
+                $start_date,
+                $end_date,
+                $attachmentPath
+            ]);
+
+            header("Location: time_log_create.php?schedule_change=success");
+            exit;
+        }
+
+
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment') {
+            $csrf_token = $_POST['csrf_token'] ?? '';
+            $announcement_id = intval($_POST['announcement_id'] ?? 0);
+            $comment_content = trim($_POST['comment'] ?? '');
+            $employee_id = $_SESSION['employee']['id'] ?? null;
+
+            // Validate CSRF token
+            if ($csrf_token !== ($_SESSION['csrf_token'] ?? '')) {
+                die("Invalid CSRF token.");
+            }
+
+            // Validate logged-in user
+            if (!$employee_id) {
+                die("User not authenticated.");
+            }
+
+            // Validate announcement exists
+            $stmt = $pdo->prepare("SELECT 1 FROM announcements WHERE announcement_id = ?");
+            $stmt->execute([$announcement_id]);
+            if (!$stmt->fetchColumn()) {
+                die("Announcement not found.");
+            }
+
+            // Prevent inserting blank comments
+            if (!empty($comment_content)) {
+                $insert = $pdo->prepare("
+            INSERT INTO comments (announcement_id, employee_id, content, created_at)
+            VALUES (?, ?, ?, NOW())
+        ");
+                $insert->execute([$announcement_id, $employee_id, $comment_content]);
+
+                // Redirect to avoid form resubmission on refresh
+                header("Location: time_log_create.php#newsFeedView");
+                exit;
+            }
+        }
+
+        // Logout
+        if (isset($_POST['logout'])) {
+            session_destroy();
+            header("Location: ../employee/login.php");
+            exit;
+        }
+    }
+} catch (Exception $e) {
+    die("Error: " . $e->getMessage());
+}
+
+
+$today = date('Y-m-d');
+$overtimeEligible = false;
+
+// Get today’s log
+$todayLogStmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs WHERE employee_id = :id AND log_date = :today");
+$todayLogStmt->execute(['id' => $employee_id, 'today' => $today]);
+$todayLog = $todayLogStmt->fetch();
+
+if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
+    $timeIn = new DateTime($todayLog['time_in']);
+    $timeOut = new DateTime($todayLog['time_out']);
+    $diffInSeconds = $timeOut->getTimestamp() - $timeIn->getTimestamp();
+
+    if ($diffInSeconds >= (7 * 3600 + 58 * 60)) { // 7hrs 58mins = 28680 secs
+        $overtimeEligible = true;
+    }
+}
+
+
+?>
+
+
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RSS HR Management System</title>
+    <meta charset="UTF-8" />
+    <title>RSS Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        .sidebar {
-            width: 250px;
-            transition: all 0.3s;
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #F4F6FA;
+            overflow-x: hidden;
         }
-        .content {
-            margin-left: 250px;
-            transition: all 0.3s;
+
+        .sidebar a {
+            color: rgba(0, 0, 0, 0.7);
         }
-        .sidebar.collapsed {
-            width: 80px;
+
+        .sidebar a.active,
+        .sidebar a:hover {
+            background-color: #d1fae5;
+            /* Light green */
+            color: #065f46;
+            /* Dark green text for contrast */
         }
-        .sidebar.collapsed + .content {
-            margin-left: 80px;
+
+        .profile-img:hover .overlay {
+            opacity: 1;
         }
-        .form-card {
-            transition: transform 0.3s, box-shadow 0.3s;
+
+        .overlay {
+            transition: opacity .3s;
+            opacity: 0;
         }
-        .form-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+
+        .fixed-box {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .schedule-day:hover {
+            transform: translateY(-2px);
+            transition: .2s ease;
         }
     </style>
+
 </head>
-<body class="bg-gray-100 min-h-screen flex">
-    <!-- Sidebar -->
-    <div id="sidebar" class="sidebar bg-blue-800 text-white h-screen fixed shadow-lg">
-        <div class="flex flex-col h-full">
-            <!-- Logo -->
-            <div class="p-4 flex items-center justify-between border-b border-blue-700">
-                <div class="flex items-center">
-                    <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/43f72e29-b379-4347-be91-916255464a72.png" alt="RSS HR System logo with leaf sprout and circular border" class="rounded-full border-2 border-white" />
-                    <span class="ml-3 text-xl font-bold" id="company-name">RSS HR</span>
-                </div>
-                <button id="toggle-sidebar" class="text-white focus:outline-none">
-                    <i class="fas fa-bars"></i>
-                </button>
-            </div>
-            
-            <!-- Navigation -->
-            <nav class="flex-1 overflow-y-auto py-4">
-                <ul>
-                    <li>
-                        <a href="#" class="block py-3 px-4 hover:bg-blue-700 active-tab" data-tab="dashboard">
-                            <i class="fas fa-tachometer-alt mr-3"></i>
-                            <span class="nav-text">Dashboard</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" class="block py-3 px-4 hover:bg-blue-700" data-tab="leave">
-                            <i class="fas fa-calendar-minus mr-3"></i>
-                            <span class="nav-text">Leave Request</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" class="block py-3 px-4 hover:bg-blue-700" data-tab="overtime">
-                            <i class="fas fa-business-time mr-3"></i>
-                            <span class="nav-text">Overtime</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" class="block py-3 px-4 hover:bg-blue-700" data-tab="schedule">
-                            <i class="fas fa-calendar-check mr-3"></i>
-                            <span class="nav-text">Schedule Request</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" class="block py-3 px-4 hover:bg-blue-700" data-tab="attendance">
-                            <i class="fas fa-user-clock mr-3"></i>
-                            <span class="nav-text">Attendance</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-            
-            <!-- User Profile -->
-            <div class="p-4 border-t border-blue-700">
-                <div class="flex items-center">
-                    <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/1cd10c1c-e005-43d3-9a02-249d3f255686.png" alt="User profile photo of HR manager with professional appearance" class="rounded-full border-2 border-white" />
-                    <div class="ml-3 text-sm">
-                        <div class="font-semibold" id="username">John Doe</div>
-                        <div class="text-blue-200">HR Manager</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div id="messageBox" class="hidden"></div>
+
+<body class="flex min-h-screen overflow-x-hidden">
+
+    <!-- Sidebar Overlay (for mobile, hidden by default) -->
+    <div id="sidebarOverlay"
+        class="fixed inset-0 bg-black bg-opacity-40 z-40 hidden md:hidden"
+        onclick="toggleSidebar()">
     </div>
 
-    <!-- Main Content -->
-    <div id="content" class="content flex-1">
-        <header class="bg-white shadow-sm p-4 border-b">
-            <h1 class="text-2xl font-bold text-gray-800">HR Dashboard</h1>
-            <div class="flex justify-between items-center mt-2">
-                <p class="text-gray-600">Welcome back! Here's what's happening today.</p>
-                <div class="flex items-center">
-                    <div class="relative mr-4">
-                        <input type="text" placeholder="Search..." class="pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-                    </div>
-                    <div class="relative">
-                        <button class="p-2 text-gray-600 hover:text-gray-900 focus:outline-none" id="notifications">
-                            <i class="fas fa-bell"></i>
-                            <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-                        </button>
-                    </div>
+    <!-- Sidebar -->
+    <aside id="sidebar"
+        class="sidebar w-60 bg-white text-gray-900 p-6 flex flex-col justify-between min-h-screen shadow-md
+           fixed top-0 left-0 z-50 transform -translate-x-full transition-transform duration-200
+           md:relative md:translate-x-0 md:flex md:w-60">
+        <!-- Top Section: Logo and Navigation -->
+        <div>
+            <!-- Logo with Divider -->
+            <div class="mb-2">
+                <div class="text-center mb-2">
+                    <img src="../asset/RSS-logo-colour.png" alt="RSS Logo" class="w-24 mx-auto hidden md:block">
+                </div>
+                <hr class="border-gray-300 w-full mx-auto">
+            </div>
+            <!-- Profile Section -->
+            <div class="flex items-center mb-2 mt-14 md:mt-5">
+                <img src="<?= $profile_picture ? '../uploads/profile_images/' . htmlspecialchars($profile_picture) : 'https://via.placeholder.com/40' ?>"
+                    alt="Profile"
+                    class="w-12 h-12 rounded-full object-cover border border-gray-300 mr-3">
+                <div class="flex flex-col">
+                    <span class="font-semibold text-base"><?= htmlspecialchars($fname . ' ' . $lname) ?></span>
+                    <span class="text-xs text-gray-500"><?= htmlspecialchars($position) ?></span>
+                </div>
+            </div>
+
+            <hr class="border-gray-300 w-full mx-auto mb-6">
+            <!-- Navigation Links -->
+            <nav class="flex-1 space-y-4">
+                <a href="#" onclick="showSection('dashboardView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                    <span class="text-xl"><i class="fas fa-tachometer-alt"></i></span>
+                    <span class="text-lg">Home</span>
+                </a>
+                <a href="#" onclick="showSection('newsFeedView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                    <span class="text-xl"><i class="fas fa-newspaper"></i></span>
+                    <span class="text-lg">News Feed</span>
+                </a>
+                <a href="#" onclick="showSection('scheduleView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                    <span class="text-xl"><i class="fas fa-calendar-alt"></i></span>
+                    <span class="text-lg">Request Change Schedule</span>
+                </a>
+                <a href="#" onclick="showSection('requestView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                    <span class="text-xl"><i class="fas fa-plane-departure"></i></span>
+                    <span class="text-lg">Request Leave</span>
+                </a>
+                <a href="#" onclick="showSection('overtimeRequestView');" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+                    <span class="text-xl"><i class="fas fa-clock"></i></span>
+                    <span class="text-lg">Request Overtime</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Bottom Section: Settings and Logout -->
+        <div class="border-t border-gray-300 mt-6 pt-4">
+            <div class="flex flex-col space-y-1">
+                <form method="POST" class="w-full">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    <button type="submit" name="logout" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-red-100 w-full text-left text-red-600 font-semibold">
+                        <span class="text-xl"><i class="fas fa-sign-out-alt"></i></span>
+                        <span class="text-lg">Logout</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-10 overflow-auto">
+        <!-- Fixed Header -->
+        <header class="fixed top-0 left-0 w-full md:left-60 md:w-[calc(100%-15rem)] bg-white shadow z-50 flex items-center justify-between px-8 py-4">
+            <!-- Burger Button (inside header, only on mobile) -->
+            <button id="burgerBtn"
+                class="md:hidden bg-white p-2 rounded shadow focus:outline-none text-gray-800 text-3xl font-bold mr-4"
+                onclick="toggleSidebar()">
+                ≡
+            </button>
+            <h1 class="sm:text-2xl font-semibold text-gray-800">Employee Dashboard</h1>
+            <div class="flex items-center space-x-6">
+                <button class="relative text-gray-600 hover:text-gray-800 focus:outline-none notification-button" onclick="toggleModal()">
+                    <i class="fas fa-bell text-xl"></i>
+                    <span class="absolute -top-1 -right-1 inline-block w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+                <?php include 'notification_modal.php'; ?>
+                <div class="flex items-center space-x-3">
+                    <div class="w-px h-6 bg-gray-300 mx-2"></div>
+                    <span class="text-gray-700 font-medium"><?= htmlspecialchars($fname . ' ' . $lname) ?></span>
+                    <button class="ml-2 text-gray-600 hover:text-gray-800 focus:outline-none"></button>
                 </div>
             </div>
         </header>
 
-        <main class="p-6">
-            <!-- Dashboard Tab -->
-            <div id="dashboard-tab" class="tab-content">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    <!-- Stats Cards -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
-                                <i class="fas fa-calendar-check text-xl"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-gray-600 text-sm">Pending Leaves</h3>
-                                <p class="text-2xl font-bold">12</p>
-                            </div>
-                        </div>
+        <div id="dashboardView" class="mt-20">
+            <?php
+            // Fetch the number of announcements
+            $stmt = $pdo->query("SELECT COUNT(announcement_id) AS total_announcements FROM announcements");
+            $announcementCount = $stmt->fetchColumn();
+            ?>
+            <!-- Welcome Banner -->
+            <div class="bg-gradient-to-r from-green-600 to-green-800 rounded-2xl p-10 text-white mb-8 shadow-2xl">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-4xl font-bold mb-2">Welcome back, <?= htmlspecialchars($fname) ?> 👋</h1>
+                        <p class="mb-6 text-lg">
+                            You have <?= (int)$announcementCount ?> announcement<?= $announcementCount == 1 ? '' : 's' ?>.
+                        </p>
+                        <button
+                            class="bg-white text-green-800 px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90 transition text-base"
+                            onclick="showSection('newsFeedView')">
+                            View News Feed
+                        </button>
                     </div>
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
-                                <i class="fas fa-business-time text-xl"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-gray-600 text-sm">OT Requests</h3>
-                                <p class="text-2xl font-bold">8</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
-                                <i class="fas fa-calendar-alt text-xl"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-gray-600 text-sm">Schedule Changes</h3>
-                                <p class="text-2xl font-bold">5</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-red-100 text-red-600 mr-4">
-                                <i class="fas fa-user-times text-xl"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-gray-600 text-sm">Absences Today</h3>
-                                <p class="text-2xl font-bold">3</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                    <!-- Leave Calendar -->
-                    <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold text-gray-800">Leave Calendar</h3>
-                            <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                Add Leave
-                            </button>
-                        </div>
-                        <div id="calendar" class="h-64">
-                            <!-- Calendar will be implemented with JavaScript -->
-                            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/905a4f72-dc43-47ae-9439-58f3341d7699.png" alt="Interactive calendar showing current month with leave days marked in different colors for different leave types" />
-                        </div>
-                    </div>
-
-                    <!-- Recent Activities -->
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Recent Activities</h3>
-                        <div class="space-y-4">
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                                    <i class="fas fa-check"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium text-gray-900">Jennifer approved</p>
-                                    <p class="text-sm text-gray-500">Vacation leave for Mark</p>
-                                    <p class="text-xs text-gray-400">10 mins ago</p>
-                                </div>
-                            </div>
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                                    <i class="fas fa-clock"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium text-gray-900">OT request submitted</p>
-                                    <p class="text-sm text-gray-500">From Sarah (4 hours)</p>
-                                    <p class="text-xs text-gray-400">25 mins ago</p>
-                                </div>
-                            </div>
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600">
-                                    <i class="fas fa-exchange-alt"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium text-gray-900">Shift change request</p>
-                                    <p class="text-sm text-gray-500">From Alex (Morning to Afternoon)</p>
-                                    <p class="text-xs text-gray-400">2 hours ago</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Pending Approvals -->
-                <div class="bg-white rounded-lg shadow p-6 mb-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Pending Approvals</h3>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Leave</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Michael Brown</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Vacation - 3 days</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">15-17 Sep 2023</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-500 font-medium">Pending</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button class="text-green-600 hover:text-green-900 mr-2">Approve</button>
-                                        <button class="text-red-600 hover:text-red-900">Deny</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Overtime</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Lisa Ray</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Weekend OT - 8 hours</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">09 Sep 2023</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-500 font-medium">Pending</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button class="text-green-600 hover:text-green-900 mr-2">Approve</button>
-                                        <button class="text-red-600 hover:text-red-900">Deny</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Schedule</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Robert Chen</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Shift change request</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Starting 12 Sep</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-500 font-medium">Pending</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button class="text-green-600 hover:text-green-900 mr-2">Approve</button>
-                                        <button class="text-red-600 hover:text-red-900">Deny</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="hidden md:block">
+                        <img src="https://cdn-icons-png.flaticon.com/512/1903/1903162.png" alt="HR Illustration" class="h-40">
                     </div>
                 </div>
             </div>
 
-            <!-- Leave Request Tab (Hidden by default) -->
-            <div id="leave-tab" class="tab-content hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="bg-white rounded-lg shadow p-6 form-card lg:col-span-1">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">New Leave Request</h3>
-                        <form id="leave-form">
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="leave-type">Leave Type</label>
-                                <select id="leave-type" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                                    <option value="vacation">Vacation Leave</option>
-                                    <option value="sick">Sick Leave</option>
-                                    <option value="personal">Personal Leave</option>
-                                    <option value="bereavement">Bereavement Leave</option>
-                                </select>
-                            </div>
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="start-date">Start Date</label>
-                                <input type="date" id="start-date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                            </div>
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="end-date">End Date</label>
-                                <input type="date" id="end-date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                            </div>
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="leave-reason">Reason</label>
-                                <textarea id="leave-reason" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
-                            </div>
-                            <div class="mb-4">
-                                <label class="flex items-center">
-                                    <input type="checkbox" class="form-checkbox" checked>
-                                    <span class="ml-2 text-sm text-gray-600">Notify manager</span>
-                                </label>
-                            </div>
-                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                                Submit Request
-                            </button>
-                        </form>
-                    </div>
-                    <div class="lg:col-span-2">
-                        <div class="bg-white rounded-lg shadow p-6 mb-6">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4">My Leave Balances</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div class="border rounded-lg p-4 text-center">
-                                    <h4 class="text-sm text-gray-600">Vacation</h4>
-                                    <p class="text-2xl font-bold text-blue-600">15/20</p>
-                                    <p class="text-xs text-gray-500">Days remaining</p>
-                                </div>
-                                <div class="border rounded-lg p-4 text-center">
-                                    <h4 class="text-sm text-gray-600">Sick</h4>
-                                    <p class="text-2xl font-bold text-green-600">10/10</p>
-                                    <p class="text-xs text-gray-500">Days remaining</p>
-                                </div>
-                                <div class="border rounded-lg p-4 text-center">
-                                    <h4 class="text-sm text-gray-600">Personal</h4>
-                                    <p class="text-2xl font-bold text-purple-600">5/5</p>
-                                    <p class="text-xs text-gray-500">Days remaining</p>
-                                </div>
-                                <div class="border rounded-lg p-4 text-center">
-                                    <h4 class="text-sm text-gray-600">Bereavement</h4>
-                                    <p class="text-2xl font-bold text-gray-600">3/3</p>
-                                    <p class="text-xs text-gray-500">Days remaining</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-lg font-semibold text-gray-800">My Leave History</h3>
-                                <div class="flex space-x-2">
-                                    <select class="border rounded-md px-3 py-1 text-sm">
-                                        <option>Last 3 months</option>
-                                        <option>Last 6 months</option>
-                                        <option>This year</option>
-                                        <option>All records</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Vacation</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">15-17 Jul 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">3</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500 font-medium">Approved</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Sick</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">22 May 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500 font-medium">Approved</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Personal</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">10-11 Apr 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500 font-medium">Approved</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Vacation</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Pending: 10-15 Sep 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">6</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-500 font-medium">Pending</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                                <button class="text-red-600 hover:text-red-900 ml-2">Cancel</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <!-- Stat Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <?php
+                include 'stats/available_leave.php';
+                include 'stats/upcoming_payday.php';
+                include 'stats/pending_requests.php';
+                include 'stats/schedule_tracker.php';
+                ?>
             </div>
 
-            <!-- Overtime Tab (Hidden by default) -->
-            <div id="overtime-tab" class="tab-content hidden">
+            <div class="flex flex-col md:flex-row gap-6 items-start md:items-stretch">
 
-            
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="bg-white rounded-lg shadow p-6 form-card lg:col-span-1">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">New Overtime Request</h3>
-                        <form id="overtime-form">
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="ot-date">Date</label>
-                                <input type="date" id="ot-date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <!-- Quick Actions - Refined Style -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 w-full md:w-1/2 border border-gray-200">
+                    <!-- Header -->
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-bolt text-yellow-500 bg-yellow-100 p-2 rounded-full mr-3"></i>
+                        Quick Actions
+                    </h3>
+
+                    <!-- Actions Grid -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Request Leave -->
+                        <button onclick="showSection('requestView')" class="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-xl border border-green-100 shadow-sm hover:shadow transition">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-green-300 to-green-500 text-white flex items-center justify-center mb-2">
+                                <i class="fas fa-calendar-plus"></i>
                             </div>
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="ot-start">Start Time</label>
-                                <input type="time" id="ot-start" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                            <span class="text-sm font-medium text-center text-gray-700">Request Leave</span>
+                        </button>
+
+                        <!-- Change Schedule -->
+                        <button onclick="showSection('scheduleView')" class="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-100 shadow-sm hover:shadow transition">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-300 to-blue-500 text-white flex items-center justify-center mb-2">
+                                <i class="fas fa-exchange-alt"></i>
                             </div>
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="ot-end">End Time</label>
-                                <input type="time" id="ot-end" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                            <span class="text-sm font-medium text-center text-gray-700">Request Change Schedule</span>
+
+                        </button>
+
+                        <!-- Profile -->
+                        <button onclick="showSection('profileView')" class="flex flex-col items-center justify-center p-4 bg-yellow-50 hover:bg-yellow-100 rounded-xl border border-yellow-100 shadow-sm hover:shadow transition">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 text-white flex items-center justify-center mb-2">
+                                <i class="fas fa-user"></i>
                             </div>
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="ot-type">OT Type</label>
-                                <select id="ot-type" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                                    <option value="regular">Regular OT</option>
-                                    <option value="weekend">Weekend OT</option>
-                                    <option value="holiday">Holiday OT</option>
-                                </select>
-                            </div>
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="ot-reason">Reason</label>
-                                <textarea id="ot-reason" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
-                            </div>
-                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                                Submit Request
-                            </button>
-                        </form>
-                    </div>
-                    <div class="lg:col-span-2">
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-lg font-semibold text-gray-800">My Overtime History</h3>
-                                <div class="flex space-x-2">
-                                    <select class="border rounded-md px-3 py-1 text-sm">
-                                        <option>Last 3 months</option>
-                                        <option>Last 6 months</option>
-                                        <option>This year</option>
-                                        <option>All records</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">20 Aug 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">4 hrs</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Regular</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500 font-medium">Approved</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$120.00</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">12 Aug 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8 hrs</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Weekend</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500 font-medium">Approved</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$240.00</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">05 Jul 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2 hrs</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Regular</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500 font-medium">Approved</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">$60.00</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Pending: 09 Sep 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8 hrs</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Weekend</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-500 font-medium">Pending</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                                <button class="text-red-600 hover:text-red-900 ml-2">Cancel</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                            <span class="text-sm font-medium text-center text-gray-700">Profile</span>
+                        </button>
+                        <!-- history -->
+<button onclick="showSection('HistoryView')" class="flex flex-col items-center justify-center p-4 bg-gray-100 hover:bg-gray-200 rounded-xl border border-gray-200 shadow-sm hover:shadow transition">
+    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 text-white flex items-center justify-center mb-2">
+        <i class="fas fa-history"></i>
+    </div>
+    <span class="text-sm font-medium text-center text-gray-700">History</span>
+</button>
                     </div>
                 </div>
+
+                <?php include 'today_attendance_card.php'; ?>
+
             </div>
+        </div>
+        </div>
+        <!-- Request Change Schedule -->
+        <div id="scheduleView" class="hidden mt-32">
+            <div class="flex justify-center items-center min-h-[60vh] px-4">
+                <div class="max-w-xl w-full bg-white p-6 rounded-xl shadow-lg border border-green-200">
 
-            <!-- Schedule Request Tab (Hidden by default) -->
-            <div id="schedule-tab" class="tab-content hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="bg-white rounded-lg shadow p-6 form-card lg:col-span-1">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">New Schedule Request</h3>
-                        <form id="schedule-form">
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="schedule-type">Request Type</label>
-                                <select id="schedule-type" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                                    <option value="shift-change">Shift Change</option>
-                                    <option value="swap">Shift Swap</option>
-                                    <option value="day-off">Additional Day Off</option>
-                                </select>
-                            </div>
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-bold mb-2" for="effective-date">Effective Date</label>
-                                <input type="date" id="effective-date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                            </div>
-                            <div class="mb-4 schedule-options">
-                                <div id="shift-change-fields">
-                                    <div class="mb-3">
-                                        <label class="block text-gray-700 text-sm font-bold mb-2" for="new-shift">New Shift</label>
-                                        <select id="new-shift" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                                            <option value="morning">Morning (8AM-4PM)</option>
-                                            <option value="afternoon">Afternoon (4PM-12AM)</option>
-                                            <option value="night">Night (12AM-8AM)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-gray-700 text-sm font-bold mb-2" for="schedule-reason">Reason</label>
-                                        <textarea id="schedule-reason" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
-                                    </div>
-                                </div>
-                                <div id="swap-fields" class="hidden">
-                                    <div class="mb-3">
-                                        <label class="block text-gray-700 text-sm font-bold mb-2" for="swap-date">Swap Date</label>
-                                        <input type="date" id="swap-date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="block text-gray-700 text-sm font-bold mb-2" for="swap-with">Swap With</label>
-                                        <select id="swap-with" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                                            <option value="">Select employee</option>
-                                            <option value="john">John Doe</option>
-                                            <option value="lisa">Lisa Ray</option>
-                                            <option value="michael">Michael Brown</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-gray-700 text-sm font-bold mb-2" for="swap-reason">Reason</label>
-                                        <textarea id="swap-reason" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
-                                    </div>
-                                </div>
-                                <div id="dayoff-fields" class="hidden">
-                                    <div class="mb-3">
-                                        <label class="block text-gray-700 text-sm font-bold mb-2" for="dayoff-date">Day Off Date</label>
-                                        <input type="date" id="dayoff-date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                                    </div>
-                                    <div>
-                                        <label class="block text-gray-700 text-sm font-bold mb-2" for="dayoff-reason">Reason</label>
-                                        <textarea id="dayoff-reason" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                                Submit Request
-                            </button>
-                        </form>
+                    <!-- Header -->
+                    <div class="bg-green-600 p-4 rounded-lg mb-6 shadow">
+                        <h2 class="text-2xl font-semibold text-center text-white">
+                            Request Change of Work Schedule
+                        </h2>
                     </div>
-                    <div class="lg:col-span-2">
-                        <div class="bg-white rounded-lg shadow p-6 mb-6">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4">My Current Schedule</h3>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Monday</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Morning</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8:00 AM - 4:00 PM</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Main Office</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Tuesday</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Morning</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8:00 AM - 4:00 PM</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Main Office</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Wednesday</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Morning</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8:00 AM - 4:00 PM</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Main Office</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Thursday</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Morning</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8:00 AM - 4:00 PM</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Main Office</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Friday</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Morning</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8:00 AM - 4:00 PM</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Main Office</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Saturday</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">OFF</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Sunday</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">OFF</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-lg font-semibold text-gray-800">My Schedule Requests</h3>
-                                <div class="flex space-x-2">
-                                    <select class="border rounded-md px-3 py-1 text-sm">
-                                        <option>Last 3 months</option>
-                                        <option>Last 6 months</option>
-                                        <option>This year</option>
-                                        <option>All records</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Request Date</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Effective Date</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Shift Change</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">To Afternoon (4PM-12AM)</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">25 Jul 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">10 Sep 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-500 font-medium">Pending</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                                <button class="text-red-600 hover:text-red-900 ml-2">Cancel</button>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Shift Swap</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">With Robert Chen (15 Aug)</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">05 Jul 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">15 Aug 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500 font-medium">Approved</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Day Off</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Personal business</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">10 Jun 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">22 Jun 2023</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-green-500 font-medium">Approved</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <button class="text-blue-600 hover:text-blue-900">View</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Attendance Tab (Hidden by default) -->
-            <div id="attendance-tab" class="tab-content hidden">
-                <div class="bg-white rounded-lg shadow p-6 mb-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Time In/Out</h3>
-                    <div class="flex justify-center items-center">
-                        <div class="text-center p-6 rounded-lg border border-gray-200 w-full max-w-md">
-                            <div class="text-gray-600 mb-4">Today is <span id="current-date">September 5, 2023</span></div>
-                            <div class="text-2xl font-bold mb-4" id="current-time">09:15 AM</div>
-                            <div class="mb-6">
-                                <div id="status-indicator" class="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-800 text-sm font-medium">Not Logged In</div>
-                            </div>
-                            <button id="time-in-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline mb-2">
-                                Time In
-                            </button>
-                            <button id="time-out-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline" disabled>
-                                Time Out
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white rounded-lg shadow p-6 mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800">Today's Attendance Logs</h3>
+                    <!-- Form Start -->
+                    <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm" class="space-y-5">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <input type="hidden" name="submit_schedule_change" value="1">
+
+                        <!-- Date Range -->
                         <div>
-                            <div class="flex items-center">
-                                <div class="mr-4">
-                                    <span class="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
-                                    <span class="text-sm text-gray-600">On Time</span>
-                                </div>
-                                <div class="mr-4">
-                                    <span class="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-1"></span>
-                                    <span class="text-sm text-gray-600">Late</span>
-                                </div>
-                                <div>
-                                    <span class="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
-                                    <span class="text-sm text-gray-600">Absent</span>
-                                </div>
-                            </div>
+                            <label for="date_range" class="block text-sm font-medium text-gray-700 mb-1">
+                                Effective Date Range
+                            </label>
+                            <input type="text" name="date_range" id="date_range"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="Choose date range" required>
                         </div>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time In</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours Worked</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 h-10 w-10">
-                                                <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/327d4822-0a3b-416d-8110-4dae483c91db.png" alt="John Doe profile photo - male employee with short hair and professional appearance" class="rounded-full border-2 border-white" />
-                                            </div>
-                                            <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900">John Doe</div>
-                                                <div class="text-sm text-gray-500">HR Dept.</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">08:05 AM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">05:30 PM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">9.25</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">On Time</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 h-10 w-10">
-                                                <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/f5fedf55-5ccc-4cc7-8762-77fc27a64386.png" alt="Lisa Ray profile photo - female employee with medium-length hair and glasses" class="rounded-full border-2 border-white" />
-                                            </div>
-                                            <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900">Lisa Ray</div>
-                                                <div class="text-sm text-gray-500">Finance Dept.</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">08:45 AM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">06:00 PM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">9.15</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Late</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 h-10 w-10">
-                                                <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/7ff6f221-e17b-4964-b619-04f95bde129d.png" alt="Michael Brown profile photo - male employee with short beard and professional appearance" class="rounded-full border-2 border-white" />
-                                            </div>
-                                            <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900">Michael Brown</div>
-                                                <div class="text-sm text-gray-500">IT Dept.</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">08:00 AM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">04:00 PM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8.00</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">On Time</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 h-10 w-10">
-                                                <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/47fcf856-c43c-4e67-a398-a4a8359ee3ea.png" alt="Sarah Johnson profile photo - female employee with curly hair and professional appearance" class="rounded-full border-2 border-white" />
-                                            </div>
-                                            <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900">Sarah Johnson</div>
-                                                <div class="text-sm text-gray-500">Marketing Dept.</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">0.00</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Absent</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="bg-white rounded-lg shadow p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800">My Attendance History</h3>
-                        <div class="flex space-x-2">
-                            <select id="month-select" class="border rounded-md px-3 py-1 text-sm">
-                                <option>September 2023</option>
-                                <option>August 2023</option>
-                                <option>July 2023</option>
-                                <option>June 2023</option>
+
+                        <!-- New Work Hours -->
+                        <div>
+                            <label for="work_schedule_id" class="block text-sm font-medium text-gray-700 mb-1">
+                                New Work Hours
+                            </label>
+                            <select name="work_schedule_id" id="work_schedule_id"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                                <option value="" disabled selected>Select new work hours</option>
+                                <?php
+                                $allowed = [4, 5, 6, 7, 8];
+                                foreach ($work_schedules as $ws):
+                                    if (in_array($ws['id'], $allowed)):
+                                ?>
+                                        <option value="<?= $ws['id'] ?>">
+                                            <?= date("g:i A", strtotime($ws['time_in'])) ?> to <?= date("g:i A", strtotime($ws['time_out'])) ?>
+                                        </option>
+                                <?php
+                                    endif;
+                                endforeach;
+                                ?>
                             </select>
                         </div>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time In</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours Worked</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">01 Sep 2023</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Friday</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">08:00 AM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">05:00 PM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">9.00</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">On Time</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">02 Sep 2023</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Saturday</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">0.00</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Weekend</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">03 Sep 2023</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Sunday</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">0.00</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Weekend</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">04 Sep 2023</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Monday</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">08:05 AM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">05:00 PM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">8.55</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">On Time</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">05 Sep 2023</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Tuesday</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">08:15 AM</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Working</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+
+                        <!-- Reason -->
+                        <div>
+                            <label for="reason" class="block text-sm font-medium text-gray-700 mb-1">
+                                Reason
+                            </label>
+                            <textarea name="reason" id="reason" rows="3"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="Explain your reason for the schedule change" required></textarea>
+                        </div>
+
+                        <!-- Attachment Upload -->
+                        <div>
+                            <label for="attachment_scr" class="block text-sm font-medium text-gray-700 mb-1">
+                                Attachment
+                            </label>
+                            <input type="file" name="attachment_scr" id="attachment_scr" accept=".pdf,.jpg,.jpeg,.png"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button type="submit"
+                            class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
+                            Submit Request
+                        </button>
+                    </form>
+                    <!-- Form End -->
+
                 </div>
             </div>
-        </main>
-    </div>
+        </div>
 
-    <script>
-        // Toggle sidebar
-        document.getElementById('toggle-sidebar').addEventListener('click', function() {
-            document.getElementById('sidebar').classList.toggle('collapsed');
-            document.getElementById('content').classList.toggle('collapsed');
-            document.getElementById('company-name').classList.toggle('hidden');
-            
-            // Hide nav text when collapsed
-            const navTexts = document.querySelectorAll('.nav-text');
-            navTexts.forEach(text => {
-                text.classList.toggle('hidden');
-            });
-        });
 
-        // Tab switching
-        const tabs = document.querySelectorAll('[data-tab]');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', function() {
-                // Remove active class from all tabs and tab contents
-                tabs.forEach(t => t.parentElement.classList.remove('bg-blue-700'));
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.add('hidden');
+
+        <!-- Profile Section -->
+        <div id="profileView" class="hidden min-h-screen bg-gray-50 py-10 px-4">
+            <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                <!-- Sidebar Info -->
+                <div class="bg-white p-6 rounded-xl shadow space-y-4">
+                    <div class="flex flex-col items-center">
+                        <div class="relative w-24 h-24 rounded-full overflow-hidden border-4 border-green-500">
+                            <?php if ($profile_picture): ?>
+                                <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover">
+                            <?php else: ?>
+                                <div class="w-full h-full bg-gray-300 flex items-center justify-center text-4xl text-white">👤</div>
+                            <?php endif; ?>
+                            <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center cursor-pointer text-xs text-white opacity-0 hover:opacity-100 transition" onclick="document.getElementById('fileInput').click()">
+                                Change
+                            </div>
+                        </div>
+                        <form action="upload_profile.php" method="POST" enctype="multipart/form-data">
+                            <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
+                        </form>
+
+                        <h3 class="mt-4 font-semibold text-lg text-center"><?= htmlspecialchars($fname . ' ' . $lname) ?></h3>
+                    </div>
+                </div>
+
+                <!-- Main Profile Info -->
+                <div class="md:col-span-2 space-y-10">
+
+                    <!-- Personal Info -->
+                    <div class="bg-white p-8 rounded-2xl shadow space-y-8">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-2xl font-semibold text-gray-800">My Profile</h4>
+                            <button onclick="openEditModal()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Edit</button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-base text-gray-700">
+                            <div><strong>First Name:</strong> <?= htmlspecialchars($fname) ?></div>
+                            <div><strong>Last Name:</strong> <?= htmlspecialchars($lname) ?></div>
+                            <div><strong>Email Address:</strong> <?= htmlspecialchars($email) ?></div>
+                            <div><strong>Mobile Number:</strong> <?= htmlspecialchars($contact) ?></div>
+                            <div><strong>Position:</strong> <?= htmlspecialchars($position) ?></div>
+                            <div><strong>Company:</strong> <?= htmlspecialchars($company) ?></div>
+                        </div>
+                    </div>
+
+                </div> <!-- End of md:col-span-2 -->
+            </div> <!-- End of grid -->
+        </div> <!-- ✅ Properly closed profileView -->
+
+        <!-- Edit Profile Modal -->
+        <div id="edit-profile-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-lg p-6 w-11/12 md:w-1/3">
+                <h4 class="text-xl font-semibold mb-4">Edit Profile</h4>
+                <form id="edit-profile-form" method="POST" action="tess.php">
+                    <div class="mb-4">
+                        <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                        <input type="email" id="email" name="email" value="<?= htmlspecialchars($email) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+                    </div>
+                    <div class="mb-4">
+                        <label for="contact" class="block text-sm font-medium text-gray-700">Mobile Number</label>
+                        <input type="text" id="contact" name="contact" value="<?= htmlspecialchars($contact) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+                    </div>
+                    <div class="mb-4">
+                        <label for="position" class="block text-sm font-medium text-gray-700">Position</label>
+                        <input type="text" id="position" name="position" value="<?= htmlspecialchars($position) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+                    </div>
+                    <div class="mb-4">
+                        <label for="company" class="block text-sm font-medium text-gray-700">Company</label>
+                        <input type="text" id="company" name="company" value="<?= htmlspecialchars($company) ?>" required class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="button" onclick="closeEditModal()" class="mr-2 bg-gray-300 text-gray-800 px-4 py-2 rounded-md">Cancel</button>
+                        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+
+
+        <!-- News Feed View -->
+        <div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-4xl mx-auto">
+            <?php include 'news_feed_content.php'; ?>
+        </div>
+
+        <!-- Comments Modal -->
+        <div id="commentsModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center px-4">
+            <div class="bg-white rounded-lg shadow-lg max-w-xl w-full max-h-[90vh] flex flex-col">
+                <!-- Header -->
+                <div class="flex justify-between items-center border-b px-4 py-3">
+                    <h3 class="text-lg font-semibold text-gray-800">Comments</h3>
+                    <button onclick="closeCommentsModal()" class="text-gray-400 hover:text-red-600 text-xl">&times;</button>
+                </div>
+
+                <!-- Comments List -->
+                <div id="modalCommentsContent" class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+                    <!-- Comments will be loaded here -->
+                </div>
+
+                <!-- Comment Input -->
+                <form method="POST" action="#newsFeedView" class="border-t p-4">
+                    <input type="hidden" name="type" value="comment">
+                    <input type="hidden" name="announcement_id" id="modalAnnouncementId">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+
+                    <div class="flex items-start space-x-3">
+                        <!-- No default avatar -->
+                        <textarea name="comment" rows="1" required placeholder="Write a comment..."
+                            class="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm resize-none focus:ring-2 focus:ring-green-500 focus:outline-none"></textarea>
+                    </div>
+                    <div class="flex justify-end mt-2">
+                        <button type="submit"
+                            class="bg-green-600 text-white px-4 py-1 rounded-full text-sm hover:bg-green-700 transition">
+                            Post
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Request Leave -->
+        <div id="requestView" class="hidden mt-32">
+            <div class="flex justify-center items-center min-h-[60vh] px-4">
+                <div class="max-w-xl w-full bg-white p-6 rounded-xl shadow-lg border border-green-200">
+
+                    <!-- Header -->
+                    <div class="bg-green-600 p-4 rounded-lg mb-6 shadow">
+                        <h2 class="text-2xl font-semibold text-center text-white">Request Leave</h2>
+                    </div>
+
+                    <!-- Form Start -->
+                    <form id="leaveRequestForm" action="time_log_create.php" method="POST" enctype="multipart/form-data" class="space-y-5">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
+
+                        <!-- Leave Type -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Leave Type</label>
+                            <select name="leaveType" required
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                                <option value="" disabled selected>Select type</option>
+                                <?php
+                                $types = [
+                                    'sick'          => 'Sick Leave (SL)',
+                                    'vacation'      => 'Vacation Leave (VL)',
+                                    'paternity'     => 'Paternity Leave',
+                                    'maternity'     => 'Maternity Leave',
+                                    'solo_parent'   => 'Solo Parent Leave (SPL)',
+                                    'halfday'       => 'Half Day Vacation (Half_VL)',
+                                    'halfday_sick'  => 'Half Day Sick (Half_SL)',
+                                    'lwop'          => 'Leave Without Pay (LWOP)',
+                                    'bereavement'   => 'Bereavement Leave',
+                                ];
+                                foreach ($types as $val => $label):
+                                ?>
+                                    <option value="<?= $val ?>"><?= $label ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Date Range -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Leave Dates</label>
+                            <input type="text" name="date_range" id="date_range" placeholder="Choose date range"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" required>
+                        </div>
+
+                        <!-- Reason -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+                            <textarea name="reason" rows="3" placeholder="Enter reason..."
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+                        </div>
+
+                        <!-- Attachment -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Attachment</label>
+                            <input type="file" name="attachment_lr" accept=".pdf,.jpg,.jpeg,.png"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        </div>
+
+                        <!-- Submit -->
+                        <button type="submit"
+                            class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
+                            Submit Request
+                        </button>
+                    </form>
+
+                    <!-- Message Box (for JS response) -->
+                    <div id="messageBox" class="hidden mt-4 p-2 text-center text-white rounded"></div>
+                </div>
+            </div>
+        </div>
+
+
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                // Initialize flatpickr for date range
+                flatpickr("#date_range", {
+                    mode: "range",
+                    dateFormat: "Y-m-d"
                 });
-                
-                // Add active class to clicked tab
-                this.parentElement.classList.add('bg-blue-700');
-                
-                // Show corresponding tab content
-                const tabId = this.getAttribute('data-tab') + '-tab';
-                document.getElementById(tabId).classList.remove('hidden');
-            });
-        });
 
-        // Simulate time in/out functionality
-        document.getElementById('time-in-btn').addEventListener('click', function() {
-            const now = new Date();
-            const hours = now.getHours();
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            const formattedHours = hours % 12 || 12;
-            
-            document.getElementById('status-indicator').textContent = 'Working';
-            document.getElementById('status-indicator').classList.remove('bg-gray-200', 'text-gray-800');
-            document.getElementById('status-indicator').classList.add('bg-blue-100', 'text-blue-800');
-            
-            document.getElementById('time-in-btn').disabled = true;
-            document.getElementById('time-out-btn').disabled = false;
-            
-            // Simulate updating today's attendance log
-            const timeCell = document.querySelector('#attendance-tab tbody tr:nth-child(1) td:nth-child(2)');
-            if (timeCell && timeCell.textContent.trim() === '-') {
-                timeCell.textContent = `${formattedHours}:${minutes} ${ampm}`;
-                
-                const statusCell = document.querySelector('#attendance-tab tbody tr:nth-child(1) td:nth-child(5)');
-                if (statusCell) {
-                    statusCell.innerHTML = `<span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Working</span>`;
-                }
-            }
-        });
-        
-        document.getElementById('time-out-btn').addEventListener('click', function() {
-            const now = new Date();
-            const hours = now.getHours();
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            const formattedHours = hours % 12 || 12;
-            
-            document.getElementById('status-indicator').textContent = 'Logged Out';
-            document.getElementById('status-indicator').classList.remove('bg-blue-100', 'text-blue-800');
-            document.getElementById('status-indicator').classList.add('bg-gray-200', 'text-gray-800');
-            
-            document.getElementById('time-in-btn').disabled = false;
-            document.getElementById('time-out-btn').disabled = true;
-            
-            // Simulate updating today's attendance log
-            const timeOutCell = document.querySelector('#attendance-tab tbody tr:nth-child(1) td:nth-child(3)');
-            if (timeOutCell && timeOutCell.textContent.trim() === '-') {
-                timeOutCell.textContent = `${formattedHours}:${minutes} ${ampm}`;
-                
-                // Calculate hours worked (simplified)
-                const timeInCell = document.querySelector('#attendance-tab tbody tr:nth-child(1) td:nth-child(2)');
-                if (timeInCell) {
-                    const timeInText = timeInCell.textContent;
-                    const [timeInHours, timeInMins] = timeInText.split(':').map(part => parseInt(part));
-                    const isAM = timeInText.includes('AM');
-                    let timeInTotal = (isAM ? timeInHours : timeInHours + 12) + timeInMins/60;
-                    let timeOutTotal = (ampm === 'AM' ? formattedHours : formattedHours + 12) + minutes/60;
-                    
-                    if (ampm === 'AM' && !isAM) {
-                        timeOutTotal += 24; // next day AM
-                    }
-                    
-                    const hoursWorked = (timeOutTotal - timeInTotal).toFixed(2);
-                    
-                    const hoursCell = document.querySelector('#attendance-tab tbody tr:nth-child(1) td:nth-child(4)');
-                    if (hoursCell) {
-                        hoursCell.textContent = hoursWorked;
-                    }
-                    
-                    const statusCell = document.querySelector('#attendance-tab tbody tr:nth-child(1) td:nth-child(5)');
-                    if (statusCell) {
-                        let statusClass = 'bg-green-100 text-green-800';
-                        if (timeInTotal > 8.5) { // Late if after 8:30 AM
-                            statusClass = 'bg-yellow-100 text-yellow-800';
+                // Confirmation before submitting leave
+                const leaveForm = document.getElementById('leaveRequestForm');
+                if (leaveForm) {
+                    leaveForm.addEventListener('submit', function(e) {
+                        if (!confirm("Are you sure you want to submit this leave request?")) {
+                            e.preventDefault();
                         }
-                        statusCell.innerHTML = `<span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">Logged</span>`;
+                    });
+                }
+
+                // Confirmation before submitting schedule change (if present)
+                const scheduleForm = document.getElementById('scheduleChangeForm');
+                if (scheduleForm) {
+                    scheduleForm.addEventListener('submit', function(e) {
+                        if (!confirm("Are you sure you want to request a schedule change?")) {
+                            e.preventDefault();
+                        }
+                    });
+                }
+
+                // Show alerts based on query parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                const alerts = {
+                    leave_request: {
+                        success: "Leave request submitted successfully!",
+                        invalid_dates: "Invalid leave date range submitted."
+                    },
+                    schedule_change: {
+                        success: "Schedule change request submitted successfully!"
+                    },
+                    overtime: {
+                        success: "Overtime request submitted successfully!",
+                        invalid_time_order: "End time must be after start time.",
+                        invalid_input: "Missing or invalid data. Please try again."
+                    }
+                };
+
+
+                for (const [key, messages] of Object.entries(alerts)) {
+                    const value = urlParams.get(key);
+                    if (value && messages[value]) {
+                        alert(messages[value]);
                     }
                 }
+
+                // Remove query parameters from URL after alert
+                if (['leave_request', 'schedule_change', 'overtime'].some(key => urlParams.has(key))) {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+
+                // Clock updater for all clock elements
+                function updateAllClocks() {
+                    const now = new Date();
+                    let h = now.getHours(),
+                        m = now.getMinutes(),
+                        s = now.getSeconds();
+                    const ampm = h >= 12 ? 'PM' : 'AM';
+                    h = h % 12 || 12;
+                    const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} ${ampm}`;
+                    const clockIds = ['dashboardClock', 'clock'];
+                    clockIds.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = timeStr;
+                    });
+                }
+                updateAllClocks();
+                setInterval(updateAllClocks, 1000);
+            });
+
+            // Section toggle
+            function showSection(id) {
+                ['dashboardView', 'requestView', 'scheduleView', 'attendanceView', 'profileView', 'newsFeedView', 'overtimeRequestView']
+                .forEach(x => document.getElementById(x)?.classList.add('hidden'));
+                document.getElementById(id)?.classList.remove('hidden');
             }
-        });
 
-        // Update current time
-        function updateCurrentTime() {
-            const now = new Date();
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', options);
-            
-            let hours = now.getHours();
-            let minutes = now.getMinutes().toString().padStart(2, '0');
-            let seconds = now.getSeconds().toString().padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            
-            document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds} ${ampm}`;
-        }
-        
-        setInterval(updateCurrentTime, 1000);
-        updateCurrentTime();
 
-        // Schedule request type toggle
-        document.getElementById('schedule-type').addEventListener('change', function() {
-            const type = this.value;
-            document.getElementById('shift-change-fields').classList.add('hidden');
-            document.getElementById('swap-fields').classList.add('hidden');
-            document.getElementById('dayoff-fields').classList.add('hidden');
-            
-            if (type === 'shift-change') {
-                document.getElementById('shift-change-fields').classList.remove('hidden');
-            } else if (type === 'swap') {
-                document.getElementById('swap-fields').classList.remove('hidden');
-            } else if (type === 'day-off') {
-                document.getElementById('dayoff-fields').classList.remove('hidden');
+
+            function openCommentsModal(announcementId) {
+                // Set hidden input field with announcement ID
+                document.getElementById('modalAnnouncementId').value = announcementId;
+
+                // Show the modal
+                document.getElementById('commentsModal').classList.remove('hidden');
+
+                // Clear previous content and show a loader
+                const commentsContainer = document.getElementById('modalCommentsContent');
+                commentsContainer.innerHTML = '<p class="text-gray-500 text-sm">Loading comments...</p>';
+
+                // Fetch comments via AJAX
+                fetch('fetch_comments.php?announcement_id=' + announcementId)
+                    .then(response => response.text())
+                    .then(data => {
+                        commentsContainer.innerHTML = data;
+                    })
+                    .catch(error => {
+                        commentsContainer.innerHTML = '<p class="text-red-500 text-sm">Failed to load comments.</p>';
+                        console.error('Error loading comments:', error);
+                    });
             }
-        });
 
-        // Form submission handlers
-        document.getElementById('leave-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert('Leave request submitted successfully!');
-            this.reset();
-        });
-        
-        document.getElementById('overtime-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert('Overtime request submitted successfully!');
-            this.reset();
-        });
-        
-        document.getElementById('schedule-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert('Schedule request submitted successfully!');
-            this.reset();
-        });
-    </script>
+            function closeCommentsModal() {
+                document.getElementById('commentsModal').classList.add('hidden');
+            }
+
+            function openEditModal() {
+                document.getElementById('edit-profile-modal').classList.remove('hidden');
+            }
+
+            function closeEditModal() {
+                document.getElementById('edit-profile-modal').classList.add('hidden');
+            }
+
+            setTimeout(() => {
+                const alerts = document.querySelectorAll('.mb-4.p-4');
+                alerts.forEach(alert => {
+                    alert.style.opacity = '0';
+                    setTimeout(() => alert.remove(), 500);
+                });
+            }, 5000);
+        </script>
+
+
+        <!--Start of Tawk.to Script-->
+        <script type="text/javascript">
+            var Tawk_API = Tawk_API || {},
+                Tawk_LoadStart = new Date();
+            (function() {
+                var s1 = document.createElement("script"),
+                    s0 = document.getElementsByTagName("script")[0];
+                s1.async = true;
+                s1.src = 'https://embed.tawk.to/68636c761c010c190e038444/1iv25vcme';
+                s1.charset = 'UTF-8';
+                s1.setAttribute('crossorigin', '*');
+                s0.parentNode.insertBefore(s1, s0);
+            })();
+        </script>
+        <!--End of Tawk.to Script-->
+        <script>
+            function toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+
+                sidebar.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+            }
+        </script>
 </body>
-</html>
 
+</html>
