@@ -35,6 +35,49 @@ try {
 
     $current_date = date("Y-m-d");
 
+try {
+    // Fetch employee details
+    $stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company, profile_picture 
+                           FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $user = $stmt->fetch();
+
+    $fname = $user['fname'] ?? '';
+    $lname = $user['lname'] ?? '';
+    $email = $user['email'] ?? '';
+    $contact = $user['contact'] ?? '';
+    $position = $user['position'] ?? '';
+    $company = $user['company'] ?? '';
+    $profile_picture = $user['profile_picture'] ?? null;
+
+    $current_date = date("Y-m-d");
+
+    // Check if checklist exists; if not, create a blank one
+$stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
+$stmt->execute([$employee_id]);
+$checklist = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$checklist) {
+        // Insert blank checklist for this employee
+        $insert = $pdo->prepare("INSERT INTO employee_checklist (employee_id) VALUES (?)");
+        $insert->execute([$employee_id]);
+
+        // Re-fetch checklist after insertion
+        $check_stmt->execute([$employee_id]);
+        $checklist = $check_stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    // Now you have both $user and $checklist available
+} catch (PDOException $e) {
+    // Handle errors gracefully
+    echo "Database error: " . $e->getMessage();
+    exit;
+}
+
+
+
+
+    
     // Fetch today's time log
     $stmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs 
                            WHERE employee_id = ? AND log_date = ?");
@@ -606,14 +649,17 @@ $announcementCount = $stmt->fetchColumn();
               placeholder="Explain your reason for the schedule change" required></textarea>
           </div>
 
-          <!-- Attachment Upload -->
-          <div>
-            <label for="attachment_scr" class="block text-sm font-medium text-gray-700 mb-1">
-              Attachment
-            </label>
-            <input type="file" name="attachment_scr" id="attachment_scr" accept=".pdf,.jpg,.jpeg,.png"
-              class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-          </div>
+<!-- Attachment -->
+<div>
+  <label class="block text-sm font-medium text-gray-700 mb-1">Attachment <span class="text-red-500">*</span></label>
+  <input 
+    type="file" 
+    name="attachment_lr" 
+    accept=".pdf,.jpg,.jpeg,.png"
+    required
+    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+</div>
+
 
           <!-- Submit Button -->
           <button type="submit"
@@ -626,42 +672,43 @@ $announcementCount = $stmt->fetchColumn();
     </div>
   </div>
 </div>
-
 <!-- Profile Section -->
 <div id="profileView" class="hidden min-h-screen bg-gray-50 py-10 px-4">
-    <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+  <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
 
-        <!-- Sidebar Info -->
-        <div class="bg-white p-6 rounded-xl shadow flex flex-col items-center justify-center">
-            <div class="flex flex-col items-center w-full">
-                <div class="relative w-36 h-36 rounded-full overflow-hidden border-4 border-green-500 flex items-center justify-center mx-auto">
-                    <?php if ($profile_picture): ?>
-                        <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover">
-                    <?php else: ?>
-                        <div class="w-full h-full bg-gray-300 flex items-center justify-center text-5xl text-white">👤</div>
-                    <?php endif; ?>
-                    <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center cursor-pointer text-xs text-white opacity-0 hover:opacity-100 transition" onclick="document.getElementById('fileInput').click()">
-                        Change
-                    </div>
-                </div>
-                <form action="upload_profile.php" method="POST" enctype="multipart/form-data" class="w-full flex justify-center">
-                    <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
-                </form>
+   <!-- Sidebar Info -->
+<div class="bg-white p-6 rounded-xl shadow flex flex-col items-center w-64 max-w-full mx-auto">
+  <!-- Avatar Container -->
+  <div class="flex flex-col items-center space-y-2">
+    <div class="relative w-36 h-36 rounded-full overflow-hidden border-4 border-green-500 flex items-center justify-center">
+      <?php if ($profile_picture): ?>
+        <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover">
+      <?php else: ?>
+        <div class="w-full h-full bg-gray-300 flex items-center justify-center text-5xl text-white">👤</div>
+      <?php endif; ?>
+      <div 
+        class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-xs text-white opacity-0 hover:opacity-100 transition cursor-pointer"
+        onclick="document.getElementById('fileInput').click()"
+      >
+        Change
+      </div>
+    </div>
+    <form action="upload_profile.php" method="POST" enctype="multipart/form-data">
+      <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
+    </form>
+    <h3 class="mt-4 font-semibold text-lg text-center"><?= htmlspecialchars($fname . ' ' . $lname) ?></h3>
+  </div>
+</div>
 
-                <h3 class="mt-4 font-semibold text-lg text-center w-full"><?= htmlspecialchars($fname . ' ' . $lname) ?></h3>
-            </div>
-        </div>
 
-    <!-- Main Profile Info -->
-    <div class="md:col-span-2 space-y-10">
-
-      <!-- Personal Info -->
+    <!-- Main Content -->
+    <div class="space-y-10">
+      <!-- My Profile Card -->
       <div class="bg-white p-8 rounded-2xl shadow space-y-8">
         <div class="flex justify-between items-center">
           <h4 class="text-2xl font-semibold text-gray-800">My Profile</h4>
           <button onclick="openEditModal()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Edit</button>
         </div>
-
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-base text-gray-700">
           <div><strong>First Name:</strong> <?= htmlspecialchars($fname) ?></div>
           <div><strong>Last Name:</strong> <?= htmlspecialchars($lname) ?></div>
@@ -672,9 +719,65 @@ $announcementCount = $stmt->fetchColumn();
         </div>
       </div>
 
-    </div> <!-- End of md:col-span-2 -->
-  </div> <!-- End of grid -->
-</div> <!-- ✅ Properly closed profileView -->
+      <!-- Checklist Card -->
+      <div class="bg-white p-8 rounded-2xl shadow space-y-6">
+        <h4 class="text-2xl font-semibold text-gray-800">201 Checklist</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-base text-gray-700">
+        </div>
+
+        <div class="mt-6">
+          <h5 class="text-lg font-semibold text-gray-700 mb-2">RSS Documents</h5>
+          <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+            <li>Signed Letter of Offer:
+              <?php if (!empty($checklist['letter_offer'])): ?>
+                <a href="../uploads/checklist/<?= htmlspecialchars($checklist['letter_offer']) ?>" target="_blank" class="text-blue-600 underline">View</a>
+              <?php else: ?>
+                <span class="text-red-600 font-medium">Not Uploaded</span>
+              <?php endif; ?>
+            </li>
+            <li>Signed Employment Contract:
+              <?php if (!empty($checklist['employment_contract'])): ?>
+                <a href="../uploads/checklist/<?= htmlspecialchars($checklist['employment_contract']) ?>" target="_blank" class="text-blue-600 underline">View</a>
+              <?php else: ?>
+                <span class="text-red-600 font-medium">Not Uploaded</span>
+              <?php endif; ?>
+            </li>
+          </ul>
+        </div>
+
+        <div class="mt-6">
+          <h5 class="text-lg font-semibold text-gray-700 mb-2">Pre-Employment Requirements</h5>
+          <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+            <?php
+              $requirements = [
+                'medical' => 'Medical',
+                'nbi_clearance' => 'NBI Clearance',
+                'diploma_tor' => 'Diploma/TOR',
+                'psa' => 'PSA',
+                'sss' => 'SSS',
+                'tin' => 'TIN',
+                'philhealth' => 'Philhealth',
+                'pagibig' => 'Pag-IBIG',
+                'coe' => 'COE (Recent Employer)'
+              ];
+              foreach ($requirements as $field => $label):
+            ?>
+            <li><?= $label ?>:
+              <?php if (!empty($checklist[$field])): ?>
+                <a href="../uploads/checklist/<?= htmlspecialchars($checklist[$field]) ?>" target="_blank" class="text-blue-600 underline">View</a>
+              <?php else: ?>
+                <span class="text-red-600 font-medium">Not Uploaded</span>
+              <?php endif; ?>
+            </li>
+            <?php endforeach; ?>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 
 <!-- Edit Profile Modal -->
 <div id="edit-profile-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
@@ -834,12 +937,17 @@ $announcementCount = $stmt->fetchColumn();
               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
           </div>
 
-          <!-- Attachment -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Attachment</label>
-            <input type="file" name="attachment_lr" accept=".pdf,.jpg,.jpeg,.png"
-              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-          </div>
+         <!-- Attachment -->
+<div>
+  <label class="block text-sm font-medium text-gray-700 mb-1">Attachment <span class="text-red-500">*</span></label>
+  <input 
+    type="file" 
+    name="attachment_lr" 
+    accept=".pdf,.jpg,.jpeg,.png"
+    required
+    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+</div>
+
 
           <!-- Submit -->
           <button type="submit"

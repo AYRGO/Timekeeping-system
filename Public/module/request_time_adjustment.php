@@ -36,31 +36,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $attachment_path = null;
 
-    // Handle file upload
-    if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
-        $allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-        $file_tmp = $_FILES['attachment']['tmp_name'];
-        $file_name = basename($_FILES['attachment']['name']);
-        $file_type = mime_content_type($file_tmp);
-        $ext = pathinfo($file_name, PATHINFO_EXTENSION);
+// Handle file upload
+if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
+    $allowed_types = [
+        'application/pdf', 'image/jpeg', 'image/png',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
 
-        if (in_array($file_type, $allowed_types)) {
-            $new_filename = uniqid("attach_", true) . "." . $ext;
-            $destination = __DIR__ . "/uploads/" . $new_filename;
+    $file_tmp  = $_FILES['attachment']['tmp_name'];
+    $file_name = basename($_FILES['attachment']['name']);
+    $file_type = mime_content_type($file_tmp);
+    $ext       = pathinfo($file_name, PATHINFO_EXTENSION);
 
-            if (!is_dir(__DIR__ . "/uploads")) {
-                mkdir(__DIR__ . "/uploads", 0755, true);
-            }
+    if (in_array($file_type, $allowed_types)) {
+        $new_filename = uniqid("attach_", true) . "." . $ext;
 
-            if (move_uploaded_file($file_tmp, $destination)) {
-                $attachment_path = "uploads/" . $new_filename;
-            } else {
-                $error = "Failed to upload file.";
-            }
-        } else {
-            $error = "Unsupported file type.";
+        // Full path to C:/xampp/htdocs/Timekeeping-system/Public/uploads/time_adjustments
+        $upload_dir = __DIR__ . "/../Public/uploads/time_adjustments/";
+
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
         }
+
+        $destination = $upload_dir . $new_filename;
+
+        if (move_uploaded_file($file_tmp, $destination)) {
+            // Save only filename to DB
+            $attachment_path = $new_filename;
+        } else {
+            $error = "Failed to upload file.";
+        }
+    } else {
+        $error = "Unsupported file type.";
     }
+}
 
     if (!$log_date || !$reason) {
         $error = "Log date and reason are required.";
@@ -165,19 +175,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
-                <!-- Step 5 -->
-                <div class="step hidden" id="step-5">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Step 5: Attach File (Optional)</label>
-                    <input type="file" name="attachment" class="block w-full text-sm text-gray-600 bg-gray-50 border border-gray-300 rounded-lg">
-                    <p class="text-xs text-gray-500 mt-1">Allowed: PDF, JPG, PNG, DOCX</p>
-                    <div class="flex justify-between mt-4">
-                        <button type="button" onclick="prevStep()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded">Back</button>
-                        <button type="submit" class="bg-green-600 text-white px-6 py-3 rounded font-semibold">
-                            <i class="fas fa-paper-plane mr-1"></i> Submit Request
-                        </button>
-                    </div>
-                </div>
-            </form>
+<!-- Step 5 -->
+<div class="step hidden" id="step-5">
+    <label class="block text-sm font-medium text-gray-700 mb-1">Step 5: Attach File <span class="text-red-500">*</span></label>
+    <input 
+        type="file" 
+        name="attachment" 
+        required
+        accept=".pdf,.jpg,.jpeg,.png,.docx"
+        class="block w-full text-sm text-gray-600 bg-gray-50 border border-gray-300 rounded-lg"
+    >
+    <p class="text-xs text-gray-500 mt-1">Allowed: PDF, JPG, PNG, DOCX</p>
+
+    <div class="flex justify-between mt-4">
+        <button type="button" onclick="prevStep()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded">Back</button>
+        <button type="submit" class="bg-green-600 text-white px-6 py-3 rounded font-semibold">
+            <i class="fas fa-paper-plane mr-1"></i> Submit Request
+        </button>
+    </div>
+</div>
+
            <!-- Back to Dashboard Button -->
     <div class="w-full max-w-2xl mt-6 flex justify-start">
         <a href="../module/time_log_create.php" class="inline-flex items-center text-blue-600 hover:underline">

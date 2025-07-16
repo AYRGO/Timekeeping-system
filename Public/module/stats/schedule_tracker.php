@@ -11,21 +11,21 @@ if (!$employee_id) {
     exit;
 }
 
-// Default schedule ID and time range
+// Default schedule ID
 $default_schedule_id = 4;
 
-// Hardcoded schedule time ranges
+// Hardcoded schedule times (you can also fetch this from DB if needed)
 $schedule_times = [
-    4 => ['in' => '7:00 AM',  'out' => '4:00 PM'],
-    5 => ['in' => '8:00 AM',  'out' => '5:00 PM'],
-    6 => ['in' => '9:00 AM',  'out' => '6:00 PM'],
-    7 => ['in' => '10:00 AM', 'out' => '7:00 PM'],
-    8 => ['in' => '6:00 AM',  'out' => '3:00 PM'],
+    4 => ['in' => '07:00 AM', 'out' => '04:00 PM'],
+    5 => ['in' => '08:00 AM', 'out' => '05:00 PM'],
+    6 => ['in' => '09:00 AM', 'out' => '06:00 PM'],
+    7 => ['in' => '10:00 AM', 'out' => '07:00 PM'],
+    8 => ['in' => '06:00 AM', 'out' => '03:00 PM'],
 ];
 
 $today = date('Y-m-d');
 
-// Get most recent request (regardless of status)f
+// Get latest schedule request for today
 $stmt = $pdo->prepare("
     SELECT * FROM schedule_change_requests 
     WHERE employee_id = ? 
@@ -35,12 +35,11 @@ $stmt = $pdo->prepare("
 $stmt->execute([$employee_id]);
 $scheduleRequest = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Initialize defaults
+// Initial defaults
 $schedule_id_to_use = $default_schedule_id;
 $schedule_status = "default";
 $status_text = "Regular Shift";
 
-// Check latest schedule request
 if ($scheduleRequest) {
     $status = strtolower(trim($scheduleRequest['status']));
     $start_date = $scheduleRequest['start_date'];
@@ -59,19 +58,29 @@ if ($scheduleRequest) {
     }
 }
 
-// Get schedule times
-$sched_time_in = $schedule_times[$schedule_id_to_use]['in'] ?? 'N/A';
+// Final schedule time
+$sched_time_in  = $schedule_times[$schedule_id_to_use]['in'] ?? 'N/A';
 $sched_time_out = $schedule_times[$schedule_id_to_use]['out'] ?? 'N/A';
 
-// Determine color
+// Determine UI badge color
 $color = match ($schedule_status) {
     'approved' => 'green',
-    'pending' => 'yellow',
+    'pending'  => 'yellow',
     'declined' => 'red',
-    default => 'blue',
+    default    => 'blue',
 };
+
+// Store schedule info in session for reuse
+$_SESSION['current_schedule'] = [
+    'schedule_id' => $schedule_id_to_use,
+    'time_in'     => $sched_time_in,
+    'time_out'    => $sched_time_out,
+    'status'      => $schedule_status,
+    'status_text' => $status_text,
+];
 ?>
-<!-- ✅ Functional UI Schedule Tracker Card -->
+
+<!-- ✅ UI: Schedule Tracker Card -->
 <div class="card bg-white rounded-lg p-6 shadow-sm transition-transform duration-200 hover:scale-105 hover:shadow-lg cursor-pointer mt-8">
     <div class="flex justify-between items-center">
         <div>

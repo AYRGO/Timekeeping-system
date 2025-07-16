@@ -60,7 +60,12 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                             <td class="px-6 py-4 text-sm">
                                 <?php if (!empty($adj['attachment'])): ?>
-                                    <a href="../uploads/time_adjustments/<?= htmlspecialchars($adj['attachment']) ?>" target="_blank" class="text-blue-600 hover:underline">View</a>
+                                   <a href="../Public/uploads/time_adjustments/<?= urlencode(htmlspecialchars($adj['attachment'])) ?>" 
+   target="_blank" 
+   class="text-blue-600 hover:underline">
+   View
+</a>
+
                                 <?php else: ?>
                                     <span class="text-gray-400 italic">None</span>
                                 <?php endif; ?>

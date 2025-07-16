@@ -4,15 +4,20 @@ ini_set('display_errors', 1);
 include('../config/db.php');
 include('header.php');
 
-// Fetch overtime requests with employee names
+// Fetch overtime requests with employee names and time logs
 $stmt = $pdo->query("
-    SELECT o.id, o.date, o.start_time, o.end_time, o.reason, o.status, o.attachment_ot, o.created_at,
-           TIMESTAMPDIFF(MINUTE, o.start_time, o.end_time) / 60 AS duration_hours,
-           e.fname, e.lname
+    SELECT 
+        o.id, o.date, o.start_time, o.end_time, o.reason, o.status, 
+        o.attachment_ot, o.created_at,
+        TIMESTAMPDIFF(MINUTE, o.start_time, o.end_time) / 60 AS duration_hours,
+        e.fname, e.lname,
+        t.time_in AS log_time_in, t.time_out AS log_time_out
     FROM overtime_requests o
     JOIN employees e ON o.employee_id = e.id
+    LEFT JOIN time_logs t ON o.employee_id = t.employee_id AND o.date = t.log_date
     ORDER BY o.created_at DESC
 ");
+
 $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -28,8 +33,10 @@ $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">End</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time In</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time Out</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Start</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT End</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration (hrs)</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attachment</th>
@@ -45,17 +52,34 @@ $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($ot['id']) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($ot['fname'] . ' ' . $ot['lname']) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars($ot['date']) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-900"><?= date('g:i A', strtotime($ot['start_time'])) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-900"><?= date('g:i A', strtotime($ot['end_time'])) ?></td>
+                            
+                            <!-- Time In -->
                             <td class="px-6 py-4 text-sm text-gray-900">
-    <?= number_format($ot['duration_hours'], 2) ?>
-</td>
-                            <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
-    <div class="truncate hover:whitespace-normal" title="<?= htmlspecialchars($ot['reason']) ?>">
-        <?= htmlspecialchars($ot['reason']) ?>
-    </div>
-</td>
+                                <?= $ot['log_time_in'] ? date('g:i A', strtotime($ot['log_time_in'])) : '<span class="text-gray-400 italic">None</span>' ?>
+                            </td>
+                            
+                            <!-- Time Out -->
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <?= $ot['log_time_out'] ? date('g:i A', strtotime($ot['log_time_out'])) : '<span class="text-gray-400 italic">None</span>' ?>
+                            </td>
 
+                            <!-- OT Start -->
+                            <td class="px-6 py-4 text-sm text-gray-900"><?= date('g:i A', strtotime($ot['start_time'])) ?></td>
+
+                            <!-- OT End -->
+                            <td class="px-6 py-4 text-sm text-gray-900"><?= date('g:i A', strtotime($ot['end_time'])) ?></td>
+
+                            <!-- Duration -->
+                            <td class="px-6 py-4 text-sm text-gray-900"><?= number_format($ot['duration_hours'], 2) ?></td>
+
+                            <!-- Reason -->
+                            <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
+                                <div class="truncate hover:whitespace-normal" title="<?= htmlspecialchars($ot['reason']) ?>">
+                                    <?= htmlspecialchars($ot['reason']) ?>
+                                </div>
+                            </td>
+
+                            <!-- Attachment -->
                             <td class="px-6 py-4 text-sm">
                                 <?php if (!empty($ot['attachment_ot'])): ?>
                                     <a href="../uploads/overtime_attachments/<?= htmlspecialchars($ot['attachment_ot']) ?>" target="_blank" class="text-blue-600 hover:underline">View</a>
@@ -63,8 +87,14 @@ $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <span class="text-gray-400 italic">None</span>
                                 <?php endif; ?>
                             </td>
+
+                            <!-- Status -->
                             <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars(ucfirst($ot['status'])) ?></td>
+
+                            <!-- Submitted -->
                             <td class="px-6 py-4 text-sm text-gray-500"><?= date('F j, Y g:i A', strtotime($ot['created_at'])) ?></td>
+
+                            <!-- Actions -->
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 <?php if (strtolower($ot['status']) === 'pending'): ?>
                                     <div class="flex items-center space-x-2">
@@ -88,7 +118,7 @@ $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="10" class="text-center text-sm py-4 text-gray-500">No overtime requests found.</td>
+                        <td colspan="13" class="text-center text-sm py-4 text-gray-500">No overtime requests found.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>

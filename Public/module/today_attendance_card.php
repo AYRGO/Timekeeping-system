@@ -36,7 +36,7 @@ if ($time_in && $time_out) {
     $diff = $start->diff($end);
     $hours = $diff->h + ($diff->i / 60);
     $workingDuration = number_format($hours, 2) . ' hours';
-    if ($hours > 8) $overtimeDetected = true;
+    if ($hours > 9.5) $overtimeDetected = true;
 }
 
 // Handle Overtime Request
@@ -284,11 +284,16 @@ $end_dt = (new DateTime('@' . $end_ot))->setTimezone($tz);
                         placeholder="Explain your reason for overtime..."></textarea>
             </div>
 
-            <!-- Attachment -->
-            <div>
-                <label for="attachment" class="block text-sm font-semibold text-gray-700 mb-1">Attachment <span class="text-gray-400 font-normal">(optional)</span></label>
-                <input type="file" id="attachment" name="attachment" class="mt-1 w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition">
-            </div>
+<!-- Attachment -->
+<div>
+  <label class="block text-sm font-medium text-gray-700 mb-1">Attachment <span class="text-red-500">*</span></label>
+  <input 
+    type="file" 
+    name="attachment_lr" 
+    accept=".pdf,.jpg,.jpeg,.png"
+    required
+    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+</div>
 
             <!-- Submit -->
             <div class="pt-2">
