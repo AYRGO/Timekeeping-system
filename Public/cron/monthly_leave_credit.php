@@ -1,91 +1,98 @@
-<?php
+<?php 
+// File: monthly_leave_credit.php
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
 $currentYear = date('Y');
 
-// Fetch all active employees
+// Step 1: Fetch all active employees
 $employees = $pdo->query("SELECT id FROM employees WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
 
+// Step 2: Define leave types with their monthly increments and annual limits
+$leaveTypes = [
+    'sick' => ['monthly_increment' => 0.42, 'max_balance' => 15],
+    'vacation' => ['monthly_increment' => 1.25, 'max_balance' => 15, 'carry_over' => 5],
+    'paternity' => ['fixed' => 7],
+    'maternity' => ['fixed' => 105],
+    'solo_parent' => ['fixed' => 7],
+    'bereavement' => ['fixed' => 3],
+    'halfday' => ['fixed' => 0],
+    'halfday_sick' => ['fixed' => 0],
+    'lwop' => ['fixed' => 0],
+];
+
+// Step 3: Loop through each employee and leave type
 foreach ($employees as $emp) {
     $employee_id = $emp['id'];
 
-    // --- SL (Sick Leave) ---
-    $sl = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'SL' AND year = ?");
-    $sl->execute([$employee_id, $currentYear]);
-    $slRow = $sl->fetch();
+    foreach ($leaveTypes as $type => $rules) {
+        // Check if leave_credits row exists
+        $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = ? AND year = ?");
+        $stmt->execute([$employee_id, $type, $currentYear]);
+        $row = $stmt->fetch();
 
-    if ($slRow) {
-        if ($slRow['balance'] < 15) {
-            $new_sl = min(15, $slRow['balance'] + 0.42);
-            $update = $pdo->prepare("UPDATE leave_credits SET balance = ? WHERE id = ?");
-            $update->execute([$new_sl, $slRow['id']]);
+        if ($row) {
+            // Existing row
+            $currentBalance = is_numeric($row['balance']) ? floatval($row['balance']) : 0.0;
+            $currentCarryOver = ($type === 'vacation' && isset($row['carry_over'])) ? floatval($row['carry_over']) : 0.0;
+
+            if (isset($rules['monthly_increment'])) {
+                $monthlyIncrement = $rules['monthly_increment'];
+
+                // Calculate how much can go to balance
+                $spaceLeft = $rules['max_balance'] - $currentBalance;
+                $toBalance = min($monthlyIncrement, $spaceLeft);
+                $remaining = $monthlyIncrement - $toBalance;
+
+                // Apply carry over if vacation and space is available
+                $toCarryOver = 0;
+                if ($type === 'vacation' && $remaining > 0) {
+                    $carrySpace = $rules['carry_over'] - $currentCarryOver;
+                    $toCarryOver = min($remaining, $carrySpace);
+                }
+
+                $newBalance = $currentBalance + $toBalance;
+                $newCarryOver = ($type === 'vacation') ? $currentCarryOver + $toCarryOver : null;
+
+                // Update the record
+                $update = $pdo->prepare("
+                    UPDATE leave_credits
+                    SET balance = ?, monthly_increment = ?, carry_over = ?, updated_at = NOW()
+                    WHERE id = ?
+                ");
+                $update->execute([$newBalance, $monthlyIncrement, $newCarryOver, $row['id']]);
+            }
+
+        } else {
+            // New row: Insert
+            $balance = 0;
+            $monthlyIncrement = null;
+            $carryOver = null;
+
+            if (isset($rules['monthly_increment'])) {
+                $balance = $rules['monthly_increment'];
+                $monthlyIncrement = $rules['monthly_increment'];
+                if ($type === 'vacation') {
+                    $carryOver = 0;
+                }
+            } elseif (isset($rules['fixed'])) {
+                $balance = $rules['fixed'];
+            }
+
+            $insert = $pdo->prepare("
+                INSERT INTO leave_credits (employee_id, leave_type, balance, monthly_increment, carry_over, year, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $insert->execute([
+                $employee_id,
+                $type,
+                $balance,
+                $monthlyIncrement,
+                $carryOver,
+                $currentYear
+            ]);
         }
-    } else {
-        $insert = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, year) VALUES (?, 'SL', 0.42, ?)");
-        $insert->execute([$employee_id, $currentYear]);
     }
-
-    // --- VL (Vacation Leave) ---
-    $vl = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'VL' AND year = ?");
-    $vl->execute([$employee_id, $currentYear]);
-    $vlRow = $vl->fetch();
-
-    if ($vlRow) {
-        if ($vlRow['balance'] < 5) {
-            $new_vl = min(5, $vlRow['balance'] + 1.25);
-            $update = $pdo->prepare("UPDATE leave_credits SET balance = ? WHERE id = ?");
-            $update->execute([$new_vl, $vlRow['id']]);
-        }
-    } else {
-        $insert = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, year) VALUES (?, 'VL', 1.25, ?)");
-        $insert->execute([$employee_id, $currentYear]);
-    }
-
-    // --- SPL (Solo Parent Leave), fixed 7 days per year ---
-    $spl = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'SPL' AND year = ?");
-    $spl->execute([$employee_id, $currentYear]);
-    $splRow = $spl->fetch();
-
-    if (!$splRow) {
-        $insertSpl = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, year) VALUES (?, 'SPL', 7, ?)");
-        $insertSpl->execute([$employee_id, $currentYear]);
-    }
-
-    // --- Half-day SL ---
-    $halfSl = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'Half_SL' AND year = ?");
-    $halfSl->execute([$employee_id, $currentYear]);
-    $halfSlRow = $halfSl->fetch();
-
-    if ($halfSlRow) {
-        if ($halfSlRow['balance'] < 15) {
-            $new_half_sl = min(15, $halfSlRow['balance'] + 0.50);
-            $update = $pdo->prepare("UPDATE leave_credits SET balance = ? WHERE id = ?");
-            $update->execute([$new_half_sl, $halfSlRow['id']]);
-        }
-    } else {
-        $insertHalfSl = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, year) VALUES (?, 'Half_SL', 0.50, ?)");
-        $insertHalfSl->execute([$employee_id, $currentYear]);
-    }
-
-    // --- Half-day VL ---
-    $halfVl = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'Half_VL' AND year = ?");
-    $halfVl->execute([$employee_id, $currentYear]);
-    $halfVlRow = $halfVl->fetch();
-
-    if ($halfVlRow) {
-        if ($halfVlRow['balance'] < 5) {
-            $new_half_vl = min(5, $halfVlRow['balance'] + 0.50);
-            $update = $pdo->prepare("UPDATE leave_credits SET balance = ? WHERE id = ?");
-            $update->execute([$new_half_vl, $halfVlRow['id']]);
-        }
-    } else {
-        $insertHalfVl = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, year) VALUES (?, 'Half_VL', 0.50, ?)");
-        $insertHalfVl->execute([$employee_id, $currentYear]);
-    }
-
-    // --- LWOP (Leave Without Pay) --- no credits to track, so skip
 }
 
-echo "Leave credits updated successfully.";
-?>
+echo "✅ Leave credits updated successfully for " . count($employees) . " employees.\n";

@@ -94,20 +94,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['update_credits'])) {
             }
         }
 
-        header("Location: employee_edit.php?id=$employeeId&updated=1");
+        header("Location: employee-edit.php?id=$employeeId&updated=1");
         exit;
-    } else {
-        $error = "Please fill in all required fields.";
+        
     }
 }
 
-// Update leave credits
+$leaveTypes = [
+    'sick',
+    'vacation',
+    'paternity',
+    'maternity',
+    'solo_parent',
+    'halfday',
+    'halfday_sick',
+    'lwop',
+    'bereavement'
+];
+
+// Update leave credits (Admin input)
 if (isset($_POST['update_credits']) && isset($_POST['credits'])) {
     foreach ($_POST['credits'] as $leaveType => $data) {
         $balance = is_numeric($data['balance']) ? floatval($data['balance']) : null;
         $monthlyIncrement = is_numeric($data['monthly_increment']) ? floatval($data['monthly_increment']) : null;
         $carryOver = isset($data['carry_over']) && is_numeric($data['carry_over']) ? floatval($data['carry_over']) : null;
 
+        // Make sure a record exists (insert if not)
+        $check = $pdo->prepare("SELECT COUNT(*) FROM leave_credits WHERE employee_id = ? AND year = ? AND leave_type = ?");
+        $check->execute([$employeeId, date('Y'), $leaveType]);
+        if ($check->fetchColumn() == 0) {
+            $insert = $pdo->prepare("
+                INSERT INTO leave_credits (employee_id, leave_type, year)
+                VALUES (?, ?, ?)
+            ");
+            $insert->execute([$employeeId, $leaveType, date('Y')]);
+        }
+
+        // Clear previous values
+        $clear = $pdo->prepare("
+            UPDATE leave_credits 
+            SET balance = NULL, carry_over = NULL, monthly_increment = NULL 
+            WHERE employee_id = ? AND year = ? AND leave_type = ?
+        ");
+        $clear->execute([$employeeId, date('Y'), $leaveType]);
+
+        // Update with new values
         $stmt = $pdo->prepare("
             UPDATE leave_credits 
             SET balance = ?, monthly_increment = ?, carry_over = ?, updated_at = NOW() 
@@ -123,9 +154,10 @@ if (isset($_POST['update_credits']) && isset($_POST['credits'])) {
         ]);
     }
 
-    header("Location: employee_edit.php?id=$employeeId&credits_updated=1");
+    header("Location: employee-edit.php?id=$employeeId&credits_updated=1");
     exit;
 }
+
 
 // Fetch employee
 $stmt = $pdo->prepare("SELECT * FROM employees WHERE id = ?");
@@ -229,43 +261,73 @@ $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
         </div>
       </form>
     </div>
+<!-- Leave Credits -->
+<div class="bg-white shadow-lg rounded-xl p-8">
+  <h2 class="text-2xl font-semibold mb-6 text-gray-800">Leave Credits (<?= date('Y') ?>)</h2>
 
-    <!-- Leave Credits -->
-    <div class="bg-white shadow-lg rounded-xl p-8">
-      <h2 class="text-2xl font-semibold mb-6 text-gray-800">Leave Credits (<?= date('Y') ?>)</h2>
-      <?php if (isset($_GET['credits_updated'])): ?>
-        <div class="flex items-center bg-green-100 text-green-700 px-4 py-2 rounded shadow mb-4">
-          <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10 0a10 10 0 100 20 10 10 0 000-20zm1 15.414l-4.293-4.293 1.414-1.414L11 12.586l3.879-3.879 1.414 1.414L11 15.414z"/></svg>
-          Leave credits updated successfully.
-        </div>
-      <?php endif; ?>
-      <form method="post">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <?php
-          $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND year = ?");
-          $stmt->execute([$employeeId, date('Y')]);
-          foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $credit):
-            $leaveType = $credit['leave_type'];
-            $label = ucwords(str_replace('_', ' ', $leaveType));
-          ?>
-          <div class="border p-4 rounded-lg bg-gray-50 shadow">
-            <h3 class="text-sm font-semibold mb-2"><?= $label ?></h3>
-            <label class="text-xs block mb-1">Balance</label>
-            <input type="number" step="0.01" name="credits[<?= $leaveType ?>][balance]" value="<?= $credit['balance'] ?>" class="w-full mb-2 px-3 py-1 border rounded" />
-            <label class="text-xs block mb-1">Monthly Increment</label>
-            <input type="number" step="0.01" name="credits[<?= $leaveType ?>][monthly_increment]" value="<?= $credit['monthly_increment'] ?>" class="w-full mb-2 px-3 py-1 border rounded" />
-            <?php if ($leaveType === 'vacation'): ?>
-              <label class="text-xs block mb-1">Carry Over</label>
-              <input type="number" step="0.01" name="credits[<?= $leaveType ?>][carry_over]" value="<?= $credit['carry_over'] ?>" class="w-full px-3 py-1 border rounded" />
-            <?php endif; ?>
-          </div>
-          <?php endforeach; ?>
-        </div>
-        <div class="flex justify-end mt-6">
-          <button type="submit" name="update_credits" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md">Save Credits</button>
-        </div>
-      </form>
+  <?php if (isset($_GET['credits_updated'])): ?>
+    <div class="flex items-center bg-green-100 text-green-700 px-4 py-2 rounded shadow mb-4">
+      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M10 0a10 10 0 100 20 10 10 0 000-20zm1 15.414l-4.293-4.293 1.414-1.414L11 12.586l3.879-3.879 1.414 1.414L11 15.414z"/>
+      </svg>
+      Leave credits updated successfully.
     </div>
+  <?php endif; ?>
+
+  <form method="post">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <?php
+      $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND year = ?");
+      $stmt->execute([$employeeId, date('Y')]);
+
+      foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $credit):
+        $leaveType = $credit['leave_type'];
+        $label = ucwords(str_replace('_', ' ', $leaveType));
+      ?>
+      <div class="border p-4 rounded-lg bg-gray-50 shadow">
+        <h3 class="text-sm font-semibold mb-2"><?= $label ?></h3>
+
+        <!-- Balance -->
+        <label class="text-xs block mb-1">Balance</label>
+        <input 
+          type="number" 
+          step="0.01" 
+          name="credits[<?= $leaveType ?>][balance]" 
+          value="<?= $credit['balance'] ?>" 
+          class="w-full mb-2 px-3 py-1 border rounded" 
+        />
+
+        <!-- Monthly Increment -->
+        <input 
+          type="hidden" 
+          name="credits[<?= $leaveType ?>][monthly_increment]" 
+          value="<?= $credit['monthly_increment'] ?? 0 ?>" 
+        />
+
+        <?php if ($leaveType === 'vacation'): ?>
+          <!-- Carry Over -->
+          <label class="text-xs block mb-1">Carry Over</label>
+          <input 
+            type="number" 
+            step="0.01" 
+            name="credits[vacation][carry_over]" 
+            value="<?= $credit['carry_over'] ?? 0 ?>" 
+            class="w-full mb-2 px-3 py-1 border rounded" 
+          />
+        <?php endif; ?>
+      </div>
+      <?php endforeach; ?>
+    </div>
+
+    <div class="flex justify-end mt-6">
+      <button type="submit" name="update_credits" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md">
+        Save Credits
+      </button>
+    </div>
+  </form>
+</div>
+
+
 
   </div>
 </body>

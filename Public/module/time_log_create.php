@@ -445,10 +445,24 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
                     <i class="fas fa-calendar-alt text-lg"></i>
                     <span class="text-base">Request Change Schedule</span>
                 </a>
-                <a href="#" onclick="showSection('requestView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
-                    <i class="fas fa-plane-departure text-lg"></i>
-                    <span class="text-base">Request Leave</span>
-                </a>
+              <div class="space-y-1">
+    <button onclick="toggleLeaveMenu()" class="flex items-center justify-between w-full p-2 rounded-lg hover:bg-green-100 text-gray-700">
+        <span class="flex items-center space-x-3">
+            <i class="fas fa-plane-departure text-lg"></i>
+            <span class="text-base">Leave</span>
+        </span>
+        <i class="fas fa-chevron-down text-sm transition-transform" id="leaveMenuIcon"></i>
+    </button>
+    <div id="leaveSubmenu" class="pl-10 hidden space-y-1">
+        <a href="#" onclick="showSection('requestView');" class="block p-2 rounded hover:bg-green-100 text-gray-700">
+            Request Leave
+        </a>
+        <a href="#" onclick="showSection('leaveCreditsView');" class="block p-2 rounded hover:bg-green-100 text-gray-700">
+            Leave Credits
+        </a>
+    </div>
+</div>
+
             </nav>
 
            <hr class="border-t border-gray-300 w-full mt-4 mb-1">
@@ -845,7 +859,7 @@ $announcementCount = $stmt->fetchColumn();
 </div>
 
 <!-- News Feed View -->
-<div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-4xl mx-auto">
+<div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-7xl mx-auto">
   <?php include 'news_feed_content.php'; ?>
 </div>
 
@@ -882,6 +896,10 @@ $announcementCount = $stmt->fetchColumn();
             </div>
         </form>
     </div>
+</div>
+
+<div id="leaveCreditsView" class="hidden">
+    <?php include 'leave_credits.php'; ?>
 </div>
 
 <!-- Request Leave -->
@@ -1131,7 +1149,15 @@ function showSection(sectionId) {
     sidebar.classList.toggle("hidden");
   }
 </script>
+<script>
+function toggleLeaveMenu() {
+    const submenu = document.getElementById('leaveSubmenu');
+    const icon = document.getElementById('leaveMenuIcon');
 
+    submenu.classList.toggle('hidden');
+    icon.classList.toggle('rotate-180'); // Optional: rotate arrow icon
+}
+</script>
 <!--End of Tawk.to Script-->
 </body>
 </html>
