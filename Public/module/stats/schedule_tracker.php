@@ -11,10 +11,15 @@ if (!$employee_id) {
     exit;
 }
 
-// Default schedule ID
-$default_schedule_id = 4;
+// Fetch official_sched from employee table
+$stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+$stmt->execute([$employee_id]);
+$employee = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Hardcoded schedule times (you can also fetch this from DB if needed)
+// Fallback to 4 if not set
+$default_schedule_id = $employee['official_sched'] ?? 4;
+
+// Hardcoded schedule times
 $schedule_times = [
     3 => ['in' => '07:30 AM', 'out' => '04:30 PM'],
     4 => ['in' => '07:00 AM', 'out' => '04:00 PM'],
@@ -28,7 +33,7 @@ $schedule_times = [
 
 $today = date('Y-m-d');
 
-// Get latest schedule request for today
+// Get latest schedule request
 $stmt = $pdo->prepare("
     SELECT * FROM schedule_change_requests 
     WHERE employee_id = ? 
@@ -38,7 +43,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$employee_id]);
 $scheduleRequest = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Initial defaults
+// Default fallback
 $schedule_id_to_use = $default_schedule_id;
 $schedule_status = "default";
 $status_text = "Regular Shift";
@@ -61,7 +66,7 @@ if ($scheduleRequest) {
     }
 }
 
-// Final schedule time
+// Final schedule
 $sched_time_in  = $schedule_times[$schedule_id_to_use]['in'] ?? 'N/A';
 $sched_time_out = $schedule_times[$schedule_id_to_use]['out'] ?? 'N/A';
 
@@ -73,7 +78,7 @@ $color = match ($schedule_status) {
     default    => 'blue',
 };
 
-// Store schedule info in session for reuse
+// Store in session
 $_SESSION['current_schedule'] = [
     'schedule_id' => $schedule_id_to_use,
     'time_in'     => $sched_time_in,
