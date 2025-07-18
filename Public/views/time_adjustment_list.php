@@ -4,6 +4,8 @@ ini_set('display_errors', 1);
 include('../config/db.php');
 include('header.php');
 
+date_default_timezone_set('Asia/Manila'); // or your preferred timezone
+
 // Fetch time adjustment requests
 $stmt = $pdo->query("
     SELECT tar.*, e.fname, e.lname

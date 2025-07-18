@@ -113,8 +113,15 @@ $dateRange = new DatePeriod($start, $interval, $end); // include today
                                 }
                             }
 
-                            $schedule_in = $schedule_times[$schedule_id_to_use]['in'];
-                            $schedule_out = $schedule_times[$schedule_id_to_use]['out'];
+                            if (isset($schedule_times[$schedule_id_to_use])) {
+    $schedule_in = $schedule_times[$schedule_id_to_use]['in'];
+    $schedule_out = $schedule_times[$schedule_id_to_use]['out'];
+} else {
+    // fallback or warning-friendly default
+    $schedule_in = '07:00 AM';
+    $schedule_out = '04:00 PM';
+}
+
 
                             // Handle times
                             $isApproved = isset($log) && strtolower($log['request_status'] ?? '') === 'approved';

@@ -29,7 +29,7 @@ if (!isset($_SESSION['admin'])) {
     </div>
 
     <!-- Form -->
-    <form method="POST" action="../views/employee_list.php" class="space-y-6">
+    <form method="POST" action="../controller/save_employee.php" class="space-y-6">
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div>

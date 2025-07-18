@@ -223,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['
 }
 
 
-     /// Schedule Change Request Check
+         /// Schedule Change Request Check
 if (isset($_POST['submit_schedule_change'])) {
     $employee_id = $_SESSION['employee']['id'] ?? null;
     $work_schedule_id = $_POST['work_schedule_id'] ?? null;
@@ -639,7 +639,7 @@ $announcementCount = $stmt->fetchColumn();
               required>
               <option value="" disabled selected>Select new work hours</option>
               <?php 
-              $allowed = [4, 5, 6, 7, 8];
+              $allowed = [4, 5, 6, 7, 8, 9, 10];
               foreach ($work_schedules as $ws):
                   if (in_array($ws['id'], $allowed)):
               ?>
@@ -668,7 +668,7 @@ $announcementCount = $stmt->fetchColumn();
   <label class="block text-sm font-medium text-gray-700 mb-1">Attachment <span class="text-red-500">*</span></label>
   <input 
     type="file" 
-    name="attachment_lr" 
+    name="attachment_scr" 
     accept=".pdf,.jpg,.jpeg,.png"
     required
     class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">

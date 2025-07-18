@@ -16,11 +16,14 @@ $default_schedule_id = 4;
 
 // Hardcoded schedule times (you can also fetch this from DB if needed)
 $schedule_times = [
+    3 => ['in' => '07:30 AM', 'out' => '04:30 PM'],
     4 => ['in' => '07:00 AM', 'out' => '04:00 PM'],
     5 => ['in' => '08:00 AM', 'out' => '05:00 PM'],
     6 => ['in' => '09:00 AM', 'out' => '06:00 PM'],
     7 => ['in' => '10:00 AM', 'out' => '07:00 PM'],
     8 => ['in' => '06:00 AM', 'out' => '03:00 PM'],
+    9 => ['in' => '08:00 AM', 'out' => '04:30 PM'],
+    10 => ['in' => '07:40 AM', 'out' => '04:40 PM'],
 ];
 
 $today = date('Y-m-d');

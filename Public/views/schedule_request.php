@@ -44,11 +44,14 @@ $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php foreach ($schedule_requests as $sr): ?>
                         <?php
                         switch ((int)$sr['work_schedule_id']) {
+                            case 3: $shift = '7:30 AM – 4:30 PM'; break;
                             case 4: $shift = '7:00 AM – 4:00 PM'; break;
                             case 5: $shift = '8:00 AM – 5:00 PM'; break;
                             case 6: $shift = '9:00 AM – 6:00 PM'; break;
                             case 7: $shift = '10:00 AM – 7:00 PM'; break;
                             case 8: $shift = '6:00 AM – 3:00 PM'; break;
+                            case 9: $shift = '8:30 AM – 4:30 PM'; break;
+                            case 10: $shift = '7:40 AM – 4:40 PM'; break;
                             default:
                                 $shift = $sr['time_in'] && $sr['time_out']
                                     ? date('g:i A', strtotime($sr['time_in'])) . ' – ' . date('g:i A', strtotime($sr['time_out']))

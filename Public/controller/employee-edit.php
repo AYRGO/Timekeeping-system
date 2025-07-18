@@ -96,7 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['update_credits'])) {
 
         header("Location: employee-edit.php?id=$employeeId&updated=1");
         exit;
-        
+    } else {
+        $error = "Please fill in all required fields.";
     }
 }
 
@@ -154,7 +155,7 @@ if (isset($_POST['update_credits']) && isset($_POST['credits'])) {
         ]);
     }
 
-    header("Location: employee-edit.php?id=$employeeId&credits_updated=1");
+    header("Location: employeeedit.php?id=$employeeId&credits_updated=1");
     exit;
 }
 

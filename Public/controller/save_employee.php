@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status
     ]);
 
-    header("Location: employee_list.php?success=1");
+    header("Location: ../views/employee_list.php?success=1");
     exit;
 }
 ?>
