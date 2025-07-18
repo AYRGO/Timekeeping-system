@@ -41,7 +41,7 @@ foreach ($employees as $emp) {
                 $employee_id,
                 $type,
                 null,              // Set balance to NULL initially
-                $monthlyInc,
+                $monthlyInc,    
                 $carryOver,
                 $currentYear
             ]);

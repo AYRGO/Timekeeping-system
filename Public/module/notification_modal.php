@@ -208,38 +208,6 @@ foreach ($ot_results as $ot) {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // Sort all notifications by newest first
     usort($notifications, function ($a, $b) {
         return strtotime($b['created_at']) - strtotime($a['created_at']);
