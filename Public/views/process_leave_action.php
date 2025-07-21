@@ -13,9 +13,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leave_id'], $_POST['a
         $message = "Invalid action specified.";
     } else {
         if ($action === 'approve') {
-            $stmt = $pdo->prepare("UPDATE leave_requests SET status = 'approved', explanation = NULL WHERE id = :id");
+            // Get the leave request details first
+            $stmt = $pdo->prepare("SELECT * FROM leave_requests WHERE id = :id");
             $stmt->execute(['id' => $leave_id]);
-            $message = "Leave request #$leave_id has been approved.";
+            $leave_request = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($leave_request) {
+                $employee_id = $leave_request['employee_id'];
+                $leave_type = $leave_request['leave_type'];
+
+                // Update the leave request status to 'approved'
+                $stmt = $pdo->prepare("UPDATE leave_requests SET status = 'approved', explanation = NULL WHERE id = :id");
+                $stmt->execute(['id' => $leave_id]);
+
+                // Now, decrease the corresponding leave credit by 1
+                $stmt = $pdo->prepare("UPDATE leave_credits SET balance = balance - 1 WHERE employee_id = :employee_id AND leave_type = :leave_type");
+                $stmt->execute([
+                    'employee_id' => $employee_id,
+                    'leave_type' => $leave_type
+                ]);
+
+                $message = "Leave request #$leave_id has been approved, and leave credit has been updated.";
+            } else {
+                $message = "Leave request not found.";
+            }
         } elseif ($action === 'decline') {
             $explanation = trim($_POST['explanation'] ?? '');
             if (empty($explanation)) {

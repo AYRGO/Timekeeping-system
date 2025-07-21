@@ -155,7 +155,7 @@ if (isset($_POST['update_credits']) && isset($_POST['credits'])) {
         ]);
     }
 
-    header("Location: employeeedit.php?id=$employeeId&credits_updated=1");
+    header("Location: employee-edit.php?id=$employeeId&credits_updated=1");
     exit;
 }
 

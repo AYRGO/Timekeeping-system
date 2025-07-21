@@ -2,30 +2,37 @@
 session_start();
 include('../config/db.php');
 
+// Validate session
 $employee_id = $_SESSION['employee']['id'] ?? null;
 if (!$employee_id) {
     header("Location: ../employee/login.php");
     exit;
 }
 
+// Handle upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) {
     $file = $_FILES['profile_picture'];
+
     $upload_dir = '../uploads/profile_images/';
     $allowed_types = ['image/jpeg', 'image/png', 'image/jpg'];
-    $max_size = 50 * 1024 * 1024;
+    $max_size = 2 * 1024 * 1024; // 2MB
 
+    // Validate file type
     if (!in_array($file['type'], $allowed_types)) {
-        die("Invalid file type.");
+        die("Invalid file type. Only JPEG and PNG allowed.");
     }
 
+    // Validate size
     if ($file['size'] > $max_size) {
         die("File too large. Max size is 2MB.");
     }
 
+    // Create directory if not exists
     if (!file_exists($upload_dir)) {
         mkdir($upload_dir, 0755, true);
     }
 
+    // Delete old profile picture
     $stmt = $pdo->prepare("SELECT profile_picture FROM employees WHERE id = ?");
     $stmt->execute([$employee_id]);
     $old = $stmt->fetchColumn();
@@ -34,14 +41,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
         unlink($upload_dir . $old);
     }
 
-    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = 'profile_' . $employee_id . '_' . time() . '.' . $ext;
+    // Manila time
+    date_default_timezone_set('Asia/Manila');
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $filename = 'profile_' . $employee_id . '_' . date('Ymd_His') . '.' . $ext;
     $destination = $upload_dir . $filename;
 
+    // Move file
     if (move_uploaded_file($file['tmp_name'], $destination)) {
+        // Update DB
         $stmt = $pdo->prepare("UPDATE employees SET profile_picture = ? WHERE id = ?");
         $stmt->execute([$filename, $employee_id]);
-        header("Location: time_log_create.php");
+
+        // Redirect back with success
+        header("Location: time_log_create.php?upload=success");
         exit;
     } else {
         die("Failed to upload file.");

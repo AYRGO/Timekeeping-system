@@ -175,7 +175,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['
         exit;
     }
 
-    // File upload
+    // ✅ Check leave credits BEFORE inserting
+    if ($leaveType !== 'LWOP') {
+        $stmt = $pdo->prepare("
+            SELECT balance FROM leave_credits 
+            WHERE employee_id = :employee_id AND leave_type = :leave_type AND year = :year
+        ");
+        $stmt->execute([
+            'employee_id' => $employee_id,
+            'leave_type'  => $leaveType,
+            'year'        => date('Y')
+        ]);
+        $creditRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $startDate = new DateTime($start);
+        $endDate = new DateTime($end);
+        $daysRequested = $startDate->diff($endDate)->days + 1; // Inclusive
+
+        if (!$creditRow) {
+            header("Location: time_log_create.php?leave_request=no_credit_record");
+            exit;
+        }
+
+        if ($creditRow['balance'] < $daysRequested) {
+            header("Location: time_log_create.php?leave_request=insufficient_credits");
+            exit;
+        }
+    }
+
+    // ✅ Handle File Upload
     $attachmentPath = null;
     if (isset($_FILES['attachment_lr']) && $_FILES['attachment_lr']['error'] === UPLOAD_ERR_OK) {
         $allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
@@ -199,7 +227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['
         }
     }
 
-    // Insert into DB
+    // ✅ Insert leave request
     $stmt = $pdo->prepare("
         INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason, status, created_at, attachment_lr)
         VALUES (?, ?, ?, ?, ?, 'pending', NOW(), ?)
@@ -221,6 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['
         die("DB Error: " . implode(" | ", $stmt->errorInfo()));
     }
 }
+
 
 
          /// Schedule Change Request Check
@@ -920,7 +949,7 @@ $announcementCount = $stmt->fetchColumn();
           <!-- Leave Type -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Leave Type</label>
-            <select name="leaveType" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+            <select name="leaveType" id="leaveType" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
               <option value="" disabled selected>Select type</option>
               <?php
               $types = [
@@ -939,6 +968,9 @@ $announcementCount = $stmt->fetchColumn();
                 <option value="<?= $val ?>"><?= $label ?></option>
               <?php endforeach; ?>
             </select>
+
+            <!-- Leave Credit Display -->
+            <div id="leaveBalance" class="text-sm mt-2 text-gray-600 hidden"></div>
           </div>
 
           <!-- Date Range -->
@@ -955,23 +987,25 @@ $announcementCount = $stmt->fetchColumn();
               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
           </div>
 
-         <!-- Attachment -->
-<div>
-  <label class="block text-sm font-medium text-gray-700 mb-1">Attachment <span class="text-red-500">*</span></label>
-  <input 
-    type="file" 
-    name="attachment_lr" 
-    accept=".pdf,.jpg,.jpeg,.png"
-    required
-    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-</div>
-
+          <!-- Attachment -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Attachment <span class="text-red-500">*</span></label>
+            <input 
+              type="file" 
+              name="attachment_lr" 
+              accept=".pdf,.jpg,.jpeg,.png"
+              required
+              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+          </div>
+            
+          <!-- Leave Balance Message -->
+<div id="leaveBalanceDisplay" class="hidden mt-2 text-sm text-red-600 font-medium text-center"></div>
 
           <!-- Submit -->
-          <button type="submit"
-            class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
-            Submit Request
-          </button>
+<button type="submit" id="submitBtn"
+  class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
+  Submit Request
+</button>
         </form>
 
         <!-- Message Box -->
@@ -980,6 +1014,22 @@ $announcementCount = $stmt->fetchColumn();
     </div>
   </div>
 </div>
+
+<?php
+// PHP: Load leave credits for current user
+$leaveCredits = [];
+if (isset($_SESSION['employee']['id'])) {
+    $empId = $_SESSION['employee']['id'];
+    $stmt = $pdo->prepare("SELECT leave_type, balance FROM leave_credits WHERE employee_id = ? AND year = ?");
+    $stmt->execute([$empId, date('Y')]);
+    $leaveCredits = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+    // Make sure to pass leaveCredits from the backend
+echo "<script>
+  const leaveCredits = " . json_encode($leaveCredits ?? []) . ";
+</script>";
+}
+?>
 
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -1158,6 +1208,37 @@ function toggleLeaveMenu() {
     icon.classList.toggle('rotate-180'); // Optional: rotate arrow icon
 }
 </script>
+<script>
+  const leaveTypeSelect = document.getElementById("leaveType");
+  const leaveBalanceDisplay = document.getElementById("leaveBalanceDisplay");
+  const submitBtn = document.getElementById("submitBtn");
+
+  leaveTypeSelect.addEventListener("change", function () {
+    const selectedType = this.value;
+    const balance = leaveCredits[selectedType] ?? 0;
+
+    // Reset state
+    leaveBalanceDisplay.classList.remove("hidden", "text-green-600", "text-red-600");
+    submitBtn.disabled = false;
+    submitBtn.classList.remove("opacity-50", "cursor-not-allowed");
+
+    if (selectedType === "lwop") {
+      leaveBalanceDisplay.classList.add("text-green-600");
+      leaveBalanceDisplay.textContent = "Leave Without Pay doesn't require credits.";
+    } else if (balance < 1) {
+      leaveBalanceDisplay.classList.add("text-red-600");
+      leaveBalanceDisplay.textContent = "❌ Not enough leave credits for this leave type.";
+      submitBtn.disabled = true;
+      submitBtn.classList.add("opacity-50", "cursor-not-allowed");
+    } else {
+      leaveBalanceDisplay.classList.add("text-green-600");
+      leaveBalanceDisplay.textContent = `✅ You have ${balance} day(s) available.`;
+    }
+
+    leaveBalanceDisplay.classList.remove("hidden");
+  });
+</script>
+
 <!--End of Tawk.to Script-->
 </body>
 </html>
