@@ -1,4 +1,8 @@
 <?php
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
@@ -762,61 +766,106 @@ $announcementCount = $stmt->fetchColumn();
         </div>
       </div>
 
-      <!-- Checklist Card -->
-      <div class="bg-white p-8 rounded-2xl shadow space-y-6">
-        <h4 class="text-2xl font-semibold text-gray-800">201 Checklist</h4>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-base text-gray-700">
-        </div>
+<!-- Checklist Card -->
+<div class="bg-white p-8 rounded-2xl shadow space-y-6">
+  <h4 class="text-2xl font-semibold text-gray-800">201 Checklist</h4>
 
-        <div class="mt-6">
-          <h5 class="text-lg font-semibold text-gray-700 mb-2">RSS Documents</h5>
-          <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-            <li>Signed Letter of Offer:
-              <?php if (!empty($checklist['letter_offer'])): ?>
-                <a href="../uploads/checklist/<?= htmlspecialchars($checklist['letter_offer']) ?>" target="_blank" class="text-blue-600 underline">View</a>
-              <?php else: ?>
-                <span class="text-red-600 font-medium">Not Uploaded</span>
-              <?php endif; ?>
-            </li>
-            <li>Signed Employment Contract:
-              <?php if (!empty($checklist['employment_contract'])): ?>
-                <a href="../uploads/checklist/<?= htmlspecialchars($checklist['employment_contract']) ?>" target="_blank" class="text-blue-600 underline">View</a>
-              <?php else: ?>
-                <span class="text-red-600 font-medium">Not Uploaded</span>
-              <?php endif; ?>
-            </li>
-          </ul>
-        </div>
+  <!-- RSS Documents -->
+  <div class="mt-6">
+    <h5 class="text-lg font-semibold text-gray-700 mb-2">RSS Documents</h5>
+    <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+      <?php
+        $rssDocs = [
+          'letter_offer' => 'Signed Letter of Offer',
+          'employment_contract' => 'Signed Employment Contract'
+        ];
+        foreach ($rssDocs as $field => $label):
+      ?>
+      <li><?= $label ?>:
+        <?php if (!empty($checklist[$field])): ?>
+          <?php
+            $files = is_array($checklist[$field]) ? $checklist[$field] : explode(',', $checklist[$field]);
+            foreach ($files as $file):
+              $file = trim($file);
+              if ($file):
+          ?>
+            <a href="../uploads/checklist/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 underline mr-2">View</a>
+          <?php
+              endif;
+            endforeach;
+          ?>
+        <?php else: ?>
+          <span class="text-red-600 font-medium">Not Uploaded</span>
+        <?php endif; ?>
+      </li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
 
-        <div class="mt-6">
-          <h5 class="text-lg font-semibold text-gray-700 mb-2">Pre-Employment Requirements</h5>
-          <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-            <?php
-              $requirements = [
-                'medical' => 'Medical',
-                'nbi_clearance' => 'NBI Clearance',
-                'diploma_tor' => 'Diploma/TOR',
-                'psa' => 'PSA',
-                'sss' => 'SSS',
-                'tin' => 'TIN',
-                'philhealth' => 'Philhealth',
-                'pagibig' => 'Pag-IBIG',
-                'coe' => 'COE (Recent Employer)'
-              ];
-              foreach ($requirements as $field => $label):
-            ?>
-            <li><?= $label ?>:
-              <?php if (!empty($checklist[$field])): ?>
-                <a href="../uploads/checklist/<?= htmlspecialchars($checklist[$field]) ?>" target="_blank" class="text-blue-600 underline">View</a>
-              <?php else: ?>
-                <span class="text-red-600 font-medium">Not Uploaded</span>
-              <?php endif; ?>
-            </li>
-            <?php endforeach; ?>
-          </ul>
-        </div>
-      </div>
-    </div>
+  <!-- Pre-Employment Requirements -->
+  <div class="mt-6">
+    <h5 class="text-lg font-semibold text-gray-700 mb-2">Pre-Employment Requirements</h5>
+    <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+      <?php
+        $requirements = [
+          'medical' => 'Medical',
+          'nbi_clearance' => 'NBI Clearance',
+          'diploma_tor' => 'Diploma/TOR',
+          'psa' => 'PSA',
+          'sss' => 'SSS',
+          'tin' => 'TIN',
+          'philhealth' => 'PhilHealth',
+          'pagibig' => 'Pag-IBIG',
+          'coe' => 'COE (Recent Employer)',
+          'valid_id' => 'Valid ID',
+          'valid_id_2' => 'Valid ID 2',
+          'solo_parent_id' => 'Solo Parent ID',
+        ];
+        foreach ($requirements as $field => $label):
+      ?>
+      <li><?= $label ?>:
+        <?php if (!empty($checklist[$field])): ?>
+          <?php
+            $files = is_array($checklist[$field]) ? $checklist[$field] : explode(',', $checklist[$field]);
+            foreach ($files as $file):
+              $file = trim($file);
+              if ($file):
+          ?>
+            <a href="../uploads/checklist/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 underline mr-2">View</a>
+          <?php
+              endif;
+            endforeach;
+          ?>
+        <?php else: ?>
+          <span class="text-red-600 font-medium">Not Uploaded</span>
+        <?php endif; ?>
+      </li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
+
+  <!-- Employment Adjustment -->
+  <div class="mt-6">
+    <h5 class="text-lg font-semibold text-gray-700 mb-2">Employment Adjustment Form</h5>
+    <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+      <li>Adjustment Files:
+        <?php if (!empty($checklist['employment_adjustment'])): ?>
+          <?php
+            $files = is_array($checklist['employment_adjustment']) ? $checklist['employment_adjustment'] : explode(',', $checklist['employment_adjustment']);
+            foreach ($files as $file):
+              $file = trim($file);
+              if ($file):
+          ?>
+            <a href="../uploads/adjustments/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 underline mr-2">View</a>
+          <?php
+              endif;
+            endforeach;
+          ?>
+        <?php else: ?>
+          <span class="text-red-600 font-medium">Not Uploaded</span>
+        <?php endif; ?>
+      </li>
+    </ul>
   </div>
 </div>
 

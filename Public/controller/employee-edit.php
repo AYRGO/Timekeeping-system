@@ -14,6 +14,10 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 }
 $employeeId = (int)$_GET['id'];
 
+
+$adjustmentField = 'employment_adjustment_form';
+$documents[$adjustmentField] = 'Employment Adjustment Form';
+
 $documents = [
   'letter_offer' => 'Signed Letter of Offer',
   'employment_contract' => 'Signed Employment Contract',
@@ -25,7 +29,10 @@ $documents = [
   'tin' => 'TIN',
   'philhealth' => 'PhilHealth',
   'pagibig' => 'Pagibig',
-  'coe' => 'Certificate of Employment (Recent Employer)'
+  'coe' => 'Certificate of Employment (Recent Employer)',
+  'valid_id' => 'Valid ID ',
+  'Valid_id_2' => 'Valid ID 2 ',
+  'solo_parent_id' => 'Solo Parent ID',
 ];
 
 // Delete attachment
@@ -43,63 +50,89 @@ if (isset($_GET['delete_attachment']) && isset($_GET['field'])) {
             $stmt->execute([$employeeId]);
         }
 
-        header("Location: employee_edit.php?id=$employeeId&deleted=1");
+        header("Location:employee-edit.php?id=$employeeId&deleted=1");
         exit;
     }
 }
 
 // Save form
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['update_credits'])) {
-    $fname = $_POST['fname'] ?? '';
-    $lname = $_POST['lname'] ?? '';
-    $email = $_POST['email'] ?? '';
-    $contact = $_POST['contact'] ?? '';
-    $position = $_POST['position'] ?? '';
-    $status = $_POST['status'] ?? '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Profile Update
+    if (isset($_POST['update_profile'])) {
+        $fname = $_POST['fname'] ?? '';
+        $lname = $_POST['lname'] ?? '';
+        $email = $_POST['email'] ?? '';
+        $contact = $_POST['contact'] ?? '';
+        $position = $_POST['position'] ?? '';
+        $status = $_POST['status'] ?? '';
 
-    if ($fname && $lname && $email) {
-        $stmt = $pdo->prepare("UPDATE employees SET fname = ?, lname = ?, email = ?, contact = ?, position = ?, status = ? WHERE id = ?");
-        $stmt->execute([$fname, $lname, $email, $contact, $position, $status, $employeeId]);
+        if ($fname && $lname && $email) {
+            $stmt = $pdo->prepare("UPDATE employees SET fname = ?, lname = ?, email = ?, contact = ?, position = ?, status = ? WHERE id = ?");
+            $stmt->execute([$fname, $lname, $email, $contact, $position, $status, $employeeId]);
+            header("Location: employee-edit.php?id=$employeeId&updated=1");
+            exit;
+        } else {
+            $error = "Please fill in all required fields.";
+        }
+    }
 
-        $uploadDir = '../uploads/checklist/';
-        if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
+    // 201 Checklist Upload
+   if (isset($_POST['upload_documents'])) {
+    $uploadDir = '../uploads/checklist/';
+    if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
 
-        $uploadedFiles = [];
-        foreach ($documents as $field => $label) {
-            if (isset($_FILES[$field]) && $_FILES[$field]['error'] === UPLOAD_ERR_OK) {
-                $filename = uniqid($field . "_") . "_" . basename($_FILES[$field]['name']);
-                move_uploaded_file($_FILES[$field]['tmp_name'], $uploadDir . $filename);
-                $uploadedFiles[$field] = $filename;
+    $uploadedFiles = [];
+
+    foreach ($documents as $field => $label) {
+        if (isset($_FILES[$field]) && !empty($_FILES[$field]['name'][0])) {
+            $filenames = [];
+
+            // Ensure it's multiple files
+            $files = $_FILES[$field];
+            $fileCount = is_array($files['name']) ? count($files['name']) : 0;
+
+            for ($i = 0; $i < $fileCount; $i++) {
+                if ($files['error'][$i] === UPLOAD_ERR_OK) {
+                    $filename = uniqid($field . "_") . "_" . basename($files['name'][$i]);
+                    move_uploaded_file($files['tmp_name'][$i], $uploadDir . $filename);
+                    $filenames[] = $filename;
+                }
+            }
+
+            if (!empty($filenames)) {
+                // Store filenames as comma-separated string
+                $uploadedFiles[$field] = implode(',', $filenames);
             }
         }
-
+    }
+  }
+    if ($uploadedFiles) {
         $stmt = $pdo->prepare("SELECT id FROM employee_checklist WHERE employee_id = ?");
         $stmt->execute([$employeeId]);
         $exists = $stmt->fetch();
 
-        if ($uploadedFiles) {
-            $columns = array_keys($uploadedFiles);
-            $values = array_values($uploadedFiles);
-            if ($exists) {
-                $sets = [];
-                foreach ($columns as $col) $sets[] = "$col = ?";
-                $values[] = $employeeId;
-                $stmt = $pdo->prepare("UPDATE employee_checklist SET " . implode(', ', $sets) . ", updated_at = NOW() WHERE employee_id = ?");
-                $stmt->execute($values);
-            } else {
-                $placeholders = implode(', ', array_fill(0, count($values), '?'));
-                array_unshift($values, $employeeId);
-                $stmt = $pdo->prepare("INSERT INTO employee_checklist (employee_id, " . implode(', ', $columns) . ") VALUES (?, $placeholders)");
-                $stmt->execute($values);
-            }
-        }
+        $columns = array_keys($uploadedFiles);
+        $values = array_values($uploadedFiles); 
 
-        header("Location: employee-edit.php?id=$employeeId&updated=1");
-        exit;
-    } else {
-        $error = "Please fill in all required fields.";
+        if ($exists) {
+            $sets = [];
+            foreach ($columns as $col) $sets[] = "$col = ?";
+            $values[] = $employeeId;
+            $stmt = $pdo->prepare("UPDATE employee_checklist SET " . implode(', ', $sets) . ", updated_at = NOW() WHERE employee_id = ?");
+            $stmt->execute($values);
+        } else {
+            $placeholders = implode(', ', array_fill(0, count($values), '?'));
+            array_unshift($values, $employeeId);
+            $stmt = $pdo->prepare("INSERT INTO employee_checklist (employee_id, " . implode(', ', $columns) . ") VALUES (?, $placeholders)");
+            $stmt->execute($values);
+        }
     }
+
+    header("Location: employee-edit.php?id=$employeeId&updated=1");
+    exit;
 }
+
+
 
 $leaveTypes = [
     'sick',
@@ -158,7 +191,23 @@ if (isset($_POST['update_credits']) && isset($_POST['credits'])) {
     header("Location: employee-edit.php?id=$employeeId&credits_updated=1");
     exit;
 }
+if (isset($_FILES[$adjustmentField]) && !empty($_FILES[$adjustmentField]['name'][0])) {
+    $filenames = [];
+    $files = $_FILES[$adjustmentField];
+    $fileCount = is_array($files['name']) ? count($files['name']) : 0;
 
+    for ($i = 0; $i < $fileCount; $i++) {
+        if ($files['error'][$i] === UPLOAD_ERR_OK) {
+            $filename = uniqid($adjustmentField . "_") . "_" . basename($files['name'][$i]);
+            move_uploaded_file($files['tmp_name'][$i], $uploadDir . $filename);
+            $filenames[] = $filename;
+        }
+    }
+
+    if (!empty($filenames)) {
+        $uploadedFiles[$adjustmentField] = implode(',', $filenames);
+    }
+}
 
 // Fetch employee
 $stmt = $pdo->prepare("SELECT * FROM employees WHERE id = ?");
@@ -206,6 +255,7 @@ $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
     <div class="bg-white shadow-lg rounded-xl p-8">
       <h2 class="text-2xl font-semibold mb-6 text-gray-800">Employee Profile</h2>
       <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <input type="hidden" name="update_profile" value="1">
         <div>
           <label class="block text-sm font-medium">First Name</label>
           <input name="fname" type="text" required value="<?= htmlspecialchars($employee['fname']) ?>" class="w-full mt-1 border px-4 py-2 rounded-md" />
@@ -245,16 +295,23 @@ $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
     <div class="bg-white shadow-lg rounded-xl p-8">
       <h2 class="text-2xl font-semibold mb-6 text-gray-800">201 Checklist</h2>
       <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <input type="hidden" name="upload_documents" value="1">
         <?php foreach ($documents as $field => $label): ?>
         <div class="md:col-span-1">
           <label class="block text-sm font-medium"><?= $label ?></label>
-          <input type="file" name="<?= $field ?>" class="mt-1 block w-full border px-4 py-2 rounded-md" />
-          <?php if (!empty($checklist[$field])): ?>
-            <div class="mt-1 text-sm space-x-3">
-              <a href="../uploads/checklist/<?= htmlspecialchars($checklist[$field]) ?>" target="_blank" class="text-blue-600 underline">View</a>
-              <a href="?id=<?= $employeeId ?>&delete_attachment=1&field=<?= $field ?>" onclick="return confirm('Delete this file?');" class="text-red-500 underline">Delete</a>
-            </div>
-          <?php endif; ?>
+          <input type="file" name="<?= $field ?>[]" multiple class="mt-1 block w-full border px-4 py-2 rounded-md" />
+
+<?php if (!empty($checklist[$field])): ?>
+  <div class="mt-2 text-sm space-y-1">
+    <?php foreach (explode(',', $checklist[$field]) as $file): ?>
+      <div class="flex space-x-2 items-center">
+        <a href="../uploads/checklist/<?= htmlspecialchars(trim($file)) ?>" target="_blank" class="text-blue-600 underline">View</a>
+        <a href="?id=<?= $employeeId ?>&delete_attachment=1&field=<?= $field ?>&file=<?= urlencode(trim($file)) ?>" onclick="return confirm('Delete this file?');" class="text-red-500 underline">Delete</a>
+      </div>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+
         </div>
         <?php endforeach; ?>
         <div class="md:col-span-2 flex justify-end">
@@ -262,6 +319,31 @@ $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
         </div>
       </form>
     </div>
+
+    <!-- Employment Adjustment Form -->
+<div class="bg-white shadow-lg rounded-xl p-8">
+  <h2 class="text-2xl font-semibold mb-6 text-gray-800">Employment Adjustment Form</h2>
+  <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 gap-6">
+    <input type="hidden" name="upload_documents" value="1">
+    <div>
+      <label class="block text-sm font-medium">Employment Adjustment Form</label>
+      <input type="file" name="<?= $adjustmentField ?>[]" multiple class="mt-1 block w-full border px-4 py-2 rounded-md" />
+      <?php if (!empty($checklist[$adjustmentField])): ?>
+        <div class="mt-2 text-sm space-y-1">
+          <?php foreach (explode(',', $checklist[$adjustmentField]) as $file): ?>
+            <div class="flex space-x-2 items-center">
+              <a href="../uploads/checklist/<?= htmlspecialchars(trim($file)) ?>" target="_blank" class="text-blue-600 underline">View</a>
+              <a href="?id=<?= $employeeId ?>&delete_attachment=1&field=<?= $adjustmentField ?>&file=<?= urlencode(trim($file)) ?>" onclick="return confirm('Delete this file?');" class="text-red-500 underline">Delete</a>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+    <div class="flex justify-end">
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md">Upload</button>
+    </div>
+  </form>
+</div>
 <!-- Leave Credits -->
 <div class="bg-white shadow-lg rounded-xl p-8">
   <h2 class="text-2xl font-semibold mb-6 text-gray-800">Leave Credits (<?= date('Y') ?>)</h2>
