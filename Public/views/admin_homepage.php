@@ -49,16 +49,21 @@ $lateCount = $lateClockins->fetchColumn();
 </head>
 <body class="bg-gray-100">
 
- <div class="flex h-screen">
+    <!-- Main Layout Container with Alpine.js -->
+    <div x-data="{ open: false }" class="flex h-screen bg-gray-100 overflow-hidden">
+        
+        <!-- Include Sidebar -->
         <?php include('sidebar.php'); ?>
 
-       <div class="flex-1 flex flex-col">
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col min-w-0">
+            
+            <!-- Include Header -->
             <?php include('header.php'); ?>
 
-
-
-            <main class="flex-1 p-6 overflow-y-auto">
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-10">
+            <!-- Main Content -->
+            <main class="flex-1 p-4 md:p-6 overflow-y-auto">
+                <div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-6 md:mb-10">
                     <?php
                     $cards = [
                         [
@@ -95,19 +100,19 @@ $lateCount = $lateClockins->fetchColumn();
 
                     foreach ($cards as $card) {
                         echo '
-                            <div class="bg-white shadow rounded-lg p-6 card-hover transition-transform duration-300">
+                            <div class="bg-white shadow rounded-lg p-4 md:p-6 card-hover transition-transform duration-300">
                                 <div class="flex items-center">
-                                    <div class="bg-green-100 p-3 rounded-md text-green-600">
-                                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">'
+                                    <div class="bg-green-100 p-2 md:p-3 rounded-md text-green-600">
+                                        <svg class="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">'
                                             . $card["icon"] .
                                         '</svg>
                                     </div>
-                                    <div class="ml-4 flex-1">
-                                        <p class="text-sm font-medium text-gray-500">' . $card["title"] . '</p>
-                                        <div class="text-2xl font-semibold text-gray-900">' . $card["value"] . '</div>
+                                    <div class="ml-3 md:ml-4 flex-1">
+                                        <p class="text-xs md:text-sm font-medium text-gray-500">' . $card["title"] . '</p>
+                                        <div class="text-xl md:text-2xl font-semibold text-gray-900">' . $card["value"] . '</div>
                                     </div>
                                 </div>
-                                <div class="mt-4 text-sm text-right">
+                                <div class="mt-3 md:mt-4 text-sm text-right">
                                     <a href="' . $card["link"] . '" class="text-green-600 hover:text-green-500 font-medium">View</a>
                                 </div>
                             </div>';
@@ -117,7 +122,7 @@ $lateCount = $lateClockins->fetchColumn();
 
                 <!-- Quick Actions -->
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-16">
                     <?php
                     $actions = [
                         [
@@ -142,15 +147,15 @@ $lateCount = $lateClockins->fetchColumn();
 
                     foreach ($actions as $action) {
                         echo '
-                        <a href="' . $action["link"] . '" class="relative rounded-lg border border-gray-200 bg-white px-6 py-5 shadow-sm flex items-center space-x-4 hover:border-green-500 focus:outline-none card-hover transition-all duration-200">
-                            <div class="bg-green-100 p-3 rounded-lg text-green-600">
-                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">'
+                        <a href="' . $action["link"] . '" class="relative rounded-lg border border-gray-200 bg-white px-4 md:px-6 py-4 md:py-5 shadow-sm flex items-center space-x-3 md:space-x-4 hover:border-green-500 focus:outline-none card-hover transition-all duration-200">
+                            <div class="bg-green-100 p-2 md:p-3 rounded-lg text-green-600">
+                                <svg class="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">'
                                     . $action["icon"] .
                                 '</svg>
                             </div>
                             <div class="flex-1">
                                 <p class="text-sm font-medium text-gray-900">' . $action["title"] . '</p>
-                                <p class="text-sm text-gray-500">' . $action["desc"] . '</p>
+                                <p class="text-xs md:text-sm text-gray-500">' . $action["desc"] . '</p>
                             </div>
                         </a>';
                     }

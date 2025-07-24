@@ -1120,19 +1120,107 @@ document.addEventListener("DOMContentLoaded", function () {
     // Initialize flatpickr for date range
     flatpickr("#date_range", {
         mode: "range",
-        dateFormat: "Y-m-d"
+        dateFormat: "Y-m-d",
+        minDate: "today",
+        onChange: function(selectedDates) {
+            checkLeaveCredits(); // Check credits when dates change
+        }
+    });
+
+    // Leave credit checking functionality
+    const leaveTypeSelect = document.getElementById("leaveType");
+    const leaveBalanceDisplay = document.getElementById("leaveBalanceDisplay");
+    const submitBtn = document.getElementById("submitBtn");
+    const dateRangeInput = document.getElementById("date_range");
+
+    function checkLeaveCredits() {
+        const selectedType = leaveTypeSelect.value;
+        const dateRange = dateRangeInput.value;
+        
+        if (!selectedType) return;
+
+        // Reset state
+        leaveBalanceDisplay.classList.remove("hidden", "text-green-600", "text-red-600", "text-blue-600");
+        enableSubmitButton();
+
+        // Get available balance
+        const balance = leaveCredits[selectedType] ?? 0;
+
+        // Calculate requested days
+        let requestedDays = 1;
+        if (dateRange && dateRange.includes(' to ')) {
+            const dates = dateRange.split(' to ');
+            if (dates.length === 2) {
+                const startDate = new Date(dates[0]);
+                const endDate = new Date(dates[1]);
+                const timeDiff = endDate.getTime() - startDate.getTime();
+                requestedDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+            }
+        }
+
+        // Handle different leave types
+        if (selectedType === "lwop") {
+            leaveBalanceDisplay.classList.add("text-blue-600");
+            leaveBalanceDisplay.textContent = "ℹ️ Leave Without Pay doesn't require credits.";
+        } else if (selectedType === "halfday" || selectedType === "halfday_sick") {
+            requestedDays = requestedDays * 0.5; // Half days
+            if (balance < requestedDays) {
+                leaveBalanceDisplay.classList.add("text-red-600");
+                leaveBalanceDisplay.textContent = `❌ Not enough credits! You need ${requestedDays} day(s) but only have ${balance} day(s).`;
+                disableSubmitButton();
+            } else {
+                leaveBalanceDisplay.classList.add("text-green-600");
+                leaveBalanceDisplay.textContent = `✅ You have ${balance} day(s) available. Requesting ${requestedDays} day(s).`;
+            }
+        } else {
+            if (balance < requestedDays) {
+                leaveBalanceDisplay.classList.add("text-red-600");
+                leaveBalanceDisplay.textContent = `❌ Not enough credits! You need ${requestedDays} day(s) but only have ${balance} day(s).`;
+                disableSubmitButton();
+            } else {
+                leaveBalanceDisplay.classList.add("text-green-600");
+                leaveBalanceDisplay.textContent = `✅ You have ${balance} day(s) available. Requesting ${requestedDays} day(s).`;
+            }
+        }
+
+        leaveBalanceDisplay.classList.remove("hidden");
+    }
+
+    function disableSubmitButton() {
+        submitBtn.disabled = true;
+        submitBtn.classList.remove("bg-green-600", "hover:bg-green-700");
+        submitBtn.classList.add("opacity-50", "cursor-not-allowed", "bg-gray-400");
+        submitBtn.textContent = "Insufficient Leave Credits";
+    }
+
+    function enableSubmitButton() {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("opacity-50", "cursor-not-allowed", "bg-gray-400");
+        submitBtn.classList.add("bg-green-600", "hover:bg-green-700");
+        submitBtn.textContent = "Submit Request";
+    }
+
+    // Event listeners
+    leaveTypeSelect.addEventListener("change", function() {
+        checkLeaveCredits();
     });
 
     // Confirmation before submitting leave
     const leaveForm = document.getElementById('leaveRequestForm');
     if (leaveForm) {
         leaveForm.addEventListener('submit', function (e) {
+            if (submitBtn.disabled) {
+                e.preventDefault();
+                alert("Cannot submit: Insufficient leave credits!");
+                return false;
+            }
             if (!confirm("Are you sure you want to submit this leave request?")) {
                 e.preventDefault();
             }
         });
     }
 
+    // ... keep all your existing code below this ...
     // Confirmation before submitting schedule change (if present)
     const scheduleForm = document.getElementById('scheduleChangeForm');
     if (scheduleForm) {
@@ -1146,20 +1234,21 @@ document.addEventListener("DOMContentLoaded", function () {
     // Show alerts based on query parameters
     const urlParams = new URLSearchParams(window.location.search);
     const alerts = {
-    leave_request: {
-        success: "Leave request submitted successfully!",
-        invalid_dates: "Invalid leave date range submitted."
-    },
-    schedule_change: {
-        success: "Schedule change request submitted successfully!"
-    },
-    overtime: {
-        success: "Overtime request submitted successfully!",
-        invalid_time_order: "End time must be after start time.",
-        invalid_input: "Missing or invalid data. Please try again."
-    }
-};
-
+        leave_request: {
+            success: "Leave request submitted successfully!",
+            invalid_dates: "Invalid leave date range submitted.",
+            insufficient_credits: "❌ Insufficient leave credits for this request!",
+            no_credit_record: "❌ No leave credit record found for this leave type!"
+        },
+        schedule_change: {
+            success: "Schedule change request submitted successfully!"
+        },
+        overtime: {
+            success: "Overtime request submitted successfully!",
+            invalid_time_order: "End time must be after start time.",
+            invalid_input: "Missing or invalid data. Please try again."
+        }
+    };
 
     for (const [key, messages] of Object.entries(alerts)) {
         const value = urlParams.get(key);
@@ -1170,8 +1259,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Remove query parameters from URL after alert
     if (['leave_request', 'schedule_change', 'overtime'].some(key => urlParams.has(key))) {
-    window.history.replaceState({}, document.title, window.location.pathname);
-}
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
 
     // Clock updater for all clock elements
     function updateAllClocks() {
@@ -1189,7 +1278,6 @@ document.addEventListener("DOMContentLoaded", function () {
     updateAllClocks();
     setInterval(updateAllClocks, 1000);
 });
-
 // Section toggle
 function showSection(id) {
     ['dashboardView', 'requestView', 'scheduleView', 'attendanceView', 'profileView' , 'newsFeedView', 'overtimeRequestView']
@@ -1253,6 +1341,7 @@ s1.setAttribute('crossorigin','*');
 s0.parentNode.insertBefore(s1,s0);
 })();
 </script>
+<!--End of Tawk.to Script-->
 
 <script>
 function showSection(sectionId) {
@@ -1319,6 +1408,5 @@ function toggleLeaveMenu() {
   });
 </script>
 
-<!--End of Tawk.to Script-->
 </body>
 </html>
