@@ -54,25 +54,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = $stmt->fetch();
 
     if ($user && $user['password'] === $password) {
+        // Success
         unset($_SESSION['login_attempts'][$username]);
         session_regenerate_id(true);
+
+        // Default role is "employee"
+        $role = $user['role'] ?? 'employee';
+
         $_SESSION['employee'] = [
-            'id' => $user['id'],
-            'fname' => $user['fname'],
-            'lname' => $user['lname'],
-            'position' => $user['position']
+            'id'       => $user['id'],
+            'fname'    => $user['fname'],
+            'lname'    => $user['lname'],
+            'position' => $user['position'],
+            'role'     => $role
         ];
+
+        // Set default view mode to employee
+        $_SESSION['view_mode'] = 'employee';
+
         header("Location: ../module/time_log_create.php");
         exit;
     } else {
+        // Failed login
         $_SESSION['login_attempts'][$username] = [
             'count' => $attempt['count'] + 1,
-            'time' => time()
+            'time'  => time()
         ];
         $error = "Invalid username or password.";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

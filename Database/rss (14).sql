@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 17, 2025 at 09:56 AM
+-- Generation Time: Jul 24, 2025 at 06:46 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -67,7 +67,8 @@ INSERT INTO `announcements` (`announcement_id`, `content`, `admin_name`, `create
 (30, 'test', 'Admin', '2025-07-16 09:28:59', '[\"uploads\\/file_6877005b8cb9a4.83615042.docx\"]'),
 (31, '13123', 'Admin', '2025-07-16 09:29:24', '[\"uploads\\/file_68770074d914f6.82081938.xlsx\"]'),
 (32, 'test', 'Admin', '2025-07-16 10:13:32', '[\"uploads\\/file_68770acc313190.25408647.xlsx\"]'),
-(33, 'tet', 'Admin', '2025-07-16 10:16:55', '[{\"original\":\"Time_Logs_Report (3).xlsx\",\"stored\":\"uploads\\/file_68770b97b6a3c2.36984329.xlsx\"}]');
+(33, 'tet', 'Admin', '2025-07-16 10:16:55', '[{\"original\":\"Time_Logs_Report (3).xlsx\",\"stored\":\"uploads\\/file_68770b97b6a3c2.36984329.xlsx\"}]'),
+(34, 'test', 'Admin', '2025-07-24 10:33:02', NULL);
 
 -- --------------------------------------------------------
 
@@ -146,82 +147,94 @@ CREATE TABLE `employees` (
   `password` varchar(255) DEFAULT NULL,
   `company` varchar(255) DEFAULT NULL,
   `profile_image` varchar(255) DEFAULT NULL,
-  `profile_picture` varchar(255) DEFAULT NULL
+  `profile_picture` varchar(255) DEFAULT NULL,
+  `official_sched` int(11) DEFAULT NULL,
+  `role` enum('employee','internal') NOT NULL DEFAULT 'employee'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `employees`
 --
 
-INSERT INTO `employees` (`id`, `fname`, `lname`, `email`, `personal_email`, `contact`, `position`, `status`, `created_at`, `username`, `password`, `company`, `profile_image`, `profile_picture`) VALUES
-(1, 'Vincent Kevin', 'Santos', 'Vincent.Antonio@entrygroup.com.au', 'vincentvinz17@gmail.com', '0905 919 2943', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'vincent.santos', '1mj4i', 'Entry Education', NULL, 'profile_1_1750742776.png'),
-(2, 'Shaina Dimayugo', 'Dela Cruz', 'shainadc86@gmail.com', 'shainadc86@gmail.com', '0935 766 5039', 'Student Support Mentoring', 'active', '2025-04-29 01:04:12', 'shaina.dela cruz', 'u6mf3', 'Entry Education', NULL, 'profile_2_1749605234.jpeg'),
-(3, 'Renalyn Abamo', 'Josafat', 'reny@entrygroup.com.au', 'rajosafat.cca@gmail.com', '0939 245 6150', 'Student Support Mentoring', 'active', '2025-04-29 01:04:12', 'renalyn.josafat', 'za9lv', 'Entry Education', NULL, 'profile_3_1750811272.png'),
-(4, 'Joel Lusung', 'Alimurong', 'Joel.Alimurong@entrygroup.com.au', 'jhei.el1768@gmail.com', '0966 539 4550', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'joel.alimurong', 'gj9af', 'Entry Education', NULL, 'profile_4_1749606383.jpeg'),
-(5, 'Aizel Santos', 'Castro', 'aizel.castro@entrygroup.com.au', 'aizel.castro01@gmail.com', '0926 215 0722', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'aizel.castro', '10kjg', 'Entry Education', NULL, NULL),
-(6, 'Reymark Bryan Silvano', 'Colis', 'bryan@entrygroup.com.au', 'reymarkbryancolis@gmail.com', '0927 014 4692', 'Technical Student Support - Team Leader', 'active', '2025-04-29 01:04:12', 'reymark.colis', '8vyia', 'Entry Education', NULL, 'profile_6_1749606888.jpeg'),
-(7, 'Francis Emmanuel Veloso', 'Fernandez', 'francis@entrygroup.com.au', 'francis2208@gmail.com', '0967 201 4330', 'Student Support - Marking Team Leader', 'active', '2025-04-29 01:04:12', 'francis.fernandez', '6fcrh', 'Entry Education', NULL, NULL),
-(8, 'Cedrick Cruz', 'Galgo', 'Cedrick.Galgo@entrygroup.com.au', 'cedrickgalgo@gmail.com', '0966 723 9536', 'IT Support', 'active', '2025-04-29 01:04:12', 'cedrick.galgo', '3fez7', 'Entry Education', NULL, NULL),
-(9, 'Shigeru', 'Centina', 'Shigeru.Otsuka@entrygroup.com.au', 'shigeruslayer12345@gmail.com', '0939 286 1648', 'Instructional Designer - Technical Specialist', 'active', '2025-04-29 01:04:12', 'shigeru.centina', 'rxg6z', 'Entry Education', NULL, 'profile_9_1749618682.jpg'),
-(10, 'Rhegene', 'Ingat Ronquillo', 'reggie@entrygroup.com.au', 'rronquillo0727@gmail.com', '0916 936 6370', 'Technical Student Support', 'active', '2025-04-29 01:04:12', 'rhegene.ronquillo', '1rodf', 'Entry Education', NULL, NULL),
-(11, 'Mary Ann', 'Vallejos Soriano', 'mary@entrygroup.com.au', 'habibisoriano@yahoo.com', '0906 255 2990', 'Sales New Student Enquiries', 'active', '2025-04-29 01:04:12', 'mary.soriano', '0bz7u', 'Entry Education', NULL, 'profile_11_1749624970.jpeg'),
-(12, 'Beverly', 'Taloban Gatbonton', 'beverly.gatbonton@entrygroup.com.au', 'beverlygatbonton29@gmail.com', '0920 403 7997', 'Team Leader Sales - New Student Enquiries', 'active', '2025-04-29 01:04:12', 'beverly.gatbonton', 'pw3zj', 'Entry Education', NULL, NULL),
-(13, 'Rogelio', 'Dela Peña Malinao', 'rogelio.malinao@entrygroup.com.au', 'rogelio.malinao@gmail.com', '0976 212 6539', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'rogelio.malinao', 'vski1', 'Entry Education', NULL, NULL),
-(15, 'Evanel', 'Caacbay Navalon', 'evanel.navalon@entrygroup.com.au', 'evanelnavalon@gmail.com', '0946 882 2198', 'Technical Student Support', 'active', '2025-04-29 01:04:12', 'evanel.navalon', 'movch', 'Entry Education', NULL, NULL),
-(16, 'Ian Myco', 'Aguilar', 'ian.aguilar@entrygroup.com.au', 'iammycovital@gmail.com', '0976 198 9787', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'ian.aguilar', 'uveib', 'Entry Education', NULL, NULL),
-(17, 'Reneeca', 'Villapaña Benalla', 'Reneeca@entrygroup.com.au', 'reneeca.benalla@gmail.com', '0909 204 3758', 'Content Writer & Instructional Designer', 'active', '2025-04-29 01:04:12', 'reneeca.benalla', 'rpycf', 'Entry Education', NULL, NULL),
-(18, 'Edith', 'David Mataga', 'Edith@entrygroup.com.au', 'edghie03@gmail.com', '0935 563 9451', 'Sales New Student Enquiries', 'active', '2025-04-29 01:04:12', 'edith.mataga', 'v2w4m', 'Entry Education', NULL, NULL),
-(20, 'Alfred Naguit', 'Ocampo', 'Alfred@entrygroup.com.au', 'derfla61@gmail.com', '0963 256 7621', 'Conveyancing Client Support', 'active', '2025-04-29 01:04:12', 'alfred.ocampo', 'xs9nq', 'Entry Education', NULL, NULL),
-(21, 'Jennifer', 'Mangitngit', 'jennifer.trinidad@entrygroup.com.au', 'jennifertrinidad0103@gmail.com', '0928 225 5869', 'Student Support - Marking', 'active', '2023-08-07 01:04:12', 'jennifer.trinidad', 'xt0rd', 'Entry Education', NULL, NULL),
-(22, 'Sean Justine', 'Francisco Mendoza', 'sean.mendoza@entrygroup.com.au', 'mendozaseanjustine@gmail.com', '0977 019 9064', 'Student Support - Marking', 'active', '2023-08-16 01:04:12', 'sean.mendoza', '71l6y', 'Entry Education', NULL, 'profile_22_1750917016.png'),
-(24, 'Elritz', 'Tongson Crisanto', 'elritz.crisanto@entrygroup.com.au', 'ritztiong@gmail.com', '0961 289 3349', 'Student Support - Marking', 'active', '2023-08-21 01:04:12', 'elritz.crisanto', '96ewj', 'Entry Education', NULL, NULL),
-(25, 'Analiza', 'Taloban Gatbonton', 'analiza.gatbonton@entrygroup.com.au', 'analizagatbonton05@gmail.com', '0961 820 1167', 'Student Support - Marking', 'active', '2023-08-21 01:04:12', 'analiza.gatbonton', 'cjfvk', 'Entry Education', NULL, NULL),
-(26, 'Franklin Roos', 'Cinco Pabillano', 'estimating@empirewestelectrical.com.au', 'frankpabillano@gmail.com', '0961 498 0228', 'Electrical Estimator', 'active', '2023-11-03 01:04:12', 'franklin.pabillano', 'd54hj', 'onn one', NULL, NULL),
-(27, 'Kristian David', 'Bansil', 'ITsupport@mtunderground.com', 'ian_pudz@icloud.com', '0939 905 0288', 'Web Developer / Admin & IT Support', 'active', '2024-02-12 01:04:12', 'kristian.bansil', 'c9zqn', 'Maintenance Tech', NULL, NULL),
-(28, 'Louis Fernand', 'Baluyot Austria', 'louis.austria@entrygroup.com.au', 'louisaustria0@gmail.com', '0998 423 4020', 'Graphic Designer', 'active', '2024-04-04 01:04:12', 'louis.austria', 'r14xu', 'Entry Education', NULL, NULL),
-(29, 'Johana Rose', 'Perez Gueco', 'johanarose.gueco@entrygroup.com.au', 'johanagueco@gmail.com', '0906 213 7926', 'Student Support - Marking', 'active', '2024-04-04 01:04:12', 'johana.gueco', 'u1o3l', 'Entry Education', NULL, NULL),
-(30, 'Erika', 'Seriosa Pineda', 'erika.seriosa@entrygroup.com.au', 'rickzseriosa@gmail.com', '0926 355 6900', 'Student Support - Marking', 'active', '2024-04-04 01:04:12', 'erika.pineda', 'agsrw', 'Entry Education', NULL, NULL),
-(31, 'Jhunel Carlo', 'Traifalgar Samodio', 'jhunelcarlo.samodio@entrygroup.com.au', 'gun.lazuli@gmail.com', '0995 483 5711', 'Student Support - Marking', 'active', '2024-04-04 01:04:12', 'jhunel.samodio', '70twd', 'Entry Education', NULL, NULL),
-(33, 'Aldwin John', 'Arceo Lozano', 'aldwinjohn.lozano@entrygroup.com.au', 'imaj.lozano@gmail.com', '0949 369 7174', 'Sales New Student Enquiries', 'active', '2024-04-08 01:04:12', 'aldwin.lozano', 'r2hsw', 'Entry Education', NULL, NULL),
-(34, 'Yris Gaelle', 'Parreñas Camerino', 'yyrish@gmail.com', 'yyrish@gmail.com', '0912 937 9482', 'Student Support - Marking', 'active', '2024-05-01 01:04:12', 'yris.camerino', 'vijg7', 'Entry Education', NULL, NULL),
-(35, 'Nika', 'Nueva Bacongallo', 'nika.bacongallo@gmail.com', 'nika.bacongallo@gmail.com', '0919 263 0516', 'Student Support - Marking', 'active', '2024-05-20 01:04:12', 'nika.bacongallo', 't80da', 'Entry Education', NULL, NULL),
-(36, 'Denver Orlanda', 'Castillano', 'dcstudio.creative@gmail.com', 'dcstudio.creative@gmail.com', '0991 933 2312', 'Draftsman', 'active', '2024-06-10 01:04:12', 'denver.castillano', 'brcio', 'DNA Furniture & Cabinets', NULL, NULL),
-(37, 'Marnie', 'Perez Catalogo', 'marniecatalogo99@gmail.com', 'marniecatalogo99@gmail.com', '0905 453 8974', 'Technical Student Support', 'active', '2024-06-10 01:04:12', 'marnie.catalogo', '2p658', 'Entry Education', NULL, NULL),
-(38, 'Ryan Rex', 'Patrimonio', 'rexryanpatrimonio@gmail.com', 'rexryanpatrimonio@gmail.com', '0916 189 2527', 'Technical Student Support', 'active', '2024-06-10 01:04:12', 'ryan.patrimonio', 'e2gdf', 'Entry Education', NULL, NULL),
-(41, 'Ma. Charisma S.', 'Platero', 'charisma.platero@gmail.com', 'charisma.platero@gmail.com', 'N/A', 'Estimator', 'active', '2024-07-22 01:04:12', 'charisma.platero', 'ia9vr', 'Fratelli Homes', NULL, NULL),
-(43, 'Lovelaine', 'Gudoy Celeste', 'lovelaineceleste@yahoo.com', 'lovelaineceleste@yahoo.com', 'N/A', 'Sales New Student Enquiries', 'active', '2024-08-12 01:04:12', 'lovelaine.celeste', '91urk', 'Entry Education', NULL, NULL),
-(46, 'Ivy', 'Nuñez', 'ivynunez26@gmail.com', 'ivynunez26@gmail.com', 'N/A', 'Student Support - Marking', 'active', '2024-08-12 01:04:12', 'ivy.nuñez', 'f1hqu', 'Entry Education', NULL, NULL),
-(47, 'Glory Ann', 'Garcia Balderas', 'Glory@fratellihomeswa.com.au', 'gloryannbalderas@gmail.com', '0981 107 2866', 'Estimator', 'active', '2024-09-16 01:04:12', 'glory.balderas', '2i8ql', 'Fratelli Homes', NULL, NULL),
-(49, 'Julie Anne', 'Guinto Maclang', 'macjulg08@gmail.com', 'macjulg08@gmail.com', 'N/A', 'Student Support - Marking', 'active', '2024-10-14 01:04:12', 'julie.maclang', 'rvlft', 'Entry Education', NULL, NULL),
-(50, 'Francis Eugene Aguhayon', 'Bondoc', 'francis.bondoc22@gmail.com', 'francis.bondoc22@gmail.com', '629-683-416-000', 'Draftsman', 'active', '2025-04-29 14:02:24', 'francis.bondoc', 'vby8e', 'Entry Education', NULL, NULL),
-(52, 'Althea Tansingco', 'Makabenta', 'document.control@bugardi.com.au', 'atansingcomakabenta@yahoo.com', '165-661-778-000', 'Document Controller', 'active', '2025-04-29 14:02:24', 'althea.makabenta', '6i8to', 'Bugardi Contracting', NULL, NULL),
-(53, 'Christian Nioda', 'Mar', 'christianmar673@gmail.com', 'christianmar673@gmail.com', '387-307-553-000', 'Sales New Student Enquiries', 'active', '2025-04-29 14:02:24', 'christian.mar', 'lzmb2', 'Entry Education', NULL, NULL),
-(55, 'Jeffry Tuazon', 'Macapagal', 'jeff.macapagal017@gmail.com', 'jeff.macapagal017@gmail.com', '513-015-013-000', 'Operations Administrator', 'active', '2025-04-29 14:02:24', 'jeffry.macapagal', 'nzkyl', 'TRSWA', NULL, NULL),
-(56, 'Allen Sobrepeña', 'Capati', 'allen.capati@entrygroup.com.au', 'allen.capati95@gmail.com', '468-497-485-000', 'Student Support - Marking', 'active', '2025-04-29 14:02:24', 'allen.capati', 'n02or', 'Entry Education', NULL, NULL),
-(57, 'Angelica Rosario', 'Estanio', 'angelica.estanio@entrygroup.com.au', 'angelica.estanio4@gmail.com', '338-546-988-000', 'Student Support - Marking', 'active', '2025-04-29 14:02:24', 'angelica.estanio', 'qm6fh', 'Entry Education', NULL, NULL),
-(58, 'Adonis Del Mundo', 'Jabinal', 'adonis.jabinal@bugardi.com.au', 'donjabinal@gmail.com', '175-092-008-000', 'Project Coordinator', 'active', '2025-04-29 14:02:24', 'adonis.jabinal', 'aoqit', 'Bugardi Contracting', NULL, NULL),
-(59, 'Joshwea Mercado', 'Monis', 'joshwea.monis@entrygroup.com.au', 'mjoshwea@gmail.com', '332-760-833-000', 'Student Support - Marking', 'active', '2025-04-29 14:02:24', 'joshwea.monis', 'bjor0', 'Entry Education', NULL, NULL),
-(60, 'Janeth Sedon', 'Solayao', 'janeth.solayao@entrygroup.com.au', 'janethsolayao32@gmail.com', 'TO FOLLOW', 'Student Support - Marking', 'active', '2025-04-29 14:02:24', 'janeth.solayao', 'i4yzp', 'Entry Education', NULL, NULL),
-(61, 'Ray Jinder Villena', 'Singh', 'rvschk@gmail.com', 'rvschk@gmail.com', '350-760-267-000', 'Executive Assistant', 'active', '2025-04-29 14:02:24', 'rj.singh', 'lpzom', 'Rowland Plumbing & Gas', NULL, NULL),
-(62, 'Shirmiley Canlas', 'Quizon', 'shirmiley.quizon@bugardi.com.au', 'shirmiley.quizon@gmail.com', '210-283-638-000', 'Recruitment Mobilization Officer', 'active', '2025-04-29 14:02:24', 'shirmiley.quizon', 'm2g7l', 'Bugardi Contracting', NULL, NULL),
-(63, 'Maria Ñina Dizon', 'Dollentes', 'nina.dollentes@entrygroup.com.au', 'marianinadollentes@gmail.com', '337-370-586-000', 'Accountant', 'active', '2025-04-29 14:02:24', 'Nina.dollentes', 'qp4i9', 'Entry Education', NULL, 'profile_63_1751009955.png'),
-(64, 'Jerzi Chezka Medel', 'Libatique', 'jerzi.libatique@entrygroup.com.au', 'jerzichezkamedel@gmail.com', '396-119-405-000', 'Accountant', 'active', '2025-04-29 14:02:24', 'jerzi.libatique', '9ta18', 'Entry Education', NULL, NULL),
-(65, 'Sabando', 'Nuñeza Dou Lester', 'lester.nuneza@bugardi.com.au', 'lesternuneza@gmail.com', '264-711-363-000', 'HSEQ Assistant Manager', 'active', '2025-04-29 14:02:24', 'Lester.nuñeza ', '3407m', 'Entry Education', NULL, NULL),
-(66, 'Dionicio', 'Ocampo Godwin', 'tgodbtg04@gmail.com', 'tgodbtg04@gmail.com', '743-363-945-000', 'Tax Accountant', 'active', '2025-04-29 14:02:24', 'godwin.ocampo ', 'udlag', 'Entry Education', NULL, NULL),
-(67, 'Apryl Ordonio', 'Pasion', 'apryl.pasion@bugardi.com.au', 'aprylpolicarpio@gmail.com', 'TO FOLLOW', 'Recruitment Mobilization Officer', 'active', '2025-04-29 14:02:24', 'apryl.pasion', 'ovcp0', 'Bugardi Contracting', NULL, NULL),
-(68, 'Christine Khlaryss', 'Angeles', 'christinekhlaryss@gmail.com', 'christinekhlaryss@gmail.com', '351-635-569-000', 'Tax Accountant', 'active', '2025-04-29 14:02:24', 'christine.angeles', 'bnl8k', 'Denning', NULL, NULL),
-(69, 'Trisha Mae Adriano', 'McGregor', 'trisha_mcgregor@yahoo.com', 'trisha_mcgregor@yahoo.com', '486-881-956-00000', 'Renovation Draftsman', 'active', '2025-04-29 14:02:24', 'trisha.mcgregor', 'biv1r', 'Ridge Renovation', NULL, NULL),
-(70, 'John Michael Comprado', 'Briones', 'jamenabriones14@gmail.com', 'jamenabriones14@gmail.com', '620-743-947-000', 'Commercial Estimator', 'active', '2025-04-29 14:02:24', 'jm.briones', 'w1g89', 'TRSWA', NULL, NULL),
-(71, 'Precious Zahra Cortez', 'Cabusao', 'zahracortez95@gmail.com', 'zahracortez95@gmail.com', '326-526-766-000', 'Hydraulics Estimator', 'active', '2025-04-29 14:02:24', 'zahra.cabusao', 'dwzgl', 'Leeway Group', NULL, NULL),
-(72, 'Milbert ', 'Sambile', 'milbert@millersroofing.com.au', 'milbert.sambile@gmail.com', '', 'Estimator', 'active', '2025-06-03 01:08:23', 'Milbert.Sambile', 'Milbert', 'Miller\'s Roofing', NULL, NULL),
-(1002, 'Neil Anthony', 'Costelloe', 'Neil.Costelloe@resourcestaff.com.ph', 'neilcosetelloe@gmail.com', NULL, 'General Manager', 'active', '2024-05-19 16:00:00', 'neil.costelloe', 'ypv9h', 'RSS', NULL, NULL),
-(1003, 'Cristina Miranda', 'Pangan', 'Tina.Pangan@resourcestaff.com.ph', 'thine2miranda@gmail.com', '0915 056 1780', 'Executive Assistant to the General Manager', 'active', '2024-03-31 16:00:00', 'cristina.pangan', '85ivt', 'RSS', NULL, NULL),
-(1004, 'Rica Joy Viray', 'Tolomia', 'Rica.Tolomia@resourcestaff.com.ph', 'Rica.Tolomia@resourcestaff.com.ph', '0917 389 7962', 'TA/HR Specialist', 'active', '2024-08-11 16:00:00', 'rj.tolomia', 'gojwd', 'RSS', NULL, NULL),
-(1005, 'Johsua Torninos', 'Dimla', 'johsua.dimla1986@gmail.com', 'johsua.dimla1986@gmail.com', '0933 430 3081', 'Facilities and Admin Support', 'active', '2024-09-29 16:00:00', 'johsua.dimla', 'r9em0', 'RSS', NULL, NULL),
-(1006, 'Cedrick', 'Arnigo', 'IT@resourcestaff.com.ph', 'cedrickarnigo1723@gmail.com', '09938642974', 'IT Support Specialist', 'active', '2025-05-27 23:09:46', 'Cedrick.Arnigo', 'Gr33n$$wRf', 'RSS', NULL, 'profile_1006_1751960992.png'),
-(1007, 'Peach', 'Herrera', 'herrerafelicci@gmail.com', 'herrerafelicci@gmail.com', '0903323232', 'Admin', 'active', '2025-06-02 06:19:09', 'Peach.Herrera', 'Gh0920', 'RSS', NULL, 'profile_1007.jpg'),
-(1009, 'Resty James', 'Nazareno', 'rjmanago@gmail.com', 'rjmanago@gmail.com', '09763659773', 'IT Intern', 'active', '2025-06-10 02:48:29', 'Kiras001', 'vosfows12', 'RSS', NULL, 'profile_1009_1752025010.png'),
-(1013, 'John ', 'Mungcal', 'John.Mungcal@gmail.com', NULL, '123123123', 'IT Intern', 'active', '2025-07-14 03:34:27', 'John.Mungcal', '123456', NULL, NULL, NULL);
+INSERT INTO `employees` (`id`, `fname`, `lname`, `email`, `personal_email`, `contact`, `position`, `status`, `created_at`, `username`, `password`, `company`, `profile_image`, `profile_picture`, `official_sched`, `role`) VALUES
+(1, 'Vincent Kevin', 'Santos', 'Vincent.Antonio@entrygroup.com.au', 'vincentvinz17@gmail.com', '0905 919 2943', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'vincent.santos', '1mj4i', 'Entry Education', NULL, 'profile_1_1750742776.png', 10, 'employee'),
+(2, 'Shaina Dimayugo', 'Dela Cruz', 'shainadc86@gmail.com', 'shainadc86@gmail.com', '0935 766 5039', 'Student Support Mentoring', 'active', '2025-04-29 01:04:12', 'shaina.dela cruz', 'u6mf3', 'Entry Education', NULL, 'profile_2_1749605234.jpeg', 4, 'employee'),
+(3, 'Renalyn Abamo', 'Josafat', 'reny@entrygroup.com.au', 'rajosafat.cca@gmail.com', '0939 245 6150', 'Student Support Mentoring', 'active', '2025-04-29 01:04:12', 'renalyn.josafat', 'za9lv', 'Entry Education', NULL, 'profile_3_1750811272.png', 4, 'employee'),
+(4, 'Joel Lusung', 'Alimurong', 'Joel.Alimurong@entrygroup.com.au', 'jhei.el1768@gmail.com', '0966 539 4550', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'joel.alimurong', 'gj9af', 'Entry Education', NULL, 'profile_4_1749606383.jpeg', 4, 'employee'),
+(5, 'Aizel Santos', 'Castro', 'aizel.castro@entrygroup.com.au', 'aizel.castro01@gmail.com', '0926 215 0722', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'aizel.castro', '10kjg', 'Entry Education', NULL, NULL, 4, 'employee'),
+(6, 'Reymark Bryan Silvano', 'Colis', 'bryan@entrygroup.com.au', 'reymarkbryancolis@gmail.com', '0927 014 4692', 'Technical Student Support - Team Leader', 'active', '2025-04-29 01:04:12', 'reymark.colis', '8vyia', 'Entry Education', NULL, 'profile_6_1749606888.jpeg', 4, 'employee'),
+(7, 'Francis Emmanuel Veloso', 'Fernandez', 'francis@entrygroup.com.au', 'francis2208@gmail.com', '0967 201 4330', 'Student Support - Marking Team Leader', 'active', '2025-04-29 01:04:12', 'francis.fernandez', '6fcrh', 'Entry Education', NULL, NULL, 4, 'employee'),
+(8, 'Cedrick Cruz', 'Galgo', 'Cedrick.Galgo@entrygroup.com.au', 'cedrickgalgo@gmail.com', '0966 723 9536', 'IT Support', 'active', '2025-04-29 01:04:12', 'cedrick.galgo', '3fez7', 'Entry Education', NULL, NULL, 4, 'employee'),
+(9, 'Shigeru', 'Centina', 'Shigeru.Otsuka@entrygroup.com.au', 'shigeruslayer12345@gmail.com', '0939 286 1648', 'Instructional Designer - Technical Specialist', 'active', '2025-04-29 01:04:12', 'shigeru.centina', 'rxg6z', 'Entry Education', NULL, 'profile_9_1749618682.jpg', 4, 'employee'),
+(10, 'Rhegene', 'Ingat Ronquillo', 'reggie@entrygroup.com.au', 'rronquillo0727@gmail.com', '0916 936 6370', 'Technical Student Support', 'active', '2025-04-29 01:04:12', 'rhegene.ronquillo', '1rodf', 'Entry Education', NULL, NULL, 4, 'employee'),
+(11, 'Mary Ann', 'Vallejos Soriano', 'mary@entrygroup.com.au', 'habibisoriano@yahoo.com', '0906 255 2990', 'Sales New Student Enquiries', 'active', '2025-04-29 01:04:12', 'mary.soriano', '0bz7u', 'Entry Education', NULL, 'profile_11_1749624970.jpeg', 4, 'employee'),
+(12, 'Beverly', 'Taloban Gatbonton', 'beverly.gatbonton@entrygroup.com.au', 'beverlygatbonton29@gmail.com', '0920 403 7997', 'Team Leader Sales - New Student Enquiries', 'active', '2025-04-29 01:04:12', 'beverly.gatbonton', 'pw3zj', 'Entry Education', NULL, NULL, 4, 'employee'),
+(13, 'Rogelio', 'Dela Peña Malinao', 'rogelio.malinao@entrygroup.com.au', 'rogelio.malinao@gmail.com', '0976 212 6539', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'rogelio.malinao', 'vski1', 'Entry Education', NULL, NULL, 4, 'employee'),
+(15, 'Evanel', 'Caacbay Navalon', 'evanel.navalon@entrygroup.com.au', 'evanelnavalon@gmail.com', '0946 882 2198', 'Technical Student Support', 'active', '2025-04-29 01:04:12', 'evanel.navalon', 'movch', 'Entry Education', NULL, NULL, 4, 'employee'),
+(16, 'Ian Myco', 'Aguilar', 'ian.aguilar@entrygroup.com.au', 'iammycovital@gmail.com', '0976 198 9787', 'Student Support - Marking', 'active', '2025-04-29 01:04:12', 'ian.aguilar', 'uveib', 'Entry Education', NULL, NULL, 4, 'employee'),
+(17, 'Reneeca', 'Villapaña Benalla', 'Reneeca@entrygroup.com.au', 'reneeca.benalla@gmail.com', '0909 204 3758', 'Content Writer & Instructional Designer', 'active', '2025-04-29 01:04:12', 'reneeca.benalla', 'rpycf', 'Entry Education', NULL, NULL, 4, 'employee'),
+(18, 'Edith', 'David Mataga', 'Edith@entrygroup.com.au', 'edghie03@gmail.com', '0935 563 9451', 'Sales New Student Enquiries', 'active', '2025-04-29 01:04:12', 'edith.mataga', 'v2w4m', 'Entry Education', NULL, NULL, 4, 'employee'),
+(20, 'Alfred Naguit', 'Ocampo', 'Alfred@entrygroup.com.au', 'derfla61@gmail.com', '0963 256 7621', 'Conveyancing Client Support', 'active', '2025-04-29 01:04:12', 'alfred.ocampo', 'xs9nq', 'Entry Education', NULL, NULL, 4, 'employee'),
+(21, 'Jennifer', 'Mangitngit', 'jennifer.trinidad@entrygroup.com.au', 'jennifertrinidad0103@gmail.com', '0928 225 5869', 'Student Support - Marking', 'active', '2023-08-07 01:04:12', 'jennifer.trinidad', 'xt0rd', 'Entry Education', NULL, NULL, 4, 'employee'),
+(22, 'Sean Justine', 'Francisco Mendoza', 'sean.mendoza@entrygroup.com.au', 'mendozaseanjustine@gmail.com', '0977 019 9064', 'Student Support - Marking', 'active', '2023-08-16 01:04:12', 'sean.mendoza', '71l6y', 'Entry Education', NULL, 'profile_22_1750917016.png', 4, 'employee'),
+(24, 'Elritz', 'Tongson Crisanto', 'elritz.crisanto@entrygroup.com.au', 'ritztiong@gmail.com', '0961 289 3349', 'Student Support - Marking', 'active', '2023-08-21 01:04:12', 'elritz.crisanto', '96ewj', 'Entry Education', NULL, NULL, 4, 'employee'),
+(25, 'Analiza', 'Taloban Gatbonton', 'analiza.gatbonton@entrygroup.com.au', 'analizagatbonton05@gmail.com', '0961 820 1167', 'Student Support - Marking', 'active', '2023-08-21 01:04:12', 'analiza.gatbonton', 'cjfvk', 'Entry Education', NULL, NULL, 4, 'employee'),
+(26, 'Franklin Roos', 'Cinco Pabillano', 'estimating@empirewestelectrical.com.au', 'frankpabillano@gmail.com', '0961 498 0228', 'Electrical Estimator', 'active', '2023-11-03 01:04:12', 'franklin.pabillano', 'd54hj', 'onn one', NULL, NULL, 4, 'employee'),
+(27, 'Kristian David', 'Bansil', 'ITsupport@mtunderground.com', 'ian_pudz@icloud.com', '0939 905 0288', 'Web Developer / Admin & IT Support', 'active', '2024-02-12 01:04:12', 'kristian.bansil', 'c9zqn', 'Maintenance Tech', NULL, NULL, 4, 'employee'),
+(28, 'Louis Fernand', 'Baluyot Austria', 'louis.austria@entrygroup.com.au', 'louisaustria0@gmail.com', '0998 423 4020', 'Graphic Designer', 'active', '2024-04-04 01:04:12', 'louis.austria', 'r14xu', 'Entry Education', NULL, NULL, 4, 'employee'),
+(29, 'Johana Rose', 'Perez Gueco', 'johanarose.gueco@entrygroup.com.au', 'johanagueco@gmail.com', '0906 213 7926', 'Student Support - Marking', 'active', '2024-04-04 01:04:12', 'johana.gueco', 'u1o3l', 'Entry Education', NULL, NULL, 4, 'employee'),
+(30, 'Erika', 'Seriosa Pineda', 'erika.seriosa@entrygroup.com.au', 'rickzseriosa@gmail.com', '0926 355 6900', 'Student Support - Marking', 'active', '2024-04-04 01:04:12', 'erika.pineda', 'agsrw', 'Entry Education', NULL, NULL, 4, 'employee'),
+(31, 'Jhunel Carlo', 'Traifalgar Samodio', 'jhunelcarlo.samodio@entrygroup.com.au', 'gun.lazuli@gmail.com', '0995 483 5711', 'Student Support - Marking', 'active', '2024-04-04 01:04:12', 'jhunel.samodio', '70twd', 'Entry Education', NULL, NULL, 4, 'employee'),
+(33, 'Aldwin John', 'Arceo Lozano', 'aldwinjohn.lozano@entrygroup.com.au', 'imaj.lozano@gmail.com', '0949 369 7174', 'Sales New Student Enquiries', 'active', '2024-04-08 01:04:12', 'aldwin.lozano', 'r2hsw', 'Entry Education', NULL, NULL, 4, 'employee'),
+(34, 'Yris Gaelle', 'Parreñas Camerino', 'yyrish@gmail.com', 'yyrish@gmail.com', '0912 937 9482', 'Student Support - Marking', 'active', '2024-05-01 01:04:12', 'yris.camerino', 'vijg7', 'Entry Education', NULL, NULL, 4, 'employee'),
+(35, 'Nika', 'Nueva Bacongallo', 'nika.bacongallo@gmail.com', 'nika.bacongallo@gmail.com', '0919 263 0516', 'Student Support - Marking', 'active', '2024-05-20 01:04:12', 'nika.bacongallo', 't80da', 'Entry Education', NULL, NULL, 4, 'employee'),
+(36, 'Denver Orlanda', 'Castillano', 'dcstudio.creative@gmail.com', 'dcstudio.creative@gmail.com', '0991 933 2312', 'Draftsman', 'active', '2024-06-10 01:04:12', 'denver.castillano', 'brcio', 'DNA Furniture & Cabinets', NULL, NULL, 4, 'employee'),
+(37, 'Marnie', 'Perez Catalogo', 'marniecatalogo99@gmail.com', 'marniecatalogo99@gmail.com', '0905 453 8974', 'Technical Student Support', 'active', '2024-06-10 01:04:12', 'marnie.catalogo', '2p658', 'Entry Education', NULL, NULL, 4, 'employee'),
+(38, 'Ryan Rex', 'Patrimonio', 'rexryanpatrimonio@gmail.com', 'rexryanpatrimonio@gmail.com', '0916 189 2527', 'Technical Student Support', 'active', '2024-06-10 01:04:12', 'ryan.patrimonio', 'e2gdf', 'Entry Education', NULL, NULL, 4, 'employee'),
+(41, 'Ma. Charisma S.', 'Platero', 'charisma.platero@gmail.com', 'charisma.platero@gmail.com', 'N/A', 'Estimator', 'active', '2024-07-22 01:04:12', 'charisma.platero', 'ia9vr', 'Fratelli Homes', NULL, NULL, 4, 'employee'),
+(43, 'Lovelaine', 'Gudoy Celeste', 'lovelaineceleste@yahoo.com', 'lovelaineceleste@yahoo.com', 'N/A', 'Sales New Student Enquiries', 'active', '2024-08-12 01:04:12', 'lovelaine.celeste', '91urk', 'Entry Education', NULL, NULL, 4, 'employee'),
+(46, 'Ivy', 'Nuñez', 'ivynunez26@gmail.com', 'ivynunez26@gmail.com', 'N/A', 'Student Support - Marking', 'active', '2024-08-12 01:04:12', 'ivy.nuñez', 'f1hqu', 'Entry Education', NULL, NULL, 4, 'employee'),
+(47, 'Glory Ann', 'Garcia Balderas', 'Glory@fratellihomeswa.com.au', 'gloryannbalderas@gmail.com', '0981 107 2866', 'Estimator', 'active', '2024-09-16 01:04:12', 'glory.balderas', '2i8ql', 'Fratelli Homes', NULL, NULL, 4, 'employee'),
+(49, 'Julie Anne', 'Guinto Maclang', 'macjulg08@gmail.com', 'macjulg08@gmail.com', 'N/A', 'Student Support - Marking', 'active', '2024-10-14 01:04:12', 'julie.maclang', 'rvlft', 'Entry Education', NULL, NULL, 4, 'employee'),
+(50, 'Francis Eugene Aguhayon', 'Bondoc', 'francis.bondoc22@gmail.com', 'francis.bondoc22@gmail.com', '629-683-416-000', 'Draftsman', 'active', '2025-04-29 14:02:24', 'francis.bondoc', 'vby8e', 'Entry Education', NULL, NULL, 4, 'employee'),
+(52, 'Althea Tansingco', 'Makabenta', 'document.control@bugardi.com.au', 'atansingcomakabenta@yahoo.com', '165-661-778-000', 'Document Controller', 'active', '2025-04-29 14:02:24', 'althea.makabenta', '6i8to', 'Bugardi Contracting', NULL, NULL, 4, 'employee'),
+(53, 'Christian Nioda', 'Mar', 'christianmar673@gmail.com', 'christianmar673@gmail.com', '387-307-553-000', 'Sales New Student Enquiries', 'active', '2025-04-29 14:02:24', 'christian.mar', 'lzmb2', 'Entry Education', NULL, NULL, 4, 'employee'),
+(55, 'Jeffry Tuazon', 'Macapagal', 'jeff.macapagal017@gmail.com', 'jeff.macapagal017@gmail.com', '513-015-013-000', 'Operations Administrator', 'active', '2025-04-29 14:02:24', 'jeffry.macapagal', 'nzkyl', 'TRSWA', NULL, NULL, 4, 'employee'),
+(56, 'Allen Sobrepeña', 'Capati', 'allen.capati@entrygroup.com.au', 'allen.capati95@gmail.com', '468-497-485-000', 'Student Support - Marking', 'active', '2025-04-29 14:02:24', 'allen.capati', 'n02or', 'Entry Education', NULL, NULL, 4, 'employee'),
+(57, 'Angelica Rosario', 'Estanio', 'angelica.estanio@entrygroup.com.au', 'angelica.estanio4@gmail.com', '338-546-988-000', 'Student Support - Marking', 'active', '2025-04-29 14:02:24', 'angelica.estanio', 'qm6fh', 'Entry Education', NULL, NULL, 4, 'employee'),
+(58, 'Adonis Del Mundo', 'Jabinal', 'adonis.jabinal@bugardi.com.au', 'donjabinal@gmail.com', '175-092-008-000', 'Project Coordinator', 'active', '2025-04-29 14:02:24', 'adonis.jabinal', 'aoqit', 'Bugardi Contracting', NULL, NULL, 4, 'employee'),
+(59, 'Joshwea Mercado', 'Monis', 'joshwea.monis@entrygroup.com.au', 'mjoshwea@gmail.com', '332-760-833-000', 'Student Support - Marking', 'active', '2025-04-29 14:02:24', 'joshwea.monis', 'bjor0', 'Entry Education', NULL, NULL, 4, 'employee'),
+(60, 'Janeth Sedon', 'Solayao', 'janeth.solayao@entrygroup.com.au', 'janethsolayao32@gmail.com', 'TO FOLLOW', 'Student Support - Marking', 'active', '2025-04-29 14:02:24', 'janeth.solayao', 'i4yzp', 'Entry Education', NULL, NULL, 4, 'employee'),
+(61, 'Ray Jinder Villena', 'Singh', 'rvschk@gmail.com', 'rvschk@gmail.com', '350-760-267-000', 'Executive Assistant', 'active', '2025-04-29 14:02:24', 'rj.singh', 'lpzom', 'Rowland Plumbing & Gas', NULL, NULL, 4, 'employee'),
+(62, 'Shirmiley Canlas', 'Quizon', 'shirmiley.quizon@bugardi.com.au', 'shirmiley.quizon@gmail.com', '210-283-638-000', 'Recruitment Mobilization Officer', 'active', '2025-04-29 14:02:24', 'shirmiley.quizon', 'm2g7l', 'Bugardi Contracting', NULL, NULL, 4, 'employee'),
+(63, 'Maria Ñina Dizon', 'Dollentes', 'nina.dollentes@entrygroup.com.au', 'marianinadollentes@gmail.com', '337-370-586-000', 'Accountant', 'active', '2025-04-29 14:02:24', 'Nina.dollentes', 'qp4i9', 'Entry Education', NULL, 'profile_63_1751009955.png', 4, 'employee'),
+(64, 'Jerzi Chezka Medel', 'Libatique', 'jerzi.libatique@entrygroup.com.au', 'jerzichezkamedel@gmail.com', '396-119-405-000', 'Accountant', 'active', '2025-04-29 14:02:24', 'jerzi.libatique', '9ta18', 'Entry Education', NULL, NULL, 4, 'employee'),
+(65, 'Sabando', 'Nuñeza Dou Lester', 'lester.nuneza@bugardi.com.au', 'lesternuneza@gmail.com', '264-711-363-000', 'HSEQ Assistant Manager', 'active', '2025-04-29 14:02:24', 'Lester.nuñeza ', '3407m', 'Entry Education', NULL, NULL, 4, 'employee'),
+(66, 'Dionicio', 'Ocampo Godwin', 'tgodbtg04@gmail.com', 'tgodbtg04@gmail.com', '743-363-945-000', 'Tax Accountant', 'active', '2025-04-29 14:02:24', 'godwin.ocampo ', 'udlag', 'Entry Education', NULL, NULL, 4, 'employee'),
+(67, 'Apryl Ordonio', 'Pasion', 'apryl.pasion@bugardi.com.au', 'aprylpolicarpio@gmail.com', 'TO FOLLOW', 'Recruitment Mobilization Officer', 'active', '2025-04-29 14:02:24', 'apryl.pasion', 'ovcp0', 'Bugardi Contracting', NULL, NULL, 4, 'employee'),
+(68, 'Christine Khlaryss', 'Angeles', 'christinekhlaryss@gmail.com', 'christinekhlaryss@gmail.com', '351-635-569-000', 'Tax Accountant', 'active', '2025-04-29 14:02:24', 'christine.angeles', 'bnl8k', 'Denning', NULL, NULL, 4, 'employee'),
+(69, 'Trisha Mae Adriano', 'McGregor', 'trisha_mcgregor@yahoo.com', 'trisha_mcgregor@yahoo.com', '486-881-956-00000', 'Renovation Draftsman', 'active', '2025-04-29 14:02:24', 'trisha.mcgregor', 'biv1r', 'Ridge Renovation', NULL, NULL, 4, 'employee'),
+(70, 'John Michael Comprado', 'Briones', 'jamenabriones14@gmail.com', 'jamenabriones14@gmail.com', '620-743-947-000', 'Commercial Estimator', 'active', '2025-04-29 14:02:24', 'jm.briones', 'w1g89', 'TRSWA', NULL, NULL, 4, 'employee'),
+(71, 'Precious Zahra Cortez', 'Cabusao', 'zahracortez95@gmail.com', 'zahracortez95@gmail.com', '326-526-766-000', 'Hydraulics Estimator', 'active', '2025-04-29 14:02:24', 'zahra.cabusao', 'dwzgl', 'Leeway Group', NULL, NULL, 4, 'employee'),
+(72, 'Milbert ', 'Sambile', 'milbert@millersroofing.com.au', 'milbert.sambile@gmail.com', '', 'Estimator', 'active', '2025-06-03 01:08:23', 'Milbert.Sambile', 'Milbert', 'Miller\'s Roofing', NULL, NULL, 4, 'employee'),
+(1002, 'Neil Anthony', 'Costelloe', 'Neil.Costelloe@resourcestaff.com.ph', 'neilcosetelloe@gmail.com', NULL, 'General Manager', 'active', '2024-05-19 16:00:00', 'neil.costelloe', 'ypv9h', 'RSS', NULL, NULL, 4, 'employee'),
+(1003, 'Cristina Miranda', 'Pangan', 'Tina.Pangan@resourcestaff.com.ph', 'thine2miranda@gmail.com', '0915 056 1780', 'Executive Assistant to the General Manager', 'active', '2024-03-31 16:00:00', 'cristina.pangan', '85ivt', 'RSS', NULL, NULL, 4, 'employee'),
+(1004, 'Rica Joy Viray', 'Tolomia', 'Rica.Tolomia@resourcestaff.com.ph', 'Rica.Tolomia@resourcestaff.com.ph', '0917 389 7962', 'TA/HR Specialist', 'active', '2024-08-11 16:00:00', 'rj.tolomia', 'gojwd', 'RSS', NULL, NULL, 4, 'employee'),
+(1005, 'Johsua Torninos', 'Dimla', 'johsua.dimla1986@gmail.com', 'johsua.dimla1986@gmail.com', '0933 430 3081', 'Facilities and Admin Support', 'active', '2024-09-29 16:00:00', 'johsua.dimla', 'r9em0', 'RSS', NULL, NULL, 4, 'employee'),
+(1006, 'Cedrick', 'Arnigo', 'IT@resourcestaff.com.ph', 'cedrickarnigo1723@gmail.com', '09938642974', 'IT Support Specialist', 'active', '2025-05-27 23:09:46', 'Cedrick.Arnigo', 'Gr33n$$wRf', 'RSS', NULL, 'profile_1006_1751960992.png', 4, 'internal'),
+(1007, 'Peach', 'Herrera', 'herrerafelicci@gmail.com', 'herrerafelicci@gmail.com', '0903323232', 'Admin', 'active', '2025-06-02 06:19:09', 'Peach.Herrera', 'Gh0920', 'RSS', NULL, 'profile_1007.jpg', 4, 'employee'),
+(1009, 'Resty James', 'Nazareno', 'rjmanago@gmail.com', 'rjmanago@gmail.com', '09763659773', 'IT Intern', 'active', '2025-06-10 02:48:29', 'Kiras001', 'vosfows12', 'RSS', NULL, 'profile_1009_1752025010.png', 4, 'internal'),
+(1013, 'John ', 'Mungcal', 'John.Mungcal@gmail.com', NULL, '123123123', 'IT Intern', 'active', '2025-07-14 03:34:27', 'John.Mungcal', '123456', NULL, NULL, NULL, 4, 'internal'),
+(1014, 'SON ', 'GOKU', 'son.goku@gmail.com', NULL, '123123123', 'IT Intern', 'active', '2025-07-18 04:26:40', 'son.goku', '$2y$10$TRebBG0TgyghCEdQ.4BjC.dU3worTEHQ9vC3c.2mu91HWThqoiUiK', NULL, NULL, NULL, 4, 'employee'),
+(1015, 'SON ', 'GOKU', 'son.goku@gmail.com', NULL, '123123123', 'IT Intern', 'active', '2025-07-18 04:31:53', 'son.goku', '$2y$10$z6fWn1CU3HqXC5qEME2W7Ogr0SLHhwYOhy5vjuibSONgwQjtBW0wa', NULL, NULL, NULL, 4, 'employee'),
+(1016, 'SON ', 'GOKUsss', 'son.goku@gmail.com', NULL, '123123123', 'IT Intern', 'active', '2025-07-18 04:32:02', 'son.goku', '$2y$10$GPGPakmemXqAyzgqXE.j5emenpcnfJtQ62/9tMzUUuqtNLIyj.8Ui', NULL, NULL, NULL, 4, 'employee'),
+(1017, 'te', 'GOKU', 'rjmanago2@gmail.com', NULL, '09763659711', 'BOSS', 'active', '2025-07-18 05:24:16', 'kiras002', '$2y$10$iZeaam5H4XSaAkz.pQaWU.QtQdeYqoE642/eOao2Cd6EurlGEsmci', NULL, NULL, NULL, 4, 'employee'),
+(1018, 'te3', 'GOKU', 'rjmanago2@gmail.com', NULL, '09763659711', 'BOSS', 'active', '2025-07-18 05:25:35', 'kiras002', '$2y$10$bABxeiO1L9gid2pYzQh84eOjRjnnQgw/7eInLn3lKHkiOAgmjQjQC', NULL, NULL, NULL, 4, 'employee'),
+(1019, 'te4', 'GOKU', 'rjmanago2@gmail.com', NULL, '09763659711', 'BOSS', 'active', '2025-07-18 05:26:09', 'kiras002', '$2y$10$pROwdSeN5EYwSEpjhNtxhOOM6pVYZjqZtlq8URAzS2wPDlrlXHHem', NULL, NULL, NULL, 4, 'employee'),
+(1020, 'te8', 'GOKU', 'rjmanago2@gmail.com', NULL, '09763659711', 'BOSS', 'active', '2025-07-18 05:26:31', 'kiras002', '$2y$10$z6G4AH/RKue3J.eb.csAmuf4xUEfOJCoQajCdi0njo.xk52RBO/yW', NULL, NULL, NULL, 4, 'employee'),
+(1021, 'te8s', 'GOKU', 'rjmanago2@gmail.com', NULL, '09763659711', 'BOSS', 'active', '2025-07-18 05:45:20', 'kiras002', '$2y$10$FwTufaGoOF6XtqZwu0KNE.N0hrODC9hc58c5C/lR/6YAY3pmd1Lea', NULL, NULL, NULL, 4, 'employee'),
+(1022, 'te8sas', 'GOKU', 'rjmanago2@gmail.com', NULL, '09763659711', 'BOSS', 'active', '2025-07-18 05:47:49', 'kiras002', '$2y$10$OOYX6QEgDosiOfqDbTdET.hpngxmVx.OqmRp5jIszX50z75LufOxy', NULL, NULL, NULL, 4, 'employee'),
+(1023, 'Vincent Kevins', ' Kevins', 'rjmanagosd@gmail.com', NULL, '0976365911', 'IT Intern', 'active', '2025-07-18 05:49:10', 'Vincent.Kevins', '$2y$10$bXGFxLEtYcaS1J5wBiFMauf8fYuLB8qCdt4OW92ZH7/QfvuSMWLC2', NULL, NULL, NULL, 4, 'employee');
 
 -- --------------------------------------------------------
 
@@ -244,17 +257,22 @@ CREATE TABLE `employee_checklist` (
   `coe` varchar(255) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `pagibig` varchar(255) DEFAULT NULL
+  `pagibig` varchar(255) DEFAULT NULL,
+  `valid_id` text DEFAULT NULL,
+  `valid_id_2` text DEFAULT NULL,
+  `solo_parent_id` text DEFAULT NULL,
+  `employment_adjustment_form` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `employee_checklist`
 --
 
-INSERT INTO `employee_checklist` (`id`, `employee_id`, `letter_offer`, `employment_contract`, `medical`, `nbi_clearance`, `diploma_tor`, `psa`, `sss`, `tin`, `philhealth`, `coe`, `created_at`, `updated_at`, `pagibig`) VALUES
-(1, 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-07-14 10:25:11', '2025-07-15 10:11:52', 'pagibig_6875b8e885a6e_0266554465.jpeg'),
-(2, 1009, 'letter_offer_6875c10ce642a_JYEXpJURGks76oHVBc5cik-1200-80.jpg', NULL, 'medical_6875db736474f_Satoru_Gojo_arrives_on_the_battlefield_29.webp', NULL, NULL, NULL, NULL, 'tin_6875e0d891648_RSS-logo-colour.png', NULL, NULL, '2025-07-14 11:22:29', '2025-07-15 13:02:16', NULL),
-(3, 1013, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-07-14 11:35:32', '2025-07-14 11:35:32', NULL);
+INSERT INTO `employee_checklist` (`id`, `employee_id`, `letter_offer`, `employment_contract`, `medical`, `nbi_clearance`, `diploma_tor`, `psa`, `sss`, `tin`, `philhealth`, `coe`, `created_at`, `updated_at`, `pagibig`, `valid_id`, `valid_id_2`, `solo_parent_id`, `employment_adjustment_form`) VALUES
+(1, 1, NULL, NULL, NULL, NULL, NULL, 'psa_687ddae327992_adssad.png', NULL, NULL, 'philhealth_687ddbe995bf6_adssad.png', 'coe_687ddb345ee00_Screenshot 2025-06-16 153720.png', '2025-07-14 10:25:11', '2025-07-24 08:06:44', 'pagibig_6875b8e885a6e_0266554465.jpeg', NULL, 'Valid_ID_2_687ddb13a2a48_adssad.png', 'solo_parent_id_687de29d02323_Smiley.svg.png,solo_parent_id_687de29d02a99_0266554465.jpeg,solo_parent_id_687de29d02f48_6a56fe8b12977b94a646525fb5200566.jpg', 'employment_adjustment_form_6881791461140_Satoru_Gojo_arrives_on_the_battlefield_29.webp'),
+(2, 1009, 'letter_offer_6875c10ce642a_JYEXpJURGks76oHVBc5cik-1200-80.jpg', NULL, 'medical_6875db736474f_Satoru_Gojo_arrives_on_the_battlefield_29.webp', NULL, NULL, NULL, NULL, 'tin_6875e0d891648_RSS-logo-colour.png', NULL, NULL, '2025-07-14 11:22:29', '2025-07-15 13:02:16', NULL, NULL, NULL, NULL, NULL),
+(3, 1013, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-07-14 11:35:32', '2025-07-14 11:35:32', NULL, NULL, NULL, NULL, NULL),
+(4, 1006, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-07-18 15:14:51', '2025-07-18 15:14:51', NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -307,15 +325,15 @@ CREATE TABLE `leave_credits` (
 --
 
 INSERT INTO `leave_credits` (`id`, `employee_id`, `leave_type`, `balance`, `carry_over`, `carried_over`, `monthly_increment`, `year`, `updated_at`) VALUES
-(1, 1, 'sick', 7.56, NULL, NULL, 0.42, 2025, '2025-07-17 15:05:52'),
-(2, 1, 'vacation', 15.00, 1.25, NULL, 1.25, 2025, '2025-07-17 15:05:52'),
-(3, 1, 'paternity', NULL, NULL, NULL, NULL, 2025, NULL),
-(4, 1, 'maternity', NULL, NULL, NULL, NULL, 2025, NULL),
-(5, 1, 'solo_parent', NULL, NULL, NULL, NULL, 2025, NULL),
-(6, 1, 'halfday', NULL, NULL, NULL, NULL, 2025, NULL),
-(7, 1, 'halfday_sick', NULL, NULL, NULL, NULL, 2025, NULL),
-(8, 1, 'lwop', NULL, NULL, NULL, NULL, 2025, NULL),
-(9, 1, 'bereavement', NULL, NULL, NULL, NULL, 2025, NULL),
+(1, 1, 'sick', 7.56, NULL, NULL, 0.42, 2025, '2025-07-21 14:04:25'),
+(2, 1, 'vacation', 15.00, 1.25, NULL, 1.25, 2025, '2025-07-21 14:04:25'),
+(3, 1, 'paternity', NULL, NULL, NULL, 0.00, 2025, '2025-07-21 14:04:25'),
+(4, 1, 'maternity', NULL, NULL, NULL, 0.00, 2025, '2025-07-21 14:04:25'),
+(5, 1, 'solo_parent', NULL, NULL, NULL, 0.00, 2025, '2025-07-21 14:04:25'),
+(6, 1, 'halfday', 0.00, NULL, NULL, 0.00, 2025, '2025-07-21 14:04:25'),
+(7, 1, 'halfday_sick', 3.00, NULL, NULL, 0.00, 2025, '2025-07-21 14:04:25'),
+(8, 1, 'lwop', NULL, NULL, NULL, 0.00, 2025, '2025-07-21 14:04:25'),
+(9, 1, 'bereavement', NULL, NULL, NULL, 0.00, 2025, '2025-07-21 14:04:25'),
 (10, 2, 'sick', 7.56, NULL, NULL, 0.42, 2025, '2025-07-17 15:05:52'),
 (11, 2, 'vacation', 15.00, 1.25, NULL, 1.25, 2025, '2025-07-17 15:05:52'),
 (12, 2, 'paternity', NULL, NULL, NULL, NULL, 2025, NULL),
@@ -901,7 +919,7 @@ INSERT INTO `leave_credits` (`id`, `employee_id`, `leave_type`, `balance`, `carr
 (592, 1007, 'halfday_sick', NULL, NULL, NULL, NULL, 2025, NULL),
 (593, 1007, 'lwop', NULL, NULL, NULL, NULL, 2025, NULL),
 (594, 1007, 'bereavement', NULL, NULL, NULL, NULL, 2025, NULL),
-(595, 1009, 'sick', 11.14, NULL, NULL, 0.42, 2025, '2025-07-17 15:21:12'),
+(595, 1009, 'sick', 10.14, NULL, NULL, 0.42, 2025, '2025-07-17 15:21:12'),
 (596, 1009, 'vacation', 5.25, 5, NULL, 1.25, 2025, '2025-07-17 15:21:12'),
 (597, 1009, 'paternity', 0.00, NULL, NULL, 0.00, 2025, '2025-07-17 15:21:12'),
 (598, 1009, 'maternity', 0.00, NULL, NULL, 0.00, 2025, '2025-07-17 15:21:12'),
@@ -909,7 +927,7 @@ INSERT INTO `leave_credits` (`id`, `employee_id`, `leave_type`, `balance`, `carr
 (600, 1009, 'halfday', 4.00, NULL, NULL, 0.00, 2025, '2025-07-17 15:21:12'),
 (601, 1009, 'halfday_sick', 1.00, NULL, NULL, 0.00, 2025, '2025-07-17 15:21:12'),
 (602, 1009, 'lwop', 3.00, NULL, NULL, 0.00, 2025, '2025-07-17 15:21:12'),
-(603, 1009, 'bereavement', 2.00, NULL, NULL, 0.00, 2025, '2025-07-17 15:21:12'),
+(603, 1009, 'bereavement', 1.00, NULL, NULL, 0.00, 2025, '2025-07-17 15:21:12'),
 (604, 1013, 'sick', 7.56, NULL, NULL, 0.42, 2025, '2025-07-17 15:05:52'),
 (605, 1013, 'vacation', 15.00, 1.25, NULL, 1.25, 2025, '2025-07-17 15:05:52'),
 (606, 1013, 'paternity', NULL, NULL, NULL, NULL, 2025, NULL),
@@ -956,7 +974,10 @@ INSERT INTO `leave_requests` (`id`, `employee_id`, `leave_type`, `start_date`, `
 (113, 1009, 'halfday', '2025-07-08', '2025-07-08', 'test', 'approved', '2025-07-08 05:40:54', '', NULL, 1, NULL),
 (114, 1009, 'halfday', '2025-07-11', '2025-07-26', 'sdasds', 'pending', '2025-07-08 05:42:13', '', NULL, 0, NULL),
 (115, 1006, 'halfday', '2025-07-09', '2025-07-09', 'test', 'pending', '2025-07-09 01:49:06', '', NULL, 0, NULL),
-(116, 1006, 'lwop', '2025-07-09', '2025-07-09', 'asdaasda', 'pending', '2025-07-09 01:50:17', '', NULL, 0, NULL);
+(116, 1006, 'lwop', '2025-07-09', '2025-07-09', 'asdaasda', 'pending', '2025-07-09 01:50:17', '', NULL, 0, NULL),
+(117, 1009, 'sick', '2025-07-21', '2025-07-21', 'test', 'approved', '2025-07-21 00:27:55', '', 'lr_687d898bb23b3.jpg', 1, NULL),
+(118, 1009, 'sick', '2025-07-21', '2025-07-26', 'tet', 'pending', '2025-07-21 00:38:00', '', 'lr_687d8be807aca.jpg', 0, NULL),
+(119, 1009, 'bereavement', '2025-07-26', '2025-07-26', 'test', 'approved', '2025-07-21 00:46:23', '', 'lr_687d8ddf83b80.jpg', 1, NULL);
 
 -- --------------------------------------------------------
 
@@ -1018,7 +1039,7 @@ INSERT INTO `reactions` (`id`, `announcement_id`, `employee_id`, `emoji`, `react
 (53, 23, 1009, '👍', '2025-07-16 00:03:31'),
 (55, 31, 1009, '❤️', '2025-07-16 01:59:02'),
 (57, 32, 1009, '❤️', '2025-07-17 00:14:46'),
-(58, 33, 1009, '❤️', '2025-07-17 02:10:05');
+(59, 33, 1009, '👍', '2025-07-21 00:09:03');
 
 -- --------------------------------------------------------
 
@@ -1078,7 +1099,15 @@ INSERT INTO `schedule_change_requests` (`id`, `employee_id`, `requested_schedule
 (84, 1009, NULL, 'test', NULL, 'Approved', '2025-07-08 05:47:43', '2025-07-26', '2025-08-09', NULL, NULL, 7, NULL, 1, NULL),
 (85, 1006, NULL, '9 -6 ced', NULL, 'Approved', '2025-07-09 23:58:22', '2025-07-10', '2025-07-10', NULL, NULL, 6, NULL, 1, NULL),
 (86, 1009, NULL, 'heyy', NULL, 'Approved', '2025-07-10 00:03:46', '2025-07-10', '2025-07-12', NULL, NULL, 8, NULL, 1, NULL),
-(87, 1009, NULL, 'test', NULL, 'Pending', '2025-07-17 07:50:47', '2025-07-19', '2025-07-19', NULL, NULL, 4, NULL, 0, NULL);
+(87, 1009, NULL, 'test', NULL, 'Pending', '2025-07-17 07:50:47', '2025-07-19', '2025-07-19', NULL, NULL, 4, NULL, 0, NULL),
+(88, 1009, NULL, 'test', NULL, 'Pending', '2025-07-17 08:00:02', '2025-07-17', '2025-07-17', NULL, NULL, 6, NULL, 0, NULL),
+(89, 1009, NULL, 'test', NULL, 'Pending', '2025-07-17 08:05:50', '2025-07-17', '2025-07-17', NULL, NULL, 6, NULL, 0, NULL),
+(90, 1009, NULL, 'test', NULL, 'Pending', '2025-07-17 08:06:37', '2025-07-17', '2025-07-17', NULL, NULL, 8, NULL, 0, NULL),
+(91, 1009, NULL, 'test', NULL, 'Pending', '2025-07-17 08:08:09', '2025-07-17', '2025-07-17', NULL, NULL, 6, 'scr_6878af69c8c0d.jpg', 0, NULL),
+(92, 1009, NULL, 'TEST', NULL, 'Approved', '2025-07-17 08:23:37', '2025-07-17', '2025-07-17', NULL, NULL, 10, 'scr_6878b309af45d.jpg', 1, NULL),
+(93, 1009, NULL, 'test', NULL, 'Approved', '2025-07-18 06:23:05', '2025-07-18', '2025-07-18', NULL, NULL, 10, 'scr_6879e8495a727.jpg', 1, NULL),
+(94, 1, NULL, 'test', NULL, 'Approved', '2025-07-18 07:18:08', '2025-07-18', '2025-07-18', NULL, NULL, 10, 'scr_6879f5305cdd9.png', 1, NULL),
+(95, 1, NULL, 'test', NULL, 'Approved', '2025-07-18 07:19:18', '2025-07-17', '2025-07-18', NULL, NULL, 7, 'scr_6879f576dfb66.jpg', 1, NULL);
 
 -- --------------------------------------------------------
 
@@ -1187,7 +1216,9 @@ INSERT INTO `time_adjustment_requests` (`id`, `employee_id`, `log_date`, `curren
 (24, 1009, '2025-07-11', '07:59:44', NULL, '08:57:00', '20:57:00', 'test dr', 'Pending', '2025-07-11 09:06:05', 'attach_6870637d870a64.62269674.jpg', '2025-07-11 09:06:05', 0),
 (25, 1009, '2025-07-11', '07:59:44', NULL, '07:06:00', '19:06:00', 'testtt -DRRRR', 'Pending', '2025-07-11 09:06:39', 'attach_6870639f70fd02.94601544.jpg', '2025-07-11 09:06:39', 0),
 (37, 1009, '2025-07-01', NULL, NULL, '08:44:00', '19:44:00', 'test', 'Approved', '2025-07-17 07:47:31', 'attach_68783a137bc335.55997696.docx', '2025-07-17 07:47:31', 1),
-(38, 1009, '2025-07-02', NULL, NULL, '08:50:00', '21:50:00', 'test', 'Approved', '2025-07-17 07:51:01', 'attach_68783ae5e47c01.23673604.docx', '2025-07-17 07:51:01', 1);
+(38, 1009, '2025-07-02', NULL, NULL, '08:50:00', '21:50:00', 'test', 'Approved', '2025-07-17 07:51:01', 'attach_68783ae5e47c01.23673604.docx', '2025-07-17 07:51:01', 1),
+(39, 1009, '2025-07-18', '12:22:42', NULL, '07:00:00', '19:00:00', 'test', 'Pending', '2025-07-18 14:00:59', 'attach_6879e31b76df69.26954096.jpg', '2025-07-18 14:00:59', 0),
+(40, 1009, '2025-07-18', '12:22:42', NULL, '07:07:00', '16:08:00', 'test', 'Pending', '2025-07-18 14:08:29', 'attach_6879e4dd315323.94196177.docx', '2025-07-18 14:08:29', 0);
 
 -- --------------------------------------------------------
 
@@ -1254,7 +1285,8 @@ INSERT INTO `time_logs` (`id`, `employee_id`, `log_date`, `time_in`, `time_out`,
 (71, 1009, '2025-07-16', '10:18:35', '12:43:35', 0, 0),
 (72, 1009, '2025-07-01', NULL, NULL, 0, 0),
 (73, 1009, '2025-07-02', NULL, NULL, 0, 0),
-(74, 1009, '2025-07-17', '08:06:42', NULL, 0, 0);
+(74, 1009, '2025-07-17', '08:06:42', NULL, 0, 0),
+(75, 1009, '2025-07-18', '12:22:42', NULL, 0, 0);
 
 -- --------------------------------------------------------
 
@@ -1295,7 +1327,9 @@ INSERT INTO `work_schedules` (`id`, `name`, `time_in`, `time_out`, `employee_id`
 (5, NULL, '08:00:00', '17:00:00', NULL, NULL),
 (6, NULL, '09:00:00', '18:00:00', NULL, NULL),
 (7, NULL, '10:00:00', '19:00:00', NULL, NULL),
-(8, NULL, '06:00:00', '15:00:00', NULL, NULL);
+(8, NULL, '06:00:00', '15:00:00', NULL, NULL),
+(9, NULL, '07:30:00', '16:30:00', NULL, NULL),
+(10, NULL, '08:30:00', '17:30:00', NULL, NULL);
 
 --
 -- Indexes for dumped tables
@@ -1467,7 +1501,7 @@ ALTER TABLE `admin`
 -- AUTO_INCREMENT for table `announcements`
 --
 ALTER TABLE `announcements`
-  MODIFY `announcement_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
+  MODIFY `announcement_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
 
 --
 -- AUTO_INCREMENT for table `approved_overtime_schedule`
@@ -1485,13 +1519,13 @@ ALTER TABLE `comments`
 -- AUTO_INCREMENT for table `employees`
 --
 ALTER TABLE `employees`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1014;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1024;
 
 --
 -- AUTO_INCREMENT for table `employee_checklist`
 --
 ALTER TABLE `employee_checklist`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `employee_schedules`
@@ -1509,13 +1543,13 @@ ALTER TABLE `employee_work_schedule`
 -- AUTO_INCREMENT for table `leave_credits`
 --
 ALTER TABLE `leave_credits`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1024;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=613;
 
 --
 -- AUTO_INCREMENT for table `leave_requests`
 --
 ALTER TABLE `leave_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=117;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=120;
 
 --
 -- AUTO_INCREMENT for table `overtime_requests`
@@ -1527,7 +1561,7 @@ ALTER TABLE `overtime_requests`
 -- AUTO_INCREMENT for table `reactions`
 --
 ALTER TABLE `reactions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=59;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=60;
 
 --
 -- AUTO_INCREMENT for table `rest_day_overtime_requests`
@@ -1539,7 +1573,7 @@ ALTER TABLE `rest_day_overtime_requests`
 -- AUTO_INCREMENT for table `schedule_change_requests`
 --
 ALTER TABLE `schedule_change_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=88;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=96;
 
 --
 -- AUTO_INCREMENT for table `schedule_exceptions`
@@ -1563,13 +1597,13 @@ ALTER TABLE `test_sql`
 -- AUTO_INCREMENT for table `time_adjustment_requests`
 --
 ALTER TABLE `time_adjustment_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT for table `time_logs`
 --
 ALTER TABLE `time_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=75;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=76;
 
 --
 -- AUTO_INCREMENT for table `vacation_leaves`
@@ -1581,7 +1615,7 @@ ALTER TABLE `vacation_leaves`
 -- AUTO_INCREMENT for table `work_schedules`
 --
 ALTER TABLE `work_schedules`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- Constraints for dumped tables

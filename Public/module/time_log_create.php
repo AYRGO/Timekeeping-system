@@ -22,6 +22,15 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
+$employee_role = $_SESSION['employee']['role'] ?? 'employee';
+
+if (isset($_POST['switch_to_admin']) && $employee_role === 'internal') {
+    $_SESSION['view_mode'] = 'admin';
+    header("Location: ../views/admin_homepage.php");
+    exit;
+}
+
+
 try {
     // Fetch employee details
     $stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company, profile_picture 
@@ -552,17 +561,35 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
                 <i class="fas fa-chevron-down"></i>
             </button>
             <!-- Dropdown Menu -->
-            <div id="userDropdown" class="absolute right-0 top-12 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden">
-                <button onclick="showSection('profileView'); closeUserDropdown();" class="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-yellow-50">
-                    <i class="fas fa-user mr-2 text-yellow-500"></i> Profile
-                </button>
-                <form method="POST" class="w-full">
-                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                    <button type="submit" name="logout" class="flex items-center w-full px-4 py-2 text-red-600 hover:bg-red-50">
-                        <i class="fas fa-sign-out-alt mr-2"></i> Logout
-                    </button>
-                </form>
-            </div>
+<div id="userDropdown" class="absolute right-0 top-12 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden">
+  
+  <!-- Profile Button -->
+  <button onclick="showSection('profileView'); closeUserDropdown();" 
+          class="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-yellow-50">
+    <i class="fas fa-user mr-2 text-yellow-500"></i> Profile
+  </button>
+
+  <!-- Logout Form -->
+  <form method="POST" class="w-full">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+    <button type="submit" name="logout" 
+            class="flex items-center w-full px-4 py-2 text-red-600 hover:bg-red-50">
+      <i class="fas fa-sign-out-alt mr-2"></i> Logout
+    </button>
+  </form>
+
+  <!-- Switch to Admin Form (Conditional) -->
+  <?php if (isset($employee_role) && $employee_role === 'internal'): ?>
+    <form method="POST" class="w-full">
+      <button type="submit" name="switch_to_admin" 
+              class="flex items-center w-full px-4 py-2 text-blue-600 hover:bg-blue-50">
+        <i class="fas fa-sync-alt mr-2"></i> Switch to Admin
+      </button>
+    </form>
+  <?php endif; ?>
+  
+</div>
+
         </div>
     </div>
 </header>
@@ -844,32 +871,36 @@ $announcementCount = $stmt->fetchColumn();
     </ul>
   </div>
 
-  <!-- Employment Adjustment -->
-  <div class="mt-6">
-    <h5 class="text-lg font-semibold text-gray-700 mb-2">Employment Adjustment Form</h5>
-    <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-      <li>Adjustment Files:
-        <?php if (!empty($checklist['employment_adjustment'])): ?>
-          <?php
-            $files = is_array($checklist['employment_adjustment']) ? $checklist['employment_adjustment'] : explode(',', $checklist['employment_adjustment']);
-            foreach ($files as $file):
-              $file = trim($file);
-              if ($file):
-          ?>
-            <a href="../uploads/adjustments/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 underline mr-2">View</a>
-          <?php
-              endif;
-            endforeach;
-          ?>
-        <?php else: ?>
-          <span class="text-red-600 font-medium">Not Uploaded</span>
-        <?php endif; ?>
-      </li>
-    </ul>
-  </div>
+<!-- Employment Adjustment -->
+<div class="mt-6">
+  <h5 class="text-lg font-semibold text-gray-700 mb-2">Employment Adjustment Form</h5>
+  <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
+    <li>Adjustment Files:
+      <?php if (!empty($checklist['employment_adjustment_form'])): ?>
+        <?php
+          $files = is_array($checklist['employment_adjustment_form']) 
+            ? $checklist['employment_adjustment_form'] 
+            : explode(',', $checklist['employment_adjustment_form']);
+          foreach ($files as $file):
+            $file = trim($file);
+            if ($file):
+        ?>
+          <a href="../uploads/checklist/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 underline mr-2">View</a>
+        <?php
+            endif;
+          endforeach;
+        ?>
+      <?php else: ?>
+        <span class="text-red-600 font-medium">Not Uploaded</span>
+      <?php endif; ?>
+    </li>
+  </ul>
 </div>
 
-
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Edit Profile Modal -->
 <div id="edit-profile-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">

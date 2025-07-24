@@ -33,6 +33,7 @@ $documents = [
   'valid_id' => 'Valid ID ',
   'Valid_id_2' => 'Valid ID 2 ',
   'solo_parent_id' => 'Solo Parent ID',
+  'employment_adjustment_form' => 'Employment Adjustment Form',
 ];
 
 // Delete attachment
