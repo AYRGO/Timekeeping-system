@@ -28,7 +28,7 @@ $schedule_times = [
     6 => ['in' => '09:00 AM', 'out' => '06:00 PM'],
     7 => ['in' => '10:00 AM', 'out' => '07:00 PM'],
     8 => ['in' => '06:00 AM', 'out' => '03:00 PM'],
-    9 => ['in' => ' AM', 'out' => '08:00 PM'],
+    9 => ['in' => '11:00 AM', 'out' => '08:00 PM'], // Fixed missing time
 ];
 
 // Fetch all logs for July 1, 2025 onwards
@@ -68,34 +68,106 @@ foreach ($logs as $log) {
     $logMap[$log['log_date']] = $log;
 }
 
-// Build date range
+// Build complete date range (all dates from July 1 to today)
 $start = new DateTime('2025-07-01');
 $end = new DateTime();
 $interval = new DateInterval('P1D');
-$dateRange = new DatePeriod($start, $interval, $end); // include today
+$dateRange = new DatePeriod($start, $interval, $end);
+
+// Convert to array and reverse (most recent first)
+$allDates = array_reverse(iterator_to_array($dateRange));
+
+// Search functionality
+$searchDate = $_GET['search'] ?? '';
+$filteredDates = $allDates;
+
+if (!empty($searchDate)) {
+    $filteredDates = array_filter($allDates, function($dateObj) use ($searchDate) {
+        $logDate = $dateObj->format('Y-m-d');
+        $formattedDate = $dateObj->format('d M Y');
+        $dayName = $dateObj->format('l');
+        
+        // Search in date, formatted date, or day name
+        return (
+            stripos($logDate, $searchDate) !== false ||
+            stripos($formattedDate, $searchDate) !== false ||
+            stripos($dayName, $searchDate) !== false
+        );
+    });
+}
+
+// Pagination setup
+$itemsPerPage = 5;
+$currentPage = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$totalItems = count($filteredDates);
+$totalPages = max(1, ceil($totalItems / $itemsPerPage));
+$offset = ($currentPage - 1) * $itemsPerPage;
+
+// Get current page items
+$currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 ?>
 
 <div class="bg-white rounded-lg shadow p-6 mt-6">
-    <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-semibold text-gray-800">My Attendance History </h3>
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <h3 class="text-lg font-semibold text-gray-800">My Attendance History</h3>
+        
+        <!-- Search Box -->
+        <div class="flex items-center gap-2">
+            <div class="relative">
+                <input 
+                    type="text" 
+                    id="searchInput"
+                    placeholder="Search by date, day..." 
+                    value="<?= htmlspecialchars($searchDate) ?>"
+                    class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+            </div>
+            <?php if (!empty($searchDate)): ?>
+                <a href="?" class="text-red-500 hover:text-red-700" title="Clear search">
+                    <i class="fas fa-times"></i>
+                </a>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Results Info -->
+    <div class="mb-4 text-sm text-gray-600">
+        <?php if (!empty($searchDate)): ?>
+            Showing <?= count($filteredDates) ?> result(s) for "<?= htmlspecialchars($searchDate) ?>"
+        <?php else: ?>
+            Showing <?= count($currentPageDates) ?> of <?= $totalItems ?> records
+        <?php endif; ?>
     </div>
 
     <div class="overflow-x-auto">
-        <div style="max-height: 260px; overflow-y: auto;">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50 sticky top-0 z-10">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time In</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours Worked</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overtime</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <?php if (empty($currentPageDates)): ?>
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time In</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours Worked</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overtime</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                            <?php if (!empty($searchDate)): ?>
+                                No attendance records found for "<?= htmlspecialchars($searchDate) ?>"
+                            <?php else: ?>
+                                No attendance records found
+                            <?php endif; ?>
+                        </td>
                     </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <?php foreach (array_reverse(iterator_to_array($dateRange)) as $dateObj): ?>
+                <?php else: ?>
+                    <?php foreach ($currentPageDates as $dateObj): ?>
                         <?php
                             $logDate = $dateObj->format('Y-m-d');
                             $dayName = $dateObj->format('l');
@@ -114,14 +186,12 @@ $dateRange = new DatePeriod($start, $interval, $end); // include today
                             }
 
                             if (isset($schedule_times[$schedule_id_to_use])) {
-    $schedule_in = $schedule_times[$schedule_id_to_use]['in'];
-    $schedule_out = $schedule_times[$schedule_id_to_use]['out'];
-} else {
-    // fallback or warning-friendly default
-    $schedule_in = '07:00 AM';
-    $schedule_out = '04:00 PM';
-}
-
+                                $schedule_in = $schedule_times[$schedule_id_to_use]['in'];
+                                $schedule_out = $schedule_times[$schedule_id_to_use]['out'];
+                            } else {
+                                $schedule_in = '07:00 AM';
+                                $schedule_out = '04:00 PM';
+                            }
 
                             // Handle times
                             $isApproved = isset($log) && strtolower($log['request_status'] ?? '') === 'approved';
@@ -174,7 +244,7 @@ $dateRange = new DatePeriod($start, $interval, $end); // include today
                                 $overtimeDisplay = 'Pending';
                             }
                         ?>
-                        <tr>
+                        <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= $formattedDate ?></td>
                             <td class="px-6 py-4 text-sm text-gray-500"><?= $dayName ?></td>
                             <td class="px-6 py-4 text-sm text-gray-500"><?= $timeInDisplay ?></td>
@@ -188,8 +258,119 @@ $dateRange = new DatePeriod($start, $interval, $end); // include today
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
+
+    <!-- Pagination -->
+    <?php if ($totalPages > 1 && empty($searchDate)): ?>
+        <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+            <div class="text-sm text-gray-700">
+                Showing <?= $offset + 1 ?> to <?= min($offset + $itemsPerPage, $totalItems) ?> of <?= $totalItems ?> results
+            </div>
+            
+            <nav class="flex items-center space-x-1">
+                <!-- Previous Button -->
+                <?php if ($currentPage > 1): ?>
+                    <a href="?page=<?= $currentPage - 1 ?>" 
+                       class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                <?php else: ?>
+                    <span class="px-3 py-2 text-sm font-medium text-gray-300 bg-gray-100 border border-gray-300 rounded-md cursor-not-allowed">
+                        <i class="fas fa-chevron-left"></i>
+                    </span>
+                <?php endif; ?>
+
+                <!-- Page Numbers -->
+                <?php
+                $startPage = max(1, $currentPage - 2);
+                $endPage = min($totalPages, $currentPage + 2);
+                
+                if ($startPage > 1): ?>
+                    <a href="?page=1" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700">1</a>
+                    <?php if ($startPage > 2): ?>
+                        <span class="px-3 py-2 text-sm font-medium text-gray-500">...</span>
+                    <?php endif; ?>
+                <?php endif; ?>
+
+                <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+                    <?php if ($i == $currentPage): ?>
+                        <span class="px-3 py-2 text-sm font-medium text-white bg-green-600 border border-green-600 rounded-md">
+                            <?= $i ?>
+                        </span>
+                    <?php else: ?>
+                        <a href="?page=<?= $i ?>" 
+                           class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700">
+                            <?= $i ?>
+                        </a>
+                    <?php endif; ?>
+                <?php endfor; ?>
+
+                <?php if ($endPage < $totalPages): ?>
+                    <?php if ($endPage < $totalPages - 1): ?>
+                        <span class="px-3 py-2 text-sm font-medium text-gray-500">...</span>
+                    <?php endif; ?>
+                    <a href="?page=<?= $totalPages ?>" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700"><?= $totalPages ?></a>
+                <?php endif; ?>
+
+                <!-- Next Button -->
+                <?php if ($currentPage < $totalPages): ?>
+                    <a href="?page=<?= $currentPage + 1 ?>" 
+                       class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                <?php else: ?>
+                    <span class="px-3 py-2 text-sm font-medium text-gray-300 bg-gray-100 border border-gray-300 rounded-md cursor-not-allowed">
+                        <i class="fas fa-chevron-right"></i>
+                    </span>
+                <?php endif; ?>
+            </nav>
+        </div>
+    <?php endif; ?>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    let searchTimeout;
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            const searchValue = this.value.trim();
+            const url = new URL(window.location);
+            
+            if (searchValue) {
+                url.searchParams.set('search', searchValue);
+                url.searchParams.delete('page'); // Reset to first page when searching
+            } else {
+                url.searchParams.delete('search');
+                url.searchParams.delete('page');
+            }
+            
+            window.location.href = url.toString();
+        }, 500); // 500ms delay for better UX
+    });
+
+    // Handle Enter key
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            clearTimeout(searchTimeout);
+            const searchValue = this.value.trim();
+            const url = new URL(window.location);
+            
+            if (searchValue) {
+                url.searchParams.set('search', searchValue);
+                url.searchParams.delete('page');
+            } else {
+                url.searchParams.delete('search');
+                url.searchParams.delete('page');
+            }
+            
+            window.location.href = url.toString();
+        }
+    });
+});
+</script>
