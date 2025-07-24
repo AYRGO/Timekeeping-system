@@ -9,6 +9,12 @@ session_start();
 
 include('../config/db.php');
 
+// Check if user is already logged in - redirect them away from login page
+if (isset($_SESSION['employee']['id'])) {
+    header("Location: ../module/time_log_create.php");
+    exit;
+}
+
 // CSRF token generation
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
