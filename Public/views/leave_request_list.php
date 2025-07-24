@@ -3,6 +3,8 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
+$pageTitle = 'Leave Requests';
+
 $sql = "
     SELECT lr.id, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.attachment_lr,
            e.fname, e.lname

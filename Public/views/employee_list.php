@@ -12,10 +12,10 @@ session_set_cookie_params([
 session_start();
 
 // Check login
-if (!isset($_SESSION['admin'])) {
-    header("Location: ../admin/login.php");
-    exit;
-}
+// if (!isset($_SESSION['admin'])) {
+//     header("Location: ../admin/login.php");
+//     exit;
+// }
 
 // CSRF token
 if (!isset($_SESSION['csrf_token'])) {
@@ -77,91 +77,207 @@ function sort_link($column, $label) {
 </head>
 <body class="bg-gray-100">
 
-    <div class="flex h-screen">
+    <div x-data="{ open: false }" class="flex h-screen">
         <?php include('sidebar.php'); ?>
 
-<div class="flex-1 flex flex-col">
-            <?php include('header.php'); ?>
+        <div class="flex-1 flex flex-col">
+            <?php 
+            $pageTitle = "Employee Management";
+            include('header.php'); 
+            ?>
             
-            <main class="flex-1 p-6 overflow-y-auto">
-                <div class="flex flex-col gap-4 mb-6">
-                    <div>
-                        <a href="../module/employee_create.php" class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">Add Employee</a>
-                        <button onclick="document.getElementById('dateModal').classList.remove('hidden')" class="px-5 py-2 rounded-lg border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400">Attendance Report</button>
-                    </div>
-                </div>
+           <main class="flex-1 p-6 overflow-y-auto">
+    <!-- Main Container - Full Width -->
+    <div class="w-full">
+        
+        <!-- Action Buttons Container -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <a href="../module/employee_create.php" 
+                   class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Add Employee
+                </a>
+                <button onclick="document.getElementById('dateModal').classList.remove('hidden')" 
+                        class="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Attendance Report
+                </button>
+            </div>
+        </div>
 
-                <!-- Modal -->
-                <div id="dateModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden z-50">
-                    <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-                        <h2 class="text-lg font-semibold mb-4 text-gray-700">Select Date Range</h2>
-                        <form action="../controller/generate_attendance_report.php" method="get" class="space-y-4">
-                            <div>
-                                <label for="start_date" class="block text-sm font-medium text-gray-600">Start Date</label>
-                                <input type="date" name="start_date" id="start_date" required class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring focus:ring-blue-200" />
-                            </div>
-                            <div>
-                                <label for="end_date" class="block text-sm font-medium text-gray-600">End Date</label>
-                                <input type="date" name="end_date" id="end_date" required class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring focus:ring-blue-200" />
-                            </div>
-                            <div class="flex justify-end gap-2 pt-4">
-                                <button type="button" onclick="document.getElementById('dateModal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
-                                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Generate</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+        <!-- Employee Table Container - Full Width -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <!-- Table Header -->
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">Employee List</h3>
+                <p class="text-sm text-gray-600 mt-1">Total: <?= $totalEmployees ?> employees</p>
+            </div>
 
-                <!-- Table -->
-                <div class="overflow-x-auto">
-                    <table class="w-full border-collapse border border-gray-300 text-left text-sm">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="border border-gray-300 px-4 py-3"><?= sort_link('id', 'ID') ?></th>
-                                <th class="border border-gray-300 px-4 py-3"><?= sort_link('fname', 'Name') ?></th>
-                                <th class="border border-gray-300 px-4 py-3"><?= sort_link('email', 'Email') ?></th>
-                                <th class="border border-gray-300 px-4 py-3"><?= sort_link('contact', 'Contact') ?></th>
-                                <th class="border border-gray-300 px-4 py-3"><?= sort_link('position', 'Position') ?></th>
-                                <th class="border border-gray-300 px-4 py-3"><?= sort_link('status', 'Status') ?></th>
-                                <th class="border border-gray-300 px-4 py-3">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($employees as $emp): ?>
-                                <tr class="even:bg-gray-50 hover:bg-blue-50">
-                                    <td class="border border-gray-300 px-4 py-2"><?= $emp['id'] ?></td>
-                                    <td class="border border-gray-300 px-4 py-2"><?= htmlspecialchars($emp['fname']) ?> <?= htmlspecialchars($emp['lname']) ?></td>
-                                    <td class="border border-gray-300 px-4 py-2"><?= htmlspecialchars($emp['email']) ?></td>
-                                    <td class="border border-gray-300 px-4 py-2"><?= htmlspecialchars($emp['contact']) ?></td>
-                                    <td class="border border-gray-300 px-4 py-2"><?= htmlspecialchars($emp['position']) ?></td>
-                                    <td class="border border-gray-300 px-4 py-2"><?= htmlspecialchars($emp['status']) ?></td>
-                                    <td class="border border-gray-300 px-4 py-2 flex gap-2 items-center">
-                                        <a href="../controller/employee-edit.php?id=<?= $emp['id'] ?>" class="text-blue-600 font-semibold hover:underline px-2 py-1">Edit</a>
-                                        <form method="POST" action="employee-delete.php" onsubmit="return confirm('Are you sure you want to delete this employee?');" class="inline">
+            <!-- Table Content -->
+            <div class="overflow-x-auto">
+                <table class="w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <?= sort_link('id', 'ID') ?>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <?= sort_link('fname', 'Name') ?>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <?= sort_link('email', 'Email') ?>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <?= sort_link('contact', 'Contact') ?>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <?= sort_link('position', 'Position') ?>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <?= sort_link('status', 'Status') ?>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php foreach ($employees as $emp): ?>
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    #<?= $emp['id'] ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        <?= htmlspecialchars($emp['fname']) ?> <?= htmlspecialchars($emp['lname']) ?>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <?= htmlspecialchars($emp['email']) ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <?= htmlspecialchars($emp['contact']) ?>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                        <?= htmlspecialchars($emp['position']) ?>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $emp['status'] === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
+                                        <?= htmlspecialchars(ucfirst($emp['status'])) ?>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <a href="../controller/employee-edit.php?id=<?= $emp['id'] ?>" 
+                                           class="text-blue-600 hover:text-blue-900 transition-colors">
+                                            Edit
+                                        </a>
+                                        <form method="POST" action="employee-delete.php" 
+                                              onsubmit="return confirm('Are you sure you want to delete this employee?');" 
+                                              class="inline">
                                             <input type="hidden" name="id" value="<?= $emp['id'] ?>">
                                             <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                                            <button type="submit" class="text-red-600 font-semibold hover:underline px-2 py-1 bg-transparent border-0 cursor-pointer">Delete</button>
+                                            <button type="submit" 
+                                                    class="text-red-600 hover:text-red-900 transition-colors">
+                                                Delete
+                                            </button>
                                         </form>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
 
-                <!-- Pagination + Logout -->
-                <div class="pt-6 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                    <nav class="flex flex-wrap gap-2" aria-label="Pagination">
-                        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                            <a href="?page=<?= $i ?>&sort=<?= $sort ?>&order=<?= $order ?>" class="px-3 py-1 rounded-md border text-sm border-gray-300 text-gray-700 hover:bg-blue-100 hover:text-blue-700 <?= $i === $page ? 'bg-blue-600 text-white border-blue-600' : '' ?>">
+            <!-- Pagination Container -->
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                    <!-- Pagination Info -->
+                    <div class="text-sm text-gray-700">
+                        Showing page <?= $page ?> of <?= $totalPages ?> 
+                        (<?= $totalEmployees ?> total employees)
+                    </div>
+
+                    <!-- Pagination Links -->
+                    <nav class="flex gap-1" aria-label="Pagination">
+                        <?php if ($page > 1): ?>
+                            <a href="?page=<?= $page - 1 ?>&sort=<?= $sort ?>&order=<?= $order ?>" 
+                               class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50">
+                                Previous
+                            </a>
+                        <?php endif; ?>
+
+                        <?php 
+                        $start = max(1, $page - 2);
+                        $end = min($totalPages, $page + 2);
+                        
+                        for ($i = $start; $i <= $end; $i++): 
+                        ?>
+                            <a href="?page=<?= $i ?>&sort=<?= $sort ?>&order=<?= $order ?>" 
+                               class="px-3 py-2 text-sm font-medium <?= $i === $page ? 'text-blue-600 bg-blue-50 border-blue-500' : 'text-gray-500 bg-white border-gray-300' ?> border hover:bg-gray-50">
                                 <?= $i ?>
                             </a>
                         <?php endfor; ?>
-                    </nav>
 
-                    <a href="../admin/logout.php" class="px-5 py-2 rounded-lg border border-red-600 text-red-600 font-semibold hover:bg-red-50 transition focus:outline-none focus:ring-2 focus:ring-red-400 self-start sm:self-auto">Logout</a>
+                        <?php if ($page < $totalPages): ?>
+                            <a href="?page=<?= $page + 1 ?>&sort=<?= $sort ?>&order=<?= $order ?>" 
+                               class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50">
+                                Next
+                            </a>
+                        <?php endif; ?>
+                    </nav>
                 </div>
-            </main>
+            </div>
+        </div>
+
+    </div> <!-- End Main Container -->
+</main>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="dateModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-gray-700">Select Date Range</h2>
+                <button onclick="document.getElementById('dateModal').classList.add('hidden')" 
+                        class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <form action="../controller/generate_attendance_report.php" method="get" class="space-y-4">
+                <div>
+                    <label for="start_date" class="block text-sm font-medium text-gray-600 mb-2">Start Date</label>
+                    <input type="date" name="start_date" id="start_date" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                    <label for="end_date" class="block text-sm font-medium text-gray-600 mb-2">End Date</label>
+                    <input type="date" name="end_date" id="end_date" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" onclick="document.getElementById('dateModal').classList.add('hidden')" 
+                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Generate Report
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

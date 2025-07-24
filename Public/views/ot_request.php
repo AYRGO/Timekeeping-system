@@ -3,6 +3,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
+$pageTitle = 'Overtime Requests';
 // Fetch overtime requests with employee names and time logs
 $stmt = $pdo->query("
     SELECT 
@@ -139,9 +140,6 @@ $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </table>
                 </div>
 
-                <div class="mt-6">
-                    <a href="admin_homepage.php" class="text-blue-600 hover:underline text-sm">← Back to Dashboard</a>
-                </div>
             </main>
         </div>
     </div>

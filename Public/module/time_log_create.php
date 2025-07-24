@@ -560,34 +560,36 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
             <button onclick="toggleUserDropdown()" class="ml-2 text-gray-600 hover:text-gray-800 focus:outline-none">
                 <i class="fas fa-chevron-down"></i>
             </button>
-            <!-- Dropdown Menu -->
-<div id="userDropdown" class="absolute right-0 top-12 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden">
+<!-- Dropdown Menu -->
+<div id="userDropdown" class="absolute right-0 top-12 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden">
   
   <!-- Profile Button -->
   <button onclick="showSection('profileView'); closeUserDropdown();" 
-          class="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-yellow-50">
-    <i class="fas fa-user mr-2 text-yellow-500"></i> Profile
+          class="flex items-center w-full px-4 py-3 text-gray-700 hover:bg-yellow-50 transition duration-150 ease-in-out border-b border-gray-100">
+    <i class="fas fa-user mr-3 text-yellow-500 w-4 text-center"></i> 
+    <span>Profile</span>
   </button>
-
-  <!-- Logout Form -->
-  <form method="POST" class="w-full">
-    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-    <button type="submit" name="logout" 
-            class="flex items-center w-full px-4 py-2 text-red-600 hover:bg-red-50">
-      <i class="fas fa-sign-out-alt mr-2"></i> Logout
-    </button>
-  </form>
 
   <!-- Switch to Admin Form (Conditional) -->
   <?php if (isset($employee_role) && $employee_role === 'internal'): ?>
     <form method="POST" class="w-full">
       <button type="submit" name="switch_to_admin" 
-              class="flex items-center w-full px-4 py-2 text-blue-600 hover:bg-blue-50">
-        <i class="fas fa-sync-alt mr-2"></i> Switch to Admin
+              class="flex items-center w-full px-4 py-3 text-blue-600 hover:bg-blue-50 transition duration-150 ease-in-out border-b border-gray-100">
+        <i class="fas fa-sync-alt mr-3 text-blue-500 w-4 text-center"></i> 
+        <span>Switch to Admin</span>
       </button>
     </form>
   <?php endif; ?>
-  
+
+  <!-- Logout Form -->
+  <form method="POST" class="w-full">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+    <button type="submit" name="logout" 
+            class="flex items-center w-full px-4 py-3 text-red-600 hover:bg-red-50 transition duration-150 ease-in-out rounded-b-lg">
+      <i class="fas fa-sign-out-alt mr-3 text-red-500 w-4 text-center"></i> 
+      <span>Logout</span>
+    </button>
+  </form>
 </div>
 
         </div>
@@ -734,7 +736,6 @@ $announcementCount = $stmt->fetchColumn();
     class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
 </div>
 
-
           <!-- Submit Button -->
           <button type="submit"
             class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
@@ -748,50 +749,76 @@ $announcementCount = $stmt->fetchColumn();
 </div>
 <!-- Profile Section -->
 <div id="profileView" class="hidden min-h-screen bg-gray-50 py-10 px-4">
-  <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
+  <div class="max-w-6xl mx-auto">
 
-   <!-- Sidebar Info -->
-<div class="bg-white p-6 rounded-xl shadow flex flex-col items-center w-64 max-w-full mx-auto">
-  <!-- Avatar Container -->
-  <div class="flex flex-col items-center space-y-2">
-    <div class="relative w-36 h-36 rounded-full overflow-hidden border-4 border-green-500 flex items-center justify-center">
-      <?php if ($profile_picture): ?>
-        <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover">
-      <?php else: ?>
-        <div class="w-full h-full bg-gray-300 flex items-center justify-center text-5xl text-white">👤</div>
-      <?php endif; ?>
-      <div 
-        class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-xs text-white opacity-0 hover:opacity-100 transition cursor-pointer"
-        onclick="document.getElementById('fileInput').click()"
-      >
-        Change
+    <!-- Combined Profile Card -->
+    <div class="bg-white p-8 rounded-2xl shadow space-y-8 mb-8">
+      <!-- Header with Edit Button -->
+      <div class="flex justify-between items-center">
+        <h4 class="text-2xl font-semibold text-gray-800">My Profile</h4>
+        <button onclick="openEditModal()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Edit</button>
+      </div>
+
+      <!-- Profile Picture and Info Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8 items-start">
+        
+        <!-- Profile Picture Section -->
+        <div class="flex flex-col items-center space-y-4">
+          <div class="relative w-48 h-48 rounded-full overflow-hidden border-4 border-green-500 flex items-center justify-center">
+            <?php if ($profile_picture): ?>
+              <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover">
+            <?php else: ?>
+              <div class="w-full h-full bg-gray-300 flex items-center justify-center text-6xl text-white">👤</div>
+            <?php endif; ?>
+            <div 
+              class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-sm text-white opacity-0 hover:opacity-100 transition cursor-pointer"
+              onclick="document.getElementById('fileInput').click()"
+            >
+              Change Photo
+            </div>
+          </div>
+          <form action="upload_profile.php" method="POST" enctype="multipart/form-data">
+            <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
+          </form>
+          <div class="text-center">
+            <h3 class="text-xl font-semibold text-gray-800"><?= htmlspecialchars($fname . ' ' . $lname) ?></h3>
+            <p class="text-gray-600"><?= htmlspecialchars($position) ?></p>
+            <p class="text-sm text-gray-500"><?= htmlspecialchars($company) ?></p>
+          </div>
+        </div>
+
+        <!-- Profile Information Grid -->
+        <div class="space-y-6">
+          <h5 class="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">Personal Information</h5>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-base text-gray-700">
+            <div class="flex flex-col space-y-1">
+              <span class="text-sm font-medium text-gray-500">First Name</span>
+              <span class="text-gray-800"><?= htmlspecialchars($fname) ?></span>
+            </div>
+            <div class="flex flex-col space-y-1">
+              <span class="text-sm font-medium text-gray-500">Last Name</span>
+              <span class="text-gray-800"><?= htmlspecialchars($lname) ?></span>
+            </div>
+            <div class="flex flex-col space-y-1">
+              <span class="text-sm font-medium text-gray-500">Email Address</span>
+              <span class="text-gray-800"><?= htmlspecialchars($email) ?></span>
+            </div>
+            <div class="flex flex-col space-y-1">
+              <span class="text-sm font-medium text-gray-500">Mobile Number</span>
+              <span class="text-gray-800"><?= htmlspecialchars($contact) ?></span>
+            </div>
+            <div class="flex flex-col space-y-1">
+              <span class="text-sm font-medium text-gray-500">Position</span>
+              <span class="text-gray-800"><?= htmlspecialchars($position) ?></span>
+            </div>
+            <div class="flex flex-col space-y-1">
+              <span class="text-sm font-medium text-gray-500">Company</span>
+              <span class="text-gray-800"><?= htmlspecialchars($company) ?></span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    <form action="upload_profile.php" method="POST" enctype="multipart/form-data">
-      <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
-    </form>
-    <h3 class="mt-4 font-semibold text-lg text-center"><?= htmlspecialchars($fname . ' ' . $lname) ?></h3>
-  </div>
-</div>
-
-
-    <!-- Main Content -->
-    <div class="space-y-10">
-      <!-- My Profile Card -->
-      <div class="bg-white p-8 rounded-2xl shadow space-y-8">
-        <div class="flex justify-between items-center">
-          <h4 class="text-2xl font-semibold text-gray-800">My Profile</h4>
-          <button onclick="openEditModal()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Edit</button>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-base text-gray-700">
-          <div><strong>First Name:</strong> <?= htmlspecialchars($fname) ?></div>
-          <div><strong>Last Name:</strong> <?= htmlspecialchars($lname) ?></div>
-          <div><strong>Email Address:</strong> <?= htmlspecialchars($email) ?></div>
-          <div><strong>Mobile Number:</strong> <?= htmlspecialchars($contact) ?></div>
-          <div><strong>Position:</strong> <?= htmlspecialchars($position) ?></div>
-          <div><strong>Company:</strong> <?= htmlspecialchars($company) ?></div>
-        </div>
-      </div>
 
 <!-- Checklist Card -->
 <div class="bg-white p-8 rounded-2xl shadow space-y-6">
@@ -896,7 +923,6 @@ $announcementCount = $stmt->fetchColumn();
     </li>
   </ul>
 </div>
-
       </div>
     </div>
   </div>

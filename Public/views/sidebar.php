@@ -30,7 +30,8 @@
             <!-- Admin Panel -->
             <div>
                 <h3 class="text-xs uppercase text-green-300 tracking-wide px-4 mb-2">Admin Panel</h3>
-                <a href="admin_homepage.php" class="flex items-center px-4 py-2 rounded hover:bg-green-700 transition">
+                <a href="admin_homepage.php" 
+                   class="flex items-center px-4 py-2 rounded transition <?= (basename($_SERVER['PHP_SELF']) === 'admin_homepage.php') ? 'bg-green-700 bg-opacity-60' : 'hover:bg-green-700' ?>">
                     <span>📊 Dashboard</span>
                 </a>
             </div>
@@ -40,7 +41,10 @@
             <!-- Management -->
             <div>
                 <h3 class="text-xs uppercase text-green-300 tracking-wide px-4 mb-2">Management</h3>
-                <a href="employee_list.php" class="block px-4 py-2 rounded hover:bg-green-700 transition">👥 Employees</a>
+                <a href="employee_list.php" 
+                   class="block px-4 py-2 rounded transition <?= (basename($_SERVER['PHP_SELF']) === 'employee_list.php') ? 'bg-green-700 bg-opacity-60' : 'hover:bg-green-700' ?>">
+                    👥 Employees
+                </a>
             </div>
 
             <hr class="border-green-700 my-2">
@@ -48,10 +52,22 @@
             <!-- Pending Approvals -->
             <div>
                 <h3 class="text-xs uppercase text-green-300 tracking-wide px-4 mb-2">Pending Approvals</h3>
-                <a href="leave_request_list.php" class="block px-4 py-2 rounded hover:bg-green-700 transition">📅 Leave Requests</a>
-                <a href="schedule_request.php" class="block px-4 py-2 rounded hover:bg-green-700 transition">⏰ Schedule Changes</a>
-                <a href="ot_request.php" class="block px-4 py-2 rounded hover:bg-green-700 transition">🕓 OT Requests</a>
-                <a href="time_adjustment_list.php" class="block px-4 py-2 rounded hover:bg-green-700 transition">⏳ Time Adjustments</a>
+                <a href="leave_request_list.php" 
+                   class="block px-4 py-2 rounded transition <?= (basename($_SERVER['PHP_SELF']) === 'leave_request_list.php') ? 'bg-green-700 bg-opacity-60' : 'hover:bg-green-700' ?>">
+                    📅 Leave Requests
+                </a>
+                <a href="schedule_request.php" 
+                   class="block px-4 py-2 rounded transition <?= (basename($_SERVER['PHP_SELF']) === 'schedule_request.php') ? 'bg-green-700 bg-opacity-60' : 'hover:bg-green-700' ?>">
+                    ⏰ Schedule Changes
+                </a>
+                <a href="ot_request.php" 
+                   class="block px-4 py-2 rounded transition <?= (basename($_SERVER['PHP_SELF']) === 'ot_request.php') ? 'bg-green-700 bg-opacity-60' : 'hover:bg-green-700' ?>">
+                    🕓 OT Requests
+                </a>
+                <a href="time_adjustment_list.php" 
+                   class="block px-4 py-2 rounded transition <?= (basename($_SERVER['PHP_SELF']) === 'time_adjustment_list.php') ? 'bg-green-700 bg-opacity-60' : 'hover:bg-green-700' ?>">
+                    ⏳ Time Adjustments
+                </a>
             </div>
 
             <hr class="border-green-700 my-2">
@@ -59,8 +75,14 @@
             <!-- System -->
             <div>
                 <h3 class="text-xs uppercase text-green-300 tracking-wide px-4 mb-2">System</h3>
-                <a href="review_logs.php" class="block px-4 py-2 rounded hover:bg-green-700 transition">📄 Review Logs</a>
-                <a href="announcement.php" class="block px-4 py-2 rounded hover:bg-green-700 transition">📢 Announcements</a>
+                <a href="review_logs.php" 
+                   class="block px-4 py-2 rounded transition <?= (basename($_SERVER['PHP_SELF']) === 'review_logs.php') ? 'bg-green-700 bg-opacity-60' : 'hover:bg-green-700' ?>">
+                    📄 Review Logs
+                </a>
+                <a href="announcement.php" 
+                   class="block px-4 py-2 rounded transition <?= (basename($_SERVER['PHP_SELF']) === 'announcement.php') ? 'bg-green-700 bg-opacity-60' : 'hover:bg-green-700' ?>">
+                    📢 Announcements
+                </a>
             </div>
         </nav>
     </div>

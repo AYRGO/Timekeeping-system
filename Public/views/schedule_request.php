@@ -3,6 +3,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
+$pageTitle = 'Schedule Change Requests';
 // Fetch schedule change requests with employee names and attachments
 $stmt = $pdo->query("
     SELECT sr.id, sr.reason, sr.status, sr.start_date, sr.end_date, sr.created_at,
@@ -90,17 +91,19 @@ $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         </td>
                                         <td class="px-6 py-4 text-sm text-gray-900"><?= htmlspecialchars(ucfirst($sr['status'])) ?></td>
                                         <td class="px-6 py-4 text-sm text-gray-500"><?= date('F j, Y g:i A', strtotime($sr['created_at'])) ?></td>
-                                        <td class="px-6 py-4 text-sm text-gray-900">
+                                         <td class="px-6 py-4 text-sm text-gray-900">
                                             <?php if (strtolower($sr['status']) === 'pending'): ?>
-                                                <div class="flex justify-between items-center">
+                                                <div class="flex space-x-2">
                                                     <form method="post" action="process_schedule_action.php" class="inline-block">
                                                         <input type="hidden" name="request_id" value="<?= $sr['id'] ?>">
                                                         <input type="hidden" name="action" value="approve">
-                                                        <button type="submit" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm">Approve</button>
+                                                        <button type="submit" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition-colors">
+                                                            Approve
+                                                        </button>
                                                     </form>
                                                     <button type="button"
                                                             onclick="openDeclineModal(<?= $sr['id'] ?>)"
-                                                            class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm ml-2">
+                                                            class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm transition-colors">
                                                         Decline
                                                     </button>
                                                 </div>
