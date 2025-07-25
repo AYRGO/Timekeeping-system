@@ -11,12 +11,6 @@ session_set_cookie_params([
 
 session_start();
 
-// Check login
-// if (!isset($_SESSION['admin'])) {
-//     header("Location: ../admin/login.php");
-//     exit;
-// }
-
 // CSRF token
 if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -175,9 +169,10 @@ function sort_link($column, $label) {
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <div class="flex space-x-2">
-                                        <a href="../controller/employee-edit.php?id=<?= $emp['id'] ?>" 
-                                           class="text-blue-600 hover:text-blue-900 transition-colors">
-                                            Edit
+                                        <a href="../views/employee-edit.php?id=<?= $emp['id'] ?>" 
+                                           class="group relative text-blue-600 hover:text-blue-900 transition-colors cursor-pointer">
+                                            View
+                                            <span class="absolute left-0 -bottom-1 w-0 h-0.5 bg-blue-600 transition-all duration-300 group-hover:w-full"></span>
                                         </a>
                                         <form method="POST" action="employee-delete.php" 
                                               onsubmit="return confirm('Are you sure you want to delete this employee?');" 

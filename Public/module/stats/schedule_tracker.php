@@ -1,3 +1,4 @@
+
 <?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -33,7 +34,19 @@ $schedule_times = [
 
 $today = date('Y-m-d');
 
-// Get latest schedule request
+// Get current active approved schedule (if any)
+$stmt = $pdo->prepare("
+    SELECT work_schedule_id, status, start_date, end_date 
+    FROM schedule_change_requests 
+    WHERE employee_id = ? AND status = 'approved' 
+    AND ? BETWEEN start_date AND end_date 
+    ORDER BY created_at DESC 
+    LIMIT 1
+");
+$stmt->execute([$employee_id, $today]);
+$currentActiveSchedule = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Get latest schedule request (for status display)
 $stmt = $pdo->prepare("
     SELECT * FROM schedule_change_requests 
     WHERE employee_id = ? 
@@ -41,28 +54,44 @@ $stmt = $pdo->prepare("
     LIMIT 1
 ");
 $stmt->execute([$employee_id]);
-$scheduleRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+$latestRequest = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Default fallback
-$schedule_id_to_use = $default_schedule_id;
-$schedule_status = "default";
-$status_text = "Regular Shift";
-
-if ($scheduleRequest) {
-    $status = strtolower(trim($scheduleRequest['status']));
-    $start_date = $scheduleRequest['start_date'];
-    $end_date = $scheduleRequest['end_date'];
-
-    if ($status === 'approved' && $today >= $start_date && $today <= $end_date) {
-        $schedule_id_to_use = $scheduleRequest['work_schedule_id'] ?? $default_schedule_id;
-        $schedule_status = "approved";
-        $status_text = "Adjusted Shift (" . date('M d', strtotime($start_date)) . " - " . date('M d', strtotime($end_date)) . ")";
-    } elseif ($status === 'pending') {
+// Determine what schedule to use based on current situation
+if ($currentActiveSchedule) {
+    // There's an active approved schedule - use it
+    $current_real_schedule_id = $currentActiveSchedule['work_schedule_id'] ?? $default_schedule_id;
+    $schedule_id_to_use = $current_real_schedule_id;
+    
+    // Check if latest request is pending (while current approved is still active)
+    if ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') {
         $schedule_status = "pending";
-        $status_text = "Schedule Change Pending";
-    } elseif (in_array($status, ['declined', 'rejected'])) {
-        $schedule_status = "declined";
-        $status_text = "Schedule Change Declined";
+        $status_text = "New Change Pending";
+    } else {
+        $schedule_status = "approved";
+        $status_text = "Active Schedule (" . date('M d', strtotime($currentActiveSchedule['start_date'])) . " - " . date('M d', strtotime($currentActiveSchedule['end_date'])) . ")";
+    }
+} else {
+    // No currently active approved schedule
+    $current_real_schedule_id = $default_schedule_id;
+    $schedule_id_to_use = $default_schedule_id;
+    
+    // Check latest request status
+    if ($latestRequest) {
+        $status = strtolower(trim($latestRequest['status']));
+        
+        if ($status === 'pending') {
+            $schedule_status = "pending";
+            $status_text = "Schedule Change Pending ";
+        } elseif (in_array($status, ['declined', 'rejected'])) {
+            $schedule_status = "declined";
+            $status_text = "Request Declined )";
+        } else {
+            $schedule_status = "baseline";
+            $status_text = "Official Schedule (ID: {$default_schedule_id})";
+        }
+    } else {
+        $schedule_status = "baseline";
+        $status_text = "Official Schedule";
     }
 }
 
@@ -78,14 +107,43 @@ $color = match ($schedule_status) {
     default    => 'blue',
 };
 
-// Store in session
+// Store in session (including current real schedule ID)
 $_SESSION['current_schedule'] = [
     'schedule_id' => $schedule_id_to_use,
+    'current_real_schedule_id' => $current_real_schedule_id,
+    'baseline_schedule_id' => $default_schedule_id,
     'time_in'     => $sched_time_in,
     'time_out'    => $sched_time_out,
     'status'      => $schedule_status,
     'status_text' => $status_text,
+    'has_active_approved' => $currentActiveSchedule ? true : false,
+    'has_pending_request' => ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') ? true : false,
 ];
+
+// Function to get current real-time schedule ID (can be called from other files)
+function getCurrentRealScheduleId($employee_id, $pdo) {
+    // Get employee's default schedule
+    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+    $default_schedule_id = $employee['official_sched'] ?? 4;
+    
+    $today = date('Y-m-d');
+    
+    // Check for active approved schedule changes
+    $stmt = $pdo->prepare("
+        SELECT work_schedule_id, status, start_date, end_date 
+        FROM schedule_change_requests 
+        WHERE employee_id = ? AND status = 'approved' 
+        AND ? BETWEEN start_date AND end_date 
+        ORDER BY created_at DESC 
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $today]);
+    $activeRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    return $activeRequest ? ($activeRequest['work_schedule_id'] ?? $default_schedule_id) : $default_schedule_id;
+}
 ?>
 
 <!-- ✅ UI: Schedule Tracker Card -->
@@ -96,9 +154,22 @@ $_SESSION['current_schedule'] = [
             <p class="text-2xl font-bold text-gray-900" style="font-family: 'Inter', sans-serif;">
                 <?= htmlspecialchars($sched_time_in) ?> - <?= htmlspecialchars($sched_time_out) ?>
             </p>
+            <!-- Enhanced debug info -->
+            <div class="text-xs text-gray-400 mt-1">
+            
+                <?php if ($currentActiveSchedule && $latestRequest && strtolower(trim($latestRequest['status'])) === 'pending'): ?>
+                <?php elseif ($currentActiveSchedule): ?>
+                <?php else: ?>
+
+                <?php endif; ?>
+            </div>
         </div>
-        <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-            <i class="fas fa-calendar-day text-xl text-blue-600"></i>
+        <div class="w-12 h-12 rounded-full bg-<?= $color ?>-100 flex items-center justify-center">
+            <?php if ($currentActiveSchedule): ?>
+                <i class="fas fa-exchange-alt text-xl text-<?= $color ?>-600"></i>
+            <?php else: ?>
+                <i class="fas fa-calendar-day text-xl text-<?= $color ?>-600"></i>
+            <?php endif; ?>
         </div>
     </div>
     <div class="mt-2 flex items-center text-sm text-<?= $color ?>-600">

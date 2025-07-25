@@ -264,7 +264,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['
 }
 
 
-
          /// Schedule Change Request Check
 if (isset($_POST['submit_schedule_change'])) {
     $employee_id = $_SESSION['employee']['id'] ?? null;
@@ -283,6 +282,31 @@ if (isset($_POST['submit_schedule_change'])) {
     if ($stmt->fetchColumn() == 0) {
         header("Location: time_log_create.php?schedule_change=invalid_schedule_id");
         exit;
+    }
+
+    // Get current real-time schedule ID
+    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+    $default_schedule_id = $employee['official_sched'] ?? 4;
+    
+    $today = date('Y-m-d');
+    $current_real_schedule_id = $default_schedule_id;
+    
+    // Check for active approved schedule changes
+    $stmt = $pdo->prepare("
+        SELECT work_schedule_id, status, start_date, end_date 
+        FROM schedule_change_requests 
+        WHERE employee_id = ? AND status = 'approved' 
+        AND ? BETWEEN start_date AND end_date 
+        ORDER BY created_at DESC 
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $today]);
+    $activeRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($activeRequest) {
+        $current_real_schedule_id = $activeRequest['work_schedule_id'] ?? $default_schedule_id;
     }
 
     // Determine start and end date
@@ -319,14 +343,15 @@ if (isset($_POST['submit_schedule_change'])) {
         }
     }
 
-    // Save request
+    // Save request with current_work_schedule_id
     $stmt = $pdo->prepare("INSERT INTO schedule_change_requests 
-        (employee_id, work_schedule_id, reason, status, start_date, end_date, created_at, attachment_scr)
-        VALUES (?, ?, ?, 'pending', ?, ?, NOW(), ?)");
+        (employee_id, work_schedule_id, current_work_schedule_id, reason, status, start_date, end_date, created_at, attachment_scr)
+        VALUES (?, ?, ?, ?, 'pending', ?, ?, NOW(), ?)");
     
     $stmt->execute([
         $employee_id,
         $work_schedule_id,
+        $current_real_schedule_id, // Current schedule being used
         $reason,
         $start_date,
         $end_date,
@@ -336,8 +361,6 @@ if (isset($_POST['submit_schedule_change'])) {
     header("Location: time_log_create.php?schedule_change=success");
     exit;
 }
-
-
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment') {
     $csrf_token = $_POST['csrf_token'] ?? '';
@@ -743,190 +766,181 @@ $announcementCount = $stmt->fetchColumn();
           </button>
         </form>
       </div>
-
+              </div>
     </div>
   </div>
-</div>
+
+
+
 <!-- Profile Section -->
-<div id="profileView" class="hidden min-h-screen bg-gray-50 py-10 px-4">
-  <div class="max-w-6xl mx-auto">
+<div id="profileView" class="hidden min-h-screen bg-gray-50 py-12 px-4">
+  <div class="max-w-5xl mx-auto space-y-10">
 
-    <!-- Combined Profile Card -->
-    <div class="bg-white p-8 rounded-2xl shadow space-y-8 mb-8">
-      <!-- Header with Edit Button -->
-      <div class="flex justify-between items-center">
-        <h4 class="text-2xl font-semibold text-gray-800">My Profile</h4>
-        <button onclick="openEditModal()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Edit</button>
-      </div>
+    <!-- Profile Card -->
+    <div class="bg-white rounded-2xl shadow-xl p-10 flex flex-col lg:flex-row items-center lg:items-start gap-10">
 
-      <!-- Profile Picture and Info Section -->
-      <div class="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8 items-start">
-        
-        <!-- Profile Picture Section -->
-        <div class="flex flex-col items-center space-y-4">
-          <div class="relative w-48 h-48 rounded-full overflow-hidden border-4 border-green-500 flex items-center justify-center">
-            <?php if ($profile_picture): ?>
-              <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover">
-            <?php else: ?>
-              <div class="w-full h-full bg-gray-300 flex items-center justify-center text-6xl text-white">👤</div>
-            <?php endif; ?>
-            <div 
-              class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-sm text-white opacity-0 hover:opacity-100 transition cursor-pointer"
-              onclick="document.getElementById('fileInput').click()"
-            >
-              Change Photo
-            </div>
-          </div>
-          <form action="upload_profile.php" method="POST" enctype="multipart/form-data">
-            <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
-          </form>
-          <div class="text-center">
-            <h3 class="text-xl font-semibold text-gray-800"><?= htmlspecialchars($fname . ' ' . $lname) ?></h3>
-            <p class="text-gray-600"><?= htmlspecialchars($position) ?></p>
-            <p class="text-sm text-gray-500"><?= htmlspecialchars($company) ?></p>
+      <!-- Profile Picture -->
+      <div class="flex flex-col items-center text-center gap-4">
+        <div class="relative w-40 h-40 rounded-full overflow-hidden border-4 border-green-500 shadow-md bg-gray-100">
+          <?php if ($profile_picture): ?>
+            <img src="../uploads/profile_images/<?= htmlspecialchars($profile_picture) ?>" class="w-full h-full object-cover" alt="Profile">
+          <?php else: ?>
+            <div class="w-full h-full flex items-center justify-center text-6xl text-gray-400">👤</div>
+          <?php endif; ?>
+
+          <div 
+            class="absolute inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex items-center justify-center opacity-0 hover:opacity-100 transition"
+            onclick="document.getElementById('fileInput').click()"
+          >
+            <span class="bg-green-600 px-4 py-1 text-sm rounded-full text-white hover:bg-green-700 transition shadow">Change Photo</span>
           </div>
         </div>
 
-        <!-- Profile Information Grid -->
-        <div class="space-y-6">
-          <h5 class="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">Personal Information</h5>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-base text-gray-700">
-            <div class="flex flex-col space-y-1">
-              <span class="text-sm font-medium text-gray-500">First Name</span>
-              <span class="text-gray-800"><?= htmlspecialchars($fname) ?></span>
-            </div>
-            <div class="flex flex-col space-y-1">
-              <span class="text-sm font-medium text-gray-500">Last Name</span>
-              <span class="text-gray-800"><?= htmlspecialchars($lname) ?></span>
-            </div>
-            <div class="flex flex-col space-y-1">
-              <span class="text-sm font-medium text-gray-500">Email Address</span>
-              <span class="text-gray-800"><?= htmlspecialchars($email) ?></span>
-            </div>
-            <div class="flex flex-col space-y-1">
-              <span class="text-sm font-medium text-gray-500">Mobile Number</span>
-              <span class="text-gray-800"><?= htmlspecialchars($contact) ?></span>
-            </div>
-            <div class="flex flex-col space-y-1">
-              <span class="text-sm font-medium text-gray-500">Position</span>
-              <span class="text-gray-800"><?= htmlspecialchars($position) ?></span>
-            </div>
-            <div class="flex flex-col space-y-1">
-              <span class="text-sm font-medium text-gray-500">Company</span>
-              <span class="text-gray-800"><?= htmlspecialchars($company) ?></span>
-            </div>
+        <form action="upload_profile.php" method="POST" enctype="multipart/form-data">
+          <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
+        </form>
+
+        <div>
+          <h3 class="text-2xl font-bold text-gray-800"><?= htmlspecialchars($fname . ' ' . $lname) ?></h3>
+          <p class="text-green-600 font-semibold"><?= htmlspecialchars($position) ?></p>
+          <p class="text-sm text-gray-500"><?= htmlspecialchars($company) ?></p>
+        </div>
+      </div>
+
+      <!-- Info -->
+      <div class="flex-1 w-full">
+        <div class="flex justify-between items-center mb-6">
+          <h4 class="text-xl font-semibold text-gray-800">Personal Information</h4>
+          <button onclick="openEditModal()" class="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition font-medium shadow">
+            <i class="fas fa-edit mr-2"></i>Edit
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <?php
+            $fields = [
+              'First Name' => $fname,
+              'Last Name' => $lname,
+              'Email Address' => $email,
+              'Mobile Number' => $contact,
+              'Position' => $position,
+              'Company' => $company
+            ];
+            foreach ($fields as $label => $value):
+          ?>
+          <div>
+            <span class="block text-xs font-medium text-gray-500 mb-1"><?= $label ?></span>
+            <span class="block text-base text-gray-800"><?= htmlspecialchars($value) ?></span>
           </div>
+          <?php endforeach; ?>
         </div>
       </div>
     </div>
 
-<!-- Checklist Card -->
-<div class="bg-white p-8 rounded-2xl shadow space-y-6">
-  <h4 class="text-2xl font-semibold text-gray-800">201 Checklist</h4>
+ <!-- Checklist Card -->
+    <div class="bg-white rounded-2xl shadow-xl p-10 space-y-8">
+      <h4 class="text-2xl font-bold text-gray-800">201 Checklist</h4>
 
-  <!-- RSS Documents -->
-  <div class="mt-6">
-    <h5 class="text-lg font-semibold text-gray-700 mb-2">RSS Documents</h5>
-    <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-      <?php
-        $rssDocs = [
-          'letter_offer' => 'Signed Letter of Offer',
-          'employment_contract' => 'Signed Employment Contract'
-        ];
-        foreach ($rssDocs as $field => $label):
-      ?>
-      <li><?= $label ?>:
-        <?php if (!empty($checklist[$field])): ?>
-          <?php
-            $files = is_array($checklist[$field]) ? $checklist[$field] : explode(',', $checklist[$field]);
-            foreach ($files as $file):
-              $file = trim($file);
-              if ($file):
-          ?>
-            <a href="../uploads/checklist/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 underline mr-2">View</a>
-          <?php
-              endif;
-            endforeach;
-          ?>
-        <?php else: ?>
-          <span class="text-red-600 font-medium">Not Uploaded</span>
-        <?php endif; ?>
-      </li>
-      <?php endforeach; ?>
-    </ul>
-  </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- First Column: RSS Documents & Employment Adjustment Form -->
+        <div class="space-y-8">
+          <!-- RSS Documents -->
+          <div>
+            <h5 class="text-lg font-semibold text-green-700 mb-3">RSS Documents</h5>
+            <ul class="space-y-3 text-sm">
+              <?php foreach (['letter_offer' => 'Signed Letter of Offer', 'employment_contract' => 'Signed Employment Contract'] as $key => $label): ?>
+              <li class="flex justify-between items-center border-b border-dashed border-gray-200 pb-2">
+                <span><?= $label ?></span>
+                <span>
+                  <?php if (!empty($checklist[$key])): ?>
+                    <?php
+                      $files = is_array($checklist[$key]) ? $checklist[$key] : explode(',', $checklist[$key]);
+                      foreach ($files as $file):
+                        $file = trim($file);
+                        if ($file):
+                    ?>
+                      <a href="../uploads/checklist/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 hover:underline mr-2">View</a>
+                    <?php endif; endforeach; ?>
+                  <?php else: ?>
+                    <span class="text-red-600 font-medium">Not Uploaded</span>
+                  <?php endif; ?>
+                </span>
+              </li>
+              <?php endforeach; ?>
+            </ul>
+          </div>
 
-  <!-- Pre-Employment Requirements -->
-  <div class="mt-6">
-    <h5 class="text-lg font-semibold text-gray-700 mb-2">Pre-Employment Requirements</h5>
-    <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-      <?php
-        $requirements = [
-          'medical' => 'Medical',
-          'nbi_clearance' => 'NBI Clearance',
-          'diploma_tor' => 'Diploma/TOR',
-          'psa' => 'PSA',
-          'sss' => 'SSS',
-          'tin' => 'TIN',
-          'philhealth' => 'PhilHealth',
-          'pagibig' => 'Pag-IBIG',
-          'coe' => 'COE (Recent Employer)',
-          'valid_id' => 'Valid ID',
-          'valid_id_2' => 'Valid ID 2',
-          'solo_parent_id' => 'Solo Parent ID',
-        ];
-        foreach ($requirements as $field => $label):
-      ?>
-      <li><?= $label ?>:
-        <?php if (!empty($checklist[$field])): ?>
-          <?php
-            $files = is_array($checklist[$field]) ? $checklist[$field] : explode(',', $checklist[$field]);
-            foreach ($files as $file):
-              $file = trim($file);
-              if ($file):
-          ?>
-            <a href="../uploads/checklist/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 underline mr-2">View</a>
-          <?php
-              endif;
-            endforeach;
-          ?>
-        <?php else: ?>
-          <span class="text-red-600 font-medium">Not Uploaded</span>
-        <?php endif; ?>
-      </li>
-      <?php endforeach; ?>
-    </ul>
-  </div>
+          <!-- Employment Adjustment Form -->
+          <div>
+            <h5 class="text-lg font-semibold text-green-700 mb-3">Employment Adjustment Form</h5>
+            <ul class="space-y-3 text-sm">
+              <li class="flex justify-between items-center border-b border-dashed border-gray-200 pb-2">
+                <span>Adjustment Files</span>
+                <span>
+                  <?php if (!empty($checklist['employment_adjustment_form'])): ?>
+                    <?php
+                      $files = is_array($checklist['employment_adjustment_form']) ? $checklist['employment_adjustment_form'] : explode(',', $checklist['employment_adjustment_form']);
+                      foreach ($files as $file):
+                        $file = trim($file);
+                        if ($file):
+                    ?>
+                      <a href="../uploads/checklist/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 hover:underline mr-2">View</a>
+                    <?php endif; endforeach; ?>
+                  <?php else: ?>
+                    <span class="text-red-600 font-medium">Not Uploaded</span>
+                  <?php endif; ?>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
 
-<!-- Employment Adjustment -->
-<div class="mt-6">
-  <h5 class="text-lg font-semibold text-gray-700 mb-2">Employment Adjustment Form</h5>
-  <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-700">
-    <li>Adjustment Files:
-      <?php if (!empty($checklist['employment_adjustment_form'])): ?>
-        <?php
-          $files = is_array($checklist['employment_adjustment_form']) 
-            ? $checklist['employment_adjustment_form'] 
-            : explode(',', $checklist['employment_adjustment_form']);
-          foreach ($files as $file):
-            $file = trim($file);
-            if ($file):
-        ?>
-          <a href="../uploads/checklist/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 underline mr-2">View</a>
-        <?php
-            endif;
-          endforeach;
-        ?>
-      <?php else: ?>
-        <span class="text-red-600 font-medium">Not Uploaded</span>
-      <?php endif; ?>
-    </li>
-  </ul>
-</div>
+        <!-- Second Column: Pre-Employment Requirements -->
+        <div>
+          <h5 class="text-lg font-semibold text-green-700 mb-3">Pre-Employment Requirements</h5>
+          <ul class="space-y-3 text-sm">
+            <?php
+            $preItems = [
+              'medical' => 'Medical',
+              'nbi_clearance' => 'NBI Clearance',
+              'diploma_tor' => 'Diploma/TOR',
+              'psa' => 'PSA',
+              'sss' => 'SSS',
+              'tin' => 'TIN',
+              'philhealth' => 'PhilHealth',
+              'pagibig' => 'Pag-IBIG',
+              'coe' => 'COE (Recent Employer)',
+              'valid_id' => 'Valid ID',
+              'valid_id_2' => 'Valid ID 2',
+              'solo_parent_id' => 'Solo Parent ID',
+            ];
+            foreach ($preItems as $key => $label): ?>
+            <li class="flex justify-between items-center border-b border-dashed border-gray-200 pb-2">
+              <span><?= $label ?></span>
+              <span>
+                <?php if (!empty($checklist[$key])): ?>
+                  <?php
+                    $files = is_array($checklist[$key]) ? $checklist[$key] : explode(',', $checklist[$key]);
+                    foreach ($files as $file):
+                      $file = trim($file);
+                      if ($file):
+                  ?>
+                    <a href="../uploads/checklist/<?= htmlspecialchars($file) ?>" target="_blank" class="text-blue-600 hover:underline mr-2">View</a>
+                  <?php endif; endforeach; ?>
+                <?php else: ?>
+                  <span class="text-red-600 font-medium">Not Uploaded</span>
+                <?php endif; ?>
+              </span>
+            </li>
+            <?php endforeach; ?>
+          </ul>
+        </div>
       </div>
     </div>
-  </div>
+    </div>
+
 </div>
+
 
 <!-- Edit Profile Modal -->
 <div id="edit-profile-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
