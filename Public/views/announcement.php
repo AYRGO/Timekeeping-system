@@ -20,10 +20,6 @@ if (isset($_SESSION['id'])) {
     $current_user_id = $_SESSION['employee_id'];
 }
 
-// Debug - remove this after testing
-// echo "<pre>Session: " . print_r($_SESSION, true) . "</pre>";
-// echo "<pre>Current User ID: " . $current_user_id . "</pre>";
-
 // Handle announcement post
 if (
     $_SERVER['REQUEST_METHOD'] === 'POST' &&
@@ -145,6 +141,61 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
         .reaction-menu.show {
             display: flex;
         }
+        .content-preview {
+            max-height: 200px;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .content-expanded {
+            max-height: none;
+        }
+        .widget-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 16px;
+            padding: 16px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .widget-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .weather-icon {
+            font-size: 2rem;
+        }
+        .news-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .news-item:hover {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin: 0 -12px;
+        }
+        .news-item:last-child {
+            border-bottom: none;
+        }
+        .quote-text {
+            font-style: italic;
+            line-height: 1.6;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -156,325 +207,446 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
         <?php include('header.php'); ?>
         
         <main class="flex-1 p-6 overflow-y-auto">
-            <div class="max-w-2xl mx-auto">
-                
-                <!-- Debug Info (remove after testing) -->
-                <?php if ($current_user_id): ?>
-                    <div class="bg-green-100 p-2 mb-4 rounded text-sm">
-                        ✅ User logged in: ID = <?= $current_user_id ?>
-                    </div>
-                <?php else: ?>
-                    <div class="bg-red-100 p-2 mb-4 rounded text-sm">
-                        ❌ No user logged in - reactions will not work!
-                    </div>
-                <?php endif; ?>
-                
-                <!-- Create Post -->
-                <div class="facebook-post mb-6">
-                    <div class="p-4">
-                        <div class="flex items-center space-x-3 mb-4">
-                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                                <i class="fas fa-user text-white"></i>
-                            </div>
-                            <div>
-                                <h3 class="font-semibold text-gray-900">Admin</h3>
-                                <p class="text-sm text-gray-500">Create new announcement</p>
+            <!-- Container with max width for centering -->
+            <div class="max-w-7xl mx-auto">
+                <div class="flex gap-6 justify-center">
+                    <!-- Left Spacer (hidden on smaller screens) -->
+                    <div class="w-70 hidden xl:block"></div>
+
+                    <!-- Main Content - Centered -->
+                    <div class="flex-1 max-w-2xl">
+                        
+                        <!-- Create Post -->
+                        <div class="facebook-post mb-6">
+                            <div class="p-4">
+                                <div class="flex items-center space-x-3 mb-4">
+                                    <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-user text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Admin</h3>
+                                        <p class="text-sm text-gray-500">Create new announcement</p>
+                                    </div>
+                                </div>
+
+                                <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                                    <input type="hidden" name="type" value="announcement">
+                                    
+                                    <input 
+                                        type="text" 
+                                        name="title" 
+                                        placeholder="Post title..." 
+                                        class="w-full p-3 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        required
+                                    >
+                                    
+                                    <textarea 
+                                        name="content" 
+                                        rows="3" 
+                                        placeholder="What's happening?" 
+                                        class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        required
+                                    ></textarea>
+
+                                    <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+                                        <div class="flex items-center space-x-4">
+                                            <label for="attachmentUpload" class="flex items-center space-x-2 cursor-pointer text-green-600 hover:text-green-700 px-3 py-2 rounded-lg hover:bg-green-50">
+                                                <i class="fas fa-image"></i>
+                                                <span>Photo/Video</span>
+                                            </label>
+                                            <input type="file" id="attachmentUpload" name="attachments[]" multiple class="hidden" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+                                            
+                                            <label for="documentUpload" class="flex items-center space-x-2 cursor-pointer text-blue-600 hover:text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-50">
+                                                <i class="fas fa-file-alt"></i>
+                                                <span>Document</span>
+                                            </label>
+                                            <input type="file" id="documentUpload" name="attachments[]" multiple class="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+                                        </div>
+                                        
+                                        <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+                                            Post
+                                        </button>
+                                    </div>
+                                    
+                                    <div id="filePreview" class="hidden space-y-2"></div>
+                                </form>
                             </div>
                         </div>
 
-                        <form method="POST" enctype="multipart/form-data" class="space-y-4">
-                            <input type="hidden" name="type" value="announcement">
-                            
-                            <input 
-                                type="text" 
-                                name="title" 
-                                placeholder="Post title..." 
-                                class="w-full p-3 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                required
-                            >
-                            
-                            <textarea 
-                                name="content" 
-                                rows="3" 
-                                placeholder="What's happening?" 
-                                class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                required
-                            ></textarea>
+                        <!-- Posts Feed -->
+                        <div class="space-y-4">
+                            <?php foreach ($announcements as $a):
+                                $aid = $a['announcement_id'];
 
-                            <div class="flex items-center justify-between pt-3 border-t border-gray-200">
-                                <div class="flex items-center space-x-4">
-                                    <label for="attachmentUpload" class="flex items-center space-x-2 cursor-pointer text-green-600 hover:text-green-700 px-3 py-2 rounded-lg hover:bg-green-50">
-                                        <i class="fas fa-image"></i>
-                                        <span>Photo/Video</span>
-                                    </label>
-                                    <input type="file" id="attachmentUpload" name="attachments[]" multiple class="hidden" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
-                                    
-                                    <label for="documentUpload" class="flex items-center space-x-2 cursor-pointer text-blue-600 hover:text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-50">
-                                        <i class="fas fa-file-alt"></i>
-                                        <span>Document</span>
-                                    </label>
-                                    <input type="file" id="documentUpload" name="attachments[]" multiple class="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
-                                </div>
+                                // Get reactions using post_reactions table
+                                $reaction_stmt = $pdo->prepare("
+                                    SELECT reaction_type, COUNT(*) as count 
+                                    FROM post_reactions 
+                                    WHERE announcement_id = ? 
+                                    GROUP BY reaction_type
+                                ");
+                                $reaction_stmt->execute([$aid]);
+                                $reaction_data = $reaction_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                                // Convert to emoji format
+                                $type_to_emoji = [
+                                    'like' => '👍',
+                                    'love' => '❤️', 
+                                    'laugh' => '😂',
+                                    'wow' => '😮',
+                                    'sad' => '😢',
+                                    'angry' => '😡'
+                                ];
+
+                                $reactions = [];
+                                foreach ($reaction_data as $row) {
+                                    $emoji = $type_to_emoji[$row['reaction_type']] ?? '👍';
+                                    $reactions[$emoji] = (int)$row['count'];
+                                }
+
+                                // Get user's reaction
+                                $user_reaction = null;
+                                if ($current_user_id) {
+                                    $user_reaction_stmt = $pdo->prepare("SELECT reaction_type FROM post_reactions WHERE announcement_id = ? AND employee_id = ? LIMIT 1");
+                                    $user_reaction_stmt->execute([$aid, $current_user_id]);
+                                    $user_reaction_type = $user_reaction_stmt->fetchColumn();
+                                    $user_reaction = $user_reaction_type ? $type_to_emoji[$user_reaction_type] : null;
+                                }
+
+                                // Get comments
+                                try {
+                                    $comment_stmt = $pdo->prepare("
+                                        SELECT c.*, e.fname, e.lname 
+                                        FROM comments c 
+                                        JOIN employees e ON c.employee_id = e.id 
+                                        WHERE c.announcement_id = ? AND c.deleted = 0 
+                                        ORDER BY c.created_at ASC
+                                    ");
+                                    $comment_stmt->execute([$aid]);
+                                    $comments = $comment_stmt->fetchAll(PDO::FETCH_ASSOC);
+                                } catch (PDOException $e) {
+                                    $comment_stmt = $pdo->prepare("
+                                        SELECT c.*, e.fname, e.lname 
+                                        FROM comments c 
+                                        JOIN employees e ON c.employee_id = e.id 
+                                        WHERE c.announcement_id = ? 
+                                        ORDER BY c.created_at ASC
+                                    ");
+                                    $comment_stmt->execute([$aid]);
+                                    $comments = $comment_stmt->fetchAll(PDO::FETCH_ASSOC);
+                                }
+                                $commentCount = count($comments);
                                 
-                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-                                    Post
-                                </button>
-                            </div>
-                            
-                            <div id="filePreview" class="hidden space-y-2"></div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Posts Feed -->
-                <div class="space-y-4">
-                    <?php foreach ($announcements as $a):
-                        $aid = $a['announcement_id'];
-
-                        // Get reactions using post_reactions table
-                        $reaction_stmt = $pdo->prepare("
-                            SELECT reaction_type, COUNT(*) as count 
-                            FROM post_reactions 
-                            WHERE announcement_id = ? 
-                            GROUP BY reaction_type
-                        ");
-                        $reaction_stmt->execute([$aid]);
-                        $reaction_data = $reaction_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                        // Convert to emoji format
-                        $type_to_emoji = [
-                            'like' => '👍',
-                            'love' => '❤️', 
-                            'laugh' => '😂',
-                            'wow' => '😮',
-                            'sad' => '😢',
-                            'angry' => '😡'
-                        ];
-
-                        $reactions = [];
-                        foreach ($reaction_data as $row) {
-                            $emoji = $type_to_emoji[$row['reaction_type']] ?? '👍';
-                            $reactions[$emoji] = (int)$row['count'];
-                        }
-
-                        // Get user's reaction
-                        $user_reaction = null;
-                        if ($current_user_id) {
-                            $user_reaction_stmt = $pdo->prepare("SELECT reaction_type FROM post_reactions WHERE announcement_id = ? AND employee_id = ? LIMIT 1");
-                            $user_reaction_stmt->execute([$aid, $current_user_id]);
-                            $user_reaction_type = $user_reaction_stmt->fetchColumn();
-                            $user_reaction = $user_reaction_type ? $type_to_emoji[$user_reaction_type] : null;
-                        }
-
-                        // Get comments
-                        try {
-                            $comment_stmt = $pdo->prepare("
-                                SELECT c.*, e.fname, e.lname 
-                                FROM comments c 
-                                JOIN employees e ON c.employee_id = e.id 
-                                WHERE c.announcement_id = ? AND c.deleted = 0 
-                                ORDER BY c.created_at ASC
-                            ");
-                            $comment_stmt->execute([$aid]);
-                            $comments = $comment_stmt->fetchAll(PDO::FETCH_ASSOC);
-                        } catch (PDOException $e) {
-                            $comment_stmt = $pdo->prepare("
-                                SELECT c.*, e.fname, e.lname 
-                                FROM comments c 
-                                JOIN employees e ON c.employee_id = e.id 
-                                WHERE c.announcement_id = ? 
-                                ORDER BY c.created_at ASC
-                            ");
-                            $comment_stmt->execute([$aid]);
-                            $comments = $comment_stmt->fetchAll(PDO::FETCH_ASSOC);
-                        }
-                        $commentCount = count($comments);
-                    ?>
-                        <div class="facebook-post" id="post-<?= $aid ?>">
-                            <!-- Post Header -->
-                            <div class="p-4 pb-0">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                                            <i class="fas fa-user text-white"></i>
-                                        </div>
-                                        <div>
-                                            <h3 class="font-semibold text-gray-900">Admin</h3>
-                                            <p class="text-sm text-gray-500"><?= date('F j, Y \a\t g:i A', strtotime($a['created_at'])) ?></p>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="relative">
-                                        <button onclick="toggleDropdown(<?= $aid ?>)" class="p-2 rounded-full hover:bg-gray-100">
-                                            <i class="fas fa-ellipsis-h text-gray-500"></i>
-                                        </button>
-                                        <div id="dropdown-<?= $aid ?>" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
-                                            <form method="POST" class="p-1">
-                                                <input type="hidden" name="delete_id" value="<?= $aid ?>">
-                                                <button type="submit" class="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded flex items-center space-x-2">
-                                                    <i class="fas fa-trash text-sm"></i>
-                                                    <span>Delete Post</span>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Post Content -->
-                            <div class="px-4 py-3">
-                                <?php if (!empty($a['title'])): ?>
-                                    <h2 class="text-xl font-bold text-gray-900 mb-2"><?= htmlspecialchars($a['title']) ?></h2>
-                                <?php endif; ?>
-                                <p class="text-gray-800 leading-relaxed"><?= nl2br(htmlspecialchars($a['content'])) ?></p>
-
-                                <!-- Attachments -->
-                                <?php if (!empty($a['image'])):
-                                    $files = json_decode($a['image'], true);
-                                    if (!is_array($files)) $files = [$a['image']];
-                                ?>
-                                <div class="mt-4 space-y-3">
-                                    <?php foreach ($files as $fileInfo):
-                                        $filePath = is_array($fileInfo) ? $fileInfo['stored'] : $fileInfo;
-                                        $originalName = is_array($fileInfo) ? $fileInfo['original'] : basename($fileInfo);
-                                        $ext = pathinfo($filePath, PATHINFO_EXTENSION);
-                                        $isImage = in_array(strtolower($ext), ['jpg', 'jpeg', 'png']);
-                                    ?>
-                                        <?php if ($isImage): ?>
-                                            <div class="rounded-lg overflow-hidden border border-gray-200">
-                                                <img src="<?= htmlspecialchars($filePath) ?>" alt="<?= htmlspecialchars($originalName) ?>" class="w-full h-auto">
-                                            </div>
-                                        <?php else: ?>
-                                            <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border">
-                                                <i class="fas fa-file-alt text-blue-600 text-xl"></i>
-                                                <div class="flex-1">
-                                                    <a href="<?= htmlspecialchars($filePath) ?>" 
-                                                       class="text-blue-600 hover:underline font-medium" download>
-                                                        <?= htmlspecialchars($originalName) ?>
-                                                    </a>
-                                                    <p class="text-sm text-gray-500">Click to download</p>
+                                // Check if content is long
+                                $content = $a['content'];
+                                $isLongContent = strlen($content) > 300;
+                                $previewContent = $isLongContent ? substr($content, 0, 300) . '...' : $content;
+                            ?>
+                                <div class="facebook-post" id="post-<?= $aid ?>">
+                                    <!-- Post Header -->
+                                    <div class="p-4 pb-0">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center space-x-3">
+                                                <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                                    <i class="fas fa-user text-white"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 class="font-semibold text-gray-900">Admin</h3>
+                                                    <p class="text-sm text-gray-500"><?= date('F j, Y \a\t g:i A', strtotime($a['created_at'])) ?></p>
                                                 </div>
                                             </div>
-                                        <?php endif; ?>
-                                    <?php endforeach; ?>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-
-                            <!-- Reaction Summary -->
-                            <div class="px-4 py-2 border-t border-gray-100" id="reaction-summary-<?= $aid ?>" <?= empty($reactions) && $commentCount == 0 ? 'style="display: none;"' : '' ?>>
-                                <div class="flex items-center justify-between text-sm text-gray-500">
-                                    <div class="flex items-center space-x-1" id="reactions-display-<?= $aid ?>">
-                                        <?php foreach ($reactions as $emoji => $count): ?>
-                                            <span class="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded-full">
-                                                <span><?= htmlspecialchars($emoji) ?></span>
-                                                <span><?= $count ?></span>
-                                            </span>
-                                        <?php endforeach; ?>
-                                    </div>
-                                    <span id="comments-count-<?= $aid ?>"><?= $commentCount ?> comment<?= $commentCount !== 1 ? 's' : '' ?></span>
-                                </div>
-                            </div>
-
-                            <!-- Action Buttons -->
-                            <div class="px-4 py-2 border-t border-gray-100">
-                                <div class="flex items-center justify-around">
-                                    <!-- Like Button -->
-                                    <div class="relative" onmouseenter="showReactions(<?= $aid ?>)" onmouseleave="hideReactions(<?= $aid ?>)">
-                                        <button id="react-btn-<?= $aid ?>" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center <?= $user_reaction ? 'text-blue-600' : 'text-gray-600' ?>" <?= !$current_user_id ? 'disabled title="Please log in to react"' : '' ?>>
-                                            <span class="text-lg" id="react-emoji-<?= $aid ?>"><?= $user_reaction ?: '👍' ?></span>
-                                            <span class="font-medium">Like</span>
-                                        </button>
-                                        <?php if ($current_user_id): ?>
-                                        <div class="reaction-menu" id="reaction-menu-<?= $aid ?>">
-                                            <?php foreach (['👍', '❤️', '😂', '😮', '😢', '😡'] as $emo): ?>
-                                                <button onclick="handleReaction(<?= $aid ?>, '<?= $emo ?>')" 
-                                                        class="hover:scale-125 transition-transform text-2xl p-1 rounded-full hover:bg-gray-100">
-                                                    <?= $emo ?>
+                                            
+                                            <div class="relative">
+                                                <button onclick="toggleDropdown(<?= $aid ?>)" class="p-2 rounded-full hover:bg-gray-100">
+                                                    <i class="fas fa-ellipsis-h text-gray-500"></i>
                                                 </button>
+                                                <div id="dropdown-<?= $aid ?>" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
+                                                    <form method="POST" class="p-1">
+                                                        <input type="hidden" name="delete_id" value="<?= $aid ?>">
+                                                        <button type="submit" class="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded flex items-center space-x-2">
+                                                            <i class="fas fa-trash text-sm"></i>
+                                                            <span>Delete Post</span>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Post Content -->
+                                    <div class="px-4 py-3">
+                                        <?php if (!empty($a['title'])): ?>
+                                            <h2 class="text-xl font-bold text-gray-900 mb-2"><?= htmlspecialchars($a['title']) ?></h2>
+                                        <?php endif; ?>
+                                        
+                                        <!-- Content with See More/Less -->
+                                        <div id="content-<?= $aid ?>">
+                                            <div id="preview-<?= $aid ?>" class="text-gray-800 leading-relaxed <?= $isLongContent ? '' : 'hidden' ?>">
+                                                <?= nl2br(htmlspecialchars($previewContent)) ?>
+                                                <?php if ($isLongContent): ?>
+                                                    <button onclick="toggleContent(<?= $aid ?>, true)" class="text-blue-600 hover:text-blue-700 font-medium ml-2">
+                                                        See more
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div id="full-<?= $aid ?>" class="text-gray-800 leading-relaxed <?= $isLongContent ? 'hidden' : '' ?>">
+                                                <?= nl2br(htmlspecialchars($content)) ?>
+                                                <?php if ($isLongContent): ?>
+                                                    <button onclick="toggleContent(<?= $aid ?>, false)" class="text-blue-600 hover:text-blue-700 font-medium ml-2">
+                                                        See less
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+
+                                        <!-- Attachments -->
+                                        <?php if (!empty($a['image'])):
+                                            $files = json_decode($a['image'], true);
+                                            if (!is_array($files)) $files = [$a['image']];
+                                        ?>
+                                        <div class="mt-4 space-y-3">
+                                            <?php foreach ($files as $fileInfo):
+                                                $filePath = is_array($fileInfo) ? $fileInfo['stored'] : $fileInfo;
+                                                $originalName = is_array($fileInfo) ? $fileInfo['original'] : basename($fileInfo);
+                                                $ext = pathinfo($filePath, PATHINFO_EXTENSION);
+                                                $isImage = in_array(strtolower($ext), ['jpg', 'jpeg', 'png']);
+                                            ?>
+                                                <?php if ($isImage): ?>
+                                                    <div class="rounded-lg overflow-hidden border border-gray-200">
+                                                        <img src="<?= htmlspecialchars($filePath) ?>" alt="<?= htmlspecialchars($originalName) ?>" class="w-full h-auto">
+                                                    </div>
+                                                <?php else: ?>
+                                                    <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border">
+                                                        <i class="fas fa-file-alt text-blue-600 text-xl"></i>
+                                                        <div class="flex-1">
+                                                            <a href="<?= htmlspecialchars($filePath) ?>" 
+                                                               class="text-blue-600 hover:underline font-medium" download>
+                                                                <?= htmlspecialchars($originalName) ?>
+                                                            </a>
+                                                            <p class="text-sm text-gray-500">Click to download</p>
+                                                        </div>
+                                                    </div>
+                                                <?php endif; ?>
                                             <?php endforeach; ?>
                                         </div>
                                         <?php endif; ?>
                                     </div>
 
-                                    <!-- Comment Button -->
-                                    <button onclick="toggleComments(<?= $aid ?>)" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
-                                        <i class="far fa-comment"></i>
-                                        <span class="font-medium">Comment</span>
-                                    </button>
-
-                                    <!-- Share Button -->
-                                    <button class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
-                                        <i class="far fa-share"></i>
-                                        <span class="font-medium">Share</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Comments Section -->
-                            <div id="comments-<?= $aid ?>" class="hidden border-t border-gray-100">
-                                <!-- Existing Comments -->
-                                <div class="px-4 py-3 space-y-3 max-h-96 overflow-y-auto">
-                                    <?php foreach ($comments as $comment): ?>
-                                        <div class="flex space-x-3">
-                                            <div class="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm">
-                                                <?= strtoupper(substr($comment['fname'], 0, 1)) ?>
+                                    <!-- Reaction Summary -->
+                                    <div class="px-4 py-2 border-t border-gray-100" id="reaction-summary-<?= $aid ?>" <?= empty($reactions) && $commentCount == 0 ? 'style="display: none;"' : '' ?>>
+                                        <div class="flex items-center justify-between text-sm text-gray-500">
+                                            <div class="flex items-center space-x-1" id="reactions-display-<?= $aid ?>">
+                                                <?php foreach ($reactions as $emoji => $count): ?>
+                                                    <span class="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded-full">
+                                                        <span><?= htmlspecialchars($emoji) ?></span>
+                                                        <span><?= $count ?></span>
+                                                    </span>
+                                                <?php endforeach; ?>
                                             </div>
-                                            <div class="flex-1">
-                                                <div class="bg-gray-100 rounded-2xl px-3 py-2">
-                                                    <h4 class="font-semibold text-sm text-gray-900"><?= htmlspecialchars($comment['fname'] . ' ' . $comment['lname']) ?></h4>
-                                                    <p class="text-gray-800"><?= htmlspecialchars($comment['content']) ?></p>
-                                                </div>
-                                                <div class="flex items-center space-x-4 mt-1 text-xs text-gray-500">
-                                                    <span><?= date('M j \a\t g:i A', strtotime($comment['created_at'])) ?></span>
-                                                    <button class="hover:underline">Like</button>
-                                                    <button class="hover:underline">Reply</button>
-                                                </div>
-                                            </div>
+                                            <span id="comments-count-<?= $aid ?>"><?= $commentCount ?> comment<?= $commentCount !== 1 ? 's' : '' ?></span>
                                         </div>
-                                    <?php endforeach; ?>
-                                </div>
+                                    </div>
 
-                                <!-- Comment Input -->
-                                <div class="px-4 py-3 border-t border-gray-100">
-                                    <form method="POST" class="flex space-x-3">
-                                        <input type="hidden" name="announcement_id" value="<?= $aid ?>">
-                                        <div class="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm">
-                                            <?= isset($_SESSION['fname']) ? strtoupper(substr($_SESSION['fname'], 0, 1)) : 'U' ?>
-                                        </div>
-                                        <div class="flex-1 flex space-x-2">
-                                            <input 
-                                                type="text" 
-                                                name="comment_content" 
-                                                placeholder="Write a comment..." 
-                                                class="comment-input flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                required
-                                                <?= !$current_user_id ? 'disabled placeholder="Please log in to comment"' : '' ?>
-                                            >
-                                            <button type="submit" class="text-blue-600 hover:text-blue-700" <?= !$current_user_id ? 'disabled' : '' ?>>
-                                                <i class="fas fa-paper-plane"></i>
+                                    <!-- Action Buttons -->
+                                    <div class="px-4 py-2 border-t border-gray-100">
+                                        <div class="flex items-center justify-around">
+                                            <!-- Like Button -->
+                                            <div class="relative" onmouseenter="showReactions(<?= $aid ?>)" onmouseleave="hideReactions(<?= $aid ?>)">
+                                                <?php 
+                                                // Get reaction text and color
+                                                $reaction_text = 'Like';
+                                                $reaction_color = 'text-gray-600';
+                                                
+                                                if ($user_reaction) {
+                                                    $emoji_to_text = [
+                                                        '👍' => 'Like',
+                                                        '❤️' => 'Love',
+                                                        '😂' => 'Haha',
+                                                        '😮' => 'Wow',
+                                                        '😢' => 'Sad',
+                                                        '😡' => 'Angry'
+                                                    ];
+                                                    
+                                                    $emoji_to_color = [
+                                                        '👍' => 'text-blue-600',
+                                                        '❤️' => 'text-red-500',
+                                                        '😂' => 'text-yellow-500',
+                                                        '😮' => 'text-yellow-500',
+                                                        '😢' => 'text-yellow-500',
+                                                        '😡' => 'text-red-600'
+                                                    ];
+                                                    
+                                                    $reaction_text = $emoji_to_text[$user_reaction] ?? 'Like';
+                                                    $reaction_color = $emoji_to_color[$user_reaction] ?? 'text-blue-600';
+                                                }
+                                                ?>
+                                                
+                                                <button id="react-btn-<?= $aid ?>" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center <?= $reaction_color ?>" <?= !$current_user_id ? 'disabled title="Please log in to react"' : '' ?>>
+                                                    <span class="text-lg" id="react-emoji-<?= $aid ?>"><?= $user_reaction ?: '👍' ?></span>
+                                                    <span class="font-medium" id="react-text-<?= $aid ?>"><?= $reaction_text ?></span>
+                                                </button>
+                                                <?php if ($current_user_id): ?>
+                                                <div class="reaction-menu" id="reaction-menu-<?= $aid ?>">
+                                                    <?php foreach (['👍', '❤️', '😂', '😮', '😢', '😡'] as $emo): ?>
+                                                        <button onclick="handleReaction(<?= $aid ?>, '<?= $emo ?>')" 
+                                                                class="hover:scale-125 transition-transform text-2xl p-1 rounded-full hover:bg-gray-100">
+                                                            <?= $emo ?>
+                                                        </button>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <!-- Comment Button -->
+                                            <button onclick="toggleComments(<?= $aid ?>)" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
+                                                <i class="far fa-comment"></i>
+                                                <span class="font-medium">Comment</span>
+                                            </button>
+
+                                            <!-- Share Button -->
+                                            <button class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
+                                                <i class="far fa-share"></i>
+                                                <span class="font-medium">Share</span>
                                             </button>
                                         </div>
-                                    </form>
+                                    </div>
+
+                                    <!-- Comments Section -->
+                                    <div id="comments-<?= $aid ?>" class="hidden border-t border-gray-100">
+                                        <!-- Existing Comments -->
+                                        <div class="px-4 py-3 space-y-3 max-h-96 overflow-y-auto">
+                                            <?php foreach ($comments as $comment): ?>
+                                                <div class="flex space-x-3">
+                                                    <div class="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm">
+                                                        <?= strtoupper(substr($comment['fname'], 0, 1)) ?>
+                                                    </div>
+                                                    <div class="flex-1">
+                                                        <div class="bg-gray-100 rounded-2xl px-3 py-2">
+                                                            <h4 class="font-semibold text-sm text-gray-900"><?= htmlspecialchars($comment['fname'] . ' ' . $comment['lname']) ?></h4>
+                                                            <p class="text-gray-800"><?= htmlspecialchars($comment['content']) ?></p>
+                                                        </div>
+                                                        <div class="flex items-center space-x-4 mt-1 text-xs text-gray-500">
+                                                            <span><?= date('M j \a\t g:i A', strtotime($comment['created_at'])) ?></span>
+                                                            <button class="hover:underline">Like</button>
+                                                            <button class="hover:underline">Reply</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+
+                                        <!-- Comment Input -->
+                                        <div class="px-4 py-3 border-t border-gray-100">
+                                            <form method="POST" class="flex space-x-3">
+                                                <input type="hidden" name="announcement_id" value="<?= $aid ?>">
+                                                <div class="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm">
+                                                    <?= isset($_SESSION['fname']) ? strtoupper(substr($_SESSION['fname'], 0, 1)) : 'U' ?>
+                                                </div>
+                                                <div class="flex-1 flex space-x-2">
+                                                    <input 
+                                                        type="text" 
+                                                        name="comment_content" 
+                                                        placeholder="Write a comment..." 
+                                                        class="comment-input flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        required
+                                                        <?= !$current_user_id ? 'disabled placeholder="Please log in to comment"' : '' ?>
+                                                    >
+                                                    <button type="submit" class="text-blue-600 hover:text-blue-700" <?= !$current_user_id ? 'disabled' : '' ?>>
+                                                        <i class="fas fa-paper-plane"></i>
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
                                 </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <?php if (empty($announcements)): ?>
+                            <div class="text-center py-12">
+                                <i class="fas fa-bullhorn text-6xl text-gray-300 mb-4"></i>
+                                <h3 class="text-xl font-semibold text-gray-700 mb-2">No announcements yet</h3>
+                                <p class="text-gray-500">Be the first to create an announcement!</p>
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="mt-8 text-center">
+                            <a href="admin_homepage.php" class="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium">
+                                <i class="fas fa-arrow-left mr-2"></i>
+                                Back to Dashboard
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Sidebar with Widgets -->
+                    <div class="w-80 space-y-4">
+                        <!-- Weather Widget -->
+                        <div class="widget-card" id="weather-widget">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-cloud-sun text-blue-500 mr-2"></i>
+                                    Weather
+                                </h3>
+                                <button onclick="refreshWeather()" class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                            <div id="weather-content">
+                                <div class="loading-spinner mx-auto"></div>
+                                <p class="text-center text-gray-500 mt-2">Loading weather...</p>
                             </div>
                         </div>
-                    <?php endforeach; ?>
-                </div>
 
-                <?php if (empty($announcements)): ?>
-                    <div class="text-center py-12">
-                        <i class="fas fa-bullhorn text-6xl text-gray-300 mb-4"></i>
-                        <h3 class="text-xl font-semibold text-gray-700 mb-2">No announcements yet</h3>
-                        <p class="text-gray-500">Be the first to create an announcement!</p>
+                        <!-- Daily Quote Widget -->
+                        <div class="widget-card" id="quote-widget">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-quote-left text-purple-500 mr-2"></i>
+                                    Daily Quote
+                                </h3>
+                                <button onclick="refreshQuote()" class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                            <div id="quote-content">
+                                <div class="loading-spinner mx-auto"></div>
+                                <p class="text-center text-gray-500 mt-2">Loading quote...</p>
+                            </div>
+                        </div>
+
+                        <!-- News Widget -->
+                        <div class="widget-card" id="news-widget">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-newspaper text-red-500 mr-2"></i>
+                                    Latest News
+                                </h3>
+                                <button onclick="refreshNews()" class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                            <div id="news-content">
+                                <div class="loading-spinner mx-auto"></div>
+                                <p class="text-center text-gray-500 mt-2">Loading news...</p>
+                            </div>
+                        </div>
+
+                        <!-- Fun Facts Widget -->
+                        <div class="widget-card" id="facts-widget">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+                                    Fun Fact
+                                </h3>
+                                <button onclick="refreshFact()" class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                            <div id="fact-content">
+                                <div class="loading-spinner mx-auto"></div>
+                                <p class="text-center text-gray-500 mt-2">Loading fact...</p>
+                            </div>
+                        </div>
                     </div>
-                <?php endif; ?>
-
-                <div class="mt-8 text-center">
-                    <a href="admin_homepage.php" class="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium">
-                        <i class="fas fa-arrow-left mr-2"></i>
-                        Back to Dashboard
-                    </a>
                 </div>
             </div>
         </main>
@@ -483,6 +655,212 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
 
 <script>
 let reactionTimeouts = {};
+
+// API functions
+async function loadWeather() {
+    try {
+        // Using OpenWeatherMap API (you'll need to get a free API key)
+        // For demo, I'll use a weather service that doesn't require API key
+        const response = await fetch('https://api.weatherapi.com/v1/current.json?key=demo&q=Pampanga&aqi=no');
+        
+        if (!response.ok) {
+            throw new Error('Weather service unavailable');
+        }
+        
+        const data = await response.json();
+        document.getElementById('weather-content').innerHTML = `
+            <div class="text-center">
+                <div class="weather-icon text-4xl mb-2">${getWeatherIcon(data.current.condition.text)}</div>
+                <h4 class="text-xl font-bold text-gray-800">${Math.round(data.current.temp_c)}°C</h4>
+                <p class="text-gray-600">${data.current.condition.text}</p>
+                <p class="text-sm text-gray-500 mt-2">${data.location.name}, ${data.location.country}</p>
+                <div class="flex justify-between mt-3 text-sm">
+                    <span>Humidity: ${data.current.humidity}%</span>
+                    <span>Wind: ${Math.round(data.current.wind_kph)} km/h</span>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        // Fallback weather data
+        document.getElementById('weather-content').innerHTML = `
+            <div class="text-center">
+                <div class="weather-icon text-4xl mb-2">☀️</div>
+                <h4 class="text-xl font-bold text-gray-800">29°C</h4>
+                <p class="text-gray-600">Partly Cloudy</p>
+                <p class="text-sm text-gray-500 mt-2">Pampanga, Philippines</p>
+                <div class="flex justify-between mt-3 text-sm">
+                    <span>Humidity: 72%</span>
+                    <span>Wind: 15 km/h</span>
+                </div>
+            </div>
+        `;
+    }
+}
+
+async function loadQuote() {
+    try {
+        const response = await fetch('https://api.quotable.io/random?minLength=50&maxLength=150');
+        
+        if (!response.ok) {
+            throw new Error('Quote service unavailable');
+        }
+        
+        const data = await response.json();
+        document.getElementById('quote-content').innerHTML = `
+            <div class="text-center">
+                <p class="quote-text text-gray-700 mb-3">"${data.content}"</p>
+                <p class="text-sm text-gray-500">— ${data.author}</p>
+            </div>
+        `;
+    } catch (error) {
+        // Fallback quotes
+        const fallbackQuotes = [
+            { content: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+            { content: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
+            { content: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+            { content: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" }
+        ];
+        
+        const randomQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+        document.getElementById('quote-content').innerHTML = `
+            <div class="text-center">
+                <p class="quote-text text-gray-700 mb-3">"${randomQuote.content}"</p>
+                <p class="text-sm text-gray-500">— ${randomQuote.author}</p>
+            </div>
+        `;
+    }
+}
+
+async function loadNews() {
+    try {
+        // Using NewsAPI or similar - you'll need an API key
+        // For demo, using a free news service
+        const response = await fetch('https://newsapi.org/v2/top-headlines?country=ph&pageSize=5&apiKey=demo');
+        
+        if (!response.ok) {
+            throw new Error('News service unavailable');
+        }
+        
+        const data = await response.json();
+        let newsHtml = '';
+        
+        data.articles.slice(0, 5).forEach(article => {
+            newsHtml += `
+                <div class="news-item" onclick="window.open('${article.url}', '_blank')">
+                    <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">${article.title}</h5>
+                    <p class="text-xs text-gray-500">${article.source.name} • ${new Date(article.publishedAt).toLocaleDateString()}</p>
+                </div>
+            `;
+        });
+        
+        document.getElementById('news-content').innerHTML = newsHtml;
+    } catch (error) {
+        // Fallback news
+        document.getElementById('news-content').innerHTML = `
+            <div class="news-item">
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Philippine Economy Shows Strong Growth</h5>
+                <p class="text-xs text-gray-500">Business World • Today</p>
+            </div>
+            <div class="news-item">
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">New Technology Hub Opens in Pampanga</h5>
+                <p class="text-xs text-gray-500">Tech News • Today</p>
+            </div>
+            <div class="news-item">
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Education Reforms Announced</h5>
+                <p class="text-xs text-gray-500">Education Today • Yesterday</p>
+            </div>
+            <div class="news-item">
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Climate Change Initiative Launched</h5>
+                <p class="text-xs text-gray-500">Environmental News • Yesterday</p>
+            </div>
+        `;
+    }
+}
+
+async function loadFact() {
+    try {
+        const response = await fetch('https://uselessfacts.jsph.pl/random.json?language=en');
+        
+        if (!response.ok) {
+            throw new Error('Facts service unavailable');
+        }
+        
+        const data = await response.json();
+        document.getElementById('fact-content').innerHTML = `
+            <div class="text-center">
+                <p class="text-gray-700 leading-relaxed">${data.text}</p>
+            </div>
+        `;
+    } catch (error) {
+        // Fallback facts
+        const fallbackFacts = [
+            "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly edible.",
+            "Octopuses have three hearts and blue blood.",
+            "A group of flamingos is called a 'flamboyance'.",
+            "Bananas are berries, but strawberries aren't.",
+            "The shortest war in history lasted only 38-45 minutes between Britain and Zanzibar in 1896."
+        ];
+        
+        const randomFact = fallbackFacts[Math.floor(Math.random() * fallbackFacts.length)];
+        document.getElementById('fact-content').innerHTML = `
+            <div class="text-center">
+                <p class="text-gray-700 leading-relaxed">${randomFact}</p>
+            </div>
+        `;
+    }
+}
+
+function getWeatherIcon(condition) {
+    condition = condition.toLowerCase();
+    if (condition.includes('sunny') || condition.includes('clear')) return '☀️';
+    if (condition.includes('cloud')) return '☁️';
+    if (condition.includes('rain')) return '🌧️';
+    if (condition.includes('storm')) return '⛈️';
+    if (condition.includes('snow')) return '❄️';
+    if (condition.includes('fog') || condition.includes('mist')) return '🌫️';
+    return '🌤️';
+}
+
+// Refresh functions
+function refreshWeather() {
+    document.getElementById('weather-content').innerHTML = '<div class="loading-spinner mx-auto"></div><p class="text-center text-gray-500 mt-2">Loading weather...</p>';
+    loadWeather();
+}
+
+function refreshQuote() {
+    document.getElementById('quote-content').innerHTML = '<div class="loading-spinner mx-auto"></div><p class="text-center text-gray-500 mt-2">Loading quote...</p>';
+    loadQuote();
+}
+
+function refreshNews() {
+    document.getElementById('news-content').innerHTML = '<div class="loading-spinner mx-auto"></div><p class="text-center text-gray-500 mt-2">Loading news...</p>';
+    loadNews();
+}
+
+function refreshFact() {
+    document.getElementById('fact-content').innerHTML = '<div class="loading-spinner mx-auto"></div><p class="text-center text-gray-500 mt-2">Loading fact...</p>';
+    loadFact();
+}
+
+// Load all widgets when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadWeather();
+    loadQuote();
+    loadNews();
+    loadFact();
+    
+    // Auto-refresh every 30 minutes
+    setInterval(() => {
+        loadWeather();
+        loadNews();
+    }, 30 * 60 * 1000);
+    
+    // Refresh quote and fact every hour
+    setInterval(() => {
+        loadQuote();
+        loadFact();
+    }, 60 * 60 * 1000);
+});
 
 function handleReaction(postId, emoji) {
     fetch('react.php', {
@@ -518,15 +896,45 @@ function updateReactionUI(postId, userReaction, reactions) {
     // Update the reaction button
     const button = document.getElementById('react-btn-' + postId);
     const emoji = document.getElementById('react-emoji-' + postId);
+    const text = document.getElementById('react-text-' + postId);
     
-    if (button && emoji) {
-        emoji.textContent = userReaction || '👍';
-        
+    // Map emojis to their text labels
+    const emojiToText = {
+        '👍': 'Like',
+        '❤️': 'Love',
+        '😂': 'Haha',
+        '😮': 'Wow',
+        '😢': 'Sad',
+        '😡': 'Angry'
+    };
+    
+    // Map emojis to their colors (Facebook-style)
+    const emojiToColor = {
+        '👍': 'text-blue-600',
+        '❤️': 'text-red-500',
+        '😂': 'text-yellow-500',
+        '😮': 'text-yellow-500',
+        '😢': 'text-yellow-500',
+        '😡': 'text-red-600'
+    };
+    
+    if (button && emoji && text) {
         if (userReaction) {
-            button.classList.remove('text-gray-600');
-            button.classList.add('text-blue-600');
+            // User has reacted - show their reaction
+            emoji.textContent = userReaction;
+            text.textContent = emojiToText[userReaction] || 'Like';
+            
+            // Remove all color classes
+            button.classList.remove('text-gray-600', 'text-blue-600', 'text-red-500', 'text-yellow-500', 'text-red-600');
+            // Add the specific color for this reaction
+            button.classList.add(emojiToColor[userReaction] || 'text-blue-600');
         } else {
-            button.classList.remove('text-blue-600');
+            // No reaction - show default
+            emoji.textContent = '👍';
+            text.textContent = 'Like';
+            
+            // Remove all color classes and set to default
+            button.classList.remove('text-blue-600', 'text-red-500', 'text-yellow-500', 'text-red-600');
             button.classList.add('text-gray-600');
         }
     }
@@ -554,6 +962,19 @@ function updateReactionUI(postId, userReaction, reactions) {
                 summaryDiv.style.display = 'none';
             }
         }
+    }
+}
+
+function toggleContent(postId, showFull) {
+    const preview = document.getElementById('preview-' + postId);
+    const full = document.getElementById('full-' + postId);
+    
+    if (showFull) {
+        preview.classList.add('hidden');
+        full.classList.remove('hidden');
+    } else {
+        full.classList.add('hidden');
+        preview.classList.remove('hidden');
     }
 }
 

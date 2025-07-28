@@ -66,20 +66,20 @@ try {
     $current_date = date("Y-m-d");
 
     // Check if checklist exists; if not, create a blank one
+// Check if checklist exists; if not, create a blank one
 $stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
 $stmt->execute([$employee_id]);
 $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$checklist) {
-        // Insert blank checklist for this employee
-        $insert = $pdo->prepare("INSERT INTO employee_checklist (employee_id) VALUES (?)");
-        $insert->execute([$employee_id]);
+if (!$checklist) {
+    // Insert blank checklist for this employee
+    $insert = $pdo->prepare("INSERT INTO employee_checklist (employee_id) VALUES (?)");
+    $insert->execute([$employee_id]);
 
-        // Re-fetch checklist after insertion
-        $check_stmt->execute([$employee_id]);
-        $checklist = $check_stmt->fetch(PDO::FETCH_ASSOC);
-    }
-
+    // Re-fetch checklist after insertion
+    $stmt->execute([$employee_id]); // ✅ FIXED - Use $stmt instead of $check_stmt
+    $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
+}
     // Now you have both $user and $checklist available
 } catch (PDOException $e) {
     // Handle errors gracefully
@@ -686,90 +686,7 @@ $announcementCount = $stmt->fetchColumn();
     <?php include 'attendance-history.php'; ?>
 </div>
 
-     <!-- Request Change Schedule -->
-<div id="scheduleView" class="hidden mt-12">
-  <div class="flex justify-center items-start min-h-[60vh] px-4">
-    <div class="w-full max-w-xl">
-
-      <!-- Floating Green Header -->
-      <div class="bg-green-600 p-4 rounded-t-xl shadow-lg text-center">
-        <h2 class="text-2xl font-semibold text-white">
-          Request Change of Work Schedule
-        </h2>
-      </div>
-
-      <!-- Card Pulled Up Under Header -->
-      <div class="bg-white p-6 rounded-b-xl shadow-lg border border-green-200 -mt-1">
-        <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm" class="space-y-5">
-          <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-          <input type="hidden" name="submit_schedule_change" value="1">
-
-          <!-- Date Range -->
-          <div>
-            <label for="date_range" class="block text-sm font-medium text-gray-700 mb-1">
-              Effective Date Range
-            </label>
-            <input type="text" name="date_range" id="date_range"
-              class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Choose date range" required>
-          </div>
-
-          <!-- New Work Hours -->
-          <div>
-            <label for="work_schedule_id" class="block text-sm font-medium text-gray-700 mb-1">
-              New Work Hours
-            </label>
-            <select name="work_schedule_id" id="work_schedule_id"
-              class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              required>
-              <option value="" disabled selected>Select new work hours</option>
-              <?php 
-              $allowed = [3, 4, 5, 6, 7, 8, 9, 10];
-              foreach ($work_schedules as $ws):
-                  if (in_array($ws['id'], $allowed)):
-              ?>
-                  <option value="<?= $ws['id'] ?>">
-                      <?= date("g:i A", strtotime($ws['time_in'])) ?> to <?= date("g:i A", strtotime($ws['time_out'])) ?>
-                  </option>
-              <?php 
-                  endif;
-              endforeach;
-              ?>
-            </select>
-          </div>
-
-          <!-- Reason -->
-          <div>
-            <label for="reason" class="block text-sm font-medium text-gray-700 mb-1">
-              Reason
-            </label>
-            <textarea name="reason" id="reason" rows="3"
-              class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="Explain your reason for the schedule change" required></textarea>
-          </div>
-
-<!-- Attachment -->
-<div>
-  <label class="block text-sm font-medium text-gray-700 mb-1">Attachment <span class="text-red-500">*</span></label>
-  <input 
-    type="file" 
-    name="attachment_scr" 
-    accept=".pdf,.jpg,.jpeg,.png"
-    required
-    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-</div>
-
-          <!-- Submit Button -->
-          <button type="submit"
-            class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
-            Submit Request
-          </button>
-        </form>
-      </div>
-              </div>
-    </div>
-  </div>
-
+<?php include 'schedule_change_form.php'; ?>
 
 
 <!-- Profile Section -->
@@ -1008,7 +925,7 @@ $announcementCount = $stmt->fetchColumn();
 </div>
 
 <!-- News Feed View -->
-<div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-2xl mx-auto">
+<div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-6xl mx-auto">
   <?php include 'news_feed_content.php'; ?>
 </div>
 
@@ -1051,89 +968,7 @@ $announcementCount = $stmt->fetchColumn();
     <?php include 'leave_credits.php'; ?>
 </div>
 
-<!-- Request Leave -->
-<div id="requestView" class="hidden mt-12">
-  <div class="flex justify-center items-start min-h-[60vh] px-4">
-    <div class="w-full max-w-xl">
-
-      <!-- Floating Green Header Outside the Card -->
-      <div class="bg-green-600 p-4 rounded-t-xl shadow-lg text-center">
-        <h2 class="text-2xl font-semibold text-white">Request Leave</h2>
-      </div>
-
-      <!-- Card Slightly Pulled Up -->
-      <div class="bg-white p-6 rounded-b-xl shadow-lg border border-green-200 -mt-1">
-        <form id="leaveRequestForm" action="time_log_create.php" method="POST" enctype="multipart/form-data" class="space-y-5">
-          <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
-
-          <!-- Leave Type -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Leave Type</label>
-            <select name="leaveType" id="leaveType" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-              <option value="" disabled selected>Select type</option>
-              <?php
-              $types = [
-                'sick'          => 'Sick Leave (SL)',
-                'vacation'      => 'Vacation Leave (VL)',
-                'paternity'     => 'Paternity Leave',
-                'maternity'     => 'Maternity Leave',
-                'solo_parent'   => 'Solo Parent Leave (SPL)',
-                'halfday'       => 'Half Day Vacation (Half_VL)',
-                'halfday_sick'  => 'Half Day Sick (Half_SL)',
-                'lwop'          => 'Leave Without Pay (LWOP)',
-                'bereavement'   => 'Bereavement Leave',
-              ];
-              foreach ($types as $val => $label):
-              ?>
-                <option value="<?= $val ?>"><?= $label ?></option>
-              <?php endforeach; ?>
-            </select>
-
-            <!-- Leave Credit Display -->
-            <div id="leaveBalance" class="text-sm mt-2 text-gray-600 hidden"></div>
-          </div>
-
-          <!-- Date Range -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Leave Dates</label>
-            <input type="text" name="date_range" id="date_range" placeholder="Choose date range"
-              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" required>
-          </div>
-
-          <!-- Reason -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-            <textarea name="reason" rows="3" placeholder="Enter reason..."
-              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
-          </div>
-
-          <!-- Attachment -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Attachment <span class="text-red-500">*</span></label>
-            <input 
-              type="file" 
-              name="attachment_lr" 
-              accept=".pdf,.jpg,.jpeg,.png"
-              required
-              class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-          </div>
-            
-          <!-- Leave Balance Message -->
-<div id="leaveBalanceDisplay" class="hidden mt-2 text-sm text-red-600 font-medium text-center"></div>
-
-          <!-- Submit -->
-<button type="submit" id="submitBtn"
-  class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-200 font-semibold text-lg">
-  Submit Request
-</button>
-        </form>
-
-        <!-- Message Box -->
-        <div id="messageBox" class="hidden mt-4 p-2 text-center text-white rounded"></div>
-      </div>
-    </div>
-  </div>
-</div>
+<?php include 'leave_request_form.php'; ?>
 
 <?php
 // PHP: Load leave credits for current user
