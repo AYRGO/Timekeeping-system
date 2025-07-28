@@ -65,7 +65,7 @@ if ($currentActiveSchedule) {
     // Check if latest request is pending (while current approved is still active)
     if ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') {
         $schedule_status = "pending";
-        $status_text = "New Change Pending";
+        $status_text = "New Schedule Pending";
     } else {
         $schedule_status = "approved";
         $status_text = "Active Schedule (" . date('M d', strtotime($currentActiveSchedule['start_date'])) . " - " . date('M d', strtotime($currentActiveSchedule['end_date'])) . ")";

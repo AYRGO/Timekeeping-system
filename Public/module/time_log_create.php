@@ -1008,7 +1008,7 @@ $announcementCount = $stmt->fetchColumn();
 </div>
 
 <!-- News Feed View -->
-<div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-7xl mx-auto">
+<div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-2xl mx-auto">
   <?php include 'news_feed_content.php'; ?>
 </div>
 
