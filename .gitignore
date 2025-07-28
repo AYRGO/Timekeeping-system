@@ -1,0 +1,39 @@
+# Environment Configuration
+.env
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+error_log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Sensitive uploads (if any)
+Public/uploads/sensitive/
+
+# Node modules (if using)
+node_modules/
+
+# Composer
+/vendor/
+
+# Cache
+cache/
+*.cache
