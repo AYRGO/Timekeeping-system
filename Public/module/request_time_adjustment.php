@@ -2,6 +2,7 @@
 
 session_start();
 include('../config/db.php');
+include_once('../config/env.php');
 date_default_timezone_set('Asia/Manila');
 
 if (!isset($_SESSION['regenerated'])) {
@@ -47,44 +48,50 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
             error_log("No reCAPTCHA response found");
         } else {
             error_log("reCAPTCHA response received: " . substr($recaptcha_response, 0, 20) . "...");
-            // Verify reCAPTCHA v2 with Google - UPDATED SECRET KEY
-            $secret_key = "6LfuRJErAAAAAH3JDCIKSZsY73CXGJ2YzoD8A75s";
-            $verify_url = "https://www.google.com/recaptcha/api/siteverify";
+            // Verify reCAPTCHA v2 with Google
+            $secret_key = EnvLoader::get('RECAPTCHA_SECRET_KEY');
             
-            $post_data = [
-                'secret' => $secret_key,
-                'response' => $recaptcha_response,
-                'remoteip' => $_SERVER['REMOTE_ADDR']
-            ];
-            
-            $options = [
-                'http' => [
-                    'header' => "Content-type: application/x-www-form-urlencoded\r\n",
-                    'method' => 'POST',
-                    'content' => http_build_query($post_data)
-                ]
-            ];
-            
-            $context = stream_context_create($options);
-            $response = file_get_contents($verify_url, false, $context);
-            $response_data = json_decode($response);
-            
-            error_log("Google response: " . json_encode($response_data));
-            
-            if ($response_data && $response_data->success) {
-                $_SESSION['human_verified_adjustment'] = true;
-                // Force session write to ensure it's saved
-                session_write_close();
-                session_start();
-                error_log("Verification successful, setting session and redirecting");
-                
-                // Clean redirect without parameters to avoid loops
-                header('Location: ' . $_SERVER['PHP_SELF']);
-                exit;
+            if (!$secret_key) {
+                $verification_error = "reCAPTCHA configuration error. Please contact administrator.";
+                error_log("reCAPTCHA secret key not configured");
             } else {
-                $error_codes = isset($response_data->{'error-codes'}) ? implode(', ', $response_data->{'error-codes'}) : 'Unknown error';
-                $verification_error = "reCAPTCHA verification failed. Error: " . $error_codes;
-                error_log("Verification failed: " . $verification_error);
+                $verify_url = "https://www.google.com/recaptcha/api/siteverify";
+                
+                $post_data = [
+                    'secret' => $secret_key,
+                    'response' => $recaptcha_response,
+                    'remoteip' => $_SERVER['REMOTE_ADDR']
+                ];
+                
+                $options = [
+                    'http' => [
+                        'header' => "Content-type: application/x-www-form-urlencoded\r\n",
+                        'method' => 'POST',
+                        'content' => http_build_query($post_data)
+                    ]
+                ];
+                
+                $context = stream_context_create($options);
+                $response = file_get_contents($verify_url, false, $context);
+                $response_data = json_decode($response);
+                
+                error_log("Google response: " . json_encode($response_data));
+                
+                if ($response_data && $response_data->success) {
+                    $_SESSION['human_verified_adjustment'] = true;
+                    // Force session write to ensure it's saved
+                    session_write_close();
+                    session_start();
+                    error_log("Verification successful, setting session and redirecting");
+                    
+                    // Clean redirect without parameters to avoid loops
+                    header('Location: ' . $_SERVER['PHP_SELF']);
+                    exit;
+                } else {
+                    $error_codes = isset($response_data->{'error-codes'}) ? implode(', ', $response_data->{'error-codes'}) : 'Unknown error';
+                    $verification_error = "reCAPTCHA verification failed. Error: " . $error_codes;
+                    error_log("Verification failed: " . $verification_error);
+                }
             }
         }
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -403,7 +410,7 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
                     
                     // Render the reCAPTCHA widget
                     widgetId = grecaptcha.render('recaptcha-widget', {
-                        'sitekey': '6LfuRJErAAAAAMxL8Ph_fKJhGjiJy4zLMMyAkiaR',
+                        'sitekey': '<?= EnvLoader::get('RECAPTCHA_SITE_KEY') ?>',
                         'theme': 'light',
                         'size': 'normal',
                         'hl': 'en',

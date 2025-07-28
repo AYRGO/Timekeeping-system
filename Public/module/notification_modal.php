@@ -15,17 +15,23 @@ $notifications = [];
 function sendEmail($to, $name, $subject, $body) {
     $mail = new PHPMailer(true);
     try {
+        // Validate required SMTP configuration
+        if (!EnvLoader::get('SMTP_HOST') || !EnvLoader::get('SMTP_USER') || !EnvLoader::get('SMTP_PASS')) {
+            error_log("SMTP configuration missing in environment variables");
+            return false;
+        }
+        
         $mail->CharSet    = 'UTF-8';
         $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
+        $mail->Host       = EnvLoader::get('SMTP_HOST');
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'it.resourcestaff@gmail.com';
+        $mail->Username   = EnvLoader::get('SMTP_USER');
 
         // ✅ Use Gmail App Password here (NOT your real Gmail password)
-        $mail->Password   = 'fqbr ocgu jcfh jwdy';
+        $mail->Password   = EnvLoader::get('SMTP_PASS');
 
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = 587;
+        $mail->Port       = EnvLoader::get('SMTP_PORT') ?: 587;
 
         $mail->SMTPOptions = [
             'ssl' => [
@@ -35,7 +41,10 @@ function sendEmail($to, $name, $subject, $body) {
             ]
         ];
 
-        $mail->setFrom('it.resourcestaff@gmail.com', 'MailBot - IT Support Specialist');
+        $mail->setFrom(
+            EnvLoader::get('SMTP_FROM_EMAIL') ?: EnvLoader::get('SMTP_USER'), 
+            EnvLoader::get('SMTP_FROM_NAME') ?: 'System Notification'
+        );
         $mail->addAddress($to, $name);
 
         $mail->isHTML(true);
