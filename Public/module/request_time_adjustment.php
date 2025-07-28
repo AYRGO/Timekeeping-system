@@ -15,6 +15,461 @@ if (!$employee_id) {
     exit;
 }
 
+// Human verification check with reCAPTCHA v2
+if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_adjustment'] !== true) {
+    // Handle verification form submission
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_human'])) {
+        $recaptcha_response = $_POST['g-recaptcha-response'] ?? '';
+        
+        if (empty($recaptcha_response)) {
+            $verification_error = "Please complete the reCAPTCHA verification.";
+        } else {
+            // Verify reCAPTCHA v2 with Google - UPDATED SECRET KEY
+            $secret_key = "6LfuRJErAAAAAH3JDCIKSZsY73CXGJ2YzoD8A75s";
+            $verify_url = "https://www.google.com/recaptcha/api/siteverify";
+            
+            $post_data = [
+                'secret' => $secret_key,
+                'response' => $recaptcha_response,
+                'remoteip' => $_SERVER['REMOTE_ADDR']
+            ];
+            
+            $options = [
+                'http' => [
+                    'header' => "Content-type: application/x-www-form-urlencoded\r\n",
+                    'method' => 'POST',
+                    'content' => http_build_query($post_data)
+                ]
+            ];
+            
+            $context = stream_context_create($options);
+            $response = file_get_contents($verify_url, false, $context);
+            $response_data = json_decode($response);
+            
+            if ($response_data && $response_data->success) {
+                $_SESSION['human_verified_adjustment'] = true;
+                header('Location: ' . $_SERVER['PHP_SELF']);
+                exit;
+            } else {
+                $error_codes = isset($response_data->{'error-codes'}) ? implode(', ', $response_data->{'error-codes'}) : 'Unknown error';
+                $verification_error = "reCAPTCHA verification failed. Error: " . $error_codes;
+            }
+        }
+    }
+    
+    // Show verification page
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Human Verification - Time Adjustment Request</title>
+        <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #f8f9fa;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #333;
+            }
+            
+            .container {
+                max-width: 1000px;
+                width: 100%;
+                background: white;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                border-radius: 12px;
+                overflow: hidden;
+                display: flex;
+                min-height: 500px;
+            }
+            
+            .left-panel {
+                flex: 1;
+                background: #333;
+                color: white;
+                padding: 40px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+            
+            .right-panel {
+                flex: 1;
+                padding: 40px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+            
+            .logo {
+                width: 60px;
+                height: 60px;
+                background: white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 30px;
+                font-size: 24px;
+                color: #333;
+            }
+            
+            .title {
+                font-size: 28px;
+                font-weight: 700;
+                margin-bottom: 15px;
+                line-height: 1.2;
+            }
+            
+            .subtitle {
+                font-size: 16px;
+                opacity: 0.9;
+                margin-bottom: 30px;
+                line-height: 1.5;
+            }
+            
+            .features {
+                list-style: none;
+            }
+            
+            .features li {
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                font-size: 14px;
+            }
+            
+            .features li:before {
+                content: "✓";
+                margin-right: 12px;
+                font-weight: bold;
+                color: #4ade80;
+            }
+            
+            .form-title {
+                font-size: 24px;
+                font-weight: 600;
+                margin-bottom: 10px;
+                color: #333;
+            }
+            
+            .form-subtitle {
+                color: #666;
+                margin-bottom: 30px;
+                font-size: 14px;
+            }
+            
+            .error-message {
+                background: #fee;
+                border: 1px solid #fcc;
+                color: #c33;
+                padding: 12px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+                font-size: 14px;
+            }
+            
+            .recaptcha-container {
+                margin: 20px 0;
+                display: flex;
+                justify-content: center;
+                min-height: 78px;
+                align-items: center;
+            }
+            
+            .loading-message {
+                color: #666;
+                font-style: italic;
+                text-align: center;
+            }
+            
+            .submit-btn {
+                width: 100%;
+                padding: 14px;
+                background: #333;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                margin-top: 20px;
+            }
+            
+            .submit-btn:hover:not(:disabled) {
+                background: #222;
+                transform: translateY(-1px);
+            }
+            
+            .submit-btn:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+                transform: none;
+            }
+            
+            .status-text {
+                text-align: center;
+                margin-top: 15px;
+                font-size: 14px;
+                color: #666;
+            }
+            
+            .status-text.success {
+                color: #22c55e;
+            }
+            
+            .status-text.error {
+                color: #ef4444;
+            }
+            
+            .help-section {
+                margin-top: 30px;
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 6px;
+                border-left: 4px solid #333;
+            }
+            
+            .help-title {
+                font-weight: 600;
+                margin-bottom: 10px;
+                color: #333;
+            }
+            
+            .help-list {
+                list-style: none;
+                font-size: 13px;
+                color: #666;
+            }
+            
+            .help-list li {
+                margin-bottom: 6px;
+                padding-left: 15px;
+                position: relative;
+            }
+            
+            .help-list li:before {
+                content: "•";
+                position: absolute;
+                left: 0;
+                color: #333;
+            }
+            
+            @media (max-width: 768px) {
+                .container {
+                    flex-direction: column;
+                    margin: 20px;
+                    max-width: none;
+                }
+                
+                .left-panel, .right-panel {
+                    padding: 30px;
+                }
+                
+                .title {
+                    font-size: 24px;
+                }
+                
+                .form-title {
+                    font-size: 20px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <!-- Left Panel -->
+            <div class="left-panel">
+                <div class="logo">🛡️</div>
+                <h1 class="title">Security Verification Required</h1>
+                <p class="subtitle">Please complete the human verification to access the time adjustment request system.</p>
+                
+                <ul class="features">
+                    <li>Secure access protection</li>
+                    <li>Bot prevention system</li>
+                    <li>Data integrity protection</li>
+                    <li>Quick verification process</li>
+                </ul>
+            </div>
+            
+            <!-- Right Panel -->
+            <div class="right-panel">
+                <h2 class="form-title">Human Verification</h2>
+                <p class="form-subtitle">Complete the puzzle below to continue</p>
+                
+                <?php if (isset($verification_error)): ?>
+                    <div class="error-message">
+                        ⚠️ <?= htmlspecialchars($verification_error) ?>
+                    </div>
+                <?php endif; ?>
+                
+                <form method="POST" id="verificationForm">
+                    <div class="recaptcha-container" id="recaptchaContainer">
+                        <div class="loading-message" id="loadingMessage">
+                            🔄 Loading verification puzzle...
+                        </div>
+                        <div id="recaptcha-widget"></div>
+                    </div>
+                    
+                    <div id="statusMessage" class="status-text">
+                        Waiting for puzzle to load...
+                    </div>
+                    
+                    <button type="submit" name="verify_human" id="submitBtn" class="submit-btn" disabled>
+                        Complete Puzzle to Continue
+                    </button>
+                </form>
+                
+                <div class="help-section">
+                    <div class="help-title">How to complete verification:</div>
+                    <ul class="help-list">
+                        <li>Wait for the puzzle to load completely</li>
+                        <li>Click the checkbox "I'm not a robot"</li>
+                        <li>Complete the image challenge if prompted</li>
+                        <li>Select all squares with the specified object</li>
+                        <li>Click "VERIFY" when done selecting</li>
+                        <li>The form will unlock automatically</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            let recaptchaLoaded = false;
+            let recaptchaRendered = false;
+            let widgetId = null;
+            
+            // Global callback function - called when reCAPTCHA API loads
+            window.onRecaptchaLoad = function() {
+                console.log('reCAPTCHA API loaded successfully');
+                recaptchaLoaded = true;
+                
+                try {
+                    // Hide loading message
+                    document.getElementById('loadingMessage').style.display = 'none';
+                    
+                    // Render the reCAPTCHA widget
+                    widgetId = grecaptcha.render('recaptcha-widget', {
+                        'sitekey': '6LfuRJErAAAAAMxL8Ph_fKJhGjiJy4zLMMyAkiaR',
+                        'theme': 'light',
+                        'callback': onRecaptchaSuccess,
+                        'expired-callback': onRecaptchaExpired,
+                        'error-callback': onRecaptchaError
+                    });
+                    
+                    recaptchaRendered = true;
+                    document.getElementById('statusMessage').textContent = 'Complete the puzzle above to proceed';
+                    console.log('reCAPTCHA rendered successfully with widget ID:', widgetId);
+                    
+                } catch (error) {
+                    console.error('Error rendering reCAPTCHA:', error);
+                    showError('Failed to load puzzle. Please refresh the page.');
+                }
+            };
+            
+            function onRecaptchaSuccess(token) {
+                console.log('reCAPTCHA completed successfully!', token);
+                
+                const submitBtn = document.getElementById('submitBtn');
+                const statusMessage = document.getElementById('statusMessage');
+                
+                // Enable submit button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Verification Complete - Continue';
+                submitBtn.style.background = '#22c55e';
+                
+                // Update status
+                statusMessage.textContent = 'Puzzle completed successfully!';
+                statusMessage.className = 'status-text success';
+            }
+            
+            function onRecaptchaExpired() {
+                console.log('reCAPTCHA expired');
+                
+                const submitBtn = document.getElementById('submitBtn');
+                const statusMessage = document.getElementById('statusMessage');
+                
+                // Reset button
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Complete Puzzle to Continue';
+                submitBtn.style.background = '#ccc';
+                
+                // Update status
+                statusMessage.textContent = 'Puzzle expired. Please solve it again.';
+                statusMessage.className = 'status-text error';
+            }
+            
+            function onRecaptchaError() {
+                console.log('reCAPTCHA error occurred');
+                showError('Error loading puzzle. Please refresh the page.');
+            }
+            
+            function showError(message) {
+                const statusMessage = document.getElementById('statusMessage');
+                statusMessage.textContent = message;
+                statusMessage.className = 'status-text error';
+                
+                // Show refresh suggestion
+                setTimeout(() => {
+                    statusMessage.innerHTML = message + ' <a href="javascript:window.location.reload()" style="color: #ef4444; text-decoration: underline;">Click here to refresh</a>';
+                }, 2000);
+            }
+            
+            // Form validation
+            document.getElementById('verificationForm').addEventListener('submit', function(e) {
+                if (!recaptchaLoaded || !recaptchaRendered || widgetId === null) {
+                    e.preventDefault();
+                    alert('Please wait for the reCAPTCHA to load completely.');
+                    return false;
+                }
+                
+                const response = grecaptcha.getResponse(widgetId);
+                if (!response) {
+                    e.preventDefault();
+                    alert('Please complete the reCAPTCHA puzzle first.');
+                    return false;
+                }
+                
+                // Show loading
+                const submitBtn = document.getElementById('submitBtn');
+                submitBtn.textContent = 'Verifying...';
+                submitBtn.disabled = true;
+            });
+            
+            // Fallback check after page loads
+            window.addEventListener('load', function() {
+                console.log('Page loaded, checking reCAPTCHA status');
+                
+                setTimeout(function() {
+                    if (typeof grecaptcha === 'undefined') {
+                        console.log('reCAPTCHA API failed to load');
+                        document.getElementById('loadingMessage').textContent = '❌ Failed to load verification system';
+                        showError('Network error. Please check your connection and refresh.');
+                    } else if (!recaptchaRendered) {
+                        console.log('reCAPTCHA API loaded but not rendered, manually triggering');
+                        window.onRecaptchaLoad();
+                    }
+                }, 5000);
+            });
+        </script>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -45,7 +500,7 @@ foreach ($period as $date) {
 }
 
 // Handle form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
     if (!hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
         die("Invalid CSRF token.");
     }
@@ -134,378 +589,334 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Request Time Adjustment</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        .step-indicator {
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            background: #333;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-bottom: 30px;
+            gap: 8px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .form-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .step-header {
+            background: #333;
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .step-icon {
+            width: 40px;
+            height: 40px;
+            background: white;
+            color: #333;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .step-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .form-content {
+            padding: 40px;
+        }
+        
+        .form-group {
+            margin-bottom: 30px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e5e5;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #333;
+        }
+        
+        .textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        .file-upload {
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
             transition: all 0.3s ease;
         }
-        .step-indicator.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            transform: scale(1.1);
+        
+        .file-upload:hover {
+            border-color: #333;
+            background: #f8f9fa;
         }
-        .step-indicator.completed {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        
+        .file-upload.dragover {
+            border-color: #333;
+            background: #f0f0f0;
         }
-        .step-content {
-            animation: fadeInUp 0.5s ease-out;
-        }
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .glass-effect {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        
+        .submit-btn {
+            background: #333;
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
             transition: all 0.3s ease;
         }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-        .btn-success {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            transition: all 0.3s ease;
-        }
-        .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(17, 153, 142, 0.3);
-        }
-        .input-field {
-            transition: all 0.3s ease;
-            border: 2px solid #e2e8f0;
-        }
-        .input-field:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        
+        .submit-btn:hover {
+            background: #222;
             transform: translateY(-1px);
         }
-        .file-upload-area {
-            border: 2px dashed #d1d5db;
-            transition: all 0.3s ease;
+        
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
         }
-        .file-upload-area:hover {
-            border-color: #667eea;
-            background-color: #f8fafc;
-        }
+        
         .alert-success {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
         }
+        
         .alert-error {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .back-link {
+            color: #333;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 30px;
+            font-weight: 500;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .form-content {
+                padding: 30px 20px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
         }
     </style>
 </head>
-<body class="min-h-screen gradient-bg">
-    <div class="min-h-screen flex items-center justify-center px-4 py-8">
-        <div class="glass-effect rounded-3xl shadow-2xl p-8 w-full max-w-4xl overflow-y-auto max-h-[90vh]">
+<body>
+    <div class="container">
+        <div class="verified-badge">
+            🛡️ Verification Complete
+        </div>
+        
+        <div class="header">
+            <h1>Time Adjustment Request</h1>
+            <p>Submit your time adjustment request with supporting information</p>
+        </div>
+        
+        <!-- Alerts -->
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-error">
+                ⚠️ <?= htmlspecialchars($error) ?>
+            </div>
+        <?php elseif (!empty($success)): ?>
+            <div class="alert alert-success">
+                ✅ <?= htmlspecialchars($success) ?>
+            </div>
+        <?php endif; ?>
+        
+        <div class="form-container">
+            <div class="step-header">
+                <div class="step-icon">📝</div>
+                <div class="step-title">Time Adjustment Request Form</div>
+            </div>
             
-            <!-- Header -->
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mb-4 shadow-lg">
-                    <i class="fas fa-clock text-white text-2xl"></i>
-                </div>
-                <h1 class="text-3xl font-bold text-gray-800 mb-2">Time Adjustment Request</h1>
-                <p class="text-gray-600">Follow the steps below to submit your time adjustment request</p>
-            </div>
-
-            <!-- Progress Indicator -->
-            <div class="flex items-center justify-center mb-8">
-                <div class="flex items-center space-x-4">
-                    <?php for ($i = 1; $i <= 5; $i++): ?>
-                        <div class="flex items-center">
-                            <div id="step-indicator-<?= $i ?>" class="step-indicator w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold <?= $i === 1 ? 'active' : 'bg-gray-300' ?> shadow-lg">
-                                <?= $i ?>
-                            </div>
-                            <?php if ($i < 5): ?>
-                                <div class="w-16 h-1 bg-gray-300 mx-2"></div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endfor; ?>
-                </div>
-            </div>
-
-            <!-- Alerts -->
-            <?php if (!empty($error)): ?>
-                <div class="alert-error text-white px-6 py-4 rounded-2xl mb-6 shadow-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-exclamation-circle mr-3"></i>
-                        <?= htmlspecialchars($error) ?>
-                    </div>
-                </div>
-            <?php elseif (!empty($success)): ?>
-                <div class="alert-success text-white px-6 py-4 rounded-2xl mb-6 shadow-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-check-circle mr-3"></i>
-                        <?= htmlspecialchars($success) ?>
-                    </div>
-                </div>
-            <?php endif; ?>
-
-            <!-- Form -->
-            <form method="POST" enctype="multipart/form-data" id="stepForm" class="space-y-6">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-
-                <!-- Step 1 -->
-                <div class="step step-content" id="step-1">
-                    <div class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                        <div class="flex items-center mb-4">
-                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                                <i class="fas fa-calendar text-blue-600"></i>
-                            </div>
-                            <h3 class="text-xl font-semibold text-gray-800">Select Log Date</h3>
-                        </div>
-                        <select name="log_date" required class="input-field w-full p-4 rounded-xl bg-gray-50 border-0 text-gray-700 font-medium">
+            <div class="form-content">
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    
+                    <div class="form-group">
+                        <label class="form-label">Select Date to Adjust</label>
+                        <select name="log_date" required class="form-control">
                             <option value="">Choose a date to adjust</option>
                             <?php foreach (array_reverse($logs) as $log):
                                 $dateObj = new DateTime($log['log_date']);
-                                $formattedDate = $dateObj->format('F j, Y');
-                                $timeIn = $log['time_in'] ? (new DateTime($log['time_in']))->format('g:i A') : '—';
-                                $timeOut = $log['time_out'] ? (new DateTime($log['time_out']))->format('g:i A') : '—';
+                                $formattedDate = $dateObj->format('F j, Y (l)');
+                                $timeIn = $log['time_in'] ? (new DateTime($log['time_in']))->format('g:i A') : 'No record';
+                                $timeOut = $log['time_out'] ? (new DateTime($log['time_out']))->format('g:i A') : 'No record';
                             ?>
                                 <option value="<?= $log['log_date'] ?>">
-                                    <?= $formattedDate ?> (In: <?= $timeIn ?> / Out: <?= $timeOut ?>)
+                                    <?= $formattedDate ?> - In: <?= $timeIn ?> | Out: <?= $timeOut ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <div class="flex justify-end mt-6">
-                            <button type="button" onclick="nextStep()" class="btn-primary text-white px-8 py-3 rounded-xl font-semibold shadow-lg">
-                                Next <i class="fas fa-arrow-right ml-2"></i>
-                            </button>
-                        </div>
                     </div>
-                </div>
-
-                <!-- Step 2 -->
-                <div class="step step-content hidden" id="step-2">
-                    <div class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                        <div class="flex items-center mb-4">
-                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                                <i class="fas fa-sign-in-alt text-green-600"></i>
-                            </div>
-                            <h3 class="text-xl font-semibold text-gray-800">Requested Time In</h3>
-                        </div>
-                        <p class="text-gray-600 mb-4">Enter your preferred check-in time</p>
-                        <input type="time" name="requested_time_in" class="input-field w-full p-4 rounded-xl bg-gray-50 border-0 text-gray-700 font-medium text-lg">
-                        <div class="flex justify-between mt-6">
-                            <button type="button" onclick="prevStep()" class="bg-gray-500 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:bg-gray-600 transition-all">
-                                <i class="fas fa-arrow-left mr-2"></i> Back
-                            </button>
-                            <button type="button" onclick="nextStep()" class="btn-primary text-white px-8 py-3 rounded-xl font-semibold shadow-lg">
-                                Next <i class="fas fa-arrow-right ml-2"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 3 -->
-                <div class="step step-content hidden" id="step-3">
-                    <div class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                        <div class="flex items-center mb-4">
-                            <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3">
-                                <i class="fas fa-sign-out-alt text-red-600"></i>
-                            </div>
-                            <h3 class="text-xl font-semibold text-gray-800">Requested Time Out</h3>
-                        </div>
-                        <p class="text-gray-600 mb-4">Enter your preferred check-out time</p>
-                        <input type="time" name="requested_time_out" class="input-field w-full p-4 rounded-xl bg-gray-50 border-0 text-gray-700 font-medium text-lg">
-                        <div class="flex justify-between mt-6">
-                            <button type="button" onclick="prevStep()" class="bg-gray-500 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:bg-gray-600 transition-all">
-                                <i class="fas fa-arrow-left mr-2"></i> Back
-                            </button>
-                            <button type="button" onclick="nextStep()" class="btn-primary text-white px-8 py-3 rounded-xl font-semibold shadow-lg">
-                                Next <i class="fas fa-arrow-right ml-2"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 4 -->
-                <div class="step step-content hidden" id="step-4">
-                    <div class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                        <div class="flex items-center mb-4">
-                            <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
-                                <i class="fas fa-edit text-yellow-600"></i>
-                            </div>
-                            <h3 class="text-xl font-semibold text-gray-800">Reason for Adjustment</h3>
-                        </div>
-                        <p class="text-gray-600 mb-4">Please provide a detailed explanation for this time adjustment</p>
-                        <textarea name="reason" rows="5" required 
-                                  class="input-field w-full p-4 rounded-xl bg-gray-50 border-0 text-gray-700 resize-none" 
-                                  placeholder="Explain why you need this time adjustment..."></textarea>
-                        <div class="flex justify-between mt-6">
-                            <button type="button" onclick="prevStep()" class="bg-gray-500 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:bg-gray-600 transition-all">
-                                <i class="fas fa-arrow-left mr-2"></i> Back
-                            </button>
-                            <button type="button" onclick="nextStep()" class="btn-primary text-white px-8 py-3 rounded-xl font-semibold shadow-lg">
-                                Next <i class="fas fa-arrow-right ml-2"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 5 -->
-                <div class="step step-content hidden" id="step-5">
-                    <div class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                        <div class="flex items-center mb-4">
-                            <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
-                                <i class="fas fa-paperclip text-purple-600"></i>
-                            </div>
-                            <h3 class="text-xl font-semibold text-gray-800">Attach Supporting Document</h3>
-                        </div>
-                        <p class="text-gray-600 mb-4">Upload a document to support your request</p>
-                        
-                        <div class="file-upload-area rounded-xl p-8 text-center">
-                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
-                            <p class="text-gray-600 mb-2">Drag and drop your file here or</p>
-                            <input type="file" name="attachment" id="fileInput" required accept=".pdf,.jpg,.jpeg,.png,.docx"
-                                   class="hidden">
-                            <label for="fileInput" class="bg-blue-600 text-white px-6 py-2 rounded-lg cursor-pointer hover:bg-blue-700 transition-all inline-block">
-                                Choose File
-                            </label>
-                            <p class="text-xs text-gray-500 mt-3">Allowed formats: PDF, JPG, PNG, DOCX (Max: 10MB)</p>
-                            <div id="fileName" class="mt-3 text-sm text-green-600 hidden"></div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label class="form-label">Requested Time In (Optional)</label>
+                            <input type="time" name="requested_time_in" class="form-control">
                         </div>
                         
-                        <div class="flex justify-between mt-6">
-                            <button type="button" onclick="prevStep()" class="bg-gray-500 text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:bg-gray-600 transition-all">
-                                <i class="fas fa-arrow-left mr-2"></i> Back
-                            </button>
-                            <button type="submit" class="btn-success text-white px-8 py-3 rounded-xl font-semibold shadow-lg">
-                                <i class="fas fa-paper-plane mr-2"></i> Submit Request
-                            </button>
+                        <div class="form-group">
+                            <label class="form-label">Requested Time Out (Optional)</label>
+                            <input type="time" name="requested_time_out" class="form-control">
                         </div>
                     </div>
-                </div>
-            </form>
-
-            <!-- Back to Dashboard -->
-            <div class="text-center mt-8">
-                <a href="../module/time_log_create.php" class="text-gray-600 hover:text-gray-800 inline-flex items-center transition-all hover:transform hover:translate-x-1">
-                    <i class="fas fa-arrow-left mr-2"></i> Back to Dashboard
-                </a>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Reason for Adjustment *</label>
+                        <textarea name="reason" required class="form-control textarea" 
+                                  placeholder="Please provide a detailed explanation for this time adjustment request (e.g., medical appointment, emergency, technical issues, etc.)..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Supporting Document (Optional)</label>
+                        <div class="file-upload" id="fileUpload">
+                            <div>📁 Drag and drop your file here or click to browse</div>
+                            <div style="margin-top: 10px; font-size: 14px; color: #666;">
+                                Supported: PDF, JPG, PNG, DOCX (Max: 10MB)
+                            </div>
+                            <input type="file" name="attachment" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.docx" style="display: none;">
+                            <div id="fileName" style="margin-top: 15px; font-weight: 600; color: #333; display: none;"></div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">
+                        📨 Submit Time Adjustment Request
+                    </button>
+                </form>
             </div>
         </div>
+        
+        <a href="../module/time_log_create.php" class="back-link">
+            ← Back to Dashboard
+        </a>
     </div>
-
+    
     <script>
-        let currentStep = 1;
-        const totalSteps = 5;
-
-        function updateProgressIndicator() {
-            for (let i = 1; i <= totalSteps; i++) {
-                const indicator = document.getElementById(`step-indicator-${i}`);
-                indicator.classList.remove('active', 'completed');
-                
-                if (i < currentStep) {
-                    indicator.classList.add('completed');
-                    indicator.innerHTML = '<i class="fas fa-check"></i>';
-                } else if (i === currentStep) {
-                    indicator.classList.add('active');
-                    indicator.innerHTML = i;
-                } else {
-                    indicator.classList.add('bg-gray-300');
-                    indicator.innerHTML = i;
-                }
-            }
-        }
-
-        function showStep(step) {
-            // Hide all steps
-            for (let i = 1; i <= totalSteps; i++) {
-                document.getElementById(`step-${i}`).classList.add('hidden');
-            }
-            
-            // Show current step with animation
-            const currentStepElement = document.getElementById(`step-${step}`);
-            currentStepElement.classList.remove('hidden');
-            
-            // Update progress indicator
-            updateProgressIndicator();
-        }
-
-        function nextStep() {
-            if (validateCurrentStep() && currentStep < totalSteps) {
-                currentStep++;
-                showStep(currentStep);
-            }
-        }
-
-        function prevStep() {
-            if (currentStep > 1) {
-                currentStep--;
-                showStep(currentStep);
-            }
-        }
-
-        function validateCurrentStep() {
-            const currentStepElement = document.getElementById(`step-${currentStep}`);
-            const requiredFields = currentStepElement.querySelectorAll('[required]');
-            
-            for (let field of requiredFields) {
-                if (!field.value.trim()) {
-                    field.focus();
-                    field.classList.add('border-red-500');
-                    setTimeout(() => field.classList.remove('border-red-500'), 3000);
-                    return false;
-                }
-            }
-            return true;
-        }
-
         // File upload handling
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const fileName = e.target.files[0]?.name;
-            const fileNameDisplay = document.getElementById('fileName');
-            
-            if (fileName) {
-                fileNameDisplay.textContent = `Selected: ${fileName}`;
-                fileNameDisplay.classList.remove('hidden');
-            } else {
-                fileNameDisplay.classList.add('hidden');
-            }
-        });
-
-        // Drag and drop functionality
-        const fileUploadArea = document.querySelector('.file-upload-area');
+        const fileUpload = document.getElementById('fileUpload');
         const fileInput = document.getElementById('fileInput');
-
-        fileUploadArea.addEventListener('dragover', (e) => {
+        const fileName = document.getElementById('fileName');
+        
+        fileUpload.addEventListener('click', () => fileInput.click());
+        
+        fileUpload.addEventListener('dragover', (e) => {
             e.preventDefault();
-            fileUploadArea.classList.add('border-blue-500', 'bg-blue-50');
+            fileUpload.classList.add('dragover');
         });
-
-        fileUploadArea.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            fileUploadArea.classList.remove('border-blue-500', 'bg-blue-50');
+        
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.classList.remove('dragover');
         });
-
-        fileUploadArea.addEventListener('drop', (e) => {
+        
+        fileUpload.addEventListener('drop', (e) => {
             e.preventDefault();
-            fileUploadArea.classList.remove('border-blue-500', 'bg-blue-50');
+            fileUpload.classList.remove('dragover');
             
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 fileInput.files = files;
-                fileInput.dispatchEvent(new Event('change'));
+                showFileName(files[0].name);
             }
         });
-
-        // Initialize
-        showStep(1);
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                showFileName(e.target.files[0].name);
+            }
+        });
+        
+        function showFileName(name) {
+            fileName.textContent = `Selected: ${name}`;
+            fileName.style.display = 'block';
+        }
     </script>
 </body>
 </html>

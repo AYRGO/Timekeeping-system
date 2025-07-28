@@ -105,7 +105,7 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 </style>
 
-<div class="flex gap-">
+<div class="flex gap-6">
     <!-- Main Content -->
     <div class="flex-1">
         <!-- Scrollable Feed Container -->
@@ -578,28 +578,31 @@ async function loadNews() {
         
         document.getElementById('news-content').innerHTML = newsHtml;
     } catch (error) {
-        // Fallback news
+        // Fallback news with clickable links
         document.getElementById('news-content').innerHTML = `
-            <div class="news-item">
+            <div class="news-item" onclick="window.open('https://www.bworldonline.com/', '_blank')">
                 <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Philippine Economy Shows Strong Growth</h5>
                 <p class="text-xs text-gray-500">Business World • Today</p>
             </div>
-            <div class="news-item">
+            <div class="news-item" onclick="window.open('https://technews.ph/', '_blank')">
                 <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">New Technology Hub Opens in Pampanga</h5>
                 <p class="text-xs text-gray-500">Tech News • Today</p>
             </div>
-            <div class="news-item">
+            <div class="news-item" onclick="window.open('https://www.deped.gov.ph/', '_blank')">
                 <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Education Reforms Announced</h5>
                 <p class="text-xs text-gray-500">Education Today • Yesterday</p>
             </div>
-            <div class="news-item">
+            <div class="news-item" onclick="window.open('https://climate.gov.ph/', '_blank')">
                 <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Climate Change Initiative Launched</h5>
                 <p class="text-xs text-gray-500">Environmental News • Yesterday</p>
+            </div>
+            <div class="news-item" onclick="window.open('https://www.bsp.gov.ph/', '_blank')">
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Digital Banking Adoption Reaches New High</h5>
+                <p class="text-xs text-gray-500">BSP Financial • 2 days ago</p>
             </div>
         `;
     }
 }
-
 async function loadFact() {
     try {
         const response = await fetch('https://uselessfacts.jsph.pl/random.json?language=en');

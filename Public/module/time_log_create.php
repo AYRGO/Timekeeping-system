@@ -479,6 +479,106 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
     transform: translateY(-2px);
     transition: .2s ease;
   }
+  /* Enhanced Sidebar Styles */
+.nav-item {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.nav-item.active {
+    background: linear-gradient(135deg, rgb(34, 197, 94) 0%, rgb(59, 130, 246) 100%);
+    color: white;
+    transform: translateX(4px);
+    box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
+}
+
+.nav-item.active .fas {
+    color: white;
+}
+
+.submenu-item {
+    margin-left: 1rem;
+    border-left: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.submenu-item:hover {
+    border-left-color: rgb(34, 197, 94);
+    transform: translateX(2px);
+}
+
+/* Smooth animations for submenu */
+#leaveSubmenu {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 0;
+    opacity: 0;
+}
+
+#leaveSubmenu:not(.hidden) {
+    max-height: 200px;
+    opacity: 1;
+}
+
+/* Icon hover effects */
+.nav-item i {
+    transition: all 0.2s ease;
+}
+
+.nav-item:hover i {
+    transform: scale(1.1);
+}
+
+/* User card hover effect */
+.user-info-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    transition: all 0.3s ease;
+}
+
+.user-info-card:hover {
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    transform: translateY(-2px);
+}
+
+/* Scrollbar styling for sidebar */
+.sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #cbd5e1, #94a3b8);
+    border-radius: 2px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, #94a3b8, #64748b);
+}
+
+/* Enhanced gradients */
+.gradient-border {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid transparent;
+    background-clip: padding-box;
+}
+
+.gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+    border-radius: inherit;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+}
 </style>
 
 </head>
@@ -925,7 +1025,7 @@ $announcementCount = $stmt->fetchColumn();
 </div>
 
 <!-- News Feed View -->
-<div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-6xl mx-auto">
+<div id="newsFeedView" class="hidden px-4 mt-12 space-y-10 max-w-5xl mx-auto">
   <?php include 'news_feed_content.php'; ?>
 </div>
 
