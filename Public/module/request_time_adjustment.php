@@ -381,20 +381,24 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
             
             function onRecaptchaSuccess(token) {
                 console.log('reCAPTCHA completed successfully!', token);
-                
+
                 const submitBtn = document.getElementById('submitBtn');
                 const statusMessage = document.getElementById('statusMessage');
-                
+
                 // Enable submit button
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Verification Complete - Continue';
                 submitBtn.style.background = '#22c55e';
-                
+
                 // Update status
                 statusMessage.textContent = 'Puzzle completed successfully!';
                 statusMessage.className = 'status-text success';
+
+                // Optionally auto-submit the form after a short delay
+                setTimeout(function() {
+                    document.getElementById('verificationForm').submit();
+                }, 800);
             }
-            
             function onRecaptchaExpired() {
                 console.log('reCAPTCHA expired');
                 
