@@ -1,11 +1,14 @@
 <?php
 session_start();
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
-if (!isset($_SESSION['admin'])) {
-    header("Location: ../admin/login.php");
+// Check authorization - must be internal employee with admin view
+if (
+    !isset($_SESSION['employee']['id']) ||
+    $_SESSION['employee']['role'] !== 'internal' ||
+    $_SESSION['view_mode'] !== 'admin'
+) {
+    // Unauthorized, redirect to employee view
+    header("Location: ../module/time_log_create.php");
     exit;
 }
 ?>
@@ -27,6 +30,35 @@ if (!isset($_SESSION['admin'])) {
       <h1 class="text-3xl font-bold text-gray-900">Add New Employee</h1>
       <p class="text-gray-500 mt-1">Fill out the form to add a new employee to the system.</p>
     </div>
+
+    <!-- Error Messages -->
+    <?php if (isset($_GET['error'])): ?>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">Validation Errors</h3>
+          <div class="mt-2 text-sm text-red-700">
+            <?php 
+            $errors = explode("|", urldecode($_GET['error']));
+            if (count($errors) > 1): ?>
+              <ul class="list-disc list-inside space-y-1">
+                <?php foreach ($errors as $error): ?>
+                  <li><?= htmlspecialchars(trim($error)) ?></li>
+                <?php endforeach; ?>
+              </ul>
+            <?php else: ?>
+              <p><?= htmlspecialchars(trim($errors[0])) ?></p>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Form -->
     <form method="POST" action="../controller/save_employee.php" class="space-y-6">

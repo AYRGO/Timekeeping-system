@@ -11,6 +11,17 @@ session_set_cookie_params([
 
 session_start();
 
+// Check authorization - must be internal employee with admin view
+if (
+    !isset($_SESSION['employee']['id']) ||
+    $_SESSION['employee']['role'] !== 'internal' ||
+    $_SESSION['view_mode'] !== 'admin'
+) {
+    // Unauthorized, redirect to employee view
+    header("Location: ../module/time_log_create.php");
+    exit;
+}
+
 // CSRF token
 if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -83,6 +94,31 @@ function sort_link($column, $label) {
            <main class="flex-1 p-6 overflow-y-auto">
     <!-- Main Container - Full Width -->
     <div class="w-full">
+        
+        <!-- Display Success Message -->
+        <?php if (isset($_GET['success']) && $_GET['success'] == '1'): ?>
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-green-800">
+                        Employee created successfully!
+                    </p>
+                </div>
+                <div class="ml-auto pl-3">
+                    <button onclick="this.parentElement.parentElement.parentElement.remove()" class="text-green-400 hover:text-green-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         
         <!-- Action Buttons Container -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -159,8 +195,7 @@ function sort_link($column, $label) {
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                                        <?= htmlspecialchars($emp['position']) ?>
-                                    </span>
+                                        <?= htmlspecialchars($emp['position']) ?> 
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $emp['status'] === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
