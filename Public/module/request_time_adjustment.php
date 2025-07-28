@@ -4,6 +4,11 @@ session_start();
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
+if (!isset($_SESSION['regenerated'])) {
+    session_regenerate_id(true);
+    $_SESSION['regenerated'] = true;
+}
+
 $employee_id = $_SESSION['employee']['id'] ?? null;
 if (!$employee_id) {
     header("Location: ../employee/login.php");
@@ -348,20 +353,6 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
                     </div>
                 <?php endif; ?>
                 
-                <!-- Debug Information -->
-                <div style="margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 4px; font-size: 12px; color: #666;">
-                    <strong>Debug Info:</strong><br>
-                    Session Status: <?= isset($_SESSION['human_verified_adjustment']) ? ($_SESSION['human_verified_adjustment'] ? 'Verified' : 'Not Verified') : 'Not Set' ?><br>
-                    URL Parameters: <?= isset($_GET['verified']) ? 'verified=' . $_GET['verified'] : 'none' ?><br>
-                    Session ID: <?= session_id() ?><br>
-                    Employee ID: <?= $employee_id ?? 'not set' ?><br>
-                    Request Method: <?= $_SERVER['REQUEST_METHOD'] ?><br>
-                    POST Data: <?= isset($_POST['verify_human']) ? 'verify_human submitted' : 'no verification post' ?><br>
-                    <?php if ($_SERVER['REQUEST_METHOD'] === 'POST'): ?>
-                        POST Keys: <?= implode(', ', array_keys($_POST)) ?><br>
-                    <?php endif; ?>
-                </div>
-                
                 <form method="POST" id="verificationForm">
                     <!-- Hidden field to ensure verify_human is always sent -->
                     <input type="hidden" name="verify_human" value="1">
@@ -547,9 +538,26 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
     exit;
 }
 
+// CSRF token generation
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
+
+// Initialize form data in session if not exists
+if (!isset($_SESSION['adjustment_form'])) {
+    $_SESSION['adjustment_form'] = [
+        'log_date' => '',
+        'requested_time_in' => '',
+        'requested_time_out' => '',
+        'reason' => '',
+        'attachment' => ''
+    ];
+}
+
+// Get current step
+$current_step = isset($_GET['step']) ? (int)$_GET['step'] : 1;
+if ($current_step < 1) $current_step = 1;
+if ($current_step > 5) $current_step = 5;
 
 // Fetch user's logs
 $stmt = $pdo->prepare("SELECT * FROM time_logs WHERE employee_id = :id");
@@ -582,20 +590,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
         die("Invalid CSRF token.");
     }
 
-    $log_date = $_POST['log_date'] ?? '';
-    $requested_time_in = $_POST['requested_time_in'] ?? null;
-    $requested_time_out = $_POST['requested_time_out'] ?? null;
-    $reason = trim($_POST['reason'] ?? '');
-    $attachment_path = null;
+    // Save current step data
+    if (isset($_POST['log_date'])) {
+        $_SESSION['adjustment_form']['log_date'] = $_POST['log_date'];
+    }
+    if (isset($_POST['requested_time_in'])) {
+        $_SESSION['adjustment_form']['requested_time_in'] = $_POST['requested_time_in'];
+    }
+    if (isset($_POST['requested_time_out'])) {
+        $_SESSION['adjustment_form']['requested_time_out'] = $_POST['requested_time_out'];
+    }
+    if (isset($_POST['reason'])) {
+        $_SESSION['adjustment_form']['reason'] = $_POST['reason'];
+    }
 
-    // File upload
+    // Handle file upload - NOW REQUIRED
     if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
         $allowed_types = [
             'application/pdf', 'image/jpeg', 'image/png',
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         ];
-
         $file_tmp = $_FILES['attachment']['tmp_name'];
         $file_name = basename($_FILES['attachment']['name']);
         $file_type = mime_content_type($file_tmp);
@@ -603,59 +618,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
 
         if (in_array($file_type, $allowed_types)) {
             $new_filename = uniqid("attach_", true) . "." . $ext;
-            $upload_dir = __DIR__ . "/../Public/uploads/time_adjustments/";
+            $upload_dir = __DIR__ . "/../uploads/time_adjustments/";
             if (!is_dir($upload_dir)) {
                 mkdir($upload_dir, 0755, true);
             }
-
             $destination = $upload_dir . $new_filename;
-
             if (move_uploaded_file($file_tmp, $destination)) {
-                $attachment_path = $new_filename;
+                $_SESSION['adjustment_form']['attachment'] = $new_filename;
             } else {
                 $error = "Failed to upload file.";
             }
         } else {
-            $error = "Unsupported file type.";
+            $error = "Unsupported file type. Please upload PDF, DOC, DOCX, JPG, JPEG, or PNG files only.";
+        }
+    } elseif (isset($_POST['next_step']) && $_POST['next_step'] == '5') {
+        // Check if attachment is required when moving to step 5 (review)
+        if (empty($_SESSION['adjustment_form']['attachment'])) {
+            $error = "Supporting document is required. Please upload a file before proceeding.";
         }
     }
 
-    if (!$log_date || !$reason) {
-        $error = "Log date and reason are required.";
-    } else {
-        // Check and create missing log
-        $log_stmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs WHERE employee_id = :id AND log_date = :date");
-        $log_stmt->execute(['id' => $employee_id, 'date' => $log_date]);
-        $existing_log = $log_stmt->fetch();
+    // Handle navigation
+    if (isset($_POST['next_step']) && empty($error)) {
+        $next_step = (int)$_POST['next_step'];
+        header("Location: ?step=" . $next_step);
+        exit;
+    }
 
-        if (!$existing_log) {
-            $createLog = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out) VALUES (:id, :log_date, NULL, NULL)");
-            $createLog->execute([
-                'id' => $employee_id,
-                'log_date' => $log_date
-            ]);
-            $existing_log = ['time_in' => null, 'time_out' => null];
-        }
+    // Handle final submission
+    if (isset($_POST['submit_request'])) {
+        $form_data = $_SESSION['adjustment_form'];
+        
+        if (empty($form_data['log_date']) || empty($form_data['reason']) || empty($form_data['attachment'])) {
+            $error = "Log date, reason, and supporting document are all required.";
+        } else {
+            $log_stmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs WHERE employee_id = :id AND log_date = :date");
+            $log_stmt->execute(['id' => $employee_id, 'date' => $form_data['log_date']]);
+            $existing_log = $log_stmt->fetch();
 
-        // Insert time adjustment request
-        $insert = $pdo->prepare("
-            INSERT INTO time_adjustment_requests 
+            if (!$existing_log) {
+                $createLog = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date) VALUES (:id, :log_date)");
+                $createLog->execute(['id' => $employee_id, 'log_date' => $form_data['log_date']]);
+                $existing_log = ['time_in' => null, 'time_out' => null];
+            }
+
+            $insert = $pdo->prepare("
+                INSERT INTO time_adjustment_requests 
                 (employee_id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, reason, attachment) 
-            VALUES 
+                VALUES 
                 (:employee_id, :log_date, :current_time_in, :current_time_out, :requested_time_in, :requested_time_out, :reason, :attachment)
-        ");
-        $insert->execute([
-            'employee_id' => $employee_id,
-            'log_date' => $log_date,
-            'current_time_in' => $existing_log['time_in'],
-            'current_time_out' => $existing_log['time_out'],
-            'requested_time_in' => $requested_time_in ?: null,
-            'requested_time_out' => $requested_time_out ?: null,
-            'reason' => $reason,
-            'attachment' => $attachment_path
-        ]);
+            ");
+            $insert->execute([
+                'employee_id' => $employee_id,
+                'log_date' => $form_data['log_date'],
+                'current_time_in' => $existing_log['time_in'],
+                'current_time_out' => $existing_log['time_out'],
+                'requested_time_in' => $form_data['requested_time_in'] ?: null,
+                'requested_time_out' => $form_data['requested_time_out'] ?: null,
+                'reason' => $form_data['reason'],
+                'attachment' => $form_data['attachment']
+            ]);
 
-        $success = "Request submitted successfully!";
+            // Clear form data
+            unset($_SESSION['adjustment_form']);
+            $success = "Request submitted successfully!";
+        }
     }
 }
 ?>
@@ -664,336 +691,703 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <title>Time Adjustment Request - Step <?= $current_step ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Request Time Adjustment</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8f9fa;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333; 
             min-height: 100vh;
-            color: #333;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: auto; 
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
         
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center; 
+            padding: 40px 20px;
+            position: relative;
         }
         
         .verified-badge {
             display: inline-flex;
             align-items: center;
-            background: #333;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
             color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
+            padding: 12px 24px;
+            border-radius: 50px;
             font-size: 14px;
-            margin-bottom: 30px;
-            gap: 8px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
         }
         
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="white" opacity="0.1"/><circle cx="80" cy="80" r="2" fill="white" opacity="0.1"/></svg>');
         }
         
-        .header h1 {
-            font-size: 32px;
-            font-weight: 700;
+        .header h1 { 
+            font-size: 32px; 
+            font-weight: 800;
             margin-bottom: 10px;
-            color: #333;
+            position: relative;
+            z-index: 1;
         }
         
         .header p {
+            font-size: 18px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .step-indicator { 
+            display: flex; 
+            justify-content: center;
+            padding: 30px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .step-item {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
+        }
+        
+        .step { 
+            width: 50px; 
+            height: 50px; 
+            background: #e9ecef; 
+            color: #6c757d; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: 700;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .step.active { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .step.completed {
+            background: #28a745;
+            color: white;
+        }
+        
+        .step.completed::after {
+            content: '✓';
+            position: absolute;
+            font-size: 16px;
+        }
+        
+        .step-connector {
+            width: 40px;
+            height: 3px;
+            background: #e9ecef;
+            margin: 0 5px;
+        }
+        
+        .step-connector.completed {
+            background: #28a745;
+        }
+        
+        .form-content {
+            padding: 50px;
+            min-height: 400px;
+        }
+        
+        .step-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #333;
+            text-align: center;
+        }
+        
+        .step-description {
+            text-align: center;
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 40px;
+        }
+        
+        .alert { 
+            padding: 20px; 
+            border-radius: 10px; 
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+        .alert-success { 
+            background: #d4edda; 
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        .alert-error { 
+            background: #f8d7da; 
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+        
+        .form-group { 
+            margin-bottom: 30px; 
+        }
+        
+        .form-label { 
+            display: block; 
+            margin-bottom: 12px; 
+            font-weight: 700;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .form-label.required::after {
+            content: ' *';
+            color: #dc3545;
+            font-weight: 700;
+        }
+        
+        .form-control { 
+            width: 100%; 
+            padding: 16px 20px; 
+            font-size: 16px; 
+            border: 2px solid #e9ecef; 
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+        
+        .form-control:focus { 
+            border-color: #667eea; 
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .textarea { 
+            min-height: 150px; 
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        .file-upload { 
+            border: 3px dashed #dc3545; 
+            padding: 50px; 
+            text-align: center; 
+            border-radius: 15px; 
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fff5f5;
+            position: relative;
+        }
+        
+        .file-upload.has-file {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+        
+        .file-upload:hover { 
+            background: #fee;
+            border-color: #c82333;
+        }
+        
+        .file-upload.has-file:hover {
+            background: #e6ffed;
+            border-color: #1e7e34;
+        }
+        
+        .file-upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #dc3545;
+        }
+        
+        .file-upload.has-file .file-upload-icon {
+            color: #28a745;
+        }
+        
+        .file-upload-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: #721c24;
+            margin-bottom: 8px;
+        }
+        
+        .file-upload.has-file .file-upload-text {
+            color: #155724;
+        }
+        
+        .file-upload-subtext {
+            font-size: 14px;
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .required-badge {
+            display: inline-block;
+            background: #dc3545;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 30px 50px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        
+        .summary-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .summary-label {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value {
             color: #666;
             font-size: 16px;
         }
         
-        .form-container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .step-header {
-            background: #333;
-            color: white;
-            padding: 20px 30px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .step-icon {
-            width: 40px;
-            height: 40px;
-            background: white;
-            color: #333;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-        }
-        
-        .step-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-        
-        .form-content {
-            padding: 40px;
-        }
-        
-        .form-group {
-            margin-bottom: 30px;
-        }
-        
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .form-control {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e5e5e5;
-            border-radius: 6px;
-            font-size: 16px;
-            transition: border-color 0.3s ease;
-        }
-        
-        .form-control:focus {
-            outline: none;
-            border-color: #333;
-        }
-        
-        .textarea {
-            resize: vertical;
-            min-height: 120px;
-        }
-        
-        .file-upload {
-            border: 2px dashed #ccc;
-            border-radius: 6px;
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .file-upload:hover {
-            border-color: #333;
-            background: #f8f9fa;
-        }
-        
-        .file-upload.dragover {
-            border-color: #333;
-            background: #f0f0f0;
-        }
-        
-        .submit-btn {
-            background: #333;
-            color: white;
-            padding: 14px 30px;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .submit-btn:hover {
-            background: #222;
-            transform: translateY(-1px);
-        }
-        
-        .alert {
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        
-        .alert-success {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-        
-        .alert-error {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-        }
-        
-        .back-link {
-            color: #333;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 30px;
-            font-weight: 500;
-        }
-        
-        .back-link:hover {
-            text-decoration: underline;
-        }
-        
         @media (max-width: 768px) {
-            .container {
-                padding: 15px;
+            .form-content { 
+                padding: 30px 20px; 
             }
-            
-            .form-content {
-                padding: 30px 20px;
+            .navigation {
+                padding: 20px;
+                flex-direction: column;
+                gap: 15px;
             }
-            
-            .header h1 {
-                font-size: 24px;
+            .step-indicator {
+                padding: 20px 10px;
+            }
+            .step {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+            .step-connector {
+                width: 20px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+<div class="container">
+    <div class="header">
         <div class="verified-badge">
-            🛡️ Verification Complete
+            🧩 Human Verified - Access Granted
         </div>
-        
-        <div class="header">
-            <h1>Time Adjustment Request</h1>
-            <p>Submit your time adjustment request with supporting information</p>
-        </div>
-        
-        <!-- Alerts -->
+        <h1>Time Adjustment Request</h1>
+        <p>Step <?= $current_step ?> of 5: Complete your request step by step</p>
+    </div>
+
+    <div class="step-indicator">
+        <?php for ($i = 1; $i <= 5; $i++): ?>
+            <?php if ($i > 1): ?>
+                <div class="step-connector <?= $i <= $current_step ? 'completed' : '' ?>"></div>
+            <?php endif; ?>
+            <div class="step-item">
+                <div class="step <?= $i == $current_step ? 'active' : ($i < $current_step ? 'completed' : '') ?>">
+                    <?= $i < $current_step ? '' : $i ?>
+                </div>
+            </div>
+        <?php endfor; ?>
+    </div>
+
+    <div class="form-content">
         <?php if (!empty($error)): ?>
-            <div class="alert alert-error">
-                ⚠️ <?= htmlspecialchars($error) ?>
-            </div>
+            <div class="alert alert-error">⚠️ <?= htmlspecialchars($error) ?></div>
         <?php elseif (!empty($success)): ?>
-            <div class="alert alert-success">
-                ✅ <?= htmlspecialchars($success) ?>
-            </div>
+            <div class="alert alert-success">✅ <?= htmlspecialchars($success) ?></div>
         <?php endif; ?>
-        
-        <div class="form-container">
-            <div class="step-header">
-                <div class="step-icon">📝</div>
-                <div class="step-title">Time Adjustment Request Form</div>
-            </div>
-            
-            <div class="form-content">
-                <form method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                    
-                    <div class="form-group">
-                        <label class="form-label">Select Date to Adjust</label>
-                        <select name="log_date" required class="form-control">
-                            <option value="">Choose a date to adjust</option>
-                            <?php foreach (array_reverse($logs) as $log):
-                                $dateObj = new DateTime($log['log_date']);
-                                $formattedDate = $dateObj->format('F j, Y (l)');
-                                $timeIn = $log['time_in'] ? (new DateTime($log['time_in']))->format('g:i A') : 'No record';
-                                $timeOut = $log['time_out'] ? (new DateTime($log['time_out']))->format('g:i A') : 'No record';
+
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+
+            <?php if ($current_step == 1): ?>
+                <div class="step-title">📅 Select Date to Adjust</div>
+                <div class="step-description">Choose the date for which you want to request a time adjustment</div>
+                
+                <div class="form-group">
+                    <label class="form-label">Filter by Month</label>
+                    <select id="monthFilter" class="form-control" style="margin-bottom: 20px;">
+                        <option value="">-- All Months --</option>
+                        <?php
+                        $months = [];
+                        foreach ($logs as $log) {
+                            $month = (new DateTime($log['log_date']))->format('Y-m');
+                            $months[$month] = (new DateTime($log['log_date']))->format('F Y');
+                        }
+                        foreach (array_unique($months) as $monthVal => $monthLabel): ?>
+                            <option value="<?= $monthVal ?>"><?= $monthLabel ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label required">Select Date</label>
+                    <select name="log_date" required class="form-control" id="logDateSelect">
+                        <option value="">-- Choose a date --</option>
+                        <?php foreach (array_reverse($logs) as $log): ?>
+                            <?php
+                            $d = new DateTime($log['log_date']);
+                            $in = $log['time_in'] ? (new DateTime($log['time_in']))->format('g:i A') : 'No IN';
+                            $out = $log['time_out'] ? (new DateTime($log['time_out']))->format('g:i A') : 'No OUT';
+                            $selected = ($_SESSION['adjustment_form']['log_date'] == $log['log_date']) ? 'selected' : '';
+                            $month = $d->format('Y-m');
                             ?>
-                                <option value="<?= $log['log_date'] ?>">
-                                    <?= $formattedDate ?> - In: <?= $timeIn ?> | Out: <?= $timeOut ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                            <option value="<?= $log['log_date'] ?>" data-month="<?= $month ?>" <?= $selected ?>>
+                                <?= $d->format('F j, Y (l)') ?> - In: <?= $in ?> | Out: <?= $out ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <script>
+                    document.getElementById('monthFilter').addEventListener('change', function() {
+                        var selectedMonth = this.value;
+                        var options = document.querySelectorAll('#logDateSelect option[data-month]');
+                        options.forEach(function(opt) {
+                            if (!selectedMonth || opt.getAttribute('data-month') === selectedMonth) {
+                                opt.style.display = '';
+                            } else {
+                                opt.style.display = 'none';
+                            }
+                        });
+                    });
+                </script>
+
+            <?php elseif ($current_step == 2): ?>
+                <div class="step-title">🕐 Set Requested Times</div>
+                <div class="step-description">Enter your requested time in and time out (optional)</div>
+                
+                <div class="form-group">
+                    <label class="form-label">Requested Time In</label>
+                    <input type="time" name="requested_time_in" class="form-control" value="<?= $_SESSION['adjustment_form']['requested_time_in'] ?>">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Requested Time Out</label>
+                    <input type="time" name="requested_time_out" class="form-control" value="<?= $_SESSION['adjustment_form']['requested_time_out'] ?>">
+                </div>
+
+            <?php elseif ($current_step == 3): ?>
+                <div class="step-title">📝 Provide Reason</div>
+                <div class="step-description">Explain why you need this time adjustment</div>
+                
+                <div class="form-group">
+                    <label class="form-label required">Reason for Adjustment</label>
+                    <textarea name="reason" class="form-control textarea" required 
+                              placeholder="Please provide a detailed explanation for this time adjustment request (e.g., medical appointment, emergency, technical issues, traffic delay, etc.)..."><?= $_SESSION['adjustment_form']['reason'] ?></textarea>
+                </div>
+
+            <?php elseif ($current_step == 4): ?>
+                <div class="step-title">📎 Upload Document</div>
+                <div class="step-description">Attach supporting documentation (REQUIRED)</div>
+                
+                <div class="form-group">
+                    <label class="form-label required">Supporting Document</label>
+                    <div class="file-upload <?= !empty($_SESSION['adjustment_form']['attachment']) ? 'has-file' : '' ?>" id="fileUpload">
+                        <div class="file-upload-icon">📁</div>
+                        <div class="file-upload-text">Click or drag file here</div>
+                        <div class="file-upload-subtext">Supported: PDF, DOC, DOCX, JPG, JPEG, PNG (Max: 10MB)</div>
+                        <div class="required-badge">REQUIRED FIELD</div>
+                        <input type="file" name="attachment" id="fileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display: none;" required>
+                        <div id="fileName" style="margin-top: 15px; font-weight: 600; color: #667eea;"></div>
                     </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div class="form-group">
-                            <label class="form-label">Requested Time In (Optional)</label>
-                            <input type="time" name="requested_time_in" class="form-control">
+                    <?php if (!empty($_SESSION['adjustment_form']['attachment'])): ?>
+                        <div style="margin-top: 15px; color: #28a745; font-weight: 600;">
+                            ✅ File uploaded: <?= $_SESSION['adjustment_form']['attachment'] ?>
                         </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Requested Time Out (Optional)</label>
-                            <input type="time" name="requested_time_out" class="form-control">
-                        </div>
+                    <?php endif; ?>
+                </div>
+
+            <?php elseif ($current_step == 5): ?>
+                <div class="step-title">📋 Review & Submit</div>
+                <div class="step-description">Review your request details before submitting</div>
+                
+                <div class="summary-item">
+                    <div class="summary-label">Selected Date:</div>
+                    <div class="summary-value">
+                        <?php if (!empty($_SESSION['adjustment_form']['log_date'])): ?>
+                            <?= (new DateTime($_SESSION['adjustment_form']['log_date']))->format('F j, Y (l)') ?>
+                        <?php else: ?>
+                            <span style="color: #dc3545;">Not selected ❌</span>
+                        <?php endif; ?>
                     </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Reason for Adjustment *</label>
-                        <textarea name="reason" required class="form-control textarea" 
-                                  placeholder="Please provide a detailed explanation for this time adjustment request (e.g., medical appointment, emergency, technical issues, etc.)..."></textarea>
+                </div>
+                
+                <div class="summary-item">
+                    <div class="summary-label">Requested Time In:</div>
+                    <div class="summary-value">
+                        <?= !empty($_SESSION['adjustment_form']['requested_time_in']) ? 
+                            (new DateTime($_SESSION['adjustment_form']['requested_time_in']))->format('g:i A') : 
+                            'Not specified' ?>
                     </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Supporting Document (Optional)</label>
-                        <div class="file-upload" id="fileUpload">
-                            <div>📁 Drag and drop your file here or click to browse</div>
-                            <div style="margin-top: 10px; font-size: 14px; color: #666;">
-                                Supported: PDF, JPG, PNG, DOCX (Max: 10MB)
-                            </div>
-                            <input type="file" name="attachment" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.docx" style="display: none;">
-                            <div id="fileName" style="margin-top: 15px; font-weight: 600; color: #333; display: none;"></div>
-                        </div>
+                </div>
+                
+                <div class="summary-item">
+                    <div class="summary-label">Requested Time Out:</div>
+                    <div class="summary-value">
+                        <?= !empty($_SESSION['adjustment_form']['requested_time_out']) ? 
+                            (new DateTime($_SESSION['adjustment_form']['requested_time_out']))->format('g:i A') : 
+                            'Not specified' ?>
                     </div>
+                </div>
+                
+                <div class="summary-item">
+                    <div class="summary-label">Reason:</div>
+                    <div class="summary-value">
+                        <?php if (!empty($_SESSION['adjustment_form']['reason'])): ?>
+                            <?= htmlspecialchars($_SESSION['adjustment_form']['reason']) ?>
+                        <?php else: ?>
+                            <span style="color: #dc3545;">Not provided ❌</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <div class="summary-item">
+                    <div class="summary-label">Supporting Document:</div>
+                    <div class="summary-value">
+                        <?php if (!empty($_SESSION['adjustment_form']['attachment'])): ?>
+                            <span style="color: #28a745;">✅ <?= $_SESSION['adjustment_form']['attachment'] ?></span>
+                        <?php else: ?>
+                            <span style="color: #dc3545;">❌ No document uploaded - REQUIRED</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <?php if (empty($_SESSION['adjustment_form']['log_date']) || empty($_SESSION['adjustment_form']['reason']) || empty($_SESSION['adjustment_form']['attachment'])): ?>
+                    <div class="alert alert-error">
+                        ⚠️ Please complete all required fields before submitting your request.
+                    </div>
+                <?php endif; ?>
+                
+            <?php endif; ?>
+        </form>
+    </div>
+
+    <div class="navigation">
+        <div>
+            <?php if ($current_step > 1): ?>
+                <a href="?step=<?= $current_step - 1 ?>" class="btn btn-secondary">
+                    ← Previous
+                </a>
+            <?php else: ?>
+                <a href="../module/time_log_create.php" class="btn btn-secondary">
+                    ← Back to Dashboard
+                </a>
+            <?php endif; ?>
+        </div>
+        
+        <div>
+            <?php if ($current_step < 5): ?>
+                <form method="POST" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    <input type="hidden" name="next_step" value="<?= $current_step + 1 ?>">
                     
-                    <button type="submit" class="submit-btn">
-                        📨 Submit Time Adjustment Request
+                    <?php if ($current_step == 1): ?>
+                        <input type="hidden" name="log_date" id="hiddenLogDate">
+                    <?php elseif ($current_step == 2): ?>
+                        <input type="hidden" name="requested_time_in" id="hiddenTimeIn">
+                        <input type="hidden" name="requested_time_out" id="hiddenTimeOut">
+                    <?php elseif ($current_step == 3): ?>
+                        <input type="hidden" name="reason" id="hiddenReason">
+                    <?php endif; ?>
+                    
+                    <button type="submit" class="btn btn-primary" id="nextBtn">
+                        Next →
                     </button>
                 </form>
-            </div>
+            <?php else: ?>
+                <form method="POST" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    <button type="submit" name="submit_request" class="btn btn-success" 
+                            <?= (empty($_SESSION['adjustment_form']['log_date']) || empty($_SESSION['adjustment_form']['reason']) || empty($_SESSION['adjustment_form']['attachment'])) ? 'disabled' : '' ?>>
+                        📤 Submit Request
+                    </button>
+                </form>
+            <?php endif; ?>
         </div>
-        
-        <a href="../module/time_log_create.php" class="back-link">
-            ← Back to Dashboard
-        </a>
     </div>
-    
-    <script>
-        // File upload handling
-        const fileUpload = document.getElementById('fileUpload');
-        const fileInput = document.getElementById('fileInput');
-        const fileName = document.getElementById('fileName');
-        
+</div>
+
+<script>
+    // File upload handling
+    const fileUpload = document.getElementById('fileUpload');
+    const fileInput = document.getElementById('fileInput');
+    const fileName = document.getElementById('fileName');
+
+    if (fileUpload && fileInput) {
         fileUpload.addEventListener('click', () => fileInput.click());
-        
         fileUpload.addEventListener('dragover', (e) => {
             e.preventDefault();
-            fileUpload.classList.add('dragover');
+            if (fileUpload.classList.contains('has-file')) {
+                fileUpload.style.borderColor = '#1e7e34';
+                fileUpload.style.background = '#e6ffed';
+            } else {
+                fileUpload.style.borderColor = '#c82333';
+                fileUpload.style.background = '#fee';
+            }
         });
-        
         fileUpload.addEventListener('dragleave', () => {
-            fileUpload.classList.remove('dragover');
+            if (fileUpload.classList.contains('has-file')) {
+                fileUpload.style.borderColor = '#28a745';
+                fileUpload.style.background = '#f8fff9';
+            } else {
+                fileUpload.style.borderColor = '#dc3545';
+                fileUpload.style.background = '#fff5f5';
+            }
         });
-        
         fileUpload.addEventListener('drop', (e) => {
             e.preventDefault();
-            fileUpload.classList.remove('dragover');
-            
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 fileInput.files = files;
-                showFileName(files[0].name);
+                fileName.textContent = `Selected: ${files[0].name}`;
+                fileName.style.display = 'block';
+                fileUpload.classList.add('has-file');
+                fileUpload.style.borderColor = '#28a745';
+                fileUpload.style.background = '#f8fff9';
             }
         });
-        
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files[0]) {
-                showFileName(e.target.files[0].name);
+            if (e.target.files.length > 0) {
+                fileName.textContent = `Selected: ${e.target.files[0].name}`;
+                fileName.style.display = 'block';
+                fileUpload.classList.add('has-file');
             }
         });
-        
-        function showFileName(name) {
-            fileName.textContent = `Selected: ${name}`;
-            fileName.style.display = 'block';
-        }
-    </script>
+    }
+
+    // Form validation and data passing
+    const nextBtn = document.getElementById('nextBtn');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', function(e) {
+            <?php if ($current_step == 1): ?>
+                const logDate = document.querySelector('select[name="log_date"]').value;
+                if (!logDate) {
+                    e.preventDefault();
+                    alert('Please select a date to continue.');
+                    return;
+                }
+                document.getElementById('hiddenLogDate').value = logDate;
+            <?php elseif ($current_step == 2): ?>
+                const timeIn = document.querySelector('input[name="requested_time_in"]').value;
+                const timeOut = document.querySelector('input[name="requested_time_out"]').value;
+                document.getElementById('hiddenTimeIn').value = timeIn;
+                document.getElementById('hiddenTimeOut').value = timeOut;
+            <?php elseif ($current_step == 3): ?>
+                const reason = document.querySelector('textarea[name="reason"]').value;
+                if (!reason.trim()) {
+                    e.preventDefault();
+                    alert('Please provide a reason for the adjustment.');
+                    return;
+                }
+                document.getElementById('hiddenReason').value = reason;
+            <?php elseif ($current_step == 4): ?>
+                const fileInput = document.querySelector('input[name="attachment"]');
+                const hasExistingFile = <?= !empty($_SESSION['adjustment_form']['attachment']) ? 'true' : 'false' ?>;
+                
+                if (!hasExistingFile && (!fileInput.files || fileInput.files.length === 0)) {
+                    e.preventDefault();
+                    alert('Please upload a supporting document before proceeding. This field is required.');
+                    return;
+                }
+            <?php endif; ?>
+        });
+    }
+</script>
 </body>
 </html>
