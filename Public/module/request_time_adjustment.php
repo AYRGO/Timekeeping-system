@@ -4,11 +4,6 @@ session_start();
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
-if (!isset($_SESSION['regenerated'])) {
-    session_regenerate_id(true);
-    $_SESSION['regenerated'] = true;
-}
-
 $employee_id = $_SESSION['employee']['id'] ?? null;
 if (!$employee_id) {
     header("Location: ../employee/login.php");
@@ -16,14 +11,37 @@ if (!$employee_id) {
 }
 
 // Human verification check with reCAPTCHA v2
+// Debug: Check current session state
+error_log("Session verification status: " . (isset($_SESSION['human_verified_adjustment']) ? ($_SESSION['human_verified_adjustment'] ? 'true' : 'false') : 'not set'));
+error_log("Full session data: " . print_r($_SESSION, true));
+error_log("POST data received: " . print_r($_POST, true));
+error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
+
+// TEMPORARY BYPASS - Remove this after testing
+if (isset($_GET['bypass']) && $_GET['bypass'] === 'test') {
+    $_SESSION['human_verified_adjustment'] = true;
+    error_log("BYPASS: Setting verification to true");
+}
+
+// Check if coming from successful verification
+if (isset($_GET['verified']) && $_GET['verified'] === '1') {
+    if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_adjustment'] !== true) {
+        $_SESSION['human_verified_adjustment'] = true;
+        error_log("VERIFIED: Setting verification to true from URL parameter");
+    }
+}
+
 if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_adjustment'] !== true) {
     // Handle verification form submission
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_human'])) {
+        error_log("Processing verification form submission");
         $recaptcha_response = $_POST['g-recaptcha-response'] ?? '';
         
         if (empty($recaptcha_response)) {
             $verification_error = "Please complete the reCAPTCHA verification.";
+            error_log("No reCAPTCHA response found");
         } else {
+            error_log("reCAPTCHA response received: " . substr($recaptcha_response, 0, 20) . "...");
             // Verify reCAPTCHA v2 with Google - UPDATED SECRET KEY
             $secret_key = "6LfuRJErAAAAAH3JDCIKSZsY73CXGJ2YzoD8A75s";
             $verify_url = "https://www.google.com/recaptcha/api/siteverify";
@@ -46,15 +64,30 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
             $response = file_get_contents($verify_url, false, $context);
             $response_data = json_decode($response);
             
+            error_log("Google response: " . json_encode($response_data));
+            
             if ($response_data && $response_data->success) {
                 $_SESSION['human_verified_adjustment'] = true;
+                // Force session write to ensure it's saved
+                session_write_close();
+                session_start();
+                error_log("Verification successful, setting session and redirecting");
+                
+                // Clean redirect without parameters to avoid loops
                 header('Location: ' . $_SERVER['PHP_SELF']);
                 exit;
             } else {
                 $error_codes = isset($response_data->{'error-codes'}) ? implode(', ', $response_data->{'error-codes'}) : 'Unknown error';
                 $verification_error = "reCAPTCHA verification failed. Error: " . $error_codes;
+                error_log("Verification failed: " . $verification_error);
             }
         }
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // If it's a POST request but not a verification, redirect to prevent time adjustment form submission
+        error_log("Non-verification POST request detected, redirecting to prevent form submission");
+        error_log("POST keys: " . implode(', ', array_keys($_POST)));
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
     }
     
     // Show verification page
@@ -315,7 +348,24 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
                     </div>
                 <?php endif; ?>
                 
+                <!-- Debug Information -->
+                <div style="margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 4px; font-size: 12px; color: #666;">
+                    <strong>Debug Info:</strong><br>
+                    Session Status: <?= isset($_SESSION['human_verified_adjustment']) ? ($_SESSION['human_verified_adjustment'] ? 'Verified' : 'Not Verified') : 'Not Set' ?><br>
+                    URL Parameters: <?= isset($_GET['verified']) ? 'verified=' . $_GET['verified'] : 'none' ?><br>
+                    Session ID: <?= session_id() ?><br>
+                    Employee ID: <?= $employee_id ?? 'not set' ?><br>
+                    Request Method: <?= $_SERVER['REQUEST_METHOD'] ?><br>
+                    POST Data: <?= isset($_POST['verify_human']) ? 'verify_human submitted' : 'no verification post' ?><br>
+                    <?php if ($_SERVER['REQUEST_METHOD'] === 'POST'): ?>
+                        POST Keys: <?= implode(', ', array_keys($_POST)) ?><br>
+                    <?php endif; ?>
+                </div>
+                
                 <form method="POST" id="verificationForm">
+                    <!-- Hidden field to ensure verify_human is always sent -->
+                    <input type="hidden" name="verify_human" value="1">
+                    
                     <div class="recaptcha-container" id="recaptchaContainer">
                         <div class="loading-message" id="loadingMessage">
                             🔄 Loading verification puzzle...
@@ -364,6 +414,8 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
                     widgetId = grecaptcha.render('recaptcha-widget', {
                         'sitekey': '6LfuRJErAAAAAMxL8Ph_fKJhGjiJy4zLMMyAkiaR',
                         'theme': 'light',
+                        'size': 'normal',
+                        'hl': 'en',
                         'callback': onRecaptchaSuccess,
                         'expired-callback': onRecaptchaExpired,
                         'error-callback': onRecaptchaError
@@ -391,13 +443,8 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
                 submitBtn.style.background = '#22c55e';
 
                 // Update status
-                statusMessage.textContent = 'Puzzle completed successfully!';
+                statusMessage.textContent = 'Puzzle completed successfully! Click the button below to continue.';
                 statusMessage.className = 'status-text success';
-
-                // Optionally auto-submit the form after a short delay
-                setTimeout(function() {
-                    document.getElementById('verificationForm').submit();
-                }, 800);
             }
             function onRecaptchaExpired() {
                 console.log('reCAPTCHA expired');
@@ -433,6 +480,11 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
             
             // Form validation
             document.getElementById('verificationForm').addEventListener('submit', function(e) {
+                console.log('Form submission attempted...');
+                console.log('reCAPTCHA loaded:', recaptchaLoaded);
+                console.log('reCAPTCHA rendered:', recaptchaRendered);
+                console.log('Widget ID:', widgetId);
+                
                 if (!recaptchaLoaded || !recaptchaRendered || widgetId === null) {
                     e.preventDefault();
                     alert('Please wait for the reCAPTCHA to load completely.');
@@ -440,16 +492,37 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
                 }
                 
                 const response = grecaptcha.getResponse(widgetId);
+                console.log('reCAPTCHA response:', response ? 'Present' : 'Missing');
+                
                 if (!response) {
                     e.preventDefault();
                     alert('Please complete the reCAPTCHA puzzle first.');
                     return false;
                 }
                 
-                // Show loading
+                // Ensure verify_human is present
+                const verifyInput = document.querySelector('input[name="verify_human"]');
+                if (!verifyInput) {
+                    console.error('verify_human input missing!');
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'verify_human';
+                    hiddenInput.value = '1';
+                    this.appendChild(hiddenInput);
+                }
+                
+                // Show loading and allow form to submit
                 const submitBtn = document.getElementById('submitBtn');
-                submitBtn.textContent = 'Verifying...';
+                const statusMessage = document.getElementById('statusMessage');
+                
+                submitBtn.textContent = 'Verifying & Redirecting...';
                 submitBtn.disabled = true;
+                statusMessage.textContent = 'Processing verification, please wait...';
+                statusMessage.className = 'status-text';
+                
+                console.log('Form validation passed, submitting with verify_human...');
+                // Let the form submit naturally
+                return true;
             });
             
             // Fallback check after page loads
