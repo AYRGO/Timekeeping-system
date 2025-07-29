@@ -1,51 +1,49 @@
-
 <!-- Request Change Schedule -->
-<div id="scheduleView" class="hidden mt-12">
-  <div class="flex justify-center items-start min-h-[60vh] px-4">
-    <div class="w-full max-w-4xl">
+<div id="scheduleView" class="hidden mt-8">
+  <div class="flex justify-center items-start min-h-[70vh] px-4">
+    <div class="w-full max-w-6xl">
 
-      <!-- Header -->
-      <div class="bg-blue-700 p-6 rounded-t-lg shadow-lg">
-        <div class="text-center">
-          <div class="inline-flex items-center justify-center w-10 h-10 bg-blue-600 rounded-lg mb-3">
-            <i class="fas fa-calendar-alt text-white"></i>
+      <!-- Modern Header with Gradient -->
+      <div class="bg-gradient-to-r from-green-600 to-green-700 p-6 rounded-t-2xl shadow-lg">
+        <div class="flex items-center justify-center space-x-3">
+          <div class="bg-white bg-opacity-20 p-2 rounded-full">
+            <i class="fas fa-calendar-alt text-white text-xl"></i>
           </div>
-          <h2 class="text-xl font-semibold text-white mb-1">
-            Schedule Change Request
-          </h2>
-          <p class="text-blue-100 text-sm">
-            Submit your schedule modification request
-          </p>
+          <h2 class="text-3xl font-bold text-white">Schedule Change Request</h2>
         </div>
+        <p class="text-green-100 text-center mt-2">Submit your schedule modification request</p>
       </div>
 
-      <!-- Form Card -->
-      <div class="bg-white p-6 rounded-b-lg shadow-lg border border-slate-200">
-        <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm" class="space-y-6">
+      <!-- Horizontal Form Layout -->
+      <div class="bg-white rounded-b-2xl shadow-xl border border-green-100 -mt-1">
+        <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm" class="p-8">
           <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
           <input type="hidden" name="submit_schedule_change" value="1">
 
           <!-- Row 1: Date Range and Work Hours -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <!-- Date Range -->
-            <div>
-              <label for="date_range" class="block text-sm font-medium text-slate-700 mb-2">
-                <i class="fas fa-calendar mr-2 text-slate-500"></i>Effective Date Range
+            <div class="space-y-2">
+              <label for="date_range" class="flex items-center text-lg font-semibold text-gray-800 mb-3">
+                <i class="fas fa-calendar text-green-600 mr-2"></i>
+                Effective Date Range
               </label>
-              <input type="text" name="date_range" id="date_range"
-                class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
-                placeholder="Select date range" required>
+              <div class="relative">
+                <input type="text" name="date_range" id="date_range" placeholder="Select date range"
+                       class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white pl-12" required>
+                <i class="fas fa-calendar absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+              </div>
             </div>
 
             <!-- Work Hours -->
-            <div>
-              <label for="work_schedule_id" class="block text-sm font-medium text-slate-700 mb-2">
-                <i class="fas fa-clock mr-2 text-slate-500"></i>New Work Hours
+            <div class="space-y-2">
+              <label for="work_schedule_id" class="flex items-center text-lg font-semibold text-gray-800 mb-3">
+                <i class="fas fa-clock text-green-600 mr-2"></i>
+                New Work Hours
               </label>
-              <select name="work_schedule_id" id="work_schedule_id"
-                class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all bg-white"
-                required>
-                <option value="" disabled selected>Select work hours</option>
+              <select name="work_schedule_id" id="work_schedule_id" required
+                      class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white">
+                <option value="" disabled selected>Choose your work hours</option>
                 <?php 
                 $allowed = [3, 4, 5, 6, 7, 8, 9, 10];
                 foreach ($work_schedules as $ws):
@@ -62,70 +60,68 @@
             </div>
           </div>
 
-          <!-- Row 2: Reason -->
-          <div>
-            <label for="reason" class="block text-sm font-medium text-slate-700 mb-2">
-              <i class="fas fa-edit mr-2 text-slate-500"></i>Reason for Change
-            </label>
-            <textarea name="reason" id="reason" rows="3"
-              class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none"
-              placeholder="Provide reason for schedule change..." required></textarea>
-          </div>
+          <!-- Row 2: Reason and Attachment -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Reason -->
+            <div class="space-y-2">
+              <label for="reason" class="flex items-center text-lg font-semibold text-gray-800 mb-3">
+                <i class="fas fa-comment-alt text-green-600 mr-2"></i>
+                Reason for Change
+              </label>
+              <textarea name="reason" id="reason" rows="4" placeholder="Provide details about your schedule change request..."
+                        class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white resize-none" required></textarea>
+              <p class="text-sm text-gray-500 mt-2">
+                <i class="fas fa-lightbulb mr-1"></i>
+                Be specific about your reason to help with approval
+              </p>
+            </div>
 
-          <!-- Row 3: File Upload -->
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-2">
-              <i class="fas fa-paperclip mr-2 text-slate-500"></i>Supporting Document <span class="text-red-500">*</span>
-            </label>
-            <div class="relative">
-              <input 
-                type="file" 
-                name="attachment_scr" 
-                id="fileInput"
-                accept=".pdf,.jpg,.jpeg,.png"
-                required
-                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-              
-              <div class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-all" id="fileDropArea">
-                <div class="flex flex-col md:flex-row items-center justify-center gap-4">
-                  <div class="flex items-center gap-3">
-                    <i class="fas fa-upload text-slate-400 text-xl"></i>
-                    <div class="text-left">
-                      <p class="text-sm text-slate-600">
-                        <span class="font-medium text-slate-800">Click to upload</span> or drag file here
-                      </p>
-                      <p class="text-xs text-slate-500">PDF, JPG, PNG (Max 10MB)</p>
-                    </div>
+            <!-- Attachment -->
+            <div class="space-y-2">
+              <label class="flex items-center text-lg font-semibold text-gray-800 mb-3">
+                <i class="fas fa-paperclip text-green-600 mr-2"></i>
+                Supporting Document
+                <span class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full ml-2 font-bold">Required</span>
+              </label>
+              <div class="relative">
+                <input type="file" name="attachment_scr" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" required
+                       class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+              </div>
+              <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
+                <div class="flex items-start">
+                  <i class="fas fa-exclamation-triangle text-amber-600 mr-2 mt-0.5"></i>
+                  <div class="text-amber-800 text-sm">
+                    <p class="font-medium">Accepted formats:</p>
+                    <p>PDF, JPG, JPEG, PNG files only (Max 10MB)</p>
                   </div>
-                  <div id="fileName" class="text-sm text-emerald-600 hidden font-medium bg-emerald-50 px-3 py-1 rounded-full"></div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Row 4: Action Buttons and Info -->
-          <div class="flex flex-col md:flex-row gap-6 pt-4">
-            <!-- Action Buttons -->
-            <div class="flex gap-3 md:w-1/2">
-              <button type="button" onclick="hideScheduleView()" 
-                class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 py-2.5 px-4 rounded-lg font-medium transition-all border border-blue-300">
-                <i class="fas fa-times mr-2"></i>Cancel
-              </button>
-              <button type="submit"
-                class="flex-1 bg-blue-700 hover:bg-blue-800 text-white py-2.5 px-4 rounded-lg font-medium transition-all shadow-sm">
-                <i class="fas fa-paper-plane mr-2"></i>Submit Request
-              </button>
-            </div>
-
-            <!-- Info -->
-            <div class="bg-slate-50 rounded-lg p-3 border border-slate-200 md:w-1/2 flex items-center">
-              <div class="flex items-center text-sm text-slate-600">
-                <i class="fas fa-info-circle text-slate-400 mr-2"></i>
-                <span>Requests are processed within 3-5 business days.</span>
-              </div>
+          <!-- Info Banner -->
+          <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+            <div class="flex items-center">
+              <i class="fas fa-info-circle text-green-600 mr-3"></i>
+              <span class="text-green-700 font-medium">Requests are processed within 3-5 business days.</span>
             </div>
           </div>
+
+          <!-- Submit Button -->
+          <div class="flex justify-center pt-6 border-t border-gray-100">
+            <button type="submit" id="submitBtn"
+                    class="group relative px-12 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+              <div class="flex items-center space-x-3">
+                <i class="fas fa-paper-plane group-hover:translate-x-1 transition-transform duration-200"></i>
+                <span>Submit Request</span>
+              </div>
+              <div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 rounded-xl transition-opacity duration-200"></div>
+            </button>
+          </div>
         </form>
+
+        <!-- Message Box -->
+        <div id="messageBox" class="hidden mx-8 mb-6 p-4 text-center text-white rounded-xl font-medium"></div>
       </div>
     </div>
   </div>
@@ -142,27 +138,12 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Input Focus */
+/* Enhanced focus effects */
 #scheduleView input:focus, 
 #scheduleView select:focus, 
 #scheduleView textarea:focus {
     transform: translateY(-1px);
-    box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.1);
 }
-
-/* File Upload */
-#scheduleView #fileDropArea.drag-over {
-    border-color: #64748b;
-    background-color: #f8fafc;
-}
-
-/* File selected state */
-#scheduleView #fileDropArea.file-selected {
-    border-color: #10b981;
-    background-color: #ecfdf5;
-}
-
-
 
 /* Button hover effects */
 #scheduleView button:hover {
@@ -176,76 +157,14 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
-    #scheduleView .grid-cols-2 {
+@media (max-width: 1024px) {
+    #scheduleView .lg\\:grid-cols-2 {
         grid-template-columns: 1fr;
-    }
-    
-    #scheduleView .md\\:flex-row {
-        flex-direction: column;
-    }
-    
-    #scheduleView .md\:w-1\/2 {
-        width: 100%;
-    }
-}
-
-/* Enhanced file upload area for horizontal layout */
-#scheduleView #fileDropArea {
-    min-height: 80px;
-}
-
-/* Grid gap responsive */
-@media (min-width: 768px) {
-    #scheduleView .gap-6 {
-        gap: 1.5rem;
     }
 }
 </style>
 
 <script>
-// File Upload
-document.getElementById('fileInput').addEventListener('change', function(e) {
-    const fileName = e.target.files[0]?.name;
-    const fileNameDisplay = document.getElementById('fileName');
-    const fileDropArea = document.getElementById('fileDropArea');
-    
-    if (fileName) {
-        fileNameDisplay.textContent = `✓ ${fileName}`;
-        fileNameDisplay.classList.remove('hidden');
-        fileDropArea.classList.add('file-selected');
-    } else {
-        fileNameDisplay.classList.add('hidden');
-        fileDropArea.classList.remove('file-selected');
-    }
-});
-
-// Drag & Drop
-const fileDropArea = document.getElementById('fileDropArea');
-const fileInput = document.getElementById('fileInput');
-
-['dragover', 'dragenter'].forEach(eventName => {
-    fileDropArea.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        fileDropArea.classList.add('drag-over');
-    });
-});
-
-['dragleave', 'drop'].forEach(eventName => {
-    fileDropArea.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        fileDropArea.classList.remove('drag-over');
-    });
-});
-
-fileDropArea.addEventListener('drop', (e) => {
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        fileInput.files = files;
-        fileInput.dispatchEvent(new Event('change'));
-    }
-});
-
 // Form Validation
 document.getElementById('scheduleChangeForm').addEventListener('submit', function(e) {
     const requiredFields = this.querySelectorAll('[required]');
@@ -273,25 +192,6 @@ document.getElementById('scheduleChangeForm').addEventListener('submit', functio
         });
     }
 });
-
-// Enhanced responsive behavior
-function handleResize() {
-    const isMobile = window.innerWidth < 768;
-    const fileDropArea = document.getElementById('fileDropArea');
-    
-    if (fileDropArea && fileDropArea.querySelector('.flex')) {
-        if (isMobile) {
-            fileDropArea.querySelector('.flex').classList.remove('md:flex-row');
-            fileDropArea.querySelector('.flex').classList.add('flex-col');
-        } else {
-            fileDropArea.querySelector('.flex').classList.add('md:flex-row');
-            fileDropArea.querySelector('.flex').classList.remove('flex-col');
-        }
-    }
-}
-
-window.addEventListener('resize', handleResize);
-document.addEventListener('DOMContentLoaded', handleResize);
 
 // Hide schedule view function
 function hideScheduleView() {

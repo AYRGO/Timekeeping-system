@@ -1,39 +1,35 @@
-
 <!-- Request Leave -->
-<div id="requestView" class="hidden mt-12">
-  <div class="flex justify-center items-start min-h-[60vh] px-4">
-    <div class="w-full max-w-4xl">
+<div id="requestView" class="hidden mt-8">
+  <div class="flex justify-center items-start min-h-[70vh] px-4">
+    <div class="w-full max-w-6xl">
 
-      <!-- Header -->
-      <div class="bg-blue-600 p-6 rounded-t-lg shadow-lg">
-        <div class="text-center">
-          <div class="inline-flex items-center justify-center w-10 h-10 bg-blue-700 rounded-lg mb-3">
-            <i class="fas fa-calendar-plus text-white"></i>
+      <!-- Modern Header with Gradient -->
+      <div class="bg-gradient-to-r from-green-600 to-green-700 p-6 rounded-t-2xl shadow-lg">
+        <div class="flex items-center justify-center space-x-3">
+          <div class="bg-white bg-opacity-20 p-2 rounded-full">
+            <i class="fas fa-calendar-plus text-white text-xl"></i>
           </div>
-          <h2 class="text-xl font-semibold text-white mb-1">
-            Leave Request
-          </h2>
-          <p class="text-blue-100 text-sm">
-            Submit your leave application
-          </p>
+          <h2 class="text-3xl font-bold text-white">Submit Leave Request</h2>
         </div>
+        <p class="text-green-100 text-center mt-2">Fill out the form below to request time off</p>
       </div>
 
-      <!-- Form Card -->
-      <div class="bg-white p-6 rounded-b-lg shadow-lg border border-slate-200">
-        <form id="leaveRequestForm" action="time_log_create.php" method="POST" enctype="multipart/form-data" class="space-y-6">
+      <!-- Horizontal Form Layout -->
+      <div class="bg-white rounded-b-2xl shadow-xl border border-green-100 -mt-1">
+        <form id="leaveRequestForm" action="time_log_create.php" method="POST" enctype="multipart/form-data" class="p-8">
           <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
 
           <!-- Row 1: Leave Type and Date Range -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <!-- Leave Type -->
-            <div>
-              <label for="leaveType" class="block text-sm font-medium text-slate-700 mb-2">
-                <i class="fas fa-list mr-2 text-slate-500"></i>Leave Type
+            <div class="space-y-2">
+              <label class="flex items-center text-lg font-semibold text-gray-800 mb-3">
+                <i class="fas fa-tags text-green-600 mr-2"></i>
+                Leave Type
               </label>
-              <select name="leaveType" id="leaveType" required
-                class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all bg-white">
-                <option value="" disabled selected>Select leave type</option>
+              <select name="leaveType" id="leaveType" required 
+                      class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white">
+                <option value="" disabled selected>Choose your leave type</option>
                 <?php
                 $types = [
                   'sick'          => 'Sick Leave (SL)',
@@ -51,279 +47,97 @@
                   <option value="<?= $val ?>"><?= $label ?></option>
                 <?php endforeach; ?>
               </select>
+
               <!-- Leave Credit Display -->
-              <div id="leaveBalance" class="text-sm mt-2 text-slate-600 hidden"></div>
+              <div id="leaveBalance" class="hidden">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                  <div class="flex items-center">
+                    <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                    <span class="text-blue-800 font-medium text-sm"></span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Date Range -->
-            <div>
-              <label for="date_range" class="block text-sm font-medium text-slate-700 mb-2">
-                <i class="fas fa-calendar mr-2 text-slate-500"></i>Leave Dates
+            <div class="space-y-2">
+              <label class="flex items-center text-lg font-semibold text-gray-800 mb-3">
+                <i class="fas fa-calendar-alt text-green-600 mr-2"></i>
+                Leave Dates
               </label>
-              <input type="text" name="date_range" id="date_range"
-                class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
-                placeholder="Select date range" required>
+              <div class="relative">
+                <input type="text" name="date_range" id="date_range" placeholder="Select your leave dates"
+                       class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white pl-12" required>
+                <i class="fas fa-calendar absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+              </div>
             </div>
           </div>
 
-          <!-- Row 2: Reason -->
-          <div>
-            <label for="reason" class="block text-sm font-medium text-slate-700 mb-2">
-              <i class="fas fa-edit mr-2 text-slate-500"></i>Reason for Leave
-            </label>
-            <textarea name="reason" id="reason" rows="3"
-              class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none"
-              placeholder="Provide reason for leave..."></textarea>
-          </div>
+          <!-- Row 2: Reason and Attachment -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Reason -->
+            <div class="space-y-2">
+              <label class="flex items-center text-lg font-semibold text-gray-800 mb-3">
+                <i class="fas fa-comment-alt text-green-600 mr-2"></i>
+                Reason for Leave
+              </label>
+              <textarea name="reason" rows="4" placeholder="Provide details about your leave request..."
+                        class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white resize-none"></textarea>
+              <p class="text-sm text-gray-500 mt-2">
+                <i class="fas fa-lightbulb mr-1"></i>
+                Be specific about your reason to help with approval
+              </p>
+            </div>
 
-          <!-- Row 3: File Upload -->
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-2">
-              <i class="fas fa-paperclip mr-2 text-slate-500"></i>Supporting Document <span class="text-red-500">*</span>
-            </label>
-            <div class="relative">
-              <input 
-                type="file" 
-                name="attachment_lr" 
-                id="fileInput"
-                accept=".pdf,.jpg,.jpeg,.png"
-                required
-                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-              
-              <div class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-all" id="fileDropArea">
-                <div class="flex flex-col md:flex-row items-center justify-center gap-4">
-                  <div class="flex items-center gap-3">
-                    <i class="fas fa-upload text-slate-400 text-xl"></i>
-                    <div class="text-left">
-                      <p class="text-sm text-slate-600">
-                        <span class="font-medium text-slate-800">Click to upload</span> or drag file here
-                      </p>
-                      <p class="text-xs text-slate-500">PDF, JPG, PNG (Max 10MB)</p>
-                    </div>
+            <!-- Attachment -->
+            <div class="space-y-2">
+              <label class="flex items-center text-lg font-semibold text-gray-800 mb-3">
+                <i class="fas fa-paperclip text-green-600 mr-2"></i>
+                Supporting Document
+                <span class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full ml-2 font-bold">Required</span>
+              </label>
+              <div class="relative">
+                <input type="file" name="attachment_lr" accept=".pdf,.jpg,.jpeg,.png" required
+                       class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+              </div>
+              <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
+                <div class="flex items-start">
+                  <i class="fas fa-exclamation-triangle text-amber-600 mr-2 mt-0.5"></i>
+                  <div class="text-amber-800 text-sm">
+                    <p class="font-medium">Accepted formats:</p>
+                    <p>PDF, JPG, JPEG, PNG files only</p>
                   </div>
-                  <div id="fileName" class="text-sm text-emerald-600 hidden font-medium bg-emerald-50 px-3 py-1 rounded-full"></div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Leave Balance Message -->
-          <div id="leaveBalanceDisplay" class="hidden text-sm text-red-600 font-medium text-center bg-red-50 p-3 rounded-lg border border-red-200"></div>
-
-          <!-- Row 4: Action Buttons and Info -->
-          <div class="flex flex-col md:flex-row gap-6 pt-4">
-            <!-- Action Buttons -->
-            <div class="flex gap-3 md:w-1/2">
-              <button type="button" onclick="hideRequestView()" 
-                class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 py-2.5 px-4 rounded-lg font-medium transition-all border border-blue-300">
-                <i class="fas fa-times mr-2"></i>Cancel
-              </button>
-              <button type="submit" id="submitBtn"
-                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-lg font-medium transition-all shadow-sm">
-                <i class="fas fa-paper-plane mr-2"></i>Submit Request
-              </button>
-            </div>
-
-            <!-- Info -->
-            <div class="bg-slate-50 rounded-lg p-3 border border-slate-200 md:w-1/2 flex items-center">
-              <div class="flex items-center text-sm text-slate-600">
-                <i class="fas fa-info-circle text-slate-400 mr-2"></i>
-                <span>Leave requests are processed within 2-3 business days.</span>
+          <!-- Leave Balance Warning -->
+          <div id="leaveBalanceDisplay" class="hidden mb-6">
+            <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div class="flex items-center">
+                <i class="fas fa-exclamation-circle text-red-600 mr-3"></i>
+                <span class="text-red-700 font-medium"></span>
               </div>
             </div>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="flex justify-center pt-6 border-t border-gray-100">
+            <button type="submit" id="submitBtn"
+                    class="group relative px-12 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+              <div class="flex items-center space-x-3">
+                <i class="fas fa-paper-plane group-hover:translate-x-1 transition-transform duration-200"></i>
+                <span>Submit Leave Request</span>
+              </div>
+              <div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 rounded-xl transition-opacity duration-200"></div>
+            </button>
           </div>
         </form>
 
         <!-- Message Box -->
-        <div id="messageBox" class="hidden mt-4 p-3 text-center text-white rounded-lg"></div>
+        <div id="messageBox" class="hidden mx-8 mb-6 p-4 text-center text-white rounded-xl font-medium"></div>
       </div>
     </div>
   </div>
 </div>
-
-<style>
-/* Form Animations */
-#requestView:not(.hidden) {
-    animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* Input Focus */
-#requestView input:focus, 
-#requestView select:focus, 
-#requestView textarea:focus {
-    transform: translateY(-1px);
-    box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.1);
-}
-
-/* File Upload */
-#requestView #fileDropArea.drag-over {
-    border-color: #64748b;
-    background-color: #f8fafc;
-}
-
-/* File selected state */
-#requestView #fileDropArea.file-selected {
-    border-color: #10b981;
-    background-color: #ecfdf5;
-}
-
-
-
-/* Button hover effects */
-#requestView button:hover {
-    transform: translateY(-1px);
-}
-
-/* Error states */
-#requestView .border-red-400 {
-    border-color: #f87171 !important;
-    background-color: #fef2f2 !important;
-}
-
-/* Message box styles */
-#requestView #messageBox.success {
-    background-color: #22c55e;
-}
-
-#requestView #messageBox.error {
-    background-color: #ef4444;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    #requestView .grid-cols-2 {
-        grid-template-columns: 1fr;
-    }
-    
-    #requestView .md\\:flex-row {
-        flex-direction: column;
-    }
-    
-    #requestView .md\\:w-1\\ {
-        width: 100%;
-    }
-}
-
-/* Enhanced file upload area for horizontal layout */
-#requestView #fileDropArea {
-    min-height: 80px;
-}
-
-/* Grid gap responsive */
-@media (min-width: 768px) {
-    #requestView .gap-6 {
-        gap: 1.5rem;
-    }
-}
-</style>
-
-<script>
-// File Upload
-document.getElementById('fileInput').addEventListener('change', function(e) {
-    const fileName = e.target.files[0]?.name;
-    const fileNameDisplay = document.getElementById('fileName');
-    const fileDropArea = document.getElementById('fileDropArea');
-    
-    if (fileName) {
-        fileNameDisplay.textContent = `✓ ${fileName}`;
-        fileNameDisplay.classList.remove('hidden');
-        fileDropArea.classList.add('file-selected');
-    } else {
-        fileNameDisplay.classList.add('hidden');
-        fileDropArea.classList.remove('file-selected');
-    }
-});
-
-// Drag & Drop
-const fileDropArea = document.getElementById('fileDropArea');
-const fileInput = document.getElementById('fileInput');
-
-['dragover', 'dragenter'].forEach(eventName => {
-    fileDropArea.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        fileDropArea.classList.add('drag-over');
-    });
-});
-
-['dragleave', 'drop'].forEach(eventName => {
-    fileDropArea.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        fileDropArea.classList.remove('drag-over');
-    });
-});
-
-fileDropArea.addEventListener('drop', (e) => {
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        fileInput.files = files;
-        fileInput.dispatchEvent(new Event('change'));
-    }
-});
-
-// Form Validation
-document.getElementById('leaveRequestForm').addEventListener('submit', function(e) {
-    const requiredFields = this.querySelectorAll('[required]');
-    let isValid = true;
-    
-    requiredFields.forEach(field => {
-        if (!field.value.trim()) {
-            field.classList.add('border-red-400');
-            isValid = false;
-            
-            field.addEventListener('input', function() {
-                this.classList.remove('border-red-400');
-            }, { once: true });
-        }
-    });
-    
-    if (!isValid) {
-        e.preventDefault();
-        this.querySelector('.border-red-400')?.focus();
-        
-        // Scroll to first error
-        this.querySelector('.border-red-400')?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
-        });
-    }
-});
-
-// Leave type change handler for balance display
-document.getElementById('leaveType').addEventListener('change', function() {
-    const leaveBalance = document.getElementById('leaveBalance');
-    if (this.value) {
-        // You can add AJAX call here to fetch balance
-        leaveBalance.classList.remove('hidden');
-        leaveBalance.textContent = 'Available balance: Loading...';
-    } else {
-        leaveBalance.classList.add('hidden');
-    }
-});
-
-// Hide request view function
-function hideRequestView() {
-    document.getElementById('requestView').classList.add('hidden');
-}
-
-// Enhanced responsive behavior
-function handleResize() {
-    const isMobile = window.innerWidth < 768;
-    const fileDropArea = document.getElementById('fileDropArea');
-    
-    if (isMobile) {
-        fileDropArea.querySelector('.flex').classList.remove('md:flex-row');
-        fileDropArea.querySelector('.flex').classList.add('flex-col');
-    } else {
-        fileDropArea.querySelector('.flex').classList.add('md:flex-row');
-        fileDropArea.querySelector('.flex').classList.remove('flex-col');
-    }
-}
-
-window.addEventListener('resize', handleResize);
-document.addEventListener('DOMContentLoaded', handleResize);
-</script>

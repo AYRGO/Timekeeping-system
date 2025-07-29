@@ -3,18 +3,37 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
+// Check which view to display (current requests or history)
+$view = isset($_GET['view']) ? $_GET['view'] : 'current';
+$isHistoryView = ($view === 'history');
+
 // Set page title for header
-$pageTitle = 'Time Adjustment Requests';
+$pageTitle = $isHistoryView ? 'Time Adjustment Requests History' : 'Time Adjustment Requests';
 
 date_default_timezone_set('Asia/Manila'); // or your preferred timezone
 
 // Fetch time adjustment requests
-$stmt = $pdo->query("
-    SELECT tar.*, e.fname, e.lname
-    FROM time_adjustment_requests tar
-    JOIN employees e ON tar.employee_id = e.id
-    ORDER BY tar.submitted_at DESC
-");
+if ($isHistoryView) {
+    // Fetch from post_time_adjustment_requests table (history)
+    $stmt = $pdo->query("
+        SELECT ptar.id, ptar.employee_id, ptar.log_date, ptar.current_time_in, ptar.current_time_out,
+               ptar.requested_time_in, ptar.requested_time_out, ptar.reason, ptar.status,
+               ptar.submitted_at, ptar.attachment, ptar.created_at,
+               e.fname, e.lname
+        FROM post_time_adjustment_requests ptar
+        JOIN employees e ON ptar.employee_id = e.id
+        ORDER BY ptar.created_at DESC
+    ");
+} else {
+    // Fetch from time_adjustment_requests table (current requests) - only pending
+    $stmt = $pdo->query("
+        SELECT tar.*, e.fname, e.lname
+        FROM time_adjustment_requests tar
+        JOIN employees e ON tar.employee_id = e.id
+        WHERE tar.status = 'pending'
+        ORDER BY tar.submitted_at DESC
+    ");
+}
 $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -24,6 +43,7 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <title><?= $pageTitle ?></title>
 </head>
 <body class="bg-gray-100">
@@ -39,13 +59,51 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <main class="flex-1 p-6 overflow-y-auto">
             <!-- Main Container - Full Width -->
             <div class="w-full">
+                <!-- Display messages -->
+                <?php if (isset($_SESSION['success'])): ?>
+                    <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                        <span class="block sm:inline"><?= htmlspecialchars($_SESSION['success']) ?></span>
+                        <span class="absolute top-0 bottom-0 right-0 px-4 py-3">
+                            <svg class="fill-current h-6 w-6 text-green-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" onclick="this.parentElement.parentElement.style.display='none'"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+                        </span>
+                    </div>
+                    <?php unset($_SESSION['success']); ?>
+                <?php endif; ?>
+                
+                <?php if (isset($_SESSION['error'])): ?>
+                    <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                        <span class="block sm:inline"><?= htmlspecialchars($_SESSION['error']) ?></span>
+                        <span class="absolute top-0 bottom-0 right-0 px-4 py-3">
+                            <svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" onclick="this.parentElement.parentElement.style.display='none'"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+                        </span>
+                    </div>
+                    <?php unset($_SESSION['error']); ?>
+                <?php endif; ?>
+
                 <!-- Page Header -->
                 <div class="mb-8">
-                
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900"><?= $pageTitle ?></h1>
+                            <p class="text-gray-600">
+                                <?= $isHistoryView ? 'View all processed time adjustment requests' : 'Manage employee time adjustment requests' ?>
+                            </p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <a href="?view=current" 
+                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= !$isHistoryView ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <i class="fas fa-clock mr-2"></i>Current Requests
+                            </a>
+                            <a href="?view=history" 
+                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= $isHistoryView ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <i class="fas fa-history mr-2"></i>History
+                            </a>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Time Adjustment Table Container - Full Width -->
-
-
+                <div class="overflow-x-auto bg-white shadow rounded-lg">
                     <!-- Table Content -->
                     <div class="overflow-x-auto">
                         <table class="w-full divide-y divide-gray-200">
@@ -59,8 +117,12 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Attachment</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <?= $isHistoryView ? 'Processed' : 'Submitted' ?>
+                                    </th>
+                                    <?php if (!$isHistoryView): ?>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <?php endif; ?>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -69,8 +131,15 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <tr class="hover:bg-gray-50 transition-colors">
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#<?= $adj['id'] ?></td>
                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="text-sm font-medium text-gray-900">
-                                                    <?= htmlspecialchars($adj['fname'] . ' ' . $adj['lname']) ?>
+                                                <div class="flex items-center">
+                                                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                                                        <span class="text-blue-600 font-medium text-sm">
+                                                            <?= strtoupper(substr($adj['fname'], 0, 1) . substr($adj['lname'], 0, 1)) ?>
+                                                        </span>
+                                                    </div>
+                                                    <div class="text-sm font-medium text-gray-900">
+                                                        <?= htmlspecialchars($adj['fname'] . ' ' . $adj['lname']) ?>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -130,10 +199,14 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 </span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <?= date('M j, Y', strtotime($adj['submitted_at'])) ?>
+                                                <?php 
+                                                $date_field = $isHistoryView ? ($adj['created_at'] ?? $adj['submitted_at']) : $adj['submitted_at'];
+                                                ?>
+                                                <?= date('M j, Y', strtotime($date_field)) ?>
                                                 <br>
-                                                <span class="text-xs"><?= date('g:i A', strtotime($adj['submitted_at'])) ?></span>
+                                                <span class="text-xs"><?= date('g:i A', strtotime($date_field)) ?></span>
                                             </td>
+                                            <?php if (!$isHistoryView): ?>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <?php if (strtolower($adj['status']) === 'pending'): ?>
                                                     <div class="flex space-x-2">
@@ -141,6 +214,7 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                             <input type="hidden" name="request_id" value="<?= $adj['id'] ?>">
                                                             <input type="hidden" name="action" value="approve">
                                                             <button type="submit" 
+                                                                    onclick="return confirm('Are you sure you want to approve this time adjustment request?')"
                                                                     class="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 text-xs font-medium transition-colors flex items-center">
                                                                 <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -161,16 +235,17 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                     <span class="text-gray-400 italic text-xs">Completed</span>
                                                 <?php endif; ?>
                                             </td>
+                                            <?php endif; ?>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="10" class="text-center py-12">
+                                        <td colspan="<?= $isHistoryView ? '9' : '10' ?>" class="text-center py-12">
                                             <div class="text-gray-400">
                                                 <svg class="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                                                 </svg>
-                                                <p class="text-lg font-medium">No time adjustment requests found</p>
+                                                <p class="text-lg font-medium"><?= $isHistoryView ? 'No processed time adjustment requests found' : 'No time adjustment requests found' ?></p>
                                                 <p class="text-sm">Requests will appear here when employees submit them</p>
                                             </div>
                                         </td>

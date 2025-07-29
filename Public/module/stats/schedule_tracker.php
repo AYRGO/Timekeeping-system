@@ -84,7 +84,7 @@ if ($currentActiveSchedule) {
             $status_text = "Schedule Change Pending ";
         } elseif (in_array($status, ['declined', 'rejected'])) {
             $schedule_status = "declined";
-            $status_text = "Request Declined )";
+            $status_text = "Request Declined";
         } else {
             $schedule_status = "baseline";
             $status_text = "Official Schedule (ID: {$default_schedule_id})";

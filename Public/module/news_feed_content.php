@@ -1,6 +1,5 @@
 <?php
 
-
 $current_user_id = $_SESSION['employee']['id'] ?? null;
 
 // Fetch announcements
@@ -12,9 +11,17 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <style>
     .facebook-post {
         background: white;
-        border-radius: 8px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-        margin-bottom: 16px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 20px;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    .facebook-post:hover {
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+
+        border-color: rgba(0, 0, 0, 0.08);
     }
     .reaction-button {
         transition: all 0.2s ease;
@@ -105,16 +112,38 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 </style>
 
+        
 <div class="flex gap-6">
     <!-- Main Content -->
     <div class="flex-1">
+        <!-- News Feed Header -->
+        <div class="mb-4">
+            <div class="rounded-lg p-4 bg-white border border-gray-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-xl font-semibold text-gray-800 mb-1 flex items-center">
+                            <span class="mr-2">📰</span> News Feed
+                        </h1>
+                        <p class="text-sm text-gray-500">
+                            Stay updated with the latest announcements and company news
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Scrollable Feed Container -->
         <div class="max-h-[90vh] overflow-y-auto w-full" id="news-feed-container" style="overflow-x: visible !important;">
 
             <!-- Lightbox Modal -->
-            <div id="lightbox-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center z-50">
-                <span class="absolute top-5 right-5 text-white text-3xl cursor-pointer" onclick="closeLightbox()">×</span>
-                <img id="lightbox-image" src="" class="max-h-[90vh] max-w-[90vw] rounded shadow-xl" alt="Expanded Image">
+            <div id="lightbox-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center z-50" onclick="closeLightbox()">
+                <span class="absolute top-5 right-5 text-white text-3xl cursor-pointer hover:text-gray-300 z-60" onclick="closeLightbox()">×</span>
+                <div class="max-h-[90vh] max-w-[90vw] relative" onclick="event.stopPropagation()">
+                    <img id="lightbox-image" src="" class="max-h-[90vh] max-w-[90vw] rounded shadow-xl" alt="Expanded Image">
+                    <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-4 py-2 rounded-lg">
+                        <p class="text-sm" id="lightbox-caption">Click image to close</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Posts Feed -->
@@ -240,23 +269,125 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <?php foreach ($files as $fileInfo):
                                     $filePath = is_array($fileInfo) ? $fileInfo['stored'] : $fileInfo;
                                     $originalName = is_array($fileInfo) ? $fileInfo['original'] : basename($fileInfo);
-                                    $ext = pathinfo($filePath, PATHINFO_EXTENSION);
-                                    $isImage = in_array(strtolower($ext), ['jpg', 'jpeg', 'png']);
-                                    $fileUrl = "/Public/views/" . htmlspecialchars($filePath);
+                                    
+                                    // Clean up the file path
+                                    $filePath = str_replace(['\\', '//'], '/', $filePath);
+                                    $filePath = ltrim($filePath, '/');
+                                    
+                                    // Construct proper file URL - simplified path construction
+                                    if (strpos($filePath, 'uploads/') === 0) {
+                                        // File is already in uploads folder
+                                        $fileUrl = '/Timekeeping-system/Public/views/' . $filePath;
+                                    } elseif (strpos($filePath, 'views/uploads/') === 0) {
+                                        // File path includes views/uploads
+                                        $fileUrl = '/Timekeeping-system/Public/' . $filePath;
+                                    } else {
+                                        // Default case - assume it's in uploads
+                                        $fileUrl = '/Timekeeping-system/Public/views/uploads/' . basename($filePath);
+                                    }
+                                    
+                                    $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+                                    $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']);
+                                    
+                                    // Get file size if possible
+                                    $fullPath = $_SERVER['DOCUMENT_ROOT'] . $fileUrl;
+                                    $fileSize = '';
+                                    if (file_exists($fullPath)) {
+                                        $size = filesize($fullPath);
+                                        if ($size !== false) {
+                                            if ($size > 1024 * 1024) {
+                                                $fileSize = round($size / (1024 * 1024), 1) . ' MB';
+                                            } elseif ($size > 1024) {
+                                                $fileSize = round($size / 1024, 1) . ' KB';
+                                            } else {
+                                                $fileSize = $size . ' B';
+                                            }
+                                        }
+                                    }
                                 ?>
                                     <?php if ($isImage): ?>
-                                        <div class="rounded-lg overflow-hidden border border-gray-200">
-                                            <img src="<?= $fileUrl ?>" alt="<?= htmlspecialchars($originalName) ?>" class="w-full h-auto cursor-pointer" onclick="openLightbox(this.src)">
+                                        <div class="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                                            <img src="<?= htmlspecialchars($fileUrl) ?>" 
+                                                 alt="<?= htmlspecialchars($originalName) ?>" 
+                                                 class="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity" 
+                                                 onclick="openLightbox('<?= htmlspecialchars($fileUrl) ?>')"
+                                                 style="max-height: 500px; object-fit: contain; background: white;"
+                                                 onerror="console.log('Image failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                            <!-- Fallback for broken images -->
+                                            <div class="hidden p-4 text-center bg-gray-100">
+                                                <i class="fas fa-image text-gray-400 text-2xl mb-2"></i>
+                                                <p class="text-gray-500 text-sm">Image not available</p>
+                                                <p class="text-xs text-gray-400 mb-2">Tried path: <?= htmlspecialchars($fileUrl) ?></p>
+                                                <a href="<?= htmlspecialchars($fileUrl) ?>" 
+                                                   class="text-blue-600 hover:underline text-sm" 
+                                                   download="<?= htmlspecialchars($originalName) ?>">
+                                                    Download <?= htmlspecialchars($originalName) ?>
+                                                </a>
+                                            </div>
                                         </div>
                                     <?php else: ?>
-                                        <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border">
-                                            <i class="fas fa-file-alt text-blue-600 text-xl"></i>
-                                            <div class="flex-1">
-                                                <a href="<?= $fileUrl ?>" 
-                                                   class="text-blue-600 hover:underline font-medium" download>
-                                                    <?= htmlspecialchars($originalName) ?>
+                                        <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
+                                            <div class="flex-shrink-0">
+                                                <?php
+                                                // Get appropriate icon based on file extension
+                                                $iconClass = 'fas fa-file';
+                                                switch ($ext) {
+                                                    case 'pdf':
+                                                        $iconClass = 'fas fa-file-pdf text-red-600';
+                                                        break;
+                                                    case 'doc':
+                                                    case 'docx':
+                                                        $iconClass = 'fas fa-file-word text-blue-600';
+                                                        break;
+                                                    case 'xls':
+                                                    case 'xlsx':
+                                                        $iconClass = 'fas fa-file-excel text-green-600';
+                                                        break;
+                                                    case 'ppt':
+                                                    case 'pptx':
+                                                        $iconClass = 'fas fa-file-powerpoint text-orange-600';
+                                                        break;
+                                                    case 'txt':
+                                                        $iconClass = 'fas fa-file-alt text-gray-600';
+                                                        break;
+                                                    case 'zip':
+                                                    case 'rar':
+                                                    case '7z':
+                                                        $iconClass = 'fas fa-file-archive text-purple-600';
+                                                        break;
+                                                    case 'mp4':
+                                                    case 'avi':
+                                                    case 'mov':
+                                                        $iconClass = 'fas fa-file-video text-red-500';
+                                                        break;
+                                                    case 'mp3':
+                                                    case 'wav':
+                                                        $iconClass = 'fas fa-file-audio text-green-500';
+                                                        break;
+                                                    default:
+                                                        $iconClass = 'fas fa-file text-gray-500';
+                                                }
+                                                ?>
+                                                <i class="<?= $iconClass ?> text-2xl"></i>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <h4 class="font-medium text-gray-800 truncate"><?= htmlspecialchars($originalName) ?></h4>
+                                                <div class="flex items-center space-x-2 text-sm text-gray-500">
+                                                    <span class="uppercase"><?= $ext ?> file</span>
+                                                    <?php if ($fileSize): ?>
+                                                        <span>•</span>
+                                                        <span><?= $fileSize ?></span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                            <div class="flex-shrink-0">
+                                                <a href="<?= htmlspecialchars($fileUrl) ?>" 
+                                                   class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors" 
+                                                   download="<?= htmlspecialchars($originalName) ?>"
+                                                   title="Download <?= htmlspecialchars($originalName) ?>">
+                                                    <i class="fas fa-download mr-1"></i>
+                                                    Download
                                                 </a>
-                                                <p class="text-sm text-gray-500">Click to download</p>
                                             </div>
                                         </div>
                                     <?php endif; ?>
@@ -280,7 +411,7 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         </div>
 
-                        <!-- Action Buttons -->
+                       <!-- Action Buttons -->
                         <div class="px-4 py-2 border-t border-gray-100">
                             <div class="flex items-center justify-around">
                                 <!-- Like Button with Reaction Menu -->
@@ -331,7 +462,7 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
 
                                 <!-- Comment Button -->
-                                <button onclick="openCommentsModal(<?= $aid ?>)" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
+                                <button onclick="toggleComments(<?= $aid ?>)" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
                                     <i class="far fa-comment"></i>
                                     <span class="font-medium">Comment</span>
                                 </button>
@@ -367,18 +498,19 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                 <?php endforeach; ?>
                             </div>
-
                             <!-- Comment Input -->
                             <div class="px-4 py-3 border-t border-gray-100">
-                                <form method="POST" action="add_comment.php" class="flex space-x-3">
+                                <form onsubmit="submitComment(event, <?= $aid ?>)" class="flex space-x-3">
+                                    <input type="hidden" name="type" value="comment">
                                     <input type="hidden" name="announcement_id" value="<?= $aid ?>">
+                                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                                     <div class="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm">
                                         <?= isset($_SESSION['employee']['fname']) ? strtoupper(substr($_SESSION['employee']['fname'], 0, 1)) : 'U' ?>
                                     </div>
                                     <div class="flex-1 flex space-x-2">
                                         <input 
                                             type="text" 
-                                            name="comment_content" 
+                                            name="comment" 
                                             placeholder="Write a comment..." 
                                             class="comment-input flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             required
@@ -477,44 +609,62 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
+
 <script>
 let reactionTimeouts = {};
 
-// API functions
 async function loadWeather() {
     try {
-        // Using OpenWeatherMap API (you'll need to get a free API key)
-        // For demo, I'll use a weather service that doesn't require API key
-       const response = await fetch('https://api.weatherapi.com/v1/current.json?key=demo&q=Pampanga&aqi=no');
+        // Visual Crossing Weather API for Clark, Pampanga
+        const apiKey = 'WGNTPH8KPCN49BMK8GHNJKYVA';
+        const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/Clark%2C%20Pampanga?unitGroup=metric&key=${apiKey}&contentType=json`;
+
+        console.log('Fetching weather from:', url);
+        const response = await fetch(url);
+
         if (!response.ok) {
-            throw new Error('Weather service unavailable');
+            throw new Error(`Weather API error: ${response.status} ${response.statusText}`);
         }
-        
+
         const data = await response.json();
+        console.log('Weather data received:', data);
+
+        // Get today's weather
+        const today = data.days && data.days.length > 0 ? data.days[0] : null;
+        if (!today) throw new Error('No weather data for today');
+
+        const temp = Math.round(today.temp);
+        const condition = today.conditions || 'Partly Cloudy';
+        const humidity = today.humidity || '--';
+        const wind = Math.round(today.windspeed || 0);
+        const location = `${data.resolvedAddress || 'Clark, Pampanga'}`;
+
         document.getElementById('weather-content').innerHTML = `
             <div class="text-center">
-                <div class="weather-icon text-4xl mb-2">${getWeatherIcon(data.current.condition.text)}</div>
-                <h4 class="text-xl font-bold text-gray-800">${Math.round(data.current.temp_c)}°C</h4>
-                <p class="text-gray-600">${data.current.condition.text}</p>
-                <p class="text-sm text-gray-500 mt-2">${data.location.name}, ${data.location.country}</p>
+                <div class="weather-icon text-4xl mb-2">${getWeatherIcon(condition)}</div>
+                <h4 class="text-xl font-bold text-gray-800">${temp}°C</h4>
+                <p class="text-gray-600 capitalize">${condition}</p>
+                <p class="text-sm text-gray-500 mt-1">${location}</p>
                 <div class="flex justify-between mt-3 text-sm">
-                    <span>Humidity: ${data.current.humidity}%</span>
-                    <span>Wind: ${Math.round(data.current.wind_kph)} km/h</span>
+                    <span>💧 ${humidity}%</span>
+                    <span>💨 ${wind} km/h</span>
                 </div>
             </div>
         `;
     } catch (error) {
-        // Fallback weather data
+        console.error('Weather loading error:', error);
+        // Fallback weather data for Clark, Pampanga
         document.getElementById('weather-content').innerHTML = `
             <div class="text-center">
-                <div class="weather-icon text-4xl mb-2">☀️</div>
+                <div class="weather-icon text-4xl mb-2">🌤️</div>
                 <h4 class="text-xl font-bold text-gray-800">29°C</h4>
                 <p class="text-gray-600">Partly Cloudy</p>
-                <p class="text-sm text-gray-500 mt-2">Pampanga, Philippines</p>
+                <p class="text-sm text-gray-500 mt-1">Clark, Philippines</p>
                 <div class="flex justify-between mt-3 text-sm">
-                    <span>Humidity: 72%</span>
-                    <span>Wind: 15 km/h</span>
+                    <span>💧 75%</span>
+                    <span>💨 12 km/h</span>
                 </div>
+                <p class="text-xs text-red-500 mt-2">Unable to fetch live data</p>
             </div>
         `;
     }
@@ -536,12 +686,14 @@ async function loadQuote() {
             </div>
         `;
     } catch (error) {
+        console.error('Quote loading error:', error);
         // Fallback quotes
         const fallbackQuotes = [
             { content: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
             { content: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
             { content: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
-            { content: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" }
+            { content: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+            { content: "Excellence is never an accident. It is always the result of high intention, sincere effort, and intelligent execution.", author: "Aristotle" }
         ];
         
         const randomQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
@@ -556,53 +708,38 @@ async function loadQuote() {
 
 async function loadNews() {
     try {
-        // Using NewsAPI or similar - you'll need an API key
-        // For demo, using a free news service
-        const response = await fetch('https://newsapi.org/v2/top-headlines?country=ph&pageSize=5&apiKey=demo');
+        // Note: NewsAPI requires a valid API key for production
+        // For demo purposes, we'll use fallback news
+        throw new Error('Using fallback news for demo');
         
-        if (!response.ok) {
-            throw new Error('News service unavailable');
-        }
-        
-        const data = await response.json();
-        let newsHtml = '';
-        
-        data.articles.slice(0, 5).forEach(article => {
-            newsHtml += `
-                <div class="news-item" onclick="window.open('${article.url}', '_blank')">
-                    <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">${article.title}</h5>
-                    <p class="text-xs text-gray-500">${article.source.name} • ${new Date(article.publishedAt).toLocaleDateString()}</p>
-                </div>
-            `;
-        });
-        
-        document.getElementById('news-content').innerHTML = newsHtml;
     } catch (error) {
-        // Fallback news with clickable links
+        console.log('Using fallback news data');
+        // Fallback news with realistic Philippine content
         document.getElementById('news-content').innerHTML = `
             <div class="news-item" onclick="window.open('https://www.bworldonline.com/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Philippine Economy Shows Strong Growth</h5>
-                <p class="text-xs text-gray-500">Business World • Today</p>
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Philippine Economy Shows Steady Growth in Q3</h5>
+                <p class="text-xs text-gray-500">Business World • ${new Date().toLocaleDateString()}</p>
             </div>
             <div class="news-item" onclick="window.open('https://technews.ph/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">New Technology Hub Opens in Pampanga</h5>
-                <p class="text-xs text-gray-500">Tech News • Today</p>
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Clark Freeport Zone Expands Tech Infrastructure</h5>
+                <p class="text-xs text-gray-500">Tech News PH • ${new Date().toLocaleDateString()}</p>
             </div>
             <div class="news-item" onclick="window.open('https://www.deped.gov.ph/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Education Reforms Announced</h5>
-                <p class="text-xs text-gray-500">Education Today • Yesterday</p>
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Education Department Launches Digital Learning Initiative</h5>
+                <p class="text-xs text-gray-500">DepEd Official • Yesterday</p>
             </div>
-            <div class="news-item" onclick="window.open('https://climate.gov.ph/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Climate Change Initiative Launched</h5>
-                <p class="text-xs text-gray-500">Environmental News • Yesterday</p>
+            <div class="news-item" onclick="window.open('https://www.doh.gov.ph/', '_blank')">
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Health Ministry Reports Improved Healthcare Access</h5>
+                <p class="text-xs text-gray-500">DOH Philippines • Yesterday</p>
             </div>
             <div class="news-item" onclick="window.open('https://www.bsp.gov.ph/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Digital Banking Adoption Reaches New High</h5>
-                <p class="text-xs text-gray-500">BSP Financial • 2 days ago</p>
+                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Central Bank Announces New Digital Payment Guidelines</h5>
+                <p class="text-xs text-gray-500">BSP • 2 days ago</p>
             </div>
         `;
     }
 }
+
 async function loadFact() {
     try {
         const response = await fetch('https://uselessfacts.jsph.pl/random.json?language=en');
@@ -618,13 +755,18 @@ async function loadFact() {
             </div>
         `;
     } catch (error) {
+        console.error('Fact loading error:', error);
         // Fallback facts
         const fallbackFacts = [
             "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly edible.",
-            "Octopuses have three hearts and blue blood.",
-            "A group of flamingos is called a 'flamboyance'.",
-            "Bananas are berries, but strawberries aren't.",
-            "The shortest war in history lasted only 38-45 minutes between Britain and Zanzibar in 1896."
+            "Octopuses have three hearts and blue blood. Two hearts pump blood to the gills, while the third pumps blood to the rest of the body.",
+            "A group of flamingos is called a 'flamboyance', which perfectly describes their vibrant pink appearance.",
+            "Bananas are technically berries, but strawberries aren't. Botanically speaking, berries have seeds inside their flesh.",
+            "The shortest war in history lasted only 38-45 minutes between Britain and Zanzibar in 1896.",
+            "Philippines has over 7,640 islands, but only about 2,000 are inhabited by people.",
+            "A single cloud can weigh more than a million pounds, yet it floats in the sky due to air density differences.",
+            "Wombat droppings are cube-shaped, making them the only known animal to produce square feces.",
+            "The human brain uses about 20% of the body's total energy, despite weighing only about 2% of body weight."
         ];
         
         const randomFact = fallbackFacts[Math.floor(Math.random() * fallbackFacts.length)];
@@ -641,10 +783,12 @@ function getWeatherIcon(condition) {
     if (condition.includes('sunny') || condition.includes('clear')) return '☀️';
     if (condition.includes('cloud')) return '☁️';
     if (condition.includes('rain')) return '🌧️';
-    if (condition.includes('storm')) return '⛈️';
+    if (condition.includes('storm') || condition.includes('thunder')) return '⛈️';
     if (condition.includes('snow')) return '❄️';
     if (condition.includes('fog') || condition.includes('mist')) return '🌫️';
-    return '🌤️';
+    if (condition.includes('drizzle')) return '🌦️';
+    if (condition.includes('wind')) return '💨';
+    return '🌤️'; // Default partly cloudy
 }
 
 // Refresh functions
@@ -668,27 +812,34 @@ function refreshFact() {
     loadFact();
 }
 
+function toggleComments(announcementId) {
+    const comments = document.getElementById('comments-' + announcementId);
+    comments.classList.toggle('hidden');
+}
 // Load all widgets when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Loading all widgets...');
     loadWeather();
     loadQuote();
     loadNews();
     loadFact();
     
-    // Auto-refresh every 30 minutes
+    // Auto-refresh every 30 minutes for weather and news
     setInterval(() => {
+        console.log('Auto-refreshing weather and news...');
         loadWeather();
         loadNews();
     }, 30 * 60 * 1000);
     
     // Refresh quote and fact every hour
     setInterval(() => {
+        console.log('Auto-refreshing quote and fact...');
         loadQuote();
         loadFact();
     }, 60 * 60 * 1000);
 });
 
-// Original reaction functions
+// Reaction functions
 function handleReaction(postId, emoji) {
     console.log('Sending reaction:', { postId, emoji });
     
@@ -795,6 +946,86 @@ function updateReactionUI(postId, userReaction, reactions) {
         }
     }
 }
+function submitComment(event, announcementId) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    const commentInput = form.querySelector('input[name="comment"]');
+    const commentText = commentInput.value.trim();
+    
+    if (!commentText) {
+        alert('Please enter a comment.');
+        return;
+    }
+    
+    // Disable submit button to prevent double submission
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalIcon = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    submitBtn.disabled = true;
+    
+    fetch('submit_comment.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Clear the input
+            commentInput.value = '';
+            
+            // Add the new comment to the comments section
+            const commentsContainer = document.querySelector(`#comments-${announcementId} .space-y-3`);
+            const newCommentHtml = `
+                <div class="flex space-x-3">
+                    <div class="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm">
+                        ${data.comment.user_initial}
+                    </div>
+                    <div class="flex-1">
+                        <div class="bg-gray-100 rounded-2xl px-3 py-2">
+                            <h4 class="font-semibold text-sm text-gray-900">${data.comment.user_name}</h4>
+                            <p class="text-gray-800">${data.comment.content}</p>
+                        </div>
+                        <div class="flex items-center space-x-4 mt-1 text-xs text-gray-500">
+                            <span>${data.comment.time}</span>
+                            <button class="hover:underline">Like</button>
+                            <button class="hover:underline">Reply</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            commentsContainer.insertAdjacentHTML('beforeend', newCommentHtml);
+            
+            // Update comment count
+            const commentCountElement = document.getElementById(`comments-count-${announcementId}`);
+            if (commentCountElement) {
+                const currentCount = parseInt(commentCountElement.textContent.match(/\d+/)[0]) || 0;
+                const newCount = currentCount + 1;
+                commentCountElement.textContent = `${newCount} comment${newCount !== 1 ? 's' : ''}`;
+            }
+            
+            // Show the reaction summary if it was hidden
+            const summaryDiv = document.getElementById(`reaction-summary-${announcementId}`);
+            if (summaryDiv) {
+                summaryDiv.style.display = 'block';
+            }
+            
+        } else {
+            alert('Failed to post comment: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to post comment. Please try again.');
+    })
+    .finally(() => {
+        // Re-enable submit button
+        submitBtn.innerHTML = originalIcon;
+        submitBtn.disabled = false;
+    });
+}
 
 function showReactions(postId) {
     clearTimeout(reactionTimeouts[postId]);
@@ -837,19 +1068,40 @@ function toggleContent(postId, showFull) {
 }
 
 function openLightbox(src) {
-    document.getElementById('lightbox-image').src = src;
-    document.getElementById('lightbox-modal').classList.remove('hidden');
-    document.getElementById('lightbox-modal').classList.add('flex');
+    const img = document.getElementById('lightbox-image');
+    const modal = document.getElementById('lightbox-modal');
+    const caption = document.getElementById('lightbox-caption');
+    
+    img.src = src;
+    
+    // Extract filename for caption
+    const filename = src.split('/').pop();
+    caption.textContent = filename || 'Click anywhere to close';
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    
+    // Prevent body scrolling
+    document.body.style.overflow = 'hidden';
 }
 
 function closeLightbox() {
-    document.getElementById('lightbox-modal').classList.add('hidden');
-    document.getElementById('lightbox-modal').classList.remove('flex');
-    document.getElementById('lightbox-image').src = '';
+    const modal = document.getElementById('lightbox-modal');
+    const img = document.getElementById('lightbox-image');
+    
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    img.src = '';
+    
+    // Restore body scrolling
+    document.body.style.overflow = '';
 }
 
-function openCommentsModal(announcementId) {
-    const comments = document.getElementById('comments-' + announcementId);
-    comments.classList.toggle('hidden');
-}
+// Close lightbox with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeLightbox();
+    }
+});
 </script>
+

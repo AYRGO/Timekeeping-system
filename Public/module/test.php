@@ -1,8 +1,8 @@
 <?php
 
 session_start();
-include('../config/db.php');
 include_once('../config/env.php');
+include_once('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
 if (!isset($_SESSION['regenerated'])) {
@@ -761,7 +761,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #fff;
             color: #333; 
             min-height: 100vh;
             padding: 20px;
@@ -776,7 +776,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
         }
         
         .header { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, rgb(16, 185, 72) 0%, rgb(5, 101, 211) 100%);
             color: white;
             text-align: center; 
             padding: 40px 20px;
@@ -885,10 +885,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
         }
         
         .step.active { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, rgb(16, 185, 72) 0%, rgb(5, 101, 211) 100%);
             color: white;
             transform: scale(1.1);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px rgba(16, 185, 72, 0.2), 0 5px 15px rgba(5, 101, 211, 0.2);
         }
         
         .step.completed {

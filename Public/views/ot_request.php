@@ -5,21 +5,41 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
-$pageTitle = 'Overtime Requests';
+// Check which view to display (current requests or history)
+$view = isset($_GET['view']) ? $_GET['view'] : 'current';
+$isHistoryView = ($view === 'history');
+
+$pageTitle = $isHistoryView ? 'Overtime Requests History' : 'Overtime Requests';
 
 // Fetch overtime requests with employee names and time logs
-$stmt = $pdo->query("
-    SELECT 
-        o.id, o.date, o.start_time, o.end_time, o.reason, o.status, 
-        o.attachment_ot, o.created_at,
-        TIMESTAMPDIFF(MINUTE, o.start_time, o.end_time) / 60 AS duration_hours,
-        e.fname, e.lname,
-        t.time_in AS log_time_in, t.time_out AS log_time_out
-    FROM overtime_requests o
-    JOIN employees e ON o.employee_id = e.id
-    LEFT JOIN time_logs t ON o.employee_id = t.employee_id AND o.date = t.log_date
-    ORDER BY o.created_at DESC
-");
+if ($isHistoryView) {
+    // Fetch from post_overtime_requests table (history)
+    $stmt = $pdo->query("
+        SELECT 
+            por.id, por.date, por.start_time, por.end_time, por.reason, por.status, 
+            por.attachment_ot, por.created_at, por.duration_hours, por.explanation,
+            por.time_in, por.time_out, por.employee_id,
+            e.fname, e.lname
+        FROM post_overtime_requests por
+        JOIN employees e ON por.employee_id = e.id
+        ORDER BY por.created_at DESC
+    ");
+} else {
+    // Fetch from overtime_requests table (current requests) - only pending
+    $stmt = $pdo->query("
+        SELECT 
+            o.id, o.date, o.start_time, o.end_time, o.reason, o.status, 
+            o.attachment_ot, o.created_at,
+            TIMESTAMPDIFF(MINUTE, o.start_time, o.end_time) / 60 AS duration_hours,
+            e.fname, e.lname,
+            t.time_in AS log_time_in, t.time_out AS log_time_out
+        FROM overtime_requests o
+        JOIN employees e ON o.employee_id = e.id
+        LEFT JOIN time_logs t ON o.employee_id = t.employee_id AND o.date = t.log_date
+        WHERE o.status = 'pending'
+        ORDER BY o.created_at DESC
+    ");
+}
 
 $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -64,9 +84,44 @@ function getStatusBadge($status) {
             <?php include('header.php'); ?>
 
             <main class="flex-1 p-6 overflow-y-auto">
+                <!-- Display messages -->
+                <?php if (isset($_GET['message'])): ?>
+                    <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                        <span class="block sm:inline"><?= htmlspecialchars(urldecode($_GET['message'])) ?></span>
+                        <span class="absolute top-0 bottom-0 right-0 px-4 py-3">
+                            <svg class="fill-current h-6 w-6 text-green-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" onclick="this.parentElement.parentElement.style.display='none'"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+                        </span>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if (isset($_GET['error'])): ?>
+                    <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                        <span class="block sm:inline"><?= htmlspecialchars(urldecode($_GET['error'])) ?></span>
+                        <span class="absolute top-0 bottom-0 right-0 px-4 py-3">
+                            <svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" onclick="this.parentElement.parentElement.style.display='none'"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+                        </span>
+                    </div>
+                <?php endif; ?>
+
                 <div class="mb-6">
-                    <h1 class="text-2xl font-bold text-gray-900">Overtime Requests</h1>
-                    <p class="text-gray-600">Manage employee overtime requests</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900"><?= $pageTitle ?></h1>
+                            <p class="text-gray-600">
+                                <?= $isHistoryView ? 'View all processed overtime requests' : 'Manage employee overtime requests' ?>
+                            </p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <a href="?view=current" 
+                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= !$isHistoryView ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <i class="fas fa-clock mr-2"></i>Current Requests
+                            </a>
+                            <a href="?view=history" 
+                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= $isHistoryView ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <i class="fas fa-history mr-2"></i>History
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="overflow-x-auto bg-white shadow rounded-lg">
@@ -82,8 +137,12 @@ function getStatusBadge($status) {
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attachment</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Submitted</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    <?= $isHistoryView ? 'Processed' : 'Submitted' ?>
+                                </th>
+                                <?php if (!$isHistoryView): ?>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -117,13 +176,19 @@ function getStatusBadge($status) {
                                                     <i class="fas fa-sign-in-alt mr-1"></i>In:
                                                 </div>
                                                 <span class="font-medium text-green-700">
-                                                    <?= $ot['log_time_in'] ? date('g:i A', strtotime($ot['log_time_in'])) : '<span class="text-gray-400 italic">None</span>' ?>
+                                                    <?php 
+                                                    $time_in = $isHistoryView ? ($ot['time_in'] ?? null) : ($ot['log_time_in'] ?? null);
+                                                    echo $time_in ? date('g:i A', strtotime($time_in)) : '<span class="text-gray-400 italic">None</span>';
+                                                    ?>
                                                 </span>
                                                 <div class="flex items-center text-xs text-red-600 mb-1 mt-2">
                                                     <i class="fas fa-sign-out-alt mr-1"></i>Out:
                                                 </div>
                                                 <span class="font-medium text-red-700">
-                                                    <?= $ot['log_time_out'] ? date('g:i A', strtotime($ot['log_time_out'])) : '<span class="text-gray-400 italic">None</span>' ?>
+                                                    <?php 
+                                                    $time_out = $isHistoryView ? ($ot['time_out'] ?? null) : ($ot['log_time_out'] ?? null);
+                                                    echo $time_out ? date('g:i A', strtotime($time_out)) : '<span class="text-gray-400 italic">None</span>';
+                                                    ?>
                                                 </span>
                                             </div>
                                         </td>
@@ -171,6 +236,7 @@ function getStatusBadge($status) {
                                                 <span class="text-xs"><?= date('g:i A', strtotime($ot['created_at'])) ?></span>
                                             </div>
                                         </td>
+                                        <?php if (!$isHistoryView): ?>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             <div class="flex space-x-1">
                                                 <?php if (strtolower($ot['status']) === 'pending'): ?>
@@ -178,6 +244,7 @@ function getStatusBadge($status) {
                                                         <input type="hidden" name="request_id" value="<?= $ot['id'] ?>">
                                                         <input type="hidden" name="action" value="approve">
                                                         <button type="submit" 
+                                                                onclick="return confirm('Are you sure you want to approve this overtime request?')"
                                                                 class="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 text-xs transition-colors">
                                                             <i class="fas fa-check mr-1"></i>Approve
                                                         </button>
@@ -194,13 +261,14 @@ function getStatusBadge($status) {
                                                 <?php endif; ?>
                                             </div>
                                         </td>
+                                        <?php endif; ?>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="11" class="text-center text-sm py-8 text-gray-500">
+                                    <td colspan="<?= $isHistoryView ? '10' : '11' ?>" class="text-center text-sm py-8 text-gray-500">
                                         <i class="fas fa-clock text-4xl text-gray-300 mb-2"></i>
-                                        <div>No overtime requests found.</div>
+                                        <div><?= $isHistoryView ? 'No processed overtime requests found.' : 'No overtime requests found.' ?></div>
                                     </td>
                                 </tr>
                             <?php endif; ?>

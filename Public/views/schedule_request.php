@@ -4,18 +4,41 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
-$pageTitle = 'Schedule Change Requests';
+// Check which view to display (current requests or history)
+$view = isset($_GET['view']) ? $_GET['view'] : 'current';
+$isHistoryView = ($view === 'history');
+
+$pageTitle = $isHistoryView ? 'Schedule Changes History' : 'Schedule Change Requests';
+
 // Fetch schedule change requests with employee names, attachments, and current schedule
-$stmt = $pdo->query("
-    SELECT sr.id, sr.reason, sr.status, sr.start_date, sr.end_date, sr.created_at,
-           sr.work_schedule_id, sr.current_work_schedule_id, sr.attachment_scr, sr.explanation,
-           e.fname, e.lname,
-           ws.time_in, ws.time_out
-    FROM schedule_change_requests sr
-    JOIN employees e ON sr.employee_id = e.id
-    LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
-    ORDER BY sr.created_at DESC
-");
+if ($isHistoryView) {
+    // Fetch from post_schedule_change_requests table (history)
+    $stmt = $pdo->query("
+        SELECT psr.id, psr.reason, psr.status, psr.start_date, psr.end_date, psr.created_at,
+               psr.work_schedule_id, psr.current_work_schedule_id, psr.attachment_scr, psr.explanation,
+               psr.created_at as approved_at, psr.employee_id,
+               e.fname, e.lname,
+               ws.time_in, ws.time_out
+        FROM post_schedule_change_requests psr
+        JOIN employees e ON psr.employee_id = e.id
+        LEFT JOIN work_schedules ws ON psr.work_schedule_id = ws.id
+        ORDER BY psr.created_at DESC
+    ");
+} else {
+    // Fetch from schedule_change_requests table (current requests)
+    $stmt = $pdo->query("
+        SELECT sr.id, sr.reason, sr.status, sr.start_date, sr.end_date, sr.created_at,
+               sr.work_schedule_id, sr.current_work_schedule_id, sr.attachment_scr, sr.explanation,
+               sr.employee_id,
+               e.fname, e.lname,
+               ws.time_in, ws.time_out
+        FROM schedule_change_requests sr
+        JOIN employees e ON sr.employee_id = e.id
+        LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
+        WHERE sr.status NOT IN ('Declined', 'Rejected', 'Approved')
+        ORDER BY sr.created_at DESC
+    ");
+}
 $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Function to get schedule time display
@@ -41,7 +64,7 @@ function getScheduleTime($schedule_id) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <title>Schedule Change Requests</title>
+    <title><?= $pageTitle ?></title>
 </head>
 <body class="bg-gray-100">
 
@@ -52,9 +75,44 @@ function getScheduleTime($schedule_id) {
             <?php include('header.php'); ?>
 
             <main class="flex-1 p-6 overflow-y-auto">
+                <!-- Display messages -->
+                <?php if (isset($_GET['message'])): ?>
+                    <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                        <span class="block sm:inline"><?= htmlspecialchars(urldecode($_GET['message'])) ?></span>
+                        <span class="absolute top-0 bottom-0 right-0 px-4 py-3">
+                            <svg class="fill-current h-6 w-6 text-green-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" onclick="this.parentElement.parentElement.style.display='none'"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+                        </span>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if (isset($_GET['error'])): ?>
+                    <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                        <span class="block sm:inline"><?= htmlspecialchars(urldecode($_GET['error'])) ?></span>
+                        <span class="absolute top-0 bottom-0 right-0 px-4 py-3">
+                            <svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" onclick="this.parentElement.parentElement.style.display='none'"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+                        </span>
+                    </div>
+                <?php endif; ?>
+
                 <div class="mb-6">
-                    <h1 class="text-2xl font-bold text-gray-900">Schedule Change Requests</h1>
-                    <p class="text-gray-600">Manage employee schedule change requests</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900"><?= $pageTitle ?></h1>
+                            <p class="text-gray-600">
+                                <?= $isHistoryView ? 'View all processed schedule change requests' : 'Manage employee schedule change requests' ?>
+                            </p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <a href="?view=current" 
+                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= !$isHistoryView ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <i class="fas fa-clock mr-2"></i>Current Requests
+                            </a>
+                            <a href="?view=history" 
+                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= $isHistoryView ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <i class="fas fa-history mr-2"></i>History
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="overflow-x-auto bg-white shadow rounded-lg">
@@ -69,8 +127,12 @@ function getScheduleTime($schedule_id) {
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attachment</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Submitted</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    <?= $isHistoryView ? 'Processed' : 'Submitted' ?>
+                                </th>
+                                <?php if (!$isHistoryView): ?>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -159,17 +221,25 @@ function getScheduleTime($schedule_id) {
                                         </td>
                                         <td class="px-6 py-4 text-sm text-gray-500">
                                             <div class="flex flex-col">
-                                                <span><?= date('M d, Y', strtotime($sr['created_at'])) ?></span>
-                                                <span class="text-xs"><?= date('g:i A', strtotime($sr['created_at'])) ?></span>
+                                                <?php if ($isHistoryView && isset($sr['approved_at'])): ?>
+                                                    <span><?= date('M d, Y', strtotime($sr['approved_at'])) ?></span>
+                                                    <span class="text-xs"><?= date('g:i A', strtotime($sr['approved_at'])) ?></span>
+                                                <?php else: ?>
+                                                    <span><?= date('M d, Y', strtotime($sr['created_at'])) ?></span>
+                                                    <span class="text-xs"><?= date('g:i A', strtotime($sr['created_at'])) ?></span>
+                                                <?php endif; ?>
                                             </div>
                                         </td>
+                                        <?php if (!$isHistoryView): ?>
                                         <td class="px-6 py-4 text-sm text-gray-900">
                                             <?php if (strtolower($sr['status']) === 'pending'): ?>
                                                 <div class="flex space-x-2">
                                                     <form method="post" action="process_schedule_action.php" class="inline-block">
                                                         <input type="hidden" name="request_id" value="<?= $sr['id'] ?>">
                                                         <input type="hidden" name="action" value="approve">
-                                                        <button type="submit" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition-colors">
+                                                        <button type="submit" 
+                                                                onclick="return confirm('Are you sure you want to approve this schedule change request?')"
+                                                                class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition-colors">
                                                             <i class="fas fa-check mr-1"></i>Approve
                                                         </button>
                                                     </form>
@@ -185,13 +255,14 @@ function getScheduleTime($schedule_id) {
                                                 </span>
                                             <?php endif; ?>
                                         </td>
+                                        <?php endif; ?>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="10" class="text-center text-sm py-8 text-gray-500">
+                                    <td colspan="<?= $isHistoryView ? '9' : '10' ?>" class="text-center text-sm py-8 text-gray-500">
                                         <i class="fas fa-calendar-times text-4xl text-gray-300 mb-2"></i>
-                                        <div>No schedule change requests found.</div>
+                                        <div><?= $isHistoryView ? 'No processed schedule changes found.' : 'No schedule change requests found.' ?></div>
                                     </td>
                                 </tr>
                             <?php endif; ?>

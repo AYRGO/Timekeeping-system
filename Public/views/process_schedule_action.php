@@ -9,40 +9,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
     $action = trim($_POST['action']);
 
     // Validate action
-    if (!in_array($action, ['approve', 'decline'])) {
+    if (!in_array($action, ['approve', 'rejected'])) {
         $message = "Invalid action specified.";
     } else {
-        $new_status = $action === 'approve' ? 'Approved' : 'Declined';
+        $new_status = $action === 'approve' ? 'Approved' : 'Rejected';
 
-        // If action is decline, ensure explanation is provided
-        if ($action === 'decline') {
-            $explanation = trim($_POST['explanation'] ?? '');
+        try {
+            $pdo->beginTransaction();
 
-            if (empty($explanation)) {
-                $message = "Explanation is required for declining.";
-            } else {
-                // Update status and explanation
-                $stmt = $pdo->prepare("UPDATE schedule_change_requests SET status = :status, explanation = :explanation WHERE id = :id");
-                $stmt->execute([
-                    'status' => $new_status,
-                    'explanation' => $explanation,
-                    'id' => $request_id
-                ]);
-                header("Location: schedule_request.php?message=Request%20ID%20%23$request_id%20has%20been%20declined");
-                exit;
+            // First, get the complete request data
+            $stmt = $pdo->prepare("SELECT * FROM schedule_change_requests WHERE id = :id");
+            $stmt->execute(['id' => $request_id]);
+            $request_data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$request_data) {
+                throw new Exception("Request not found.");
             }
-        } else {
-            // If approved, just update status
-            $stmt = $pdo->prepare("UPDATE schedule_change_requests SET status = :status WHERE id = :id");
+
+            // If action is decline, ensure explanation is provided
+            if ($action === 'decline') {
+                $explanation = trim($_POST['explanation'] ?? '');
+                if (empty($explanation)) {
+                    throw new Exception("Explanation is required for declining.");
+                }
+                $request_data['explanation'] = $explanation;
+            }
+
+            // Update the status
+            $request_data['status'] = $new_status;
+
+            // Insert into post_schedule_change_requests table
+            $stmt = $pdo->prepare("
+                INSERT INTO post_schedule_change_requests 
+                (employee_id, reason, status, start_date, end_date, work_schedule_id, 
+                 current_work_schedule_id, attachment_scr, explanation, created_at, notified) 
+                VALUES 
+                (:employee_id, :reason, :status, :start_date, :end_date, :work_schedule_id, 
+                 :current_work_schedule_id, :attachment_scr, :explanation, :created_at, :notified)
+            ");
+            
             $stmt->execute([
-                'status' => $new_status,
-                'id' => $request_id
+                'employee_id' => $request_data['employee_id'],
+                'reason' => $request_data['reason'],
+                'status' => $request_data['status'],
+                'start_date' => $request_data['start_date'],
+                'end_date' => $request_data['end_date'],
+                'work_schedule_id' => $request_data['work_schedule_id'],
+                'current_work_schedule_id' => $request_data['current_work_schedule_id'],
+                'attachment_scr' => $request_data['attachment_scr'],
+                'explanation' => $request_data['explanation'] ?? null,
+                'created_at' => $request_data['created_at'],
+                'notified' => $request_data['notified'] ?? 0
             ]);
-            header("Location: schedule_request.php?message=Request%20ID%20%23$request_id%20has%20been%20approved");
+
+            // Delete from schedule_change_requests table
+            $stmt = $pdo->prepare("DELETE FROM schedule_change_requests WHERE id = :id");
+            $stmt->execute(['id' => $request_id]);
+
+            // Create notification for the employee
+            $notification_message = $action === 'approve' 
+                ? "Your schedule change request has been approved by admin."
+                : "Your schedule change request has been declined by admin.";
+            
+            $stmt = $pdo->prepare("
+                INSERT INTO notifications (employee_id, message, type, created_at) 
+                VALUES (:employee_id, :message, 'schedule_response', NOW())
+            ");
+            $stmt->execute([
+                'employee_id' => $request_data['employee_id'],
+                'message' => $notification_message
+            ]);
+
+            $pdo->commit();
+
+            $action_text = $action === 'approve' ? 'approved' : 'rejected';
+            header("Location: schedule_request.php?message=Request%20ID%20%23$request_id%20has%20been%20$action_text");
             exit;
+
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $message = "Error processing request: " . $e->getMessage();
         }
     }
 } else {
     $message = "Invalid form submission.";
 }
+
+// If we reach here, there was an error
+header("Location: schedule_request.php?error=" . urlencode($message));
+exit;
 ?>

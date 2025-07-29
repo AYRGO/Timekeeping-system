@@ -196,7 +196,7 @@ $end_dt = (new DateTime('@' . $end_ot))->setTimezone($tz);
     </form>
 
     <div class="mt-4 text-center">
-        <a href="request_time_adjustment.php"
+        <a href="test.php"
         onclick="return confirm('Are you requesting a time adjustment because you forgot to time in?')"
         class="text-sm text-blue-600 hover:underline">
             Request Time Adjustment

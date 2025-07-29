@@ -3,6 +3,8 @@
 session_start();
 include('../config/db.php');
 
+$pageTitle = 'News Feed';
+
 date_default_timezone_set('Asia/Manila');
 $pdo->exec("SET time_zone = '+08:00'");
 
@@ -38,22 +40,41 @@ if (
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'application/vnd.ms-powerpoint',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'image/jpeg', 'image/png',
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
         ];
 
         $uploadDir = __DIR__ . '/uploads';
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
 
         foreach ($_FILES['attachments']['tmp_name'] as $index => $tmpName) {
+            // Skip empty files
+            if (empty($tmpName) || empty($_FILES['attachments']['name'][$index])) {
+                continue;
+            }
+            
             $fileName = $_FILES['attachments']['name'][$index];
+            $fileError = $_FILES['attachments']['error'][$index];
+            
+            // Check for upload errors
+            if ($fileError !== UPLOAD_ERR_OK) {
+                continue;
+            }
+            
+            // Validate file exists and is uploaded
+            if (!is_uploaded_file($tmpName)) {
+                continue;
+            }
+            
             $fileType = mime_content_type($tmpName);
             $ext = pathinfo($fileName, PATHINFO_EXTENSION);
 
             if (in_array($fileType, $allowedTypes)) {
                 $uniqueName = uniqid('file_', true) . '.' . $ext;
                 $filePath = 'uploads/' . $uniqueName;
-                move_uploaded_file($tmpName, $uploadDir . '/' . $uniqueName);
-                $uploadedFiles[] = ['original' => $fileName, 'stored' => $filePath];
+                
+                if (move_uploaded_file($tmpName, $uploadDir . '/' . $uniqueName)) {
+                    $uploadedFiles[] = ['original' => $fileName, 'stored' => $filePath];
+                }
             }
         }
     }
@@ -208,7 +229,7 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
         
         <main class="flex-1 p-6 overflow-y-auto">
             <!-- Container with max width for centering -->
-            <div class="max-w-7xl mx-auto">
+            <div class="max-w-8xl mx-auto">
                 <div class="flex gap-6 justify-center">
                     <!-- Left Spacer (hidden on smaller screens) -->
                     <div class="w-70 hidden xl:block"></div>
@@ -408,18 +429,45 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                             <?php foreach ($files as $fileInfo):
                                                 $filePath = is_array($fileInfo) ? $fileInfo['stored'] : $fileInfo;
                                                 $originalName = is_array($fileInfo) ? $fileInfo['original'] : basename($fileInfo);
-                                                $ext = pathinfo($filePath, PATHINFO_EXTENSION);
-                                                $isImage = in_array(strtolower($ext), ['jpg', 'jpeg', 'png']);
+                                                
+                                                // Clean up the file path
+                                                $filePath = str_replace(['\\', '//'], '/', $filePath);
+                                                $filePath = ltrim($filePath, '/');
+                                                
+                                                // Construct proper file URL
+                                                if (strpos($filePath, 'uploads/') === 0) {
+                                                    $fileUrl = $filePath;
+                                                } else {
+                                                    $fileUrl = 'uploads/' . basename($filePath);
+                                                }
+                                                
+                                                $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+                                                $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']);
                                             ?>
                                                 <?php if ($isImage): ?>
                                                     <div class="rounded-lg overflow-hidden border border-gray-200">
-                                                        <img src="<?= htmlspecialchars($filePath) ?>" alt="<?= htmlspecialchars($originalName) ?>" class="w-full h-auto">
+                                                        <img src="<?= htmlspecialchars($fileUrl) ?>" 
+                                                             alt="<?= htmlspecialchars($originalName) ?>" 
+                                                             class="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                                             style="max-height: 500px; object-fit: contain; background: white;"
+                                                             onclick="openLightbox('<?= htmlspecialchars($fileUrl) ?>')"
+                                                             onerror="console.log('Image failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                                        <!-- Fallback for broken images -->
+                                                        <div class="hidden p-4 text-center bg-gray-100">
+                                                            <i class="fas fa-image text-gray-400 text-2xl mb-2"></i>
+                                                            <p class="text-gray-500 text-sm">Image not available</p>
+                                                            <a href="<?= htmlspecialchars($fileUrl) ?>" 
+                                                               class="text-blue-600 hover:underline text-sm" 
+                                                               download="<?= htmlspecialchars($originalName) ?>">
+                                                                Download <?= htmlspecialchars($originalName) ?>
+                                                            </a>
+                                                        </div>
                                                     </div>
                                                 <?php else: ?>
                                                     <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border">
                                                         <i class="fas fa-file-alt text-blue-600 text-xl"></i>
                                                         <div class="flex-1">
-                                                            <a href="<?= htmlspecialchars($filePath) ?>" 
+                                                            <a href="<?= htmlspecialchars($fileUrl) ?>" 
                                                                class="text-blue-600 hover:underline font-medium" download>
                                                                 <?= htmlspecialchars($originalName) ?>
                                                             </a>
@@ -659,43 +707,61 @@ let reactionTimeouts = {};
 // API functions
 async function loadWeather() {
     try {
-        // Using OpenWeatherMap API (you'll need to get a free API key)
-        // For demo, I'll use a weather service that doesn't require API key
-        const response = await fetch('https://api.weatherapi.com/v1/current.json?key=demo&q=Pampanga&aqi=no');
-        
+        // Visual Crossing Weather API for Clark, Pampanga
+        const apiKey = 'WGNTPH8KPCN49BMK8GHNJKYVA';
+        const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/Clark%2C%20Pampanga?unitGroup=metric&key=${apiKey}&contentType=json`;
+
+        console.log('Fetching weather from:', url);
+        const response = await fetch(url);
+
         if (!response.ok) {
-            throw new Error('Weather service unavailable');
+            throw new Error(`Weather API error: ${response.status} ${response.statusText}`);
         }
-        
+
         const data = await response.json();
+        console.log('Weather data received:', data);
+
+        // Get today's weather
+        const today = data.days && data.days.length > 0 ? data.days[0] : null;
+        if (!today) throw new Error('No weather data for today');
+
+        const temp = Math.round(today.temp);
+        const condition = today.conditions || 'Partly Cloudy';
+        const humidity = today.humidity || '--';
+        const wind = Math.round(today.windspeed || 0);
+        const location = `${data.resolvedAddress || 'Clark, Pampanga'}`;
+
         document.getElementById('weather-content').innerHTML = `
             <div class="text-center">
-                <div class="weather-icon text-4xl mb-2">${getWeatherIcon(data.current.condition.text)}</div>
-                <h4 class="text-xl font-bold text-gray-800">${Math.round(data.current.temp_c)}°C</h4>
-                <p class="text-gray-600">${data.current.condition.text}</p>
-                <p class="text-sm text-gray-500 mt-2">${data.location.name}, ${data.location.country}</p>
+                <div class="weather-icon text-4xl mb-2">${getWeatherIcon(condition)}</div>
+                <h4 class="text-xl font-bold text-gray-800">${temp}°C</h4>
+                <p class="text-gray-600 capitalize">${condition}</p>
+                <p class="text-sm text-gray-500 mt-1">${location}</p>
                 <div class="flex justify-between mt-3 text-sm">
-                    <span>Humidity: ${data.current.humidity}%</span>
-                    <span>Wind: ${Math.round(data.current.wind_kph)} km/h</span>
+                    <span>💧 ${humidity}%</span>
+                    <span>💨 ${wind} km/h</span>
                 </div>
             </div>
         `;
     } catch (error) {
-        // Fallback weather data
+        console.error('Weather loading error:', error);
+        // Fallback weather data for Clark, Pampanga
         document.getElementById('weather-content').innerHTML = `
             <div class="text-center">
-                <div class="weather-icon text-4xl mb-2">☀️</div>
+                <div class="weather-icon text-4xl mb-2">🌤️</div>
                 <h4 class="text-xl font-bold text-gray-800">29°C</h4>
                 <p class="text-gray-600">Partly Cloudy</p>
-                <p class="text-sm text-gray-500 mt-2">Pampanga, Philippines</p>
+                <p class="text-sm text-gray-500 mt-1">Clark, Philippines</p>
                 <div class="flex justify-between mt-3 text-sm">
-                    <span>Humidity: 72%</span>
-                    <span>Wind: 15 km/h</span>
+                    <span>💧 75%</span>
+                    <span>💨 12 km/h</span>
                 </div>
+                <p class="text-xs text-red-500 mt-2">Unable to fetch live data</p>
             </div>
         `;
     }
 }
+
 
 async function loadQuote() {
     try {
@@ -1039,6 +1105,46 @@ function handleFilePreview(e) {
         preview.classList.add('hidden');
     }
 }
+
+// Lightbox functionality
+function openLightbox(src) {
+    // Create lightbox if it doesn't exist
+    let lightbox = document.getElementById('image-lightbox');
+    if (!lightbox) {
+        lightbox = document.createElement('div');
+        lightbox.id = 'image-lightbox';
+        lightbox.className = 'fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden';
+        lightbox.innerHTML = `
+            <span class="absolute top-5 right-5 text-white text-3xl cursor-pointer hover:text-gray-300" onclick="closeLightbox()">×</span>
+            <div class="max-h-[90vh] max-w-[90vw] relative" onclick="event.stopPropagation()">
+                <img id="lightbox-img" src="" class="max-h-[90vh] max-w-[90vw] rounded shadow-xl" alt="Expanded Image">
+            </div>
+        `;
+        lightbox.onclick = closeLightbox;
+        document.body.appendChild(lightbox);
+    }
+    
+    const img = document.getElementById('lightbox-img');
+    img.src = src;
+    lightbox.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+    const lightbox = document.getElementById('image-lightbox');
+    if (lightbox) {
+        lightbox.classList.add('hidden');
+        document.getElementById('lightbox-img').src = '';
+        document.body.style.overflow = '';
+    }
+}
+
+// Close lightbox with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeLightbox();
+    }
+});
 </script>
 
 </body>

@@ -66,21 +66,25 @@ if ($current_user_id) {
     $emp_stmt->execute([$current_user_id]);
     $employee = $emp_stmt->fetch(PDO::FETCH_ASSOC);
 
-// --- Leave Requests ---
+// --- Leave Requests (from both tables) ---
+// Pending leave requests
 $leave_stmt = $pdo->prepare("
-    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation
+    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, 'pending' as source_table
     FROM leave_requests 
     WHERE employee_id = ?
+    UNION ALL
+    SELECT id, leave_type, 'approved' as status, start_date, end_date, created_at, notified, '' as explanation, 'approved' as source_table
+    FROM post_leave_requests
+    WHERE employee_id = ?
     ORDER BY created_at DESC
-    LIMIT 5
+    LIMIT 10
 ");
-$leave_stmt->execute([$current_user_id]);
+$leave_stmt->execute([$current_user_id, $current_user_id]);
 $leave_results = $leave_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($leave_results as $leave) {
     $raw_status = strtolower($leave['status']);
-    $status = ucfirst($raw_status); // Directly capitalize: approved, rejected, etc.
-
+    $status = ucfirst($raw_status);
     $range = date('F j', strtotime($leave['start_date'])) . ' to ' . date('F j', strtotime($leave['end_date']));
     $message = "Leave request for <strong>{$leave['leave_type']}</strong> ($range) was <strong>$status</strong>.";
 
@@ -90,7 +94,8 @@ foreach ($leave_results as $leave) {
 
     $notifications[] = ['message' => $message, 'created_at' => $leave['created_at']];
 
-    if (in_array($raw_status, ['approved', 'rejected']) && !$leave['notified']) {
+    // Only send email notifications for pending table entries that changed status
+    if (in_array($raw_status, ['approved', 'rejected']) && !$leave['notified'] && $leave['source_table'] === 'pending') {
         $subject = "Leave Request {$status}";
         $body = "<p>Hi {$employee['fname']},<br>Your leave request from <strong>$range</strong> for <strong>{$leave['leave_type']}</strong> was <strong>$status</strong>.</p>";
 
@@ -105,51 +110,58 @@ foreach ($leave_results as $leave) {
     }
 }
 
-    // --- Schedule Requests ---
-    $schedule_stmt = $pdo->prepare("
-        SELECT id, work_schedule_id, status, start_date, end_date, created_at, notified, explanation
-        FROM schedule_change_requests 
-        WHERE employee_id = ?
-        ORDER BY created_at DESC
-        LIMIT 5
-    ");
-    $schedule_stmt->execute([$current_user_id]);
-    $schedule_results = $schedule_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    foreach ($schedule_results as $sched) {
-        $status = ucfirst($sched['status']);
-        $range = date('F j', strtotime($sched['start_date'])) . ' to ' . date('F j', strtotime($sched['end_date']));
-        $message = "Schedule change request for ($range) was <strong>$status</strong>.";
-
-        if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
-            $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($sched['explanation']) . "</span>";
-        }
-
-        $notifications[] = ['message' => $message, 'created_at' => $sched['created_at']];
-
-        if (in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified']) {
-            $subject = "Schedule Change Request {$status}";
-            $body = "<p>Hi {$employee['fname']},<br>Your schedule change request for <strong>$range</strong> was <strong>$status</strong>.</p>";
-            if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
-                $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($sched['explanation'])) . "</p>";
-            }
-            if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
-                $update = $pdo->prepare("UPDATE schedule_change_requests SET notified = 1 WHERE id = ?");
-                $update->execute([$sched['id']]);
-            }
-        }
-    }
-
-
-    // --- Time Adjustment Requests ---
-$adjust_stmt = $pdo->prepare("
-    SELECT id, log_date, status, reason, created_at, notified
-    FROM time_adjustment_requests 
+// --- Schedule Requests (from both tables) ---
+$schedule_stmt = $pdo->prepare("
+    SELECT id, work_schedule_id, status, start_date, end_date, created_at, notified, explanation, 'pending' as source_table
+    FROM schedule_change_requests 
+    WHERE employee_id = ?
+    UNION ALL
+    SELECT id, work_schedule_id, 'approved' as status, start_date, end_date, created_at, notified, '' as explanation, 'approved' as source_table
+    FROM post_schedule_change_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
-    LIMIT 5
+    LIMIT 10
 ");
-$adjust_stmt->execute([$current_user_id]);
+$schedule_stmt->execute([$current_user_id, $current_user_id]);
+$schedule_results = $schedule_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($schedule_results as $sched) {
+    $status = ucfirst($sched['status']);
+    $range = date('F j', strtotime($sched['start_date'])) . ' to ' . date('F j', strtotime($sched['end_date']));
+    $message = "Schedule change request for ($range) was <strong>$status</strong>.";
+
+    if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
+        $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($sched['explanation']) . "</span>";
+    }
+
+    $notifications[] = ['message' => $message, 'created_at' => $sched['created_at']];
+
+    if (in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified'] && $sched['source_table'] === 'pending') {
+        $subject = "Schedule Change Request {$status}";
+        $body = "<p>Hi {$employee['fname']},<br>Your schedule change request for <strong>$range</strong> was <strong>$status</strong>.</p>";
+        if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
+            $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($sched['explanation'])) . "</p>";
+        }
+        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
+            $update = $pdo->prepare("UPDATE schedule_change_requests SET notified = 1 WHERE id = ?");
+            $update->execute([$sched['id']]);
+        }
+    }
+}
+
+// --- Time Adjustment Requests (from both tables) ---
+$adjust_stmt = $pdo->prepare("
+    SELECT id, log_date, status, reason, created_at, notified, 'pending' as source_table
+    FROM time_adjustment_requests 
+    WHERE employee_id = ?
+    UNION ALL
+    SELECT id, log_date, 'approved' as status, '' as reason, created_at, notified, 'approved' as source_table
+    FROM post_time_adjustment_requests
+    WHERE employee_id = ?
+    ORDER BY created_at DESC
+    LIMIT 10
+");
+$adjust_stmt->execute([$current_user_id, $current_user_id]);
 $adjust_results = $adjust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($adjust_results as $adjustment) {
@@ -163,7 +175,7 @@ foreach ($adjust_results as $adjustment) {
 
     $notifications[] = ['message' => $message, 'created_at' => $adjustment['created_at']];
 
-    if (in_array(strtolower($adjustment['status']), ['approved', 'declined']) && !$adjustment['notified']) {
+    if (in_array(strtolower($adjustment['status']), ['approved', 'declined']) && !$adjustment['notified'] && $adjustment['source_table'] === 'pending') {
         $subject = "Time Adjustment Request {$status}";
         $body = "<p>Hi {$employee['fname']},<br>Your time adjustment request for <strong>$date</strong> was <strong>$status</strong>.</p>";
 
@@ -178,16 +190,19 @@ foreach ($adjust_results as $adjustment) {
     }
 }
 
-
-// --- Overtime Requests ---
+// --- Overtime Requests (from both tables) ---
 $ot_stmt = $pdo->prepare("
-    SELECT id, date, start_time, end_time, status, explanation, created_at, notified
+    SELECT id, date, start_time, end_time, status, explanation, created_at, notified, 'pending' as source_table
     FROM overtime_requests
     WHERE employee_id = ?
+    UNION ALL
+    SELECT id, date, start_time, end_time, 'approved' as status, '' as explanation, created_at, notified, 'approved' as source_table
+    FROM post_overtime_requests
+    WHERE employee_id = ?
     ORDER BY created_at DESC
-    LIMIT 5
+    LIMIT 10
 ");
-$ot_stmt->execute([$current_user_id]);
+$ot_stmt->execute([$current_user_id, $current_user_id]);
 $ot_results = $ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($ot_results as $ot) {
@@ -201,7 +216,7 @@ foreach ($ot_results as $ot) {
 
     $notifications[] = ['message' => $message, 'created_at' => $ot['created_at']];
 
-    if (in_array(strtolower($ot['status']), ['approved', 'rejected']) && !$ot['notified']) {
+    if (in_array(strtolower($ot['status']), ['approved', 'rejected']) && !$ot['notified'] && $ot['source_table'] === 'pending') {
         $subject = "Overtime Request $status";
         $body = "<p>Hi {$employee['fname']},<br>Your overtime request on <strong>$date</strong> was <strong>$status</strong>.</p>";
 

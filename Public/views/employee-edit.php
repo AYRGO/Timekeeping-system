@@ -222,19 +222,13 @@ $leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'hal
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-    .tab-button.active {
-        color: #2563eb;
-        border-bottom-color: #2563eb;
-    }
+
   </style>
 </head>
 <body class="bg-gray-100">
 
 <div class="flex h-screen">
-    <?php include('../views/sidebar.php'); ?>
+    <?php include('sidebar.php'); ?>
 
     <div class="flex-1 flex flex-col">
         <?php 
