@@ -72,7 +72,7 @@ try {
             <div class="space-y-2">
                 <h3 class="text-xs uppercase text-gray-400 tracking-wider font-semibold px-3 mb-3">Dashboard</h3>
                 <a href="admin_homepage.php" 
-                   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'admin_homepage.php') ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg' : 'hover:bg-gray-800 hover:shadow-md' ?>">
+                   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'admin_homepage.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800 hover:shadow-md' ?>">
                     <div class="w-8 h-8 rounded-lg bg-blue-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
                         <i class="fas fa-chart-line text-blue-400 text-sm"></i>
                     </div>
@@ -83,13 +83,13 @@ try {
             <!-- Management Section -->
             <div class="space-y-2">
                 <h3 class="text-xs uppercase text-gray-400 tracking-wider font-semibold px-3 mb-3">Management</h3>
-                <a href="employee_list.php" 
-                   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'employee_list.php') ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg' : 'hover:bg-gray-800 hover:shadow-md' ?>">
-                    <div class="w-8 h-8 rounded-lg bg-purple-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
-                        <i class="fas fa-users text-purple-400 text-sm"></i>
-                    </div>
-                    <span class="font-medium">Employee Directory</span>
-                </a>
+<a href="employee_list.php" 
+   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'employee_list.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800 hover:shadow-md' ?>">
+    <div class="w-8 h-8 rounded-lg bg-transparent flex items-center justify-center mr-3 group-hover:bg-gray-700 group-hover:bg-opacity-30 transition-all">
+        <i class="fas fa-users text-gray-400 text-sm"></i>
+    </div>
+    <span class="font-medium">Employee Directory</span>
+</a>
             </div>
 
             <!-- Pending Approvals Section -->
@@ -97,7 +97,7 @@ try {
                 <h3 class="text-xs uppercase text-gray-400 tracking-wider font-semibold px-3 mb-3">Pending Approvals</h3>
                 
                 <a href="leave_request_list.php" 
-                   class="group flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'leave_request_list.php') ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg' : 'hover:bg-gray-800 hover:shadow-md' ?>">
+                   class="group flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'leave_request_list.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800 hover:shadow-md' ?>">
                     <div class="flex items-center">
                         <div class="w-8 h-8 rounded-lg bg-orange-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
                             <i class="fas fa-calendar-alt text-orange-400 text-sm"></i>
@@ -110,7 +110,7 @@ try {
                 </a>
 
                 <a href="schedule_request.php" 
-                   class="group flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'schedule_request.php') ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg' : 'hover:bg-gray-800 hover:shadow-md' ?>">
+                   class="group flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'schedule_request.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800 hover:shadow-md' ?>">
                     <div class="flex items-center">
                         <div class="w-8 h-8 rounded-lg bg-indigo-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
                             <i class="fas fa-clock text-indigo-400 text-sm"></i>
@@ -123,7 +123,7 @@ try {
                 </a>
 
                 <a href="ot_request.php" 
-                   class="group flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'ot_request.php') ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg' : 'hover:bg-gray-800 hover:shadow-md' ?>">
+                   class="group flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'ot_request.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800 hover:shadow-md' ?>">
                     <div class="flex items-center">
                         <div class="w-8 h-8 rounded-lg bg-yellow-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
                             <i class="fas fa-business-time text-yellow-400 text-sm"></i>
@@ -136,7 +136,7 @@ try {
                 </a>
 
                 <a href="time_adjustment_list.php" 
-                   class="group flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'time_adjustment_list.php') ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg' : 'hover:bg-gray-800 hover:shadow-md' ?>">
+                   class="group flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'time_adjustment_list.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800 hover:shadow-md' ?>">
                     <div class="flex items-center">
                         <div class="w-8 h-8 rounded-lg bg-pink-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
                             <i class="fas fa-edit text-pink-400 text-sm"></i>
@@ -154,7 +154,7 @@ try {
                 <h3 class="text-xs uppercase text-gray-400 tracking-wider font-semibold px-3 mb-3">System</h3>
 
                 <a href="announcement.php" 
-                   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'announcement.php') ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg' : 'hover:bg-gray-800 hover:shadow-md' ?>">
+                   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'announcement.php') ? 'bg-white bg-opacity-5 border border-gray-700': 'hover:bg-gray-800 hover:shadow-md' ?>">
                     <div class="w-8 h-8 rounded-lg bg-red-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
                         <i class="fas fa-bullhorn text-red-400 text-sm"></i>
                     </div>

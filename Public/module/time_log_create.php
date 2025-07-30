@@ -615,6 +615,7 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
         <i class="fas fa-sync-alt mr-3 text-blue-500 w-4 text-center"></i> 
         <span>Switch to Admin</span>
       </button>
+      
     </form>
   <?php endif; ?>
 

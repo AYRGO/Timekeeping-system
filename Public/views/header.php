@@ -13,17 +13,15 @@
         <h1 class="text-xl font-bold text-gray-800"><?= $pageTitle ?? 'Dashboard' ?></h1>
     </div>
     
-    <!-- Back to Employee View Button -->
-    <div class="flex items-center space-x-4">
-        <button onclick="switchToEmployeeView()" 
-                class="flex items-center px-3 py-2 md:px-4 md:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200 text-xs md:text-sm font-medium">
-            <svg class="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
-            </svg>
-            <span class="hidden sm:inline">Back to Employee View</span>
-            <span class="sm:hidden">Back</span>
-        </button>
-    </div>
+    <!-- Back to Employee View Text -->
+    <span onclick="switchToEmployeeView()" 
+          class="cursor-pointer text-green-600 hover:text-green-700 font-medium text-xs md:text-sm transition duration-200">
+        <svg class="inline w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
+        </svg>
+        <span class="hidden sm:inline">Back to Employee View</span>
+        <span class="sm:hidden">Back</span>
+    </span>
 </header>
 
 <script>

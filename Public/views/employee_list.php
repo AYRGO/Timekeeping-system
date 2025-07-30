@@ -1,5 +1,6 @@
 <?php
 
+$pageTitle = "Management";
 // Secure session cookie params
 session_set_cookie_params([
     'lifetime' => 0,
@@ -121,7 +122,7 @@ function sort_link($column, $label) {
 <body class="bg-gray-50">
 
     <div x-data="{ open: false }" class="flex h-screen">
-        <?php include('../views/sidebar.php'); ?>
+        <?php include('sidebar.php'); ?>
 
         <div class="flex-1 flex flex-col">
             <?php 
@@ -159,7 +160,7 @@ function sort_link($column, $label) {
                         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                             <!-- Title and Stats -->
                             <div>
-                                <h1 class="text-2xl font-bold text-gray-900 mb-2">Employee Directory</h1>
+                                <h1 class="text-2xl font-bold text-gray-900 mb-2">Lists of Employees</h1>
                                 <p class="text-gray-600">
                                     <i class="fas fa-users text-blue-500 mr-2"></i>
                                     Manage your organization's workforce

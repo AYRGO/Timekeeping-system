@@ -66,20 +66,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
             $stmt = $pdo->prepare("DELETE FROM schedule_change_requests WHERE id = :id");
             $stmt->execute(['id' => $request_id]);
 
-            // Create notification for the employee
-            $notification_message = $action === 'approve' 
-                ? "Your schedule change request has been approved by admin."
-                : "Your schedule change request has been declined by admin.";
-            
-            $stmt = $pdo->prepare("
-                INSERT INTO notifications (employee_id, message, type, created_at) 
-                VALUES (:employee_id, :message, 'schedule_response', NOW())
-            ");
-            $stmt->execute([
-                'employee_id' => $request_data['employee_id'],
-                'message' => $notification_message
-            ]);
-
             $pdo->commit();
 
             $action_text = $action === 'approve' ? 'approved' : 'rejected';

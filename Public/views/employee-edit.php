@@ -11,22 +11,34 @@ $employeeId = (int)$_GET['id'];
 $adjustmentField = 'employment_adjustment_form';
 $documents[$adjustmentField] = 'Employment Adjustment Form';
 
+// Documents array reorganized
 $documents = [
-  'letter_offer' => 'Signed Letter of Offer',
-  'employment_contract' => 'Signed Employment Contract',
-  'medical' => 'Medical',
-  'nbi_clearance' => 'NBI Clearance',
-  'diploma_tor' => 'Diploma / TOR',
-  'psa' => 'PSA',
-  'sss' => 'SSS',
-  'tin' => 'TIN',
-  'philhealth' => 'PhilHealth',
-  'pagibig' => 'Pagibig',
-  'coe' => 'Certificate of Employment (Recent Employer)',
-  'valid_id' => 'Valid ID ',
-  'Valid_id_2' => 'Valid ID 2 ',
-  'solo_parent_id' => 'Solo Parent ID',
-  'employment_adjustment_form' => 'Employment Adjustment Form',
+    // Basic Employment Documents
+    'letter_offer' => 'Signed Letter of Offer',
+    'employment_contract' => 'Signed Employment Contract',
+    'employment_adjustment_form' => 'Employment Adjustment Form',
+    
+    // Medical & Clearances
+    'medical' => 'Medical Certificate',
+    'nbi_clearance' => 'NBI Clearance',
+    
+    // Educational Documents
+    'diploma_tor' => 'Diploma / TOR',
+    
+    // Government IDs & Documents
+    'psa' => 'PSA Birth Certificate',
+    'sss' => 'SSS ID/E1 Form',
+    'tin' => 'TIN ID/BIR Form',
+    'philhealth' => 'PhilHealth ID/MDR',
+    'pagibig' => 'Pagibig ID/MDF',
+    
+    // Valid IDs
+    'valid_id' => 'Valid ID (Primary)',
+    'Valid_id_2' => 'Valid ID (Secondary)',
+    
+    // Special Documents
+    'solo_parent_id' => 'Solo Parent ID',
+    'coe' => 'Certificate of Employment (Previous Employer)',
 ];
 
 // Delete attachment
@@ -59,103 +71,118 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $contact = $_POST['contact'] ?? '';
         $position = $_POST['position'] ?? '';
         $status = $_POST['status'] ?? '';
+        $company = $_POST['company'] ?? '';
 
         if ($fname && $lname && $email) {
-            $stmt = $pdo->prepare("UPDATE employees SET fname = ?, lname = ?, email = ?, contact = ?, position = ?, status = ? WHERE id = ?");
-            $stmt->execute([$fname, $lname, $email, $contact, $position, $status, $employeeId]);
-            header("Location: employee-edit.php?id=$employeeId&updated=1");
+            $stmt = $pdo->prepare("UPDATE employees SET fname = ?, lname = ?, email = ?, contact = ?, position = ?, status = ?, company = ? WHERE id = ?");
+            $stmt->execute([$fname, $lname, $email, $contact, $position, $status, $company, $employeeId]);
+            echo "<script>alert('Employee updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
             exit;
         } else {
-            $error = "Please fill in all required fields.";
+            echo "<script>alert('Please fill in all required fields.');</script>";
+        }
+    }
+
+    // Update Schedule
+    if (isset($_POST['update_schedule'])) {
+        $newSchedule = $_POST['official_sched'] ?? '';
+        
+        if ($newSchedule) {
+            $stmt = $pdo->prepare("UPDATE employees SET official_sched = ? WHERE id = ?");
+            $stmt->execute([$newSchedule, $employeeId]);
+            echo "<script>alert('Schedule updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+            exit;
+        } else {
+            echo "<script>alert('Please select a schedule.');</script>";
         }
     }
 
     // 201 Checklist Upload
-   if (isset($_POST['upload_documents'])) {
-    $uploadDir = '../uploads/checklist/';
-    if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
+    if (isset($_POST['upload_documents'])) {
+        $uploadDir = '../uploads/checklist/';
+        if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
 
-    $uploadedFiles = [];
+        $uploadedFiles = [];
 
-    foreach ($documents as $field => $label) {
-        if (isset($_FILES[$field]) && !empty($_FILES[$field]['name'][0])) {
-            $filenames = [];
+        foreach ($documents as $field => $label) {
+            if (isset($_FILES[$field]) && !empty($_FILES[$field]['name'][0])) {
+                $filenames = [];
 
-            // Ensure it's multiple files
-            $files = $_FILES[$field];
-            $fileCount = is_array($files['name']) ? count($files['name']) : 0;
+                // Ensure it's multiple files
+                $files = $_FILES[$field];
+                $fileCount = is_array($files['name']) ? count($files['name']) : 0;
 
-            for ($i = 0; $i < $fileCount; $i++) {
-                if ($files['error'][$i] === UPLOAD_ERR_OK) {
-                    $filename = uniqid($field . "_") . "_" . basename($files['name'][$i]);
-                    move_uploaded_file($files['tmp_name'][$i], $uploadDir . $filename);
-                    $filenames[] = $filename;
+                for ($i = 0; $i < $fileCount; $i++) {
+                    if ($files['error'][$i] === UPLOAD_ERR_OK) {
+                        $filename = uniqid($field . "_") . "_" . basename($files['name'][$i]);
+                        move_uploaded_file($files['tmp_name'][$i], $uploadDir . $filename);
+                        $filenames[] = $filename;
+                    }
+                }
+
+                if (!empty($filenames)) {
+                    // Store filenames as comma-separated string
+                    $uploadedFiles[$field] = implode(',', $filenames);
                 }
             }
+        }
 
-            if (!empty($filenames)) {
-                // Store filenames as comma-separated string
-                $uploadedFiles[$field] = implode(',', $filenames);
+        if ($uploadedFiles) {
+            $stmt = $pdo->prepare("SELECT id FROM employee_checklist WHERE employee_id = ?");
+            $stmt->execute([$employeeId]);
+            $exists = $stmt->fetch();
+
+            $columns = array_keys($uploadedFiles);
+            $values = array_values($uploadedFiles); 
+
+            if ($exists) {
+                $sets = [];
+                foreach ($columns as $col) $sets[] = "$col = ?";
+                $values[] = $employeeId;
+                $stmt = $pdo->prepare("UPDATE employee_checklist SET " . implode(', ', $sets) . ", updated_at = NOW() WHERE employee_id = ?");
+                $stmt->execute($values);
+            } else {
+                $placeholders = implode(', ', array_fill(0, count($values), '?'));
+                array_unshift($values, $employeeId);
+                $stmt = $pdo->prepare("INSERT INTO employee_checklist (employee_id, " . implode(', ', $columns) . ") VALUES (?, $placeholders)");
+                $stmt->execute($values);
             }
         }
+
+        echo "<script>alert('Documents uploaded successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+        exit;
     }
 
-    if ($uploadedFiles) {
-        $stmt = $pdo->prepare("SELECT id FROM employee_checklist WHERE employee_id = ?");
-        $stmt->execute([$employeeId]);
-        $exists = $stmt->fetch();
+    // Update leave credits
+    if (isset($_POST['update_credits']) && isset($_POST['credits'])) {
+        foreach ($_POST['credits'] as $leaveType => $data) {
+            $balance = is_numeric($data['balance']) ? floatval($data['balance']) : null;
+            $monthlyIncrement = is_numeric($data['monthly_increment']) ? floatval($data['monthly_increment']) : null;
+            $carryOver = isset($data['carry_over']) && is_numeric($data['carry_over']) ? floatval($data['carry_over']) : null;
 
-        $columns = array_keys($uploadedFiles);
-        $values = array_values($uploadedFiles); 
+            // Make sure a record exists (insert if not)
+            $check = $pdo->prepare("SELECT COUNT(*) FROM leave_credits WHERE employee_id = ? AND year = ? AND leave_type = ?");
+            $check->execute([$employeeId, date('Y'), $leaveType]);
+            if ($check->fetchColumn() == 0) {
+                $insert = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, year) VALUES (?, ?, ?)");
+                $insert->execute([$employeeId, $leaveType, date('Y')]);
+            }
 
-        if ($exists) {
-            $sets = [];
-            foreach ($columns as $col) $sets[] = "$col = ?";
-            $values[] = $employeeId;
-            $stmt = $pdo->prepare("UPDATE employee_checklist SET " . implode(', ', $sets) . ", updated_at = NOW() WHERE employee_id = ?");
-            $stmt->execute($values);
-        } else {
-            $placeholders = implode(', ', array_fill(0, count($values), '?'));
-            array_unshift($values, $employeeId);
-            $stmt = $pdo->prepare("INSERT INTO employee_checklist (employee_id, " . implode(', ', $columns) . ") VALUES (?, $placeholders)");
-            $stmt->execute($values);
-        }
-    }
-
-    header("Location: employee-edit.php?id=$employeeId&updated=1");
-    exit;
-  }
-
-  // Update leave credits
-  if (isset($_POST['update_credits']) && isset($_POST['credits'])) {
-    foreach ($_POST['credits'] as $leaveType => $data) {
-        $balance = is_numeric($data['balance']) ? floatval($data['balance']) : null;
-        $monthlyIncrement = is_numeric($data['monthly_increment']) ? floatval($data['monthly_increment']) : null;
-        $carryOver = isset($data['carry_over']) && is_numeric($data['carry_over']) ? floatval($data['carry_over']) : null;
-
-        // Make sure a record exists (insert if not)
-        $check = $pdo->prepare("SELECT COUNT(*) FROM leave_credits WHERE employee_id = ? AND year = ? AND leave_type = ?");
-        $check->execute([$employeeId, date('Y'), $leaveType]);
-        if ($check->fetchColumn() == 0) {
-            $insert = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, year) VALUES (?, ?, ?)");
-            $insert->execute([$employeeId, $leaveType, date('Y')]);
+            // Update with new values
+            $stmt = $pdo->prepare("UPDATE leave_credits SET balance = ?, monthly_increment = ?, carry_over = ?, updated_at = NOW() WHERE employee_id = ? AND year = ? AND leave_type = ?");
+            $stmt->execute([
+                $balance,
+                $monthlyIncrement,
+                $leaveType === 'vacation' ? $carryOver : null,
+                $employeeId,
+                date('Y'),
+                $leaveType
+            ]);
         }
 
-        // Update with new values
-        $stmt = $pdo->prepare("UPDATE leave_credits SET balance = ?, monthly_increment = ?, carry_over = ?, updated_at = NOW() WHERE employee_id = ? AND year = ? AND leave_type = ?");
-        $stmt->execute([
-            $balance,
-            $monthlyIncrement,
-            $leaveType === 'vacation' ? $carryOver : null,
-            $employeeId,
-            date('Y'),
-            $leaveType
-        ]);
+        echo "<script>alert('Leave credits updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+        exit;
     }
-
-    header("Location: employee-edit.php?id=$employeeId&credits_updated=1");
-    exit;
-  }
 }
 
 // Fetch employee
@@ -211,6 +238,19 @@ function getStatusBadge($status) {
 }
 
 $leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'halfday', 'halfday_sick', 'lwop', 'bereavement'];
+
+// Schedule options
+$scheduleOptions = [
+    3 => ['in' => '07:30 AM', 'out' => '04:30 PM'],
+    4 => ['in' => '07:00 AM', 'out' => '04:00 PM'],
+    5 => ['in' => '08:00 AM', 'out' => '05:00 PM'],
+    6 => ['in' => '09:00 AM', 'out' => '06:00 PM'],
+    7 => ['in' => '10:00 AM', 'out' => '07:00 PM'],
+    8 => ['in' => '06:00 AM', 'out' => '03:00 PM'],
+    9 => ['in' => '08:00 AM', 'out' => '04:30 PM'],
+    10 => ['in' => '07:40 AM', 'out' => '04:40 PM'],
+    11 => ['in' => '06:30 AM', 'out' => '03:00 PM'],
+];
 ?>
 
 <!DOCTYPE html>
@@ -237,21 +277,6 @@ $leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'hal
         ?>
         
         <main class="flex-1 p-6 overflow-y-auto">
-            <!-- Flash Messages -->
-            <?php if (isset($_GET['updated'])): ?>
-                <div class="flex items-center bg-green-100 text-green-700 px-4 py-2 rounded shadow mb-6">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10 0a10 10 0 100 20 10 10 0 000-20zm1 15.414l-4.293-4.293 1.414-1.414L11 12.586l3.879-3.879 1.414 1.414L11 15.414z"/></svg>
-                    Employee updated successfully.
-                </div>
-            <?php endif; ?>
-
-            <?php if (isset($_GET['credits_updated'])): ?>
-                <div class="flex items-center bg-green-100 text-green-700 px-4 py-2 rounded shadow mb-6">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10 0a10 10 0 100 20 10 10 0 000-20zm1 15.414l-4.293-4.293 1.414-1.414L11 12.586l3.879-3.879 1.414 1.414L11 15.414z"/></svg>
-                    Leave credits updated successfully.
-                </div>
-            <?php endif; ?>
-
             <!-- Profile Header -->
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
                 <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
@@ -275,9 +300,6 @@ $leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'hal
                                 <button onclick="toggleEditMode()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
                                     <i class="fas fa-edit mr-2"></i>Edit Profile
                                 </button>
-                                <button onclick="window.print()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">
-                                    <i class="fas fa-print mr-2"></i>Print
-                                </button>
                             </div>
                         </div>
                         
@@ -293,7 +315,7 @@ $leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'hal
                             <div class="bg-gray-50 p-3 rounded-lg">
                                 <p class="text-sm text-gray-500">Status</p>
                                 <p class="font-medium">
-                                    <span class="<?= $employee['status'] === 'Active' ? 'text-green-600' : 'text-red-600' ?>">
+                                    <span class="text-green-600">
                                         <?= htmlspecialchars($employee['status']) ?>
                                     </span>
                                 </p>
@@ -311,6 +333,9 @@ $leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'hal
             <div class="flex overflow-x-auto border-b border-gray-200 mb-6">
                 <button onclick="openTab(event, 'profile')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition active" id="default-tab">
                     <i class="fas fa-user mr-2"></i>Profile
+                </button>
+                <button onclick="openTab(event, 'current-schedule')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
+                    <i class="fas fa-calendar-check mr-2"></i>Current Schedule
                 </button>
                 <button onclick="openTab(event, 'checklist')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
                     <i class="fas fa-tasks mr-2"></i>201 Checklist
@@ -361,9 +386,13 @@ $leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'hal
                             <p class="font-medium"><?= htmlspecialchars($employee['position']) ?></p>
                         </div>
                         <div>
+                            <p class="text-sm text-gray-500">Company</p>
+                            <p class="font-medium"><?= htmlspecialchars($employee['company'] ?? 'Not specified') ?></p>
+                        </div>
+                        <div>
                             <p class="text-sm text-gray-500">Status</p>
                             <p class="font-medium">
-                                <span class="<?= $employee['status'] === 'Active' ? 'text-green-600' : 'text-red-600' ?>">
+                                <span class="<?= $employee['status'] === 'Active' ? 'text-green-600' : 'text-gray-600' ?>">
                                     <?= htmlspecialchars($employee['status']) ?>
                                 </span>
                             </p>
@@ -399,6 +428,11 @@ $leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'hal
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                         <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Company</label>
+                            <input name="company" type="text" value="<?= htmlspecialchars($employee['company'] ?? '') ?>" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
                             <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="Active" <?= $employee['status'] === 'Active' ? 'selected' : '' ?>>Active</option>
@@ -423,41 +457,279 @@ $leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'hal
                 </div>
             </div>
 
+            <!-- Current Schedule Tab -->
+            <div id="current-schedule" class="tab-content">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6">Current Schedule</h2>
+                    
+                    <!-- Current Schedule Display -->
+                    <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                        <h3 class="text-lg font-medium text-blue-800 mb-2">Current Work Schedule</h3>
+                        <?php 
+                        $currentSched = $employee['official_sched'] ?? null;
+                        if ($currentSched && isset($scheduleOptions[$currentSched])): 
+                        ?>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="text-center">
+                                    <p class="text-sm text-blue-600">Schedule ID</p>
+                                    <p class="text-2xl font-bold text-blue-800">#<?= $currentSched ?></p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-sm text-blue-600">Time In</p>
+                                    <p class="text-2xl font-bold text-blue-800"><?= $scheduleOptions[$currentSched]['in'] ?></p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-sm text-blue-600">Time Out</p>
+                                    <p class="text-2xl font-bold text-blue-800"><?= $scheduleOptions[$currentSched]['out'] ?></p>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center py-4">
+                                <p class="text-gray-500">No schedule assigned</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Change Schedule Form -->
+                    <form method="post" class="space-y-6">
+                        <input type="hidden" name="update_schedule" value="1">
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Select New Schedule</label>
+                            <select name="official_sched" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select a schedule...</option>
+                                <?php foreach ($scheduleOptions as $id => $times): ?>
+                                    <option value="<?= $id ?>" <?= $currentSched == $id ? 'selected' : '' ?>>
+                                        Schedule <?= $id ?> - <?= $times['in'] ?> to <?= $times['out'] ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Schedule Options Preview -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <?php foreach ($scheduleOptions as $id => $times): ?>
+                                <div class="border border-gray-200 rounded-lg p-4 <?= $currentSched == $id ? 'bg-blue-50 border-blue-300' : 'hover:bg-gray-50' ?>">
+                                    <div class="text-center">
+                                        <h4 class="font-semibold text-gray-800">Schedule <?= $id ?></h4>
+                                        <p class="text-sm text-gray-600 mt-1"><?= $times['in'] ?> - <?= $times['out'] ?></p>
+                                        <?php if ($currentSched == $id): ?>
+                                            <span class="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Current</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md transition">
+                                <i class="fas fa-save mr-2"></i>Update Schedule
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <!-- 201 Checklist Tab -->
             <div id="checklist" class="tab-content">
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold text-gray-800 mb-6">201 Checklist</h2>
                     
-                    <form method="post" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <form method="post" enctype="multipart/form-data">
                         <input type="hidden" name="upload_documents" value="1">
                         
-                        <?php foreach ($documents as $field => $label): ?>
-                        <div class="md:col-span-1">
-                            <label class="block text-sm font-medium text-gray-700 mb-2"><?= $label ?></label>
-                            <input type="file" name="<?= $field ?>[]" multiple 
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-
-                            <?php if (!empty($checklist[$field])): ?>
-                                <div class="mt-2 text-sm space-y-1">
-                                    <?php foreach (explode(',', $checklist[$field]) as $file): ?>
-                                        <div class="flex space-x-2 items-center bg-gray-50 p-2 rounded">
-                                            <a href="../uploads/checklist/<?= htmlspecialchars(trim($file)) ?>" target="_blank" 
-                                               class="text-blue-600 hover:underline flex-1">
-                                                <i class="fas fa-file-alt mr-2"></i>View Document
-                                            </a>
-                                            <a href="?id=<?= $employeeId ?>&delete_attachment=1&field=<?= $field ?>&file=<?= urlencode(trim($file)) ?>" 
-                                               onclick="return confirm('Delete this file?');" 
-                                               class="text-red-600 hover:text-red-800">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </a>
+                        <!-- Basic Employment Documents -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-medium text-gray-800 mb-4 pb-2 border-b border-gray-200">
+                                <i class="fas fa-briefcase mr-2 text-blue-600"></i>Basic Employment Documents
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <?php 
+                                $basicDocs = ['letter_offer', 'employment_contract', 'employment_adjustment_form'];
+                                foreach ($basicDocs as $field): 
+                                    if (isset($documents[$field])):
+                                ?>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2"><?= $documents[$field] ?></label>
+                                    <input type="file" name="<?= $field ?>[]" multiple 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <?php if (!empty($checklist[$field])): ?>
+                                        <div class="mt-2 text-sm space-y-1">
+                                            <?php foreach (explode(',', $checklist[$field]) as $file): ?>
+                                                <div class="flex space-x-2 items-center bg-gray-50 p-2 rounded">
+                                                    <a href="../uploads/checklist/<?= htmlspecialchars(trim($file)) ?>" target="_blank" 
+                                                       class="text-blue-600 hover:underline flex-1">
+                                                        <i class="fas fa-file-alt mr-2"></i>View Document
+                                                    </a>
+                                                    <a href="?id=<?= $employeeId ?>&delete_attachment=1&field=<?= $field ?>&file=<?= urlencode(trim($file)) ?>" 
+                                                       onclick="return confirm('Delete this file?');" 
+                                                       class="text-red-600 hover:text-red-800">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </a>
+                                                </div>
+                                            <?php endforeach; ?>
                                         </div>
-                                    <?php endforeach; ?>
+                                    <?php endif; ?>
                                 </div>
-                            <?php endif; ?>
+                                <?php 
+                                    endif;
+                                endforeach; 
+                                ?>
+                            </div>
                         </div>
-                        <?php endforeach; ?>
+
+                        <!-- Medical & Clearances -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-medium text-gray-800 mb-4 pb-2 border-b border-gray-200">
+                                <i class="fas fa-user-md mr-2 text-green-600"></i>Medical & Clearances
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <?php 
+                                $medicalDocs = ['medical', 'nbi_clearance'];
+                                foreach ($medicalDocs as $field): 
+                                    if (isset($documents[$field])):
+                                ?>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2"><?= $documents[$field] ?></label>
+                                    <input type="file" name="<?= $field ?>[]" multiple 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <?php if (!empty($checklist[$field])): ?>
+                                        <div class="mt-2 text-sm space-y-1">
+                                            <?php foreach (explode(',', $checklist[$field]) as $file): ?>
+                                                <div class="flex space-x-2 items-center bg-gray-50 p-2 rounded">
+                                                    <a href="../uploads/checklist/<?= htmlspecialchars(trim($file)) ?>" target="_blank" 
+                                                       class="text-blue-600 hover:underline flex-1">
+                                                        <i class="fas fa-file-alt mr-2"></i>View Document
+                                                    </a>
+                                                    <a href="?id=<?= $employeeId ?>&delete_attachment=1&field=<?= $field ?>&file=<?= urlencode(trim($file)) ?>" 
+                                                       onclick="return confirm('Delete this file?');" 
+                                                       class="text-red-600 hover:text-red-800">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </a>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php 
+                                    endif;
+                                endforeach; 
+                                ?>
+                            </div>
+                        </div>
+
+                        <!-- Educational Documents -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-medium text-gray-800 mb-4 pb-2 border-b border-gray-200">
+                                <i class="fas fa-graduation-cap mr-2 text-purple-600"></i>Educational Documents
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2"><?= $documents['diploma_tor'] ?></label>
+                                    <input type="file" name="diploma_tor[]" multiple 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <?php if (!empty($checklist['diploma_tor'])): ?>
+                                        <div class="mt-2 text-sm space-y-1">
+                                            <?php foreach (explode(',', $checklist['diploma_tor']) as $file): ?>
+                                                <div class="flex space-x-2 items-center bg-gray-50 p-2 rounded">
+                                                    <a href="../uploads/checklist/<?= htmlspecialchars(trim($file)) ?>" target="_blank" 
+                                                       class="text-blue-600 hover:underline flex-1">
+                                                        <i class="fas fa-file-alt mr-2"></i>View Document
+                                                    </a>
+                                                    <a href="?id=<?= $employeeId ?>&delete_attachment=1&field=diploma_tor&file=<?= urlencode(trim($file)) ?>" 
+                                                       onclick="return confirm('Delete this file?');" 
+                                                       class="text-red-600 hover:text-red-800">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </a>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Government IDs & Documents -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-medium text-gray-800 mb-4 pb-2 border-b border-gray-200">
+                                <i class="fas fa-id-card mr-2 text-red-600"></i>Government IDs & Documents
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <?php 
+                                $govDocs = ['psa', 'sss', 'tin', 'philhealth', 'pagibig'];
+                                foreach ($govDocs as $field): 
+                                    if (isset($documents[$field])):
+                                ?>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2"><?= $documents[$field] ?></label>
+                                    <input type="file" name="<?= $field ?>[]" multiple 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <?php if (!empty($checklist[$field])): ?>
+                                        <div class="mt-2 text-sm space-y-1">
+                                            <?php foreach (explode(',', $checklist[$field]) as $file): ?>
+                                                <div class="flex space-x-2 items-center bg-gray-50 p-2 rounded">
+                                                    <a href="../uploads/checklist/<?= htmlspecialchars(trim($file)) ?>" target="_blank" 
+                                                       class="text-blue-600 hover:underline flex-1">
+                                                        <i class="fas fa-file-alt mr-2"></i>View Document
+                                                    </a>
+                                                    <a href="?id=<?= $employeeId ?>&delete_attachment=1&field=<?= $field ?>&file=<?= urlencode(trim($file)) ?>" 
+                                                       onclick="return confirm('Delete this file?');" 
+                                                       class="text-red-600 hover:text-red-800">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </a>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php 
+                                    endif;
+                                endforeach; 
+                                ?>
+                            </div>
+                        </div>
+
+                        <!-- Valid IDs & Special Documents -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-medium text-gray-800 mb-4 pb-2 border-b border-gray-200">
+                                <i class="fas fa-address-card mr-2 text-orange-600"></i>Valid IDs & Special Documents
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <?php 
+                                $idDocs = ['valid_id', 'Valid_id_2', 'solo_parent_id', 'coe'];
+                                foreach ($idDocs as $field): 
+                                    if (isset($documents[$field])):
+                                ?>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2"><?= $documents[$field] ?></label>
+                                    <input type="file" name="<?= $field ?>[]" multiple 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <?php if (!empty($checklist[$field])): ?>
+                                        <div class="mt-2 text-sm space-y-1">
+                                            <?php foreach (explode(',', $checklist[$field]) as $file): ?>
+                                                <div class="flex space-x-2 items-center bg-gray-50 p-2 rounded">
+                                                    <a href="../uploads/checklist/<?= htmlspecialchars(trim($file)) ?>" target="_blank" 
+                                                       class="text-blue-600 hover:underline flex-1">
+                                                        <i class="fas fa-file-alt mr-2"></i>View Document
+                                                    </a>
+                                                    <a href="?id=<?= $employeeId ?>&delete_attachment=1&field=<?= $field ?>&file=<?= urlencode(trim($file)) ?>" 
+                                                       onclick="return confirm('Delete this file?');" 
+                                                       class="text-red-600 hover:text-red-800">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </a>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php 
+                                    endif;
+                                endforeach; 
+                                ?>
+                            </div>
+                        </div>
                         
-                        <div class="md:col-span-2 flex justify-end pt-4">
+                        <div class="flex justify-end pt-4">
                             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition">
                                 <i class="fas fa-upload mr-2"></i>Upload Documents
                             </button>

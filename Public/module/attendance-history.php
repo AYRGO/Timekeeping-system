@@ -28,7 +28,7 @@ $schedule_times = [
     6 => ['in' => '09:00 AM', 'out' => '06:00 PM'],
     7 => ['in' => '10:00 AM', 'out' => '07:00 PM'],
     8 => ['in' => '06:00 AM', 'out' => '03:00 PM'],
-    9 => ['in' => '11:00 AM', 'out' => '08:00 PM'], // Fixed missing time
+    9 => ['in' => '11:00 AM', 'out' => '08:00 PM'],
 ];
 
 // Fetch all logs for July 1, 2025 onwards
@@ -111,11 +111,12 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h3 class="text-lg font-semibold text-gray-800">My Attendance History</h3>
         
-        <!-- Search Box -->
-        <div class="flex items-center gap-2">
+        <!-- Search Form -->
+        <form method="GET" class="flex items-center gap-2">
             <div class="relative">
                 <input 
                     type="text" 
+                    name="search"
                     id="searchInput"
                     placeholder="Search by date, day..." 
                     value="<?= htmlspecialchars($searchDate) ?>"
@@ -125,20 +126,38 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                     <i class="fas fa-search text-gray-400"></i>
                 </div>
             </div>
+            
+            <!-- Search Button -->
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-search"></i>
+            </button>
+            
+            <!-- Clear Button -->
             <?php if (!empty($searchDate)): ?>
-                <a href="?" class="text-red-500 hover:text-red-700" title="Clear search">
+                <a href="?" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors" title="Clear search">
                     <i class="fas fa-times"></i>
                 </a>
             <?php endif; ?>
-        </div>
+            
+            <!-- Preserve page number if needed -->
+            <?php if (isset($_GET['page']) && !empty($searchDate)): ?>
+                <input type="hidden" name="page" value="<?= htmlspecialchars($_GET['page']) ?>">
+            <?php endif; ?>
+        </form>
     </div>
 
     <!-- Results Info -->
     <div class="mb-4 text-sm text-gray-600">
         <?php if (!empty($searchDate)): ?>
-            Showing <?= count($filteredDates) ?> result(s) for "<?= htmlspecialchars($searchDate) ?>"
+            <div class="flex items-center gap-2">
+                <i class="fas fa-filter text-blue-500"></i>
+                <span>Showing <?= count($filteredDates) ?> result(s) for "<strong><?= htmlspecialchars($searchDate) ?></strong>"</span>
+            </div>
         <?php else: ?>
-            Showing <?= count($currentPageDates) ?> of <?= $totalItems ?> records
+            <div class="flex items-center gap-2">
+                <i class="fas fa-calendar text-green-500"></i>
+                <span>Showing <?= count($currentPageDates) ?> of <?= $totalItems ?> records</span>
+            </div>
         <?php endif; ?>
     </div>
 
@@ -159,11 +178,15 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                 <?php if (empty($currentPageDates)): ?>
                     <tr>
                         <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                            <?php if (!empty($searchDate)): ?>
-                                No attendance records found for "<?= htmlspecialchars($searchDate) ?>"
-                            <?php else: ?>
-                                No attendance records found
-                            <?php endif; ?>
+                            <div class="flex flex-col items-center gap-2">
+                                <i class="fas fa-search text-4xl text-gray-300"></i>
+                                <?php if (!empty($searchDate)): ?>
+                                    <p>No attendance records found for "<strong><?= htmlspecialchars($searchDate) ?></strong>"</p>
+                                    <p class="text-sm">Try searching with different keywords</p>
+                                <?php else: ?>
+                                    <p>No attendance records found</p>
+                                <?php endif; ?>
+                            </div>
                         </td>
                     </tr>
                 <?php else: ?>
@@ -264,7 +287,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
     </div>
 
     <!-- Pagination -->
-    <?php if ($totalPages > 1 && empty($searchDate)): ?>
+    <?php if ($totalPages > 1): ?>
         <div class="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div class="text-sm text-gray-700">
                 Showing <?= $offset + 1 ?> to <?= min($offset + $itemsPerPage, $totalItems) ?> of <?= $totalItems ?> results
@@ -273,7 +296,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
             <nav class="flex items-center space-x-1">
                 <!-- Previous Button -->
                 <?php if ($currentPage > 1): ?>
-                    <a href="?page=<?= $currentPage - 1 ?>" 
+                    <a href="?page=<?= $currentPage - 1 ?><?= !empty($searchDate) ? '&search=' . urlencode($searchDate) : '' ?>" 
                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700">
                         <i class="fas fa-chevron-left"></i>
                     </a>
@@ -289,7 +312,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                 $endPage = min($totalPages, $currentPage + 2);
                 
                 if ($startPage > 1): ?>
-                    <a href="?page=1" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700">1</a>
+                    <a href="?page=1<?= !empty($searchDate) ? '&search=' . urlencode($searchDate) : '' ?>" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700">1</a>
                     <?php if ($startPage > 2): ?>
                         <span class="px-3 py-2 text-sm font-medium text-gray-500">...</span>
                     <?php endif; ?>
@@ -301,7 +324,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             <?= $i ?>
                         </span>
                     <?php else: ?>
-                        <a href="?page=<?= $i ?>" 
+                        <a href="?page=<?= $i ?><?= !empty($searchDate) ? '&search=' . urlencode($searchDate) : '' ?>" 
                            class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700">
                             <?= $i ?>
                         </a>
@@ -312,12 +335,12 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                     <?php if ($endPage < $totalPages - 1): ?>
                         <span class="px-3 py-2 text-sm font-medium text-gray-500">...</span>
                     <?php endif; ?>
-                    <a href="?page=<?= $totalPages ?>" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700"><?= $totalPages ?></a>
+                    <a href="?page=<?= $totalPages ?><?= !empty($searchDate) ? '&search=' . urlencode($searchDate) : '' ?>" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700"><?= $totalPages ?></a>
                 <?php endif; ?>
 
                 <!-- Next Button -->
                 <?php if ($currentPage < $totalPages): ?>
-                    <a href="?page=<?= $currentPage + 1 ?>" 
+                    <a href="?page=<?= $currentPage + 1 ?><?= !empty($searchDate) ? '&search=' . urlencode($searchDate) : '' ?>" 
                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 hover:text-gray-700">
                         <i class="fas fa-chevron-right"></i>
                     </a>
@@ -334,42 +357,18 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('searchInput');
-    let searchTimeout;
-
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            const searchValue = this.value.trim();
-            const url = new URL(window.location);
-            
-            if (searchValue) {
-                url.searchParams.set('search', searchValue);
-                url.searchParams.delete('page'); // Reset to first page when searching
-            } else {
-                url.searchParams.delete('search');
-                url.searchParams.delete('page');
-            }
-            
-            window.location.href = url.toString();
-        }, 500); // 500ms delay for better UX
+    
+    // Focus on search input for better UX
+    searchInput.addEventListener('focus', function() {
+        this.select();
     });
-
-    // Handle Enter key
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            clearTimeout(searchTimeout);
-            const searchValue = this.value.trim();
-            const url = new URL(window.location);
-            
-            if (searchValue) {
-                url.searchParams.set('search', searchValue);
-                url.searchParams.delete('page');
-            } else {
-                url.searchParams.delete('search');
-                url.searchParams.delete('page');
-            }
-            
-            window.location.href = url.toString();
+    
+    // Optional: Add some visual feedback when typing
+    searchInput.addEventListener('input', function() {
+        if (this.value.length > 0) {
+            this.style.borderColor = '#3B82F6';
+        } else {
+            this.style.borderColor = '#D1D5DB';
         }
     });
 });

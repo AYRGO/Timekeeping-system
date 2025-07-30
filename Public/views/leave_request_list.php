@@ -120,10 +120,7 @@ function getLeaveTypeBadge($type) {
                 <div class="mb-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h1 class="text-2xl font-bold text-gray-900"><?= $pageTitle ?></h1>
-                            <p class="text-gray-600">
-                                <?= $isHistoryView ? 'View all processed leave requests' : 'Manage employee leave requests' ?>
-                            </p>
+
                         </div>
                         <div class="flex space-x-2">
                             <a href="?view=current" 
@@ -257,11 +254,73 @@ function getLeaveTypeBadge($type) {
                     </table>
                 </div>
 
-                <div class="mt-6">
-                    <a href="../views/employee_list.php" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm">
-                        <i class="fas fa-arrow-left mr-2"></i>Back to Employee List
-                    </a>
+                <!-- Summary Cards -->
+                <?php if (!empty($leave_requests)): ?>
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <?php
+                    $summary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'declined' => 0];
+                    $totalDays = 0;
+                    foreach ($leave_requests as $req) {
+                        $status = strtolower($req['status'] ?? 'pending');
+                        if (isset($summary[$status])) {
+                            $summary[$status]++;
+                        }
+                        
+                        // Calculate total approved days
+                        if ($status === 'approved') {
+                            $start = new DateTime($req['start_date']);
+                            $end = new DateTime($req['end_date']);
+                            $totalDays += $start->diff($end)->days + 1;
+                        }
+                    }
+                    ?>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-blue-100 rounded-lg">
+                                <i class="fas fa-list text-blue-600"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-500">Total Requests</p>
+                                <p class="text-lg font-semibold text-gray-900"><?= count($leave_requests) ?></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-yellow-100 rounded-lg">
+                                <i class="fas fa-clock text-yellow-600"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-500">Pending</p>
+                                <p class="text-lg font-semibold text-gray-900"><?= $summary['pending'] ?></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-green-100 rounded-lg">
+                                <i class="fas fa-check text-green-600"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-500">Approved</p>
+                                <p class="text-lg font-semibold text-gray-900"><?= $summary['approved'] ?></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-purple-100 rounded-lg">
+                                <i class="fas fa-calendar-day text-purple-600"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-500">Approved Days</p>
+                                <p class="text-lg font-semibold text-gray-900"><?= $totalDays ?></p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                <?php endif; ?>
+
             </main>
         </div>
     </div>

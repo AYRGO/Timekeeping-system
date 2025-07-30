@@ -8,7 +8,7 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'current';
 $isHistoryView = ($view === 'history');
 
 // Set page title for header
-$pageTitle = $isHistoryView ? 'Time Adjustment Requests History' : 'Time Adjustment Requests';
+$pageTitle = $isHistoryView ? 'Time Adjustment Requests History' : 'Time Adjustments';
 
 date_default_timezone_set('Asia/Manila'); // or your preferred timezone
 
@@ -84,10 +84,7 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="mb-8">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h1 class="text-2xl font-bold text-gray-900"><?= $pageTitle ?></h1>
-                            <p class="text-gray-600">
-                                <?= $isHistoryView ? 'View all processed time adjustment requests' : 'Manage employee time adjustment requests' ?>
-                            </p>
+                          
                         </div>
                         <div class="flex space-x-2">
                             <a href="?view=current" 

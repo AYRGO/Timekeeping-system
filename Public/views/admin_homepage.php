@@ -23,6 +23,8 @@ if (
 
 // Get stats
 $totalEmployees = $pdo->query("SELECT COUNT(*) FROM employees")->fetchColumn();
+$activeEmployees = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'Active'")->fetchColumn();
+$inactiveEmployees = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'Inactive'")->fetchColumn();
 $pendingLeaves = $pdo->query("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'")->fetchColumn();
 $pendingSchedules = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE status = 'pending'")->fetchColumn();
 $pendingOT = $pdo->query("SELECT COUNT(*) FROM overtime_requests WHERE status = 'Pending'")->fetchColumn();
@@ -101,7 +103,7 @@ $recentActivity = array_slice($recentActivity, 0, 30); // Show latest 30 activit
 // Get chart data
 $chartData = [
     'pendingRequests' => [
-        'leaves' => $pendingLeaves,
+        'leaves' => $pendingLeaves, 
         'schedules' => $pendingSchedules,
         'overtime' => $pendingOT,
         'adjustments' => $pendingTimeAdjustments
@@ -109,22 +111,44 @@ $chartData = [
     'monthlyActivity' => []
 ];
 
-// Get monthly activity data for the last 6 months
+// Get monthly employee status data for the last 6 months
 for ($i = 5; $i >= 0; $i--) {
     $month = date('Y-m', strtotime("-$i months"));
     $monthName = date('M Y', strtotime("-$i months"));
+    $monthEnd = date('Y-m-t', strtotime("-$i months")); // Last day of the month
     
-    $monthlyLeaves = $pdo->query("SELECT COUNT(*) FROM post_leave_requests WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month'")->fetchColumn();
-    $monthlyOT = $pdo->query("SELECT COUNT(*) FROM post_overtime_requests WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month'")->fetchColumn();
-    $monthlySchedules = $pdo->query("SELECT COUNT(*) FROM post_schedule_change_requests WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month'")->fetchColumn();
-    $monthlyAdjustments = $pdo->query("SELECT COUNT(*) FROM post_time_adjustment_requests WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month'")->fetchColumn();
+    // Count employees hired up to this month (cumulative)
+    $monthlyActive = $pdo->query("
+        SELECT COUNT(*) FROM employees 
+        WHERE DATE(created_at) <= '$monthEnd' 
+        AND status = 'Active'
+    ")->fetchColumn();
+    
+    // Count inactive employees (assuming they became inactive after being hired)
+    $monthlyInactive = $pdo->query("
+        SELECT COUNT(*) FROM employees 
+        WHERE DATE(created_at) <= '$monthEnd' 
+        AND status = 'Inactive'
+    ")->fetchColumn();
+    
+    // Total employees hired up to this month
+    $monthlyTotal = $pdo->query("
+        SELECT COUNT(*) FROM employees 
+        WHERE DATE(created_at) <= '$monthEnd'
+    ")->fetchColumn();
+    
+    // New hires for this specific month
+    $newHires = $pdo->query("
+        SELECT COUNT(*) FROM employees 
+        WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month'
+    ")->fetchColumn();
     
     $chartData['monthlyActivity'][] = [
         'month' => $monthName,
-        'leaves' => $monthlyLeaves,
-        'overtime' => $monthlyOT,
-        'schedules' => $monthlySchedules,
-        'adjustments' => $monthlyAdjustments
+        'active' => (int)$monthlyActive,
+        'inactive' => (int)$monthlyInactive,
+        'total' => (int)$monthlyTotal,
+        'newHires' => (int)$newHires
     ];
 }
 ?>
@@ -146,7 +170,7 @@ for ($i = 5; $i >= 0; $i--) {
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
         }
         .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #10B981 0%, #047857 100%);
         }
         .activity-item {
             transition: all 0.2s ease;
@@ -194,7 +218,7 @@ for ($i = 5; $i >= 0; $i--) {
                     <div class="flex items-center justify-between">
                         <div>
                             <h1 class="text-3xl font-bold mb-2">Welcome back, Admin!</h1>
-                            <p class="text-blue-100 text-lg">Here's what's happening in your organization today.</p>
+                            <p class="text-green-100 text-lg">Here's what's happening in your organization today.</p>
                         </div>
                         <div class="hidden md:block">
                             <div class="bg-white bg-opacity-20 rounded-xl p-4">
@@ -208,7 +232,7 @@ for ($i = 5; $i >= 0; $i--) {
                 </div>
 
                 <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                     <?php
                     $stats = [
                         [
@@ -216,6 +240,13 @@ for ($i = 5; $i >= 0; $i--) {
                             "value" => $totalEmployees,
                             "icon" => "fas fa-users",
                             "color" => "blue",
+                            "link" => "employee_list.php"
+                        ],
+                        [
+                            "title" => "Active Employees",
+                            "value" => $activeEmployees,
+                            "icon" => "fas fa-user-check",
+                            "color" => "green",
                             "link" => "employee_list.php"
                         ],
                         [
@@ -282,12 +313,12 @@ for ($i = 5; $i >= 0; $i--) {
                         </div>
                     </div>
 
-                    <!-- Monthly Activity Chart -->
+                    <!-- Employee Status Chart -->
                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                         <div class="flex items-center justify-between mb-6">
-                            <h3 class="text-lg font-semibold text-gray-900">Monthly Activity</h3>
+                            <h3 class="text-lg font-semibold text-gray-900">Employee Status Overview</h3>
                             <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
                                 <span class="text-sm text-gray-600">Last 6 Months</span>
                             </div>
                         </div>
@@ -428,7 +459,8 @@ for ($i = 5; $i >= 0; $i--) {
                         '#F59E0B', // Orange
                         '#3B82F6', // Blue
                         '#8B5CF6', // Purple
-                        '#10B981'  // Green
+                        '#10B981', // Green
+                        
                     ],
                     borderWidth: 2,
                     borderColor: '#ffffff',
@@ -453,7 +485,7 @@ for ($i = 5; $i >= 0; $i--) {
             }
         });
 
-        // Monthly Activity Line Chart
+        // Employee Status Line Chart
         const activityCtx = document.getElementById('activityChart').getContext('2d');
         new Chart(activityCtx, {
             type: 'line',
@@ -461,48 +493,62 @@ for ($i = 5; $i >= 0; $i--) {
                 labels: chartData.monthlyActivity.map(item => item.month),
                 datasets: [
                     {
-                        label: 'Leave Requests',
-                        data: chartData.monthlyActivity.map(item => item.leaves),
-                        borderColor: '#F59E0B',
-                        backgroundColor: '#F59E0B20',
+                        label: 'Total Employees (Cumulative)',
+                        data: chartData.monthlyActivity.map(item => item.total),
+                        borderColor: '#3B82F6',
+                        backgroundColor: '#3B82F620',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#3B82F6',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2
+                    },
+                    {
+                        label: 'Active Employees',
+                        data: chartData.monthlyActivity.map(item => item.active),
+                        borderColor: '#10B981',
+                        backgroundColor: '#10B98120',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#10B981',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2
+                    },
+                    {
+                        label: 'Inactive Employees',
+                        data: chartData.monthlyActivity.map(item => item.inactive),
+                        borderColor: '#EF4444',
+                        backgroundColor: '#EF444420',
                         borderWidth: 2,
                         fill: false,
                         tension: 0.4,
                         pointRadius: 3,
-                        pointHoverRadius: 5
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: '#EF4444',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        borderDash: [5, 5]
                     },
                     {
-                        label: 'Overtime',
-                        data: chartData.monthlyActivity.map(item => item.overtime),
+                        label: 'New Hires',
+                        data: chartData.monthlyActivity.map(item => item.newHires),
                         borderColor: '#8B5CF6',
                         backgroundColor: '#8B5CF620',
                         borderWidth: 2,
                         fill: false,
                         tension: 0.4,
-                        pointRadius: 3,
-                        pointHoverRadius: 5
-                    },
-                    {
-                        label: 'Schedule Changes',
-                        data: chartData.monthlyActivity.map(item => item.schedules),
-                        borderColor: '#3B82F6',
-                        backgroundColor: '#3B82F620',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 3,
-                        pointHoverRadius: 5
-                    },
-                    {
-                        label: 'Time Adjustments',
-                        data: chartData.monthlyActivity.map(item => item.adjustments),
-                        borderColor: '#10B981',
-                        backgroundColor: '#10B98120',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 3,
-                        pointHoverRadius: 5
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: '#8B5CF6',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointStyle: 'triangle'
                     }
                 ]
             },
@@ -519,6 +565,20 @@ for ($i = 5; $i >= 0; $i--) {
                                 size: 11
                             }
                         }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            afterLabel: function(context) {
+                                if (context.datasetIndex === 0) {
+                                    return 'Hired since company start';
+                                } else if (context.datasetIndex === 3) {
+                                    return 'New employees this month';
+                                }
+                                return '';
+                            }
+                        }
                     }
                 },
                 scales: {
@@ -526,6 +586,12 @@ for ($i = 5; $i >= 0; $i--) {
                         beginAtZero: true,
                         grid: {
                             color: '#F3F4F6'
+                        },
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(value) {
+                                return Math.floor(value);
+                            }
                         }
                     },
                     x: {

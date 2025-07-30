@@ -106,10 +106,8 @@ function getStatusBadge($status) {
                 <div class="mb-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h1 class="text-2xl font-bold text-gray-900"><?= $pageTitle ?></h1>
-                            <p class="text-gray-600">
-                                <?= $isHistoryView ? 'View all processed overtime requests' : 'Manage employee overtime requests' ?>
-                            </p>
+
+
                         </div>
                         <div class="flex space-x-2">
                             <a href="?view=current" 
@@ -341,11 +339,6 @@ function getStatusBadge($status) {
                 </div>
                 <?php endif; ?>
 
-                <div class="mt-6">
-                    <a href="../views/employee_list.php" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm">
-                        <i class="fas fa-arrow-left mr-2"></i>Back to Employee List
-                    </a>
-                </div>
             </main>
         </div>
     </div>
