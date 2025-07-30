@@ -7,6 +7,22 @@ include('../config/db.php');
 
 $employee_id = $_SESSION['employee']['id'] ?? null;
 
+// Fetch employee's default schedule from employees table
+$empStmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+$empStmt->execute([$employee_id]);
+$employee = $empStmt->fetch(PDO::FETCH_ASSOC);
+$default_schedule_id = $employee['official_sched'] ?? 4;
+
+// Fetch all approved schedule changes from post_schedule_change_requests
+$scheduleChangesStmt = $pdo->prepare("
+    SELECT work_schedule_id, start_date, end_date 
+    FROM post_schedule_change_requests 
+    WHERE employee_id = ? AND status = 'Approved' 
+    ORDER BY created_at DESC
+");
+$scheduleChangesStmt->execute([$employee_id]);
+$approvedScheduleChanges = $scheduleChangesStmt->fetchAll(PDO::FETCH_ASSOC);
+
 // Store latest approved schedule change in session for future use
 $scheduleRequestStmt = $pdo->prepare("SELECT * FROM schedule_change_requests WHERE employee_id = ? AND status = 'approved' ORDER BY created_at DESC LIMIT 1");
 $scheduleRequestStmt->execute([$employee_id]);
@@ -21,7 +37,6 @@ if ($latestScheduleRequest) {
     ];
 }
 
-$default_schedule_id = 4;
 $schedule_times = [
     4 => ['in' => '07:00 AM', 'out' => '04:00 PM'],
     5 => ['in' => '08:00 AM', 'out' => '05:00 PM'],
@@ -198,13 +213,14 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 
                             $log = $logMap[$logDate] ?? null;
 
-                            // Schedule logic
+                            // Updated schedule logic - check post_schedule_change_requests
                             $schedule_id_to_use = $default_schedule_id;
-                            if (isset($_SESSION['schedule_request']) && strtolower($_SESSION['schedule_request']['status']) === 'approved') {
-                                $req_start = $_SESSION['schedule_request']['start_date'];
-                                $req_end = $_SESSION['schedule_request']['end_date'];
-                                if ($logDate >= $req_start && $logDate <= $req_end) {
-                                    $schedule_id_to_use = $_SESSION['schedule_request']['work_schedule_id'];
+                            
+                            // Check if there's an approved schedule change for this date
+                            foreach ($approvedScheduleChanges as $scheduleChange) {
+                                if ($logDate >= $scheduleChange['start_date'] && $logDate <= $scheduleChange['end_date']) {
+                                    $schedule_id_to_use = $scheduleChange['work_schedule_id'];
+                                    break; // Use the first matching (most recent) schedule change
                                 }
                             }
 

@@ -1,4 +1,5 @@
 <!-- Profile Section -->
+
 <div id="profileView" class="hidden min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100">
 
   <!-- Main Content Container -->
@@ -423,7 +424,5 @@
       <button onclick="closeConfirmModal()" class="mr-2 bg-gray-300 text-gray-800 px-4 py-2 rounded-md">Cancel</button>
       <button onclick="submitProfileForm()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Yes, Save</button>
     </div>
-  </div>
-</div>
   </div>
 </div>

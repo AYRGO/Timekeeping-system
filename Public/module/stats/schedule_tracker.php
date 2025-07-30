@@ -1,4 +1,3 @@
-
 <?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -35,11 +34,11 @@ $schedule_times = [
 
 $today = date('Y-m-d');
 
-// Get current active approved schedule (if any)
+// Get current active approved schedule from post_schedule_change_requests
 $stmt = $pdo->prepare("
     SELECT work_schedule_id, status, start_date, end_date 
-    FROM schedule_change_requests 
-    WHERE employee_id = ? AND status = 'approved' 
+    FROM post_schedule_change_requests 
+    WHERE employee_id = ? AND status = 'Approved' 
     AND ? BETWEEN start_date AND end_date 
     ORDER BY created_at DESC 
     LIMIT 1
@@ -47,7 +46,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$employee_id, $today]);
 $currentActiveSchedule = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Get latest schedule request (for status display)
+// Get latest schedule request from schedule_change_requests (for pending status)
 $stmt = $pdo->prepare("
     SELECT * FROM schedule_change_requests 
     WHERE employee_id = ? 
@@ -121,7 +120,7 @@ $_SESSION['current_schedule'] = [
     'has_pending_request' => ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') ? true : false,
 ];
 
-// Function to get current real-time schedule ID (can be called from other files)
+// Function to get current real-time schedule ID (updated to use post_schedule_change_requests)
 function getCurrentRealScheduleId($employee_id, $pdo) {
     // Get employee's default schedule
     $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
@@ -131,11 +130,11 @@ function getCurrentRealScheduleId($employee_id, $pdo) {
     
     $today = date('Y-m-d');
     
-    // Check for active approved schedule changes
+    // Check for active approved schedule changes from post_schedule_change_requests
     $stmt = $pdo->prepare("
         SELECT work_schedule_id, status, start_date, end_date 
-        FROM schedule_change_requests 
-        WHERE employee_id = ? AND status = 'approved' 
+        FROM post_schedule_change_requests 
+        WHERE employee_id = ? AND status = 'Approved' 
         AND ? BETWEEN start_date AND end_date 
         ORDER BY created_at DESC 
         LIMIT 1
