@@ -29,8 +29,8 @@
             </div>
           </div>
 
-          <form action="upload_profile.php" method="POST" enctype="multipart/form-data">
-            <input type="file" id="fileInput" name="profile_picture" class="hidden" onchange="this.form.submit()">
+          <form action="../module/upload_profile.php" method="POST" enctype="multipart/form-data" id="profilePictureForm">
+            <input type="file" id="fileInput" name="profile_picture" accept="image/*" class="hidden" onchange="handleFileUpload(this)">
           </form>
         </div>
 
@@ -426,3 +426,107 @@
     </div>
   </div>
 </div>
+
+<script>
+function handleFileUpload(input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Please select a valid image file (JPEG, PNG, or GIF).');
+            input.value = '';
+            return;
+        }
+        
+        // Validate file size (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File size must be less than 5MB.');
+            input.value = '';
+            return;
+        }
+        
+        // Show loading state
+        const profileImg = document.querySelector('.w-32.h-32 img, .w-40.h-40 img');
+        const profileDiv = document.querySelector('.w-32.h-32, .w-40.h-40');
+        
+        // Create loading overlay
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-full';
+        loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin text-white text-2xl"></i>';
+        profileDiv.appendChild(loadingDiv);
+        
+        // Submit form via AJAX
+        const formData = new FormData();
+        formData.append('profile_picture', file);
+        
+        fetch('../config/upload_profile.php', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Remove loading overlay
+            loadingDiv.remove();
+            
+            if (data.success) {
+                // Update the profile picture immediately
+                if (profileImg) {
+                    profileImg.src = '../uploads/profile_images/' + data.filename + '?t=' + new Date().getTime();
+                } else {
+                    // If no image exists, create one
+                    const iconDiv = profileDiv.querySelector('.fa-user')?.parentElement;
+                    if (iconDiv) {
+                        iconDiv.innerHTML = `<img src="../uploads/profile_images/${data.filename}?t=${new Date().getTime()}" class="w-full h-full object-cover" alt="Profile">`;
+                    }
+                }
+                
+                // Show success message
+                showNotification('Profile picture updated successfully!', 'success');
+            } else {
+                showNotification(data.message || 'Upload failed. Please try again.', 'error');
+            }
+        })
+        .catch(error => {
+            // Remove loading overlay
+            loadingDiv.remove();
+            console.error('Upload error:', error);
+            showNotification('Upload failed. Please try again.', 'error');
+        });
+        
+        // Clear the input
+        input.value = '';
+    }
+}
+
+function showNotification(message, type) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transform transition-all duration-300 translate-x-full ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+        notification.classList.remove('translate-x-full');
+    }, 100);
+    
+    // Animate out and remove
+    setTimeout(() => {
+        notification.classList.add('translate-x-full');
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 3000);
+}
+</script>
