@@ -38,12 +38,15 @@ if ($latestScheduleRequest) {
 }
 
 $schedule_times = [
-    4 => ['in' => '07:00 AM', 'out' => '04:00 PM'],
-    5 => ['in' => '08:00 AM', 'out' => '05:00 PM'],
-    6 => ['in' => '09:00 AM', 'out' => '06:00 PM'],
-    7 => ['in' => '10:00 AM', 'out' => '07:00 PM'],
-    8 => ['in' => '06:00 AM', 'out' => '03:00 PM'],
-    9 => ['in' => '11:00 AM', 'out' => '08:00 PM'],
+    3 => ['in' => '07:30:00', 'out' => '16:30:00'],
+    4 => ['in' => '07:00:00', 'out' => '16:00:00'],
+    5 => ['in' => '08:00:00', 'out' => '17:00:00'],
+    6 => ['in' => '09:00:00', 'out' => '18:00:00'],
+    7 => ['in' => '10:00:00', 'out' => '19:00:00'],
+    8 => ['in' => '06:00:00', 'out' => '15:00:00'],
+    9 => ['in' => '08:00:00', 'out' => '16:30:00'],
+    10 => ['in' => '07:40:00', 'out' => '16:40:00'],
+    11 => ['in' => '06:30:00', 'out' => '15:00:00'],
 ];
 
 // Fetch all logs for July 1, 2025 onwards
@@ -225,9 +228,13 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             }
 
                             if (isset($schedule_times[$schedule_id_to_use])) {
-                                $schedule_in = $schedule_times[$schedule_id_to_use]['in'];
-                                $schedule_out = $schedule_times[$schedule_id_to_use]['out'];
+                                $schedule_in_24h = $schedule_times[$schedule_id_to_use]['in'];
+                                $schedule_out_24h = $schedule_times[$schedule_id_to_use]['out'];
+                                $schedule_in = date('h:i A', strtotime($schedule_in_24h));
+                                $schedule_out = date('h:i A', strtotime($schedule_out_24h));
                             } else {
+                                $schedule_in_24h = '07:00:00';
+                                $schedule_out_24h = '16:00:00';
                                 $schedule_in = '07:00 AM';
                                 $schedule_out = '04:00 PM';
                             }
@@ -249,17 +256,22 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 $hoursWorked = number_format($hours, 2);
                             }
 
-                            // Status
+                            // Status calculation based on actual schedule (official or approved change)
                             $status = '-';
                             $badgeClass = 'bg-gray-100 text-gray-800';
 
                             if ($timeIn) {
-                                $inTime = strtotime("$logDate " . date('H:i:s', strtotime($timeIn)));
-                                $standardIn = strtotime("$logDate " . date('H:i:s', strtotime('+15 minutes', strtotime($schedule_in))));
-                                $sched_out = strtotime("$logDate " . date('H:i:s', strtotime($schedule_out)));
-                                $actual_out = $timeOut ? strtotime("$logDate " . date('H:i:s', strtotime($timeOut))) : $sched_out;
+                                // Use 24-hour format for accurate comparison
+                                $actualTimeIn = date('H:i:s', strtotime($timeIn));
+                                $actualTimeOut = $timeOut ? date('H:i:s', strtotime($timeOut)) : null;
+                                
+                                // Calculate grace period (15 minutes after scheduled time in)
+                                $scheduledTimeIn = $schedule_in_24h;
+                                $graceTimeIn = date('H:i:s', strtotime($scheduledTimeIn . ' +15 minutes'));
+                                $scheduledTimeOut = $schedule_out_24h;
 
-                                if ($inTime <= $standardIn) {
+                                // Check if on time (within 15-minute grace period)
+                                if ($actualTimeIn <= $graceTimeIn) {
                                     $status = 'On Time';
                                     $badgeClass = 'bg-green-100 text-green-800';
                                 } else {
@@ -267,7 +279,8 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                     $badgeClass = 'bg-yellow-100 text-yellow-800';
                                 }
 
-                                if ($actual_out < $sched_out) {
+                                // Check for early departure
+                                if ($actualTimeOut && $actualTimeOut < $scheduledTimeOut) {
                                     $status = 'Left Early';
                                     $badgeClass = 'bg-red-100 text-red-800';
                                 }
@@ -286,8 +299,18 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= $formattedDate ?></td>
                             <td class="px-6 py-4 text-sm text-gray-500"><?= $dayName ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-500"><?= $timeInDisplay ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-500"><?= $timeOutDisplay ?></td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                <?= $timeInDisplay ?>
+                                <div class="text-xs text-gray-400 mt-1">
+                                    Sched: <?= $schedule_in ?>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                <?= $timeOutDisplay ?>
+                                <div class="text-xs text-gray-400 mt-1">
+                                    Sched: <?= $schedule_out ?>
+                                </div>
+                            </td>
                             <td class="px-6 py-4 text-sm text-gray-500"><?= $hoursWorked ?></td>
                             <td class="px-6 py-4 text-sm text-gray-500"><?= $overtimeDisplay ?></td>
                             <td class="px-6 py-4">

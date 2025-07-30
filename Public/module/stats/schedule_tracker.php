@@ -21,15 +21,15 @@ $default_schedule_id = $employee['official_sched'] ?? 4;
 
 // Hardcoded schedule times
 $schedule_times = [
-    3 => ['in' => '07:30 AM', 'out' => '04:30 PM'],
-    4 => ['in' => '07:00 AM', 'out' => '04:00 PM'],
-    5 => ['in' => '08:00 AM', 'out' => '05:00 PM'],
-    6 => ['in' => '09:00 AM', 'out' => '06:00 PM'],
-    7 => ['in' => '10:00 AM', 'out' => '07:00 PM'],
-    8 => ['in' => '06:00 AM', 'out' => '03:00 PM'],
-    9 => ['in' => '08:00 AM', 'out' => '04:30 PM'],
-    10 => ['in' => '07:40 AM', 'out' => '04:40 PM'],
-    11 => ['in' => '06:30 AM', 'out' => '03:00 PM'],
+    3 => ['in' => '07:30:00', 'out' => '16:30:00'],
+    4 => ['in' => '07:00:00', 'out' => '16:00:00'],
+    5 => ['in' => '08:00:00', 'out' => '17:00:00'],
+    6 => ['in' => '09:00:00', 'out' => '18:00:00'],
+    7 => ['in' => '10:00:00', 'out' => '19:00:00'],
+    8 => ['in' => '06:00:00', 'out' => '15:00:00'],
+    9 => ['in' => '08:00:00', 'out' => '16:30:00'],
+    10 => ['in' => '07:40:00', 'out' => '16:40:00'],
+    11 => ['in' => '06:30:00', 'out' => '15:00:00'],
 ];
 
 $today = date('Y-m-d');
@@ -95,9 +95,11 @@ if ($currentActiveSchedule) {
     }
 }
 
-// Final schedule
-$sched_time_in  = $schedule_times[$schedule_id_to_use]['in'] ?? 'N/A';
-$sched_time_out = $schedule_times[$schedule_id_to_use]['out'] ?? 'N/A';
+// Final schedule - convert to display format
+$sched_time_in_24h = $schedule_times[$schedule_id_to_use]['in'] ?? '07:00:00';
+$sched_time_out_24h = $schedule_times[$schedule_id_to_use]['out'] ?? '16:00:00';
+$sched_time_in  = date('h:i A', strtotime($sched_time_in_24h));
+$sched_time_out = date('h:i A', strtotime($sched_time_out_24h));
 
 // Determine UI badge color
 $color = match ($schedule_status) {
