@@ -173,7 +173,7 @@ $adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                                 <?php if (!empty($adj['attachment'])): ?>
-                                                    <a href="../Public/uploads/time_adjustments/<?= urlencode(htmlspecialchars($adj['attachment'])) ?>" 
+                                                    <a href="../uploads/time_adjustments/<?= $adj['attachment'] ?>" 
                                                        target="_blank" 
                                                        class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs hover:bg-blue-200 transition">
                                                         <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

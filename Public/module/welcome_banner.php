@@ -78,7 +78,8 @@ try {
                     <?php if ($unreadAnnouncements > 0): ?>
                         <button
                             class="bg-white text-blue-800 px-7 py-3 rounded-xl font-semibold hover:bg-opacity-90 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl flex items-center space-x-3 group"
-                            onclick="showSection('newsFeedView')"
+                            onclick="handleUnreadClick(this)"
+                            id="unreadBtn"
                         >
                             <div class="relative">
                                 <i class="fas fa-bell text-lg group-hover:animate-pulse"></i>
@@ -92,20 +93,10 @@ try {
                         <button
                             class="bg-white bg-opacity-20 text-white px-7 py-3 rounded-xl font-semibold hover:bg-opacity-30 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 border-2 border-white border-opacity-30"
                             onclick="showSection('newsFeedView')"
+                            id="caughtUpBtn"
                         >
                             <i class="fas fa-check-circle text-lg text-green-300"></i>
                             <span class="text-base">All caught up! View News Feed</span>
-                        </button>
-                    <?php endif; ?>
-                    
-                    <?php if ($unreadAnnouncements > 0): ?>
-                        <button
-                            class="bg-white bg-opacity-15 text-white px-5 py-3 rounded-xl font-medium hover:bg-opacity-25 transition-all duration-300 flex items-center space-x-2 border border-white border-opacity-30 backdrop-blur-sm"
-                            onclick="markAllAsRead()"
-                            id="markAllBtn"
-                        >
-                            <i class="fas fa-check-double text-sm"></i>
-                            <span class="text-sm">Mark All Read</span>
                         </button>
                     <?php endif; ?>
                 </div>
@@ -188,8 +179,6 @@ try {
 </style>
 
 <script>
-// Function to mark all announcements as read
-
 // Function to mark all announcements as read
 function markAllAsRead() {
     const btn = document.getElementById('markAllBtn');
@@ -279,6 +268,52 @@ function markAnnouncementAsRead(announcementId) {
     })
     .catch(error => {
         console.error('Error marking as read:', error);
+    });
+}
+
+function handleUnreadClick(btn) {
+    btn.classList.add('loading');
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = `
+        <i class="fas fa-spinner fa-spin text-sm"></i>
+        <span class="text-sm">Marking...</span>
+    `;
+    fetch('mark_all_read.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            action: 'mark_all_read',
+            csrf_token: '<?= $_SESSION['csrf_token'] ?? '' ?>'
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Change button to caught up state
+            btn.classList.remove('loading');
+            btn.className = "bg-white bg-opacity-20 text-white px-7 py-3 rounded-xl font-semibold hover:bg-opacity-30 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 border-2 border-white border-opacity-30";
+            btn.innerHTML = `
+                <i class="fas fa-check-circle text-lg text-green-300"></i>
+                <span class="text-base">All caught up! View News Feed</span>
+            `;
+            setTimeout(() => {
+                showSection('newsFeedView');
+            }, 500);
+        } else {
+            throw new Error(data.error || 'Unknown error');
+        }
+    })
+    .catch(error => {
+        alert('Failed to mark announcements as read: ' + error.message);
+        btn.classList.remove('loading');
+        btn.innerHTML = originalContent;
     });
 }
 </script>
