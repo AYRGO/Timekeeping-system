@@ -37,7 +37,7 @@ if ($time_in && $time_out) {
     $hours -= 1; // Deduct 1 hour for lunch break
     if ($hours < 0) $hours = 0; // Prevent negative hours
     $workingDuration = number_format($hours, 2) . ' hours';
-    if ($hours > 8) $overtimeDetected = true; // Overtime if more than 8 working hours (after lunch deduction)
+    if ($hours > 7.75) $overtimeDetected = true; // Overtime if more than 8 working hours (after lunch deduction)
 }
 
 // Handle Overtime Request
@@ -290,7 +290,7 @@ $end_dt = (new DateTime('@' . $end_ot))->setTimezone($tz);
   <label class="block text-sm font-medium text-gray-700 mb-1">Attachment <span class="text-red-500">*</span></label>
   <input 
     type="file" 
-    name="attachment_lr" 
+    name="attachment" 
     accept=".pdf,.jpg,.jpeg,.png"
     required
     class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
