@@ -216,7 +216,7 @@ function getStatusBadge($status) {
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             <?php if (!empty($ot['attachment_ot'])): ?>
-                                                <a href="../uploads/overtime_attachments/<?= htmlspecialchars($ot['attachment_ot']) ?>"
+                                                <a href="../module/<?= htmlspecialchars($ot['attachment_ot']) ?>"
                                                    target="_blank"
                                                    class="inline-flex items-center text-blue-600 hover:text-blue-800">
                                                     <i class="fas fa-paperclip mr-1"></i>View
