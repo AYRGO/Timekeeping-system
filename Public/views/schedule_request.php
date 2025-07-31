@@ -55,6 +55,45 @@ function getScheduleTime($schedule_id) {
         default: return 'N/A';
     }
 }
+
+// Helper: Get current schedule for an employee (same logic as schedule_tracker.php)
+function getCurrentScheduleForEmployee($employee_id, $pdo) {
+    // Hardcoded schedule times
+    $schedule_times = [
+        3 => ['in' => '07:30:00', 'out' => '16:30:00'],
+        4 => ['in' => '07:00:00', 'out' => '16:00:00'],
+        5 => ['in' => '08:00:00', 'out' => '17:00:00'],
+        6 => ['in' => '09:00:00', 'out' => '18:00:00'],
+        7 => ['in' => '10:00:00', 'out' => '19:00:00'],
+        8 => ['in' => '06:00:00', 'out' => '15:00:00'],
+        9 => ['in' => '08:00:00', 'out' => '16:30:00'],
+        10 => ['in' => '07:40:00', 'out' => '16:40:00'],
+        11 => ['in' => '06:30:00', 'out' => '15:00:00'],
+    ];
+    $today = date('Y-m-d');
+    // Get official_sched
+    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+    $default_schedule_id = $employee['official_sched'] ?? 4;
+    // Check for active approved schedule
+    $stmt = $pdo->prepare("
+        SELECT work_schedule_id, start_date, end_date
+        FROM post_schedule_change_requests
+        WHERE employee_id = ? AND status = 'Approved'
+        AND ? BETWEEN start_date AND end_date
+        ORDER BY created_at DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $today]);
+    $active = $stmt->fetch(PDO::FETCH_ASSOC);
+    $schedule_id = $active ? ($active['work_schedule_id'] ?? $default_schedule_id) : $default_schedule_id;
+    $sched = $schedule_times[$schedule_id] ?? ['in' => '07:00:00', 'out' => '16:00:00'];
+    return [
+        'id' => $schedule_id,
+        'display' => date('g:i A', strtotime($sched['in'])) . ' – ' . date('g:i A', strtotime($sched['out']))
+    ];
+}
 ?>
 
 <!DOCTYPE html>
@@ -141,10 +180,8 @@ function getScheduleTime($schedule_id) {
                                     if ($requested_shift === 'N/A' && $sr['time_in'] && $sr['time_out']) {
                                         $requested_shift = date('g:i A', strtotime($sr['time_in'])) . ' – ' . date('g:i A', strtotime($sr['time_out']));
                                     }
-                                    
-                                    // Get current schedule time
-                                    $current_shift = getScheduleTime($sr['current_work_schedule_id']);
-                                    
+                                    // Get current schedule from tracker logic
+                                    $current_sched = getCurrentScheduleForEmployee($sr['employee_id'], $pdo);
                                     // Calculate period duration
                                     $start = new DateTime($sr['start_date']);
                                     $end = new DateTime($sr['end_date']);
@@ -165,14 +202,10 @@ function getScheduleTime($schedule_id) {
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 text-sm text-gray-900">
-                                            <?php if (!empty($sr['current_work_schedule_id'])): ?>
-                                                <div class="flex flex-col">
-                                                    <span class="font-medium text-red-600">Schedule <?= $sr['current_work_schedule_id'] ?>:</span>
-                                                    <span class="text-sm"><?= $current_shift ?></span>
-                                                </div>
-                                            <?php else: ?>
-                                                <span class="text-gray-400 italic">Not recorded</span>
-                                            <?php endif; ?>
+                                            <div class="flex flex-col">
+                                                <span class="font-medium text-red-600">Schedule <?= $current_sched['id'] ?>:</span>
+                                                <span class="text-sm"><?= $current_sched['display'] ?></span>
+                                            </div>
                                         </td>
                                         <td class="px-6 py-4 text-sm text-gray-900">
                                             <div class="flex flex-col">

@@ -99,14 +99,6 @@
             </div>
           </div>
 
-          <!-- Info Banner -->
-          <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-            <div class="flex items-center">
-              <i class="fas fa-info-circle text-green-600 mr-3"></i>
-              <span class="text-green-700 font-medium">Requests are processed within 3-5 business days.</span>
-            </div>
-          </div>
-
           <!-- Submit Button -->
           <div class="flex justify-center pt-6 border-t border-gray-100">
             <button type="submit" id="submitBtn"
