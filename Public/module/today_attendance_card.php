@@ -1,4 +1,3 @@
-
 <?php
 
 date_default_timezone_set('Asia/Manila');
@@ -35,8 +34,10 @@ if ($time_in && $time_out) {
     $end = new DateTime($time_out);
     $diff = $start->diff($end);
     $hours = $diff->h + ($diff->i / 60);
+    $hours -= 1; // Deduct 1 hour for lunch break
+    if ($hours < 0) $hours = 0; // Prevent negative hours
     $workingDuration = number_format($hours, 2) . ' hours';
-    if ($hours > 9.5) $overtimeDetected = true;
+    if ($hours > 8) $overtimeDetected = true; // Overtime if more than 8 working hours (after lunch deduction)
 }
 
 // Handle Overtime Request
