@@ -4,7 +4,7 @@ require_once __DIR__ . '/env.php';
 
 // Database configuration from environment variables
 $host = EnvLoader::get('DB_HOST', 'localhost');
-$dbname = EnvLoader::get('DB_NAME', 'rss2');  // Temporary fallback until env is working
+$dbname = EnvLoader::get('DB_NAME', 'rss');  // Temporary fallback until env is working
 $username = EnvLoader::get('DB_USER', 'root');
 $password = EnvLoader::get('DB_PASS', '');
 
