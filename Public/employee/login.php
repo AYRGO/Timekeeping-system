@@ -59,7 +59,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
-    if ($user && $user['password'] === $password) {
+    // Check password - handle both hashed and plain text passwords
+    $password_valid = false;
+    if ($user) {
+        // First try password_verify for hashed passwords (new method)
+        if (password_verify($password, $user['password'])) {
+            $password_valid = true;
+        } 
+        // If that fails, try direct comparison for plain text passwords (legacy method)
+        else if ($user['password'] === $password) {
+            $password_valid = true;
+            
+            // Optional: Update to hashed password for security
+            // This will automatically upgrade plain text passwords to hashed ones
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $update_stmt = $pdo->prepare("UPDATE employees SET password = ? WHERE id = ?");
+            $update_stmt->execute([$hashed_password, $user['id']]);
+        }
+    }
+
+    if ($user && $password_valid) {
         // Success
         unset($_SESSION['login_attempts'][$username]);
         session_regenerate_id(true);

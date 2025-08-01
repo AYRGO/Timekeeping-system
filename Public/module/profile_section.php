@@ -143,7 +143,7 @@
         <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
           <h3 class="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
           <div class="space-y-3">
-            <button class="w-full text-left bg-gray-50 hover:bg-blue-50 p-4 rounded-xl transition-all duration-200 group">
+            <button onclick="openPasswordModal()" class="w-full text-left bg-gray-50 hover:bg-blue-50 p-4 rounded-xl transition-all duration-200 group">
               <div class="flex items-center">
                 <div class="bg-blue-100 group-hover:bg-blue-200 p-2 rounded-lg mr-3">
                   <i class="fas fa-key text-blue-600 text-sm"></i>
@@ -427,6 +427,114 @@
   </div>
 </div>
 
+<!-- Change Password Modal -->
+<div id="change-password-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+  <div class="bg-white rounded-2xl p-8 w-11/12 md:w-1/2 lg:w-1/3 shadow-2xl">
+    <!-- Header -->
+    <div class="flex items-center mb-6">
+      <div class="bg-blue-100 p-3 rounded-xl mr-4">
+        <i class="fas fa-key text-blue-600 text-xl"></i>
+      </div>
+      <div>
+        <h4 class="text-2xl font-bold text-gray-900">Change Password</h4>
+        <p class="text-gray-600">Update your account security</p>
+      </div>
+    </div>
+    
+    <form id="change-password-form" method="POST" action="update_profile.php">
+      <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+      <input type="hidden" name="password_only" value="1">
+
+      <!-- Current Password -->
+      <div class="mb-6">
+        <label for="pwd_current_password" class="block text-sm font-semibold text-gray-700 mb-2">
+          <i class="fas fa-lock mr-2 text-gray-500"></i>Current Password
+        </label>
+        <input 
+          type="password" 
+          id="pwd_current_password" 
+          name="current_password" 
+          required 
+          class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200" 
+          placeholder="Enter your current password"
+        >
+      </div>
+
+      <!-- New Password -->
+      <div class="mb-6">
+        <label for="pwd_new_password" class="block text-sm font-semibold text-gray-700 mb-2">
+          <i class="fas fa-key mr-2 text-gray-500"></i>New Password
+        </label>
+        <input 
+          type="password" 
+          id="pwd_new_password" 
+          name="new_password" 
+          required 
+          minlength="6"
+          class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200" 
+          placeholder="Enter new password (minimum 6 characters)"
+        >
+        <div class="mt-2">
+          <div class="flex items-center text-xs text-gray-500">
+            <i class="fas fa-info-circle mr-1"></i>
+            Password must be at least 6 characters long
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirm New Password -->
+      <div class="mb-6">
+        <label for="pwd_confirm_password" class="block text-sm font-semibold text-gray-700 mb-2">
+          <i class="fas fa-check-circle mr-2 text-gray-500"></i>Confirm New Password
+        </label>
+        <input 
+          type="password" 
+          id="pwd_confirm_password" 
+          name="confirm_password" 
+          required 
+          class="w-full border-2 border-gray-300 rounded-xl p-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200" 
+          placeholder="Confirm your new password"
+        >
+        <div id="password-match-indicator" class="mt-2 text-xs hidden">
+          <span id="password-match-text"></span>
+        </div>
+      </div>
+
+      <!-- Security Tips -->
+      <div class="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+        <div class="flex items-start">
+          <i class="fas fa-shield-alt text-yellow-600 text-lg mr-3 mt-1"></i>
+          <div>
+            <h5 class="font-semibold text-yellow-800 mb-2">Security Tips</h5>
+            <ul class="text-sm text-yellow-700 space-y-1">
+              <li>• Use a mix of letters, numbers, and symbols</li>
+              <li>• Avoid using personal information</li>
+              <li>• Don't reuse passwords from other accounts</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button 
+          type="button" 
+          onclick="closePasswordModal()" 
+          class="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-all duration-200 font-semibold"
+        >
+          <i class="fas fa-times mr-2"></i>Cancel
+        </button>
+        <button 
+          type="submit" 
+          class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold shadow-lg"
+        >
+          <i class="fas fa-save mr-2"></i>Update Password
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 function handleFileUpload(input) {
     if (input.files && input.files[0]) {
@@ -529,4 +637,117 @@ function showNotification(message, type) {
         }, 300);
     }, 3000);
 }
+
+// Profile modal functions
+function openEditModal() {
+    document.getElementById('edit-profile-modal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+    document.getElementById('edit-profile-modal').classList.add('hidden');
+}
+
+// Password modal functions
+function openPasswordModal() {
+    document.getElementById('change-password-modal').classList.remove('hidden');
+    // Clear form when opening
+    document.getElementById('change-password-form').reset();
+    hidePasswordMatchIndicator();
+}
+
+function closePasswordModal() {
+    document.getElementById('change-password-modal').classList.add('hidden');
+    // Clear form when closing
+    document.getElementById('change-password-form').reset();
+    hidePasswordMatchIndicator();
+}
+
+// Password validation functions
+function hidePasswordMatchIndicator() {
+    document.getElementById('password-match-indicator').classList.add('hidden');
+}
+
+function showPasswordMatchIndicator(isMatch, message) {
+    const indicator = document.getElementById('password-match-indicator');
+    const text = document.getElementById('password-match-text');
+    
+    indicator.classList.remove('hidden');
+    text.textContent = message;
+    
+    if (isMatch) {
+        text.className = 'text-green-600';
+        text.innerHTML = '<i class="fas fa-check mr-1"></i>' + message;
+    } else {
+        text.className = 'text-red-600';
+        text.innerHTML = '<i class="fas fa-times mr-1"></i>' + message;
+    }
+}
+
+// Real-time password validation
+document.addEventListener('DOMContentLoaded', function() {
+    const newPasswordField = document.getElementById('pwd_new_password');
+    const confirmPasswordField = document.getElementById('pwd_confirm_password');
+    
+    function validatePasswordMatch() {
+        const newPassword = newPasswordField.value;
+        const confirmPassword = confirmPasswordField.value;
+        
+        if (confirmPassword === '') {
+            hidePasswordMatchIndicator();
+            return;
+        }
+        
+        if (newPassword === confirmPassword) {
+            showPasswordMatchIndicator(true, 'Passwords match');
+        } else {
+            showPasswordMatchIndicator(false, 'Passwords do not match');
+        }
+    }
+    
+    newPasswordField.addEventListener('input', validatePasswordMatch);
+    confirmPasswordField.addEventListener('input', validatePasswordMatch);
+});
+
+// Form validation - simplified for profile only
+document.getElementById('edit-profile-form').addEventListener('submit', function(e) {
+    // No password validation needed here anymore - just submit
+});
+
+// Password form validation
+document.getElementById('change-password-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const currentPassword = document.getElementById('pwd_current_password').value;
+    const newPassword = document.getElementById('pwd_new_password').value;
+    const confirmPassword = document.getElementById('pwd_confirm_password').value;
+    
+    // Validate all fields are filled
+    if (!currentPassword) {
+        showNotification('Please enter your current password.', 'error');
+        return;
+    }
+    
+    if (!newPassword) {
+        showNotification('Please enter a new password.', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showNotification('New password must be at least 6 characters long.', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showNotification('New password and confirm password do not match.', 'error');
+        return;
+    }
+    
+    if (currentPassword === newPassword) {
+        showNotification('New password must be different from current password.', 'error');
+        return;
+    }
+    
+    // If validation passes, submit the form
+    this.submit();
+});
 </script>
