@@ -229,7 +229,7 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
         
         <main class="flex-1 p-6 overflow-y-auto">
             <!-- Container with max width for centering -->
-            <div class="max-w-8xl mx-auto">
+            <div class="max-w-10xl mx-auto">
                 <div class="flex gap-6 justify-center">
                     <!-- Left Spacer (hidden on smaller screens) -->
                     <div class="w-70 hidden xl:block"></div>
