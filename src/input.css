@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+/* Custom CSS for Bugardi Theme */
+:root {
+  --color-bugardi-50: #fff7ed;
+  --color-bugardi-100: #ffedd5;
+  --color-bugardi-200: #fed7aa;
+  --color-bugardi-300: #fdba74;
+  --color-bugardi-400: #fb923c;
+  --color-bugardi-500: #f97316;
+  --color-bugardi-600: #ea580c;
+  --color-bugardi-700: #c2410c;
+  --color-bugardi-800: #9a3412;
+  --color-bugardi-900: #7c2d12;
+  --color-bugardi-950: #431407;
+}
+
+/* Custom Components for Bugardi */
+.sidebar-orange-gradient { 
+  background: linear-gradient(to bottom, var(--color-bugardi-600), #b91c1c) !important; 
+}
+
+.sidebar-orange-500 { 
+  background-color: var(--color-bugardi-500) !important; 
+}
+
+.sidebar-orange-400 { 
+  background-color: var(--color-bugardi-400) !important; 
+}
+
+.sidebar-orange-border { 
+  border-color: var(--color-bugardi-500) !important; 
+}
+
+.sidebar-text-orange-200 { 
+  color: var(--color-bugardi-200) !important; 
+}
+
+.sidebar-text-orange-100 { 
+  color: var(--color-bugardi-100) !important; 
+}
+
+.sidebar-text-orange-600 { 
+  color: var(--color-bugardi-600) !important; 
+}
+
+.sidebar-hover-orange:hover { 
+  background-color: var(--color-bugardi-500) !important; 
+}
+
+/* Bugardi Button Components */
+.btn-bugardi {
+  background-color: var(--color-bugardi-600);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.btn-bugardi:hover {
+  background-color: var(--color-bugardi-700);
+}
+
+.btn-bugardi-outline {
+  border: 1px solid var(--color-bugardi-600);
+  color: var(--color-bugardi-600);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.btn-bugardi-outline:hover {
+  background-color: var(--color-bugardi-600);
+  color: white;
+}
+
+/* Card Components */
+.card-bugardi {
+  background: linear-gradient(to right, var(--color-bugardi-500), #dc2626);
+  color: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+}
+
+/* Status Badges */
+.badge-active {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.badge-inactive {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.badge-new {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+/* Utility Classes */
+.text-bugardi {
+  color: var(--color-bugardi-600) !important;
+}
+
+.bg-bugardi {
+  background-color: var(--color-bugardi-600) !important;
+}
+
+.bg-bugardi-50 { background-color: var(--color-bugardi-50) !important; }
+.bg-bugardi-100 { background-color: var(--color-bugardi-100) !important; }
+.bg-bugardi-200 { background-color: var(--color-bugardi-200) !important; }
+.bg-bugardi-300 { background-color: var(--color-bugardi-300) !important; }
+.bg-bugardi-400 { background-color: var(--color-bugardi-400) !important; }
+.bg-bugardi-500 { background-color: var(--color-bugardi-500) !important; }
+.bg-bugardi-600 { background-color: var(--color-bugardi-600) !important; }
+.bg-bugardi-700 { background-color: var(--color-bugardi-700) !important; }
+
+.text-bugardi-50 { color: var(--color-bugardi-50) !important; }
+.text-bugardi-100 { color: var(--color-bugardi-100) !important; }
+.text-bugardi-200 { color: var(--color-bugardi-200) !important; }
+.text-bugardi-300 { color: var(--color-bugardi-300) !important; }
+.text-bugardi-400 { color: var(--color-bugardi-400) !important; }
+.text-bugardi-500 { color: var(--color-bugardi-500) !important; }
+.text-bugardi-600 { color: var(--color-bugardi-600) !important; }
+.text-bugardi-700 { color: var(--color-bugardi-700) !important; }
+
+.border-bugardi {
+  border-color: var(--color-bugardi-600) !important;
+}
+
+.hover\:bg-bugardi-700:hover {
+  background-color: var(--color-bugardi-700) !important;
+}
+
+.hover\:bg-bugardi-600:hover {
+  background-color: var(--color-bugardi-600) !important;
+}

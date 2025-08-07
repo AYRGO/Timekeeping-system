@@ -164,7 +164,7 @@ function sort_link($column, $label) {
                                 <p class="text-gray-600">
                                     <i class="fas fa-users text-blue-500 mr-2"></i>
                                     Manage your organization's workforce
-                                    <span class="ml-4 text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+                                    <span class="ml-4 text-sm bg-blue-100 text-white-800 px-3 py-1 rounded-full">
                                         <?= $totalEmployees ?> Total Employees
                                     </span>
                                 </p>

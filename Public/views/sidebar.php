@@ -160,6 +160,15 @@ try {
                     </div>
                     <span class="font-medium">Announcements</span>
                 </a>
+
+                <a href="generate_scott_link.php" 
+                   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'generate_scott_link.php') ? 'bg-white bg-opacity-5 border border-gray-700': 'hover:bg-gray-800 hover:shadow-md' ?>">
+                    <div class="w-8 h-8 rounded-lg bg-purple-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
+                        <i class="fas fa-external-link-alt text-purple-400 text-sm"></i>
+                    </div>
+                    <span class="font-medium">Scott's OT Link</span>
+                    <div class="bg-blue-500 text-white text-xs rounded-full px-2 py-0.5 font-bold text-[10px] ml-1">NEW</div>
+                </a>
             </div>
         </nav>
 
