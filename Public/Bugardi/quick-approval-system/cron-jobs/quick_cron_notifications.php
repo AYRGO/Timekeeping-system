@@ -1,11 +1,11 @@
 <?php
 /**
- * Cron Job for Scott Notifications
+ * Cron Job for Quick Notifications
  * Run this daily to send automatic reminders
  * 
  * Setup Instructions:
  * 1. Add to your server's crontab:
- *    0 9 * * 1-5 /usr/bin/php /path/to/your/project/Public/Bugardi/scott_cron_notifications.php
+ *    0 9 * * 1-5 /usr/bin/php /path/to/your/project/Public/Bugardi/quick_cron_notifications.php
  *    (This runs Monday-Friday at 9 AM)
  * 
  * 2. For Windows Task Scheduler:

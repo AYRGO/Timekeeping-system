@@ -15,8 +15,13 @@ include('../config/db.php');
 $employee_id = $_GET['employee_id'] ?? '';
 $date_filter = $_GET['date_filter'] ?? ''; // Default to show all dates
 
+// Pagination settings
+$recordsPerPage = 15;
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$offset = ($page - 1) * $recordsPerPage;
+
 // Build query conditions
-$where_conditions = ["LOWER(e.company) = 'bugardi'"];
+$where_conditions = ["LOWER(TRIM(e.company)) = 'bugardi'"];
 $params = [];
 
 if ($employee_id) {
@@ -31,8 +36,20 @@ if ($date_filter) {
 
 $where_clause = implode(' AND ', $where_conditions);
 
-// Fetch time logs
-$stmt = $pdo->prepare("
+// Get total count for pagination
+$count_stmt = $pdo->prepare("
+    SELECT COUNT(*) as total_count
+    FROM time_logs tl
+    JOIN employees e ON tl.employee_id = e.id
+    WHERE $where_clause
+");
+$count_stmt->execute($params);
+$totalCountResult = $count_stmt->fetch(PDO::FETCH_ASSOC);
+$totalRecords = $totalCountResult['total_count'];
+$totalPages = ceil($totalRecords / $recordsPerPage);
+
+// Fetch time logs with pagination
+$query = "
     SELECT 
         tl.*,
         e.fname, e.lname, e.position, e.company
@@ -40,15 +57,23 @@ $stmt = $pdo->prepare("
     JOIN employees e ON tl.employee_id = e.id
     WHERE $where_clause
     ORDER BY tl.log_date DESC, tl.time_in DESC
-");
-$stmt->execute($params);
-$time_logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    LIMIT $recordsPerPage OFFSET $offset
+";
+
+if (empty($params)) {
+    $stmt = $pdo->query($query);
+    $time_logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    $time_logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Get list of Bugardi employees for filter dropdown
 $emp_stmt = $pdo->query("
     SELECT id, fname, lname, position 
     FROM employees 
-    WHERE LOWER(company) = 'bugardi' 
+    WHERE LOWER(TRIM(company)) = 'bugardi' 
     ORDER BY fname, lname
 ");
 $employees = $emp_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -83,7 +108,7 @@ $employees = $emp_stmt->fetchAll(PDO::FETCH_ASSOC);
                             <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg px-4 py-2">
                                 <div class="flex items-center text-white">
                                     <i class="fas fa-clock mr-2"></i>
-                                    <span class="font-semibold"><?= count($time_logs) ?> Records</span>
+                                    <span class="font-semibold"><?= $totalRecords ?> Total Records</span>
                                 </div>
                             </div>
                         </div>
@@ -112,14 +137,16 @@ $employees = $emp_stmt->fetchAll(PDO::FETCH_ASSOC);
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
                             <p class="text-xs text-gray-500 mt-1">Leave empty to show all dates</p>
                         </div>
-                        <div class="flex items-end space-x-2">
-                            <button type="submit" class="flex-1 bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition-colors">
-                                <i class="fas fa-search mr-2"></i>Filter
-                            </button>
-                            <a href="time_logs.php" class="flex-1 bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-center">
-                                <i class="fas fa-times mr-2"></i>Clear
-                            </a>
-                            </button>
+                        <div class="flex flex-col">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
+                            <div class="flex space-x-2">
+                                <button type="submit" class="flex-1 bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition-colors text-sm">
+                                    <i class="fas fa-search mr-2"></i>Filter
+                                </button>
+                                <a href="time_logs.php" class="flex-1 bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors text-center text-sm">
+                                    <i class="fas fa-times mr-2"></i>Clear
+                                </a>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -226,6 +253,38 @@ $employees = $emp_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Pagination Controls -->
+                <?php if ($totalPages > 1): ?>
+                <div class="mt-6 flex justify-between items-center">
+                    <div class="text-sm text-gray-700">
+                        Showing <?= min($offset + 1, $totalRecords) ?> to <?= min($offset + $recordsPerPage, $totalRecords) ?> of <?= $totalRecords ?> time logs
+                    </div>
+                    
+                    <div class="flex space-x-1">
+                        <?php if ($page > 1): ?>
+                            <a href="?employee_id=<?= urlencode($employee_id) ?>&date_filter=<?= urlencode($date_filter) ?>&page=<?= $page - 1 ?>" 
+                               class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-500 hover:bg-gray-50">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                            <a href="?employee_id=<?= urlencode($employee_id) ?>&date_filter=<?= urlencode($date_filter) ?>&page=<?= $i ?>" 
+                               class="px-3 py-2 border rounded-md text-sm <?= $i == $page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50' ?>">
+                                <?= $i ?>
+                            </a>
+                        <?php endfor; ?>
+                        
+                        <?php if ($page < $totalPages): ?>
+                            <a href="?employee_id=<?= urlencode($employee_id) ?>&date_filter=<?= urlencode($date_filter) ?>&page=<?= $page + 1 ?>" 
+                               class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-500 hover:bg-gray-50">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
 
             </main>
         </div>

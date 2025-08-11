@@ -20,7 +20,7 @@ if ($_POST['action'] ?? '' === 'delete' && isset($_POST['request_id'])) {
         $deleteStmt = $pdo->prepare("
             DELETE ot FROM overtime_requests ot
             JOIN employees e ON ot.employee_id = e.id
-            WHERE ot.id = ? AND LOWER(e.company) = 'bugardi'
+            WHERE ot.id = ? AND LOWER(TRIM(e.company)) = 'bugardi'
         ");
         
         if ($deleteStmt->execute([$requestId])) {
@@ -33,7 +33,23 @@ if ($_POST['action'] ?? '' === 'delete' && isset($_POST['request_id'])) {
     }
 }
 
-// Fetch all overtime requests for Bugardi (both pending and processed)
+// Pagination settings
+$recordsPerPage = 15;
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$offset = ($page - 1) * $recordsPerPage;
+
+// Get total count for pagination
+$countStmt = $pdo->query("
+    SELECT COUNT(*) as total_count
+    FROM overtime_requests o
+    JOIN employees e ON o.employee_id = e.id
+    WHERE LOWER(TRIM(e.company)) = 'bugardi'
+");
+$totalCountResult = $countStmt->fetch(PDO::FETCH_ASSOC);
+$totalRecords = $totalCountResult['total_count'];
+$totalPages = ceil($totalRecords / $recordsPerPage);
+
+// Fetch overtime requests for Bugardi with pagination
 $stmt = $pdo->query("
     SELECT 
         o.id, o.date, o.start_time, o.end_time, o.reason, o.status, 
@@ -41,8 +57,9 @@ $stmt = $pdo->query("
         e.fname, e.lname, e.company
     FROM overtime_requests o
     JOIN employees e ON o.employee_id = e.id
-    WHERE LOWER(e.company) = 'bugardi'
+    WHERE LOWER(TRIM(e.company)) = 'bugardi'
     ORDER BY o.created_at DESC
+    LIMIT $recordsPerPage OFFSET $offset
 ");
 
 $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -307,6 +324,38 @@ function getStatusBadge($status) {
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Pagination Controls -->
+                <?php if ($totalPages > 1): ?>
+                <div class="mt-6 flex justify-between items-center">
+                    <div class="text-sm text-gray-700">
+                        Showing <?= min($offset + 1, $totalRecords) ?> to <?= min($offset + $recordsPerPage, $totalRecords) ?> of <?= $totalRecords ?> requests
+                    </div>
+                    
+                    <div class="flex space-x-1">
+                        <?php if ($page > 1): ?>
+                            <a href="?page=<?= $page - 1 ?>" 
+                               class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-500 hover:bg-gray-50">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                            <a href="?page=<?= $i ?>" 
+                               class="px-3 py-2 border rounded-md text-sm <?= $i == $page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50' ?>">
+                                <?= $i ?>
+                            </a>
+                        <?php endfor; ?>
+                        
+                        <?php if ($page < $totalPages): ?>
+                            <a href="?page=<?= $page + 1 ?>" 
+                               class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-500 hover:bg-gray-50">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
 
             </main>
         </div>

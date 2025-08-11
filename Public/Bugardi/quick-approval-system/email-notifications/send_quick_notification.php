@@ -1,11 +1,11 @@
 <?php
 /**
- * Send Scott Notification Endpoint
- * Handles AJAX requests to send notifications to Scott
+ * Send Quick Notification Endpoint
+ * Handles AJAX requests to send notifications to Quick
  */
 
 require_once '../config/db.php';
-require_once 'scott_notifications.php';
+require_once 'quick_notifications.php';
 
 // Set content type for JSON response
 header('Content-Type: application/json');
@@ -38,13 +38,13 @@ try {
     $pendingCount = $result['pending_count'];
     
     if ($pendingCount > 0) {
-        $notifier = new ScottNotificationSystem($pdo);
+        $notifier = new QuickNotificationSystem($pdo);
         $success = $notifier->sendWeeklyReminder();
         
         if ($success) {
             echo json_encode([
                 'success' => true, 
-                'message' => "Notification sent to Scott about $pendingCount pending request(s)"
+                'message' => "Notification sent to Quick about $pendingCount pending request(s)"
             ]);
         } else {
             echo json_encode([
@@ -60,7 +60,7 @@ try {
     }
     
 } catch (Exception $e) {
-    error_log("Scott notification error: " . $e->getMessage());
+    error_log("Quick notification error: " . $e->getMessage());
     echo json_encode([
         'success' => false, 
         'message' => 'Server error occurred while sending notification'

@@ -1,6 +1,6 @@
 <?php
 /**
- * Scott Notification System for OT Requests
+ * Quick Notification System for OT Requests
  * Sends email notifications when new OT requests are submitted
  */
 
@@ -38,16 +38,16 @@ function loadEnv($path) {
 // Load environment variables
 loadEnv(__DIR__ . '/../../.env');
 
-class ScottNotificationSystem {
+class QuickNotificationSystem {
     private $pdo;
-    private $scottEmail = 'cedrickarnigo1723@gmail.com'; // Scott's email - updated for testing
+    private $quickEmail = 'cedrickarnigo1723@gmail.com'; // Quick's email - updated for testing
     
     public function __construct($pdo) {
         $this->pdo = $pdo;
     }
     
     /**
-     * Send notification to Scott about new OT requests
+     * Send notification to Quick about new OT requests
      */
     public function sendNewOTNotification($requestId, $employeeName, $date, $reason, $duration) {
         $mail = new PHPMailer(true);
@@ -64,7 +64,7 @@ class ScottNotificationSystem {
             
             // Recipients
             $mail->setFrom($_ENV['SMTP_FROM_EMAIL'] ?? 'it.resourcestaff@gmail.com', $_ENV['SMTP_FROM_NAME'] ?? 'Bugardi Timekeeping System');
-            $mail->addAddress($this->scottEmail, 'Scott');
+            $mail->addAddress($this->quickEmail, 'Quick');
             
             // Generate approval links
             $approveLink = $this->generateQuickApprovalLink($requestId, 'approve');
@@ -85,7 +85,7 @@ class ScottNotificationSystem {
             return true;
             
         } catch (Exception $e) {
-            error_log("Scott notification failed: {$mail->ErrorInfo}");
+            error_log("Quick notification failed: {$mail->ErrorInfo}");
             return false;
         }
     }
@@ -94,7 +94,7 @@ class ScottNotificationSystem {
      * Generate quick approval links with tokens
      */
     private function generateQuickApprovalLink($requestId, $action) {
-        $secret = 'scott-ot-quick-approval-2025';
+        $secret = 'quick-ot-quick-approval-2025';
         $token = hash('sha256', $requestId . $action . $secret . date('Y-m-d'));
         
         // Get base URL - use localhost as fallback for command line testing
@@ -103,15 +103,15 @@ class ScottNotificationSystem {
     }
     
     /**
-     * Generate Scott's main view link
+     * Generate Quick's main view link
      */
     private function generateViewLink() {
-        $secret = 'scott-ot-approval-bugardi-temporary-2025';
-        $token = hash('sha256', 'scott-temporary' . $secret . date('Y-m-d'));
+        $secret = 'quick-ot-approval-bugardi-temporary-2025';
+        $token = hash('sha256', 'quick-temporary' . $secret . date('Y-m-d'));
         
         // Get base URL - use localhost as fallback for command line testing
         $baseUrl = $this->getBaseUrl();
-        return $baseUrl . '/Timekeeping-system/Public/Bugardi/scott_ot_approval.php?token=' . $token . '&type=temporary';
+        return $baseUrl . '/Timekeeping-system/Public/Bugardi/quick_ot_approval.php?token=' . $token . '&type=temporary';
     }
     
     /**
@@ -163,7 +163,7 @@ class ScottNotificationSystem {
                 </div>
                 
                 <div class='content'>
-                    <p>Hi Scott,</p>
+                    <p>Hi Quick,</p>
                     
                     <p>A new overtime request has been submitted and requires your approval:</p>
                     
@@ -240,7 +240,7 @@ class ScottNotificationSystem {
             $mail->Port       = $_ENV['SMTP_PORT'] ?? 587;
             
             $mail->setFrom($_ENV['SMTP_FROM_EMAIL'] ?? 'it.resourcestaff@gmail.com', $_ENV['SMTP_FROM_NAME'] ?? 'Bugardi Timekeeping System');
-            $mail->addAddress($this->scottEmail, 'Scott');
+            $mail->addAddress($this->quickEmail, 'Quick');
             
             $viewLink = $this->generateViewLink();
             
@@ -312,7 +312,7 @@ class ScottNotificationSystem {
                 
                 <div class='content'>
                     <div class='summary'>
-                        <p style='margin: 0 0 10px 0; font-size: 18px; color: #374151;'><strong>Hi Scott,</strong></p>
+                        <p style='margin: 0 0 10px 0; font-size: 18px; color: #374151;'><strong>Hi Quick,</strong></p>
                         <p style='margin: 0; color: #6b7280;'>You have</p>
                         <div class='count'>$pendingCount</div>
                         <p style='margin: 0; color: #6b7280; font-size: 16px;'>pending overtime request" . ($pendingCount > 1 ? 's' : '') . " waiting for your approval</p>
@@ -345,7 +345,7 @@ class ScottNotificationSystem {
  * Function to trigger notification when new OT request is created
  * Call this from your OT request creation form
  */
-function notifyScottNewOTRequest($requestId) {
+function notifyQuickNewOTRequest($requestId) {
     global $pdo;
     
     // Get request details
@@ -362,7 +362,7 @@ function notifyScottNewOTRequest($requestId) {
     $request = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($request) {
-        $notifier = new ScottNotificationSystem($pdo);
+        $notifier = new QuickNotificationSystem($pdo);
         $notifier->sendNewOTNotification(
             $request['id'],
             $request['employee_name'],

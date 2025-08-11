@@ -17,15 +17,40 @@ $isHistoryView = ($view === 'history');
 
 $pageTitle = $isHistoryView ? 'Overtime Requests History - Bugardi' : 'Overtime Requests - Bugardi';
 
-// Get pending requests count for Scott notification
+// Pagination settings
+$recordsPerPage = 10;
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$offset = ($page - 1) * $recordsPerPage;
+
+// Get pending requests count for Quick notification
 $pendingStmt = $pdo->query("
     SELECT COUNT(*) as pending_count
     FROM overtime_requests ot
     JOIN employees e ON ot.employee_id = e.id
-    WHERE ot.status = 'pending' AND LOWER(e.company) = 'bugardi'
+    WHERE ot.status = 'pending' AND LOWER(TRIM(e.company)) = 'bugardi'
 ");
 $pendingResult = $pendingStmt->fetch(PDO::FETCH_ASSOC);
 $pendingCount = $pendingResult['pending_count'];
+
+// Get total count for pagination
+if ($isHistoryView) {
+    $countStmt = $pdo->query("
+        SELECT COUNT(*) as total_count
+        FROM post_overtime_requests por
+        JOIN employees e ON por.employee_id = e.id
+        WHERE LOWER(TRIM(e.company)) = 'bugardi'
+    ");
+} else {
+    $countStmt = $pdo->query("
+        SELECT COUNT(*) as total_count
+        FROM overtime_requests o
+        JOIN employees e ON o.employee_id = e.id
+        WHERE o.status = 'pending' AND LOWER(TRIM(e.company)) = 'bugardi'
+    ");
+}
+$totalCountResult = $countStmt->fetch(PDO::FETCH_ASSOC);
+$totalRecords = $totalCountResult['total_count'];
+$totalPages = ceil($totalRecords / $recordsPerPage);
 
 // Fetch overtime requests with employee names and time logs (filtered for Bugardi company)
 if ($isHistoryView) {
@@ -38,8 +63,9 @@ if ($isHistoryView) {
             e.fname, e.lname, e.company
         FROM post_overtime_requests por
         JOIN employees e ON por.employee_id = e.id
-        WHERE LOWER(e.company) = 'bugardi'
+        WHERE LOWER(TRIM(e.company)) = 'bugardi'
         ORDER BY por.created_at DESC
+        LIMIT $recordsPerPage OFFSET $offset
     ");
 } else {
     // Fetch from overtime_requests table (current requests) - only pending for Bugardi company
@@ -53,8 +79,9 @@ if ($isHistoryView) {
         FROM overtime_requests o
         JOIN employees e ON o.employee_id = e.id
         LEFT JOIN time_logs t ON o.employee_id = t.employee_id AND o.date = t.log_date
-        WHERE o.status = 'pending' AND LOWER(e.company) = 'bugardi'
+        WHERE o.status = 'pending' AND LOWER(TRIM(e.company)) = 'bugardi'
         ORDER BY o.created_at DESC
+        LIMIT $recordsPerPage OFFSET $offset
     ");
 }
 
@@ -135,7 +162,7 @@ function getStatusBadge($status) {
                                class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= $isHistoryView ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
                                 <i class="fas fa-history mr-2"></i>History
                             </a>
-                            <a href="scott-approval-system/admin-tools/generate_acceess_link.php" 
+                            <a href="quick-approval-system/admin-tools/generate_access_link.php" 
                                class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-purple-600 text-white hover:bg-purple-700 relative">
                                 <i class="fas fa-link mr-2"></i>Generate Access Link
                                 <?php if ($pendingCount > 0): ?>
@@ -301,6 +328,38 @@ function getStatusBadge($status) {
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Pagination Controls -->
+                <?php if ($totalPages > 1): ?>
+                <div class="mt-6 flex justify-between items-center">
+                    <div class="text-sm text-gray-700">
+                        Showing <?= min($offset + 1, $totalRecords) ?> to <?= min($offset + $recordsPerPage, $totalRecords) ?> of <?= $totalRecords ?> results
+                    </div>
+                    
+                    <div class="flex space-x-1">
+                        <?php if ($page > 1): ?>
+                            <a href="?view=<?= $view ?>&page=<?= $page - 1 ?>" 
+                               class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-500 hover:bg-gray-50">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                            <a href="?view=<?= $view ?>&page=<?= $i ?>" 
+                               class="px-3 py-2 border rounded-md text-sm <?= $i == $page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50' ?>">
+                                <?= $i ?>
+                            </a>
+                        <?php endfor; ?>
+                        
+                        <?php if ($page < $totalPages): ?>
+                            <a href="?view=<?= $view ?>&page=<?= $page + 1 ?>" 
+                               class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-500 hover:bg-gray-50">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- Summary Cards -->
                 <?php if (!empty($overtime_requests)): ?>

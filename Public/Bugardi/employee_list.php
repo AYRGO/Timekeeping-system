@@ -11,7 +11,22 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
-// Fetch Bugardi employees
+// Pagination settings
+$recordsPerPage = 10;
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$offset = ($page - 1) * $recordsPerPage;
+
+// Get total count for pagination
+$countStmt = $pdo->query("
+    SELECT COUNT(*) as total_count
+    FROM employees e
+    WHERE LOWER(TRIM(e.company)) = 'bugardi'
+");
+$totalCountResult = $countStmt->fetch(PDO::FETCH_ASSOC);
+$totalRecords = $totalCountResult['total_count'];
+$totalPages = ceil($totalRecords / $recordsPerPage);
+
+// Fetch Bugardi employees with pagination
 $stmt = $pdo->query("
     SELECT 
         e.id, e.fname, e.lname, e.email, e.contact, e.position, e.company,
@@ -21,12 +36,20 @@ $stmt = $pdo->query("
         MAX(tl.log_date) as last_attendance
     FROM employees e
     LEFT JOIN time_logs tl ON e.id = tl.employee_id
-    WHERE LOWER(e.company) = 'bugardi'
+    WHERE LOWER(TRIM(e.company)) = 'bugardi'
     GROUP BY e.id, e.fname, e.lname, e.email, e.contact, e.position, e.company, e.created_at
     ORDER BY e.fname, e.lname
+    LIMIT $recordsPerPage OFFSET $offset
 ");
 
 $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Debug information - check if there are any employees
+error_log("Total records: " . $totalRecords);
+error_log("Current page: " . $page);
+error_log("Records per page: " . $recordsPerPage);
+error_log("Offset: " . $offset);
+error_log("Employee count fetched: " . count($employees));
 ?>
 
 <!DOCTYPE html>
@@ -250,6 +273,38 @@ $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Pagination Controls -->
+                <?php if ($totalPages > 1): ?>
+                <div class="mt-6 flex justify-between items-center">
+                    <div class="text-sm text-gray-700">
+                        Showing <?= min($offset + 1, $totalRecords) ?> to <?= min($offset + $recordsPerPage, $totalRecords) ?> of <?= $totalRecords ?> employees
+                    </div>
+                    
+                    <div class="flex space-x-1">
+                        <?php if ($page > 1): ?>
+                            <a href="?page=<?= $page - 1 ?>" 
+                               class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-500 hover:bg-gray-50">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                            <a href="?page=<?= $i ?>" 
+                               class="px-3 py-2 border rounded-md text-sm <?= $i == $page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50' ?>">
+                                <?= $i ?>
+                            </a>
+                        <?php endfor; ?>
+                        
+                        <?php if ($page < $totalPages): ?>
+                            <a href="?page=<?= $page + 1 ?>" 
+                               class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-500 hover:bg-gray-50">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
 
             </main>
         </div>

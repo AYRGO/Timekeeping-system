@@ -1,6 +1,6 @@
 <?php
 /**
- * Special OT Approval Page for Scott - Enhanced Version
+ * Special OT Approval Page for Quick - Enhanced Version
  * Supports both permanent and temporary access tokens
  */
 
@@ -8,17 +8,17 @@ require_once '../config/db.php';
 
 // Token verification functions
 function verifyTemporaryToken($token, $date = null) {
-    $secret = 'scott-ot-approval-bugardi-2025';
+    $secret = 'quick-ot-approval-bugardi-2025';
     $date = $date ?: date('Y-m-d');
-    $expectedToken = hash('sha256', 'scott' . $date . $secret);
-    $yesterdayToken = hash('sha256', 'scott' . date('Y-m-d', strtotime('-1 day')) . $secret);
+    $expectedToken = hash('sha256', 'quick' . $date . $secret);
+    $yesterdayToken = hash('sha256', 'quick' . date('Y-m-d', strtotime('-1 day')) . $secret);
     
     return hash_equals($expectedToken, $token) || hash_equals($yesterdayToken, $token);
 }
 
 function verifyPermanentToken($token) {
-    $secret = 'scott-ot-approval-bugardi-permanent-2025';
-    $expectedToken = hash('sha256', 'scott-permanent' . $secret);
+    $secret = 'quick-ot-approval-bugardi-permanent-2025';
+    $expectedToken = hash('sha256', 'quick-permanent' . $secret);
     
     return hash_equals($expectedToken, $token);
 }
@@ -42,7 +42,7 @@ if (!$isValidToken) {
     <html>
     <head>
         <title>Access Denied</title>
-        <link href="../../src/output.css" rel="stylesheet">
+        <link href="../../../../src/output.css" rel="stylesheet">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     </head>
     <body class="bg-red-50 min-h-screen flex items-center justify-center">
@@ -153,8 +153,8 @@ $rejectedCount = count(array_filter($overtime_requests, fn($req) => $req['status
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bugardi OT Approval - Scott</title>
-    <link href="../../src/output.css" rel="stylesheet">
+    <title>Bugardi OT Approval - Quick</title>
+    <link href="../../../../src/output.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -169,7 +169,7 @@ $rejectedCount = count(array_filter($overtime_requests, fn($req) => $req['status
                         Bugardi Overtime Approval
                     </h1>
                     <div class="flex items-center space-x-3 mt-1">
-                        <p class="text-gray-600">Manager Dashboard - Scott</p>
+                        <p class="text-gray-600">Manager Dashboard - Quick</p>
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?= $tokenType === 'permanent' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800' ?>">
                             <i class="fas <?= $tokenType === 'permanent' ? 'fa-infinity' : 'fa-clock' ?> mr-1"></i>
                             <?= $accessType ?>
@@ -182,34 +182,6 @@ $rejectedCount = count(array_filter($overtime_requests, fn($req) => $req['status
             </div>
         </div>
     </header>
-
-    <!-- Notification Banner for Pending Requests -->
-    <?php if ($pendingCount > 0): ?>
-    <div class="bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-400 p-4">
-        <div class="container mx-auto">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-bell text-yellow-600 text-xl animate-pulse"></i>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm font-medium text-yellow-800">
-                            You have <strong><?= $pendingCount ?></strong> pending overtime request<?= $pendingCount > 1 ? 's' : '' ?> waiting for approval.
-                        </p>
-                        <p class="text-xs text-yellow-700 mt-1">
-                            <i class="fas fa-clock mr-1"></i>These requests need your attention to keep the team's schedules on track.
-                        </p>
-                    </div>
-                </div>
-                <div class="flex-shrink-0">
-                    <button onclick="scrollToPendingRequests()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                        <i class="fas fa-arrow-down mr-1"></i>Review Now
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
 
     <!-- Success/Error Message -->
     <?php if (isset($message)): ?>
@@ -385,31 +357,24 @@ $rejectedCount = count(array_filter($overtime_requests, fn($req) => $req['status
                             <td class="px-6 py-4">
                                 <?php if ($request['status'] === 'Pending'): ?>
                                 <div class="flex space-x-2">
-                                    <form method="POST" class="inline-block" onsubmit="return confirmApproval('<?= htmlspecialchars($request['employee_name']) ?>', '<?= date('M d, Y', strtotime($request['date'])) ?>', '<?= $request['duration_hours'] ?> hrs')">
+                                    <form method="POST" class="inline-block" onsubmit="return confirm('Are you sure you want to APPROVE this overtime request?')">
                                         <input type="hidden" name="action" value="approve">
                                         <input type="hidden" name="request_id" value="<?= $request['id'] ?>">
-                                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-md transition duration-200 flex items-center">
-                                            <i class="fas fa-check mr-2"></i>Approve
+                                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded-md transition duration-200">
+                                            <i class="fas fa-check mr-1"></i>Approve
                                         </button>
                                     </form>
                                     
-                                    <form method="POST" class="inline-block" onsubmit="return confirmRejection('<?= htmlspecialchars($request['employee_name']) ?>', '<?= date('M d, Y', strtotime($request['date'])) ?>')">
+                                    <form method="POST" class="inline-block" onsubmit="return confirm('Are you sure you want to REJECT this overtime request?')">
                                         <input type="hidden" name="action" value="reject">
                                         <input type="hidden" name="request_id" value="<?= $request['id'] ?>">
-                                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-2 rounded-md transition duration-200 flex items-center">
-                                            <i class="fas fa-times mr-2"></i>Reject
+                                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded-md transition duration-200">
+                                            <i class="fas fa-times mr-1"></i>Reject
                                         </button>
                                     </form>
                                 </div>
                                 <?php else: ?>
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-sm text-gray-500 flex items-center">
-                                        <i class="fas fa-check-circle mr-1 text-green-500"></i>Processed
-                                    </span>
-                                    <span class="text-xs text-gray-400">
-                                        <?= date('M d', strtotime($request['created_at'])) ?>
-                                    </span>
-                                </div>
+                                <span class="text-sm text-gray-500">Processed</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -434,54 +399,6 @@ $rejectedCount = count(array_filter($overtime_requests, fn($req) => $req['status
             <p class="text-sm mt-2">Secure Access • Updated in Real-time • <?= $accessType ?></p>
         </div>
     </footer>
-
-    <script>
-        function scrollToPendingRequests() {
-            const table = document.querySelector('table');
-            if (table) {
-                table.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                // Highlight pending rows briefly
-                const pendingRows = document.querySelectorAll('tr');
-                pendingRows.forEach(row => {
-                    if (row.innerHTML.includes('bg-yellow-100')) {
-                        row.style.backgroundColor = '#fef3c7';
-                        setTimeout(() => {
-                            row.style.backgroundColor = '';
-                        }, 3000);
-                    }
-                });
-            }
-        }
-        
-        function confirmApproval(employeeName, date, duration) {
-            return confirm(`🟢 APPROVE OVERTIME REQUEST\n\nEmployee: ${employeeName}\nDate: ${date}\nDuration: ${duration}\n\nAre you sure you want to approve this request?`);
-        }
-        
-        function confirmRejection(employeeName, date) {
-            return confirm(`🔴 REJECT OVERTIME REQUEST\n\nEmployee: ${employeeName}\nDate: ${date}\n\nAre you sure you want to reject this request?\n\nNote: The employee will be notified of the rejection.`);
-        }
-        
-        // Auto-refresh every 5 minutes to show new requests
-        setInterval(function() {
-            // Only refresh if user is not actively interacting
-            if (document.hidden === false) {
-                const lastActivity = localStorage.getItem('lastActivity') || 0;
-                const now = Date.now();
-                if (now - lastActivity > 300000) { // 5 minutes
-                    window.location.reload();
-                }
-            }
-        }, 300000);
-        
-        // Track user activity
-        document.addEventListener('click', function() {
-            localStorage.setItem('lastActivity', Date.now());
-        });
-        
-        document.addEventListener('scroll', function() {
-            localStorage.setItem('lastActivity', Date.now());
-        });
-    </script>
 
 </body>
 </html>

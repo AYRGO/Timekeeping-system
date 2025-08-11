@@ -1,6 +1,6 @@
 <?php
 /**
- * Generate Special Access Links for Scott - Enhanced Version
+ * Generate Special Access Links for Quick - Enhanced Version
  * Admin tool to create secure access links with permanent and temporary options
  */
 
@@ -12,16 +12,16 @@ if ($_POST['action'] ?? false) {
     
     if ($linkType === 'permanent') {
         // Generate permanent token (valid indefinitely)
-        $secret = 'scott-ot-approval-bugardi-permanent-2025';
-        $permanentToken = hash('sha256', 'scott-permanent' . $secret);
+        $secret = 'quick-ot-approval-bugardi-permanent-2025';
+        $permanentToken = hash('sha256', 'quick-permanent' . $secret);
         $generatedLink = getPermanentLink($permanentToken);
         $linkExpiry = 'Never expires';
         $linkDescription = 'Permanent Access Link';
     } else {
         // Generate temporary token (valid for 24 hours)
-        $secret = 'scott-ot-approval-bugardi-2025';
+        $secret = 'quick-ot-approval-bugardi-2025';
         $date = date('Y-m-d');
-        $temporaryToken = hash('sha256', 'scott' . $date . $secret);
+        $temporaryToken = hash('sha256', 'quick' . $date . $secret);
         $generatedLink = getTemporaryLink($temporaryToken);
         $linkExpiry = 'Expires in 24 hours (' . date('M d, Y g:i A', strtotime('+1 day')) . ')';
         $linkDescription = 'Temporary Access Link';
@@ -30,12 +30,12 @@ if ($_POST['action'] ?? false) {
 
 function getPermanentLink($token) {
     $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
-    return $baseUrl . '/Timekeeping-system/Public/Bugardi/scott_ot_approval.php?token=' . $token . '&type=permanent';
+    return $baseUrl . '/Timekeeping-system/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $token . '&type=permanent';
 }
 
 function getTemporaryLink($token) {
     $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
-    return $baseUrl . '/Timekeeping-system/Public/Bugardi/scott_ot_approval.php?token=' . $token . '&type=temporary';
+    return $baseUrl . '/Timekeeping-system/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $token . '&type=temporary';
 }
 
 // Get current statistics
@@ -57,7 +57,7 @@ $emailConfigured = !empty($_ENV['SMTP_HOST']) && !empty($_ENV['SMTP_USER']) && !
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scott's OT Access Links - Bugardi</title>
+    <title>Quick's OT Access Links - Bugardi</title>
     <link href="../../../../src/output.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -72,7 +72,7 @@ $emailConfigured = !empty($_ENV['SMTP_HOST']) && !empty($_ENV['SMTP_USER']) && !
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900 flex items-center">
                             <i class="fas fa-link text-blue-600 mr-3"></i>
-                            Scott's OT Access Links
+                            Quick's OT Access Links
                         </h1>
                         <p class="text-gray-600 mt-1">Generate secure access links for overtime request approval</p>
                     </div>
@@ -83,8 +83,8 @@ $emailConfigured = !empty($_ENV['SMTP_HOST']) && !empty($_ENV['SMTP_USER']) && !
                         </div>
                         <?php if ($pendingOT > 0): ?>
                         <div class="mt-2">
-                            <button onclick="sendNotificationToScott()" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md transition-colors">
-                                <i class="fas fa-bell mr-1"></i>Notify Scott
+                            <button onclick="sendNotificationToQuick()" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md transition-colors">
+                                <i class="fas fa-bell mr-1"></i>Notify Quick
                             </button>
                         </div>
                         <?php endif; ?>
@@ -98,7 +98,7 @@ $emailConfigured = !empty($_ENV['SMTP_HOST']) && !empty($_ENV['SMTP_USER']) && !
                             <?php else: ?>
                             <div class="text-xs text-red-600 flex items-center">
                                 <i class="fas fa-exclamation-circle mr-1"></i>
-                                <a href="test_scott_email.php" class="underline">Setup Email</a>
+                                <a href="test_quick_email.php" class="underline">Setup Email</a>
                             </div>
                             <?php endif; ?>
                         </div>
@@ -216,7 +216,7 @@ $emailConfigured = !empty($_ENV['SMTP_HOST']) && !empty($_ENV['SMTP_USER']) && !
 
                 <!-- Quick Actions -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <a href="mailto:scott@bugardi.com?subject=OT Approval Access&body=Hi Scott,%0A%0AHere's your secure link to approve overtime requests:%0A%0A<?= urlencode($generatedLink) ?>%0A%0A<?= urlencode($linkExpiry) ?>%0A%0ABest regards" 
+                    <a href="mailto:quick@bugardi.com?subject=OT Approval Access&body=Hi Quick,%0A%0AHere's your secure link to approve overtime requests:%0A%0A<?= urlencode($generatedLink) ?>%0A%0A<?= urlencode($linkExpiry) ?>%0A%0ABest regards" 
                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-md text-center transition duration-200 text-sm">
                         <i class="fas fa-envelope mr-2"></i>Send via Email
                     </a>
@@ -291,14 +291,14 @@ $emailConfigured = !empty($_ENV['SMTP_HOST']) && !empty($_ENV['SMTP_USER']) && !
         }
 
         function shareViaWhatsApp(link) {
-            const message = `Hi Scott,\n\nHere's your secure link to approve overtime requests:\n\n${link}\n\n<?= isset($linkExpiry) ? $linkExpiry : '' ?>\n\nBest regards`;
+            const message = `Hi Quick,\n\nHere's your secure link to approve overtime requests:\n\n${link}\n\n<?= isset($linkExpiry) ? $linkExpiry : '' ?>\n\nBest regards`;
             const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
         }
         
-        function sendNotificationToScott() {
-            if (confirm('Send an email notification to Scott about pending OT requests?')) {
-                fetch('send_scott_notification.php', {
+        function sendNotificationToQuick() {
+            if (confirm('Send an email notification to Quick about pending OT requests?')) {
+                fetch('send_quick_notification.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -308,7 +308,7 @@ $emailConfigured = !empty($_ENV['SMTP_HOST']) && !empty($_ENV['SMTP_USER']) && !
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert('✅ Notification sent to Scott successfully!');
+                        alert('✅ Notification sent to Quick successfully!');
                     } else {
                         alert('❌ Failed to send notification: ' + data.message);
                     }

@@ -1,6 +1,6 @@
 <?php
 /**
- * Quick Approval Handler for Scott's Email Links
+ * Quick Approval Handler for Quick's Email Links
  * Handles one-click approve/reject from email notifications
  */
 
@@ -18,7 +18,7 @@ if (!$requestId || !in_array($action, ['approve', 'reject']) || !$token) {
 }
 
 // Verify token
-$secret = 'scott-ot-quick-approval-2025';
+$secret = 'quick-ot-quick-approval-2025';
 $expectedToken = hash('sha256', $requestId . $action . $secret . date('Y-m-d'));
 
 if (!hash_equals($expectedToken, $token)) {
@@ -74,9 +74,9 @@ function showSuccess($action, $request) {
     $borderColor = $action === 'approve' ? 'border-green-200' : 'border-red-200';
     
     // Generate link back to main dashboard
-    $secret = 'scott-ot-approval-bugardi-temporary-2025';
-    $token = hash('sha256', 'scott-temporary' . $secret . date('Y-m-d'));
-    $dashboardLink = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/Timekeeping-system/Public/Bugardi/scott_ot_approval.php?token=' . $token . '&type=temporary';
+    $secret = 'quick-ot-approval-bugardi-temporary-2025';
+    $token = hash('sha256', 'quick-temporary' . $secret . date('Y-m-d'));
+    $dashboardLink = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/Timekeeping-system/Public/Bugardi/quick_ot_approval.php?token=' . $token . '&type=temporary';
     
     echo "
     <!DOCTYPE html>
@@ -85,7 +85,7 @@ function showSuccess($action, $request) {
         <meta charset='UTF-8'>
         <meta name='viewport' content='width=device-width, initial-scale=1.0'>
         <title>Request $actionText</title>
-        <link href='../../src/output.css' rel='stylesheet'>
+        <link href='../../../../src/output.css' rel='stylesheet'>
         <link href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css' rel='stylesheet'>
     </head>
     <body class='bg-gray-100 min-h-screen flex items-center justify-center'>
@@ -135,7 +135,7 @@ function showError($message) {
         <meta charset='UTF-8'>
         <meta name='viewport' content='width=device-width, initial-scale=1.0'>
         <title>Error</title>
-        <link href='../../src/output.css' rel='stylesheet'>
+        <link href='../../../../src/output.css' rel='stylesheet'>
         <link href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css' rel='stylesheet'>
     </head>
     <body class='bg-gray-100 min-h-screen flex items-center justify-center'>
