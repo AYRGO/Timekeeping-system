@@ -190,43 +190,52 @@ foreach ($adjust_results as $adjustment) {
     }
 }
 
-// --- Overtime Requests (from both tables) ---
+// --- Overtime Requests (from post_ot_requests table only) ---
 $ot_stmt = $pdo->prepare("
-    SELECT id, date, start_time, end_time, status, explanation, created_at, notified, 'pending' as source_table
-    FROM overtime_requests
-    WHERE employee_id = ?
-    UNION ALL
-    SELECT id, date, start_time, end_time, 'approved' as status, '' as explanation, created_at, notified, 'approved' as source_table
-    FROM post_overtime_requests
-    WHERE employee_id = ?
-    ORDER BY created_at DESC
+    SELECT id, time_log_id, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified
+    FROM post_ot_requests
+    WHERE employee_id = ? AND status IN ('Approved', 'Rejected') AND (approved_at IS NOT NULL OR status != 'Pending')
+    ORDER BY COALESCE(approved_at, created_at) DESC
     LIMIT 10
 ");
-$ot_stmt->execute([$current_user_id, $current_user_id]);
+$ot_stmt->execute([$current_user_id]);
 $ot_results = $ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($ot_results as $ot) {
-    $status = ucfirst($ot['status']);
-    $date = date('F j, Y', strtotime($ot['date']));
-    $message = "Overtime request on <strong>{$date}</strong> was <strong>{$status}</strong>.";
+    $status = ucfirst(strtolower($ot['status']));
+    $duration = number_format($ot['ot_duration'], 2);
+    $ot_type = $ot['ot_type'] ?? 'Regular OT';
+    
+    $message = "Overtime request for <strong>{$ot_type}</strong> ({$duration} hours) was <strong>{$status}</strong>.";
 
-    if (strtolower($ot['status']) === 'rejected' && !empty($ot['explanation'])) {
-        $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($ot['explanation']) . "</span>";
+    // Check if there's an admin note in the reason field
+    $admin_note = null;
+    if (strtolower($ot['status']) === 'rejected' && strpos($ot['reason'], '[Admin Note:') !== false) {
+        preg_match('/\[Admin Note: (.*?)\]/', $ot['reason'], $matches);
+        if (isset($matches[1])) {
+            $admin_note = trim($matches[1]);
+            $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($admin_note) . "</span>";
+        }
     }
 
-    $notifications[] = ['message' => $message, 'created_at' => $ot['created_at']];
+    $notifications[] = [
+        'message' => $message, 
+        'created_at' => $ot['approved_at'] ?? $ot['created_at']
+    ];
 
-    if (in_array(strtolower($ot['status']), ['approved', 'rejected']) && !$ot['notified'] && $ot['source_table'] === 'pending') {
+    // Send email notification ONLY for requests that haven't been notified yet
+    if (in_array(strtolower($ot['status']), ['approved', 'rejected']) && !$ot['notified']) {
         $subject = "Overtime Request $status";
-        $body = "<p>Hi {$employee['fname']},<br>Your overtime request on <strong>$date</strong> was <strong>$status</strong>.</p>";
+        $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$ot_type}</strong> ({$duration} hours) was <strong>$status</strong>.</p>";
 
-        if (!empty($ot['explanation'])) {
-            $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($ot['explanation'])) . "</p>";
+        if (strtolower($ot['status']) === 'rejected' && $admin_note) {
+            $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($admin_note)) . "</p>";
         }
 
         if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
-            $update = $pdo->prepare("UPDATE overtime_requests SET notified = 1 WHERE id = ?");
-            $update->execute([$ot['id']]);
+            // Mark as notified to prevent duplicate emails
+            $update_ot = $pdo->prepare("UPDATE post_ot_requests SET notified = 1 WHERE id = ?");
+            $update_ot->execute([$ot['id']]);
         }
     }
 }

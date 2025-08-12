@@ -9,20 +9,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leave_id'], $_POST['a
     $leave_id = intval($_POST['leave_id']);
     $action = $_POST['action'];
 
-    if (!in_array($action, ['approve', 'decline'])) {
+    if (!in_array($action, ['approve', 'decline', 'cancel'])) {
         $message = "Invalid action specified.";
     } else {
         try {
             $pdo->beginTransaction();
 
-            // Get the complete leave request data
-            $stmt = $pdo->prepare("SELECT * FROM leave_requests WHERE id = :id");
-            $stmt->execute(['id' => $leave_id]);
-            $leave_request = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($action === 'cancel') {
+                // Handle cancel action for approved leaves from post_leave_requests
+                $cancel_reason = trim($_POST['cancel_reason'] ?? '');
+                if (empty($cancel_reason)) {
+                    throw new Exception("Reason for cancellation is required.");
+                }
 
-            if (!$leave_request) {
-                throw new Exception("Leave request not found.");
-            }
+                // Get the leave request from post_leave_requests
+                $stmt = $pdo->prepare("SELECT * FROM post_leave_requests WHERE id = :id AND status = 'approved'");
+                $stmt->execute(['id' => $leave_id]);
+                $leave_request = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$leave_request) {
+                    throw new Exception("Approved leave request not found or cannot be cancelled.");
+                }
+
+                // Check if leave hasn't started yet
+                $today = new DateTime();
+                $startDate = new DateTime($leave_request['start_date']);
+                
+                if ($startDate <= $today) {
+                    throw new Exception("Cannot cancel leave request that has already started.");
+                }
+
+                $employee_id = $leave_request['employee_id'];
+                $leave_type = $leave_request['leave_type'];
+
+                // Calculate the number of days to restore
+                $start_date = new DateTime($leave_request['start_date']);
+                $end_date = new DateTime($leave_request['end_date']);
+                $requested_days = $start_date->diff($end_date)->days + 1;
+                
+                // Map leave types to their corresponding credit types and determine restoration amount
+                $restoration_amount = 1; // Default full day
+                $credit_type = $leave_type; // Default to same type
+                
+                // Map halfday and special types to their base credit types
+                switch ($leave_type) {
+                    case 'halfday':
+                        $credit_type = 'vacation';
+                        $restoration_amount = 0.5 * $requested_days;
+                        break;
+                    case 'halfday_sick':
+                        $credit_type = 'sick';
+                        $restoration_amount = 0.5 * $requested_days;
+                        break;
+                    case 'lwop':
+                        // LWOP doesn't affect credits
+                        $restoration_amount = 0;
+                        $credit_type = null;
+                        break;
+                    default:
+                        // Full day leave types (sick, vacation, paternity, maternity, solo_parent, bereavement)
+                        $credit_type = $leave_type;
+                        $restoration_amount = $requested_days;
+                        break;
+                }
+
+                // Restore the corresponding leave credit if applicable
+                if ($restoration_amount > 0 && $credit_type) {
+                    $stmt = $pdo->prepare("UPDATE leave_credits SET balance = balance + ? WHERE employee_id = ? AND leave_type = ? AND year = ?");
+                    $stmt->execute([
+                        $restoration_amount,
+                        $employee_id,
+                        $credit_type,
+                        date('Y')
+                    ]);
+                }
+
+                // Update the status to 'cancelled' and add cancellation reason
+                $stmt = $pdo->prepare("UPDATE post_leave_requests SET status = 'cancelled', explanation = ? WHERE id = ?");
+                $stmt->execute([$cancel_reason, $leave_id]);
+
+                $pdo->commit();
+                $message = "Leave request #$leave_id has been cancelled and leave credits have been restored.";
+
+            } else {
+                // Original logic for approve/decline actions
+                // Get the complete leave request data
+                $stmt = $pdo->prepare("SELECT * FROM leave_requests WHERE id = :id");
+                $stmt->execute(['id' => $leave_id]);
+                $leave_request = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$leave_request) {
+                    throw new Exception("Leave request not found.");
+                }
 
             if ($action === 'approve') {
                 $employee_id = $leave_request['employee_id'];
@@ -31,12 +109,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leave_id'], $_POST['a
                 // Update status
                 $leave_request['status'] = 'approved';
 
-                // Decrease the corresponding leave credit by 1
-                $stmt = $pdo->prepare("UPDATE leave_credits SET balance = balance - 1 WHERE employee_id = :employee_id AND leave_type = :leave_type");
-                $stmt->execute([
-                    'employee_id' => $employee_id,
-                    'leave_type' => $leave_type
-                ]);
+                // Map leave types to their corresponding credit types and determine deduction amount
+                $deduction_amount = 1; // Default full day
+                $credit_type = $leave_type; // Default to same type
+                
+                // Calculate the number of days requested
+                $start_date = new DateTime($leave_request['start_date']);
+                $end_date = new DateTime($leave_request['end_date']);
+                $requested_days = $start_date->diff($end_date)->days + 1;
+                
+                // Map halfday and special types to their base credit types
+                switch ($leave_type) {
+                    case 'halfday':
+                        $credit_type = 'vacation';
+                        $deduction_amount = 0.5 * $requested_days;
+                        break;
+                    case 'halfday_sick':
+                        $credit_type = 'sick';
+                        $deduction_amount = 0.5 * $requested_days;
+                        break;
+                    case 'lwop':
+                        // LWOP doesn't deduct from any credits
+                        $deduction_amount = 0;
+                        $credit_type = null;
+                        break;
+                    default:
+                        // Full day leave types (sick, vacation, paternity, maternity, solo_parent, bereavement)
+                        $credit_type = $leave_type;
+                        $deduction_amount = $requested_days;
+                        break;
+                }
+
+                // Decrease the corresponding leave credit if applicable
+                if ($deduction_amount > 0 && $credit_type) {
+                    $stmt = $pdo->prepare("UPDATE leave_credits SET balance = balance - ? WHERE employee_id = ? AND leave_type = ? AND year = ?");
+                    $stmt->execute([
+                        $deduction_amount,
+                        $employee_id,
+                        $credit_type,
+                        date('Y')
+                    ]);
+                }
 
             } elseif ($action === 'decline') {
                 $explanation = trim($_POST['explanation'] ?? '');
@@ -74,24 +187,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leave_id'], $_POST['a
             $stmt = $pdo->prepare("DELETE FROM leave_requests WHERE id = :id");
             $stmt->execute(['id' => $leave_id]);
 
-            // Create notification for the employee
-            $notification_message = $action === 'approve' 
-                ? "Your leave request has been approved by admin."
-                : "Your leave request has been declined by admin.";
-            
-            $stmt = $pdo->prepare("
-                INSERT INTO notifications (employee_id, message, type, created_at) 
-                VALUES (:employee_id, :message, 'leave_response', NOW())
-            ");
-            $stmt->execute([
-                'employee_id' => $leave_request['employee_id'],
-                'message' => $notification_message
-            ]);
-
             $pdo->commit();
 
             $action_text = $action === 'approve' ? 'approved' : 'declined';
             $message = "Leave request #$leave_id has been $action_text.";
+            }
 
         } catch (Exception $e) {
             $pdo->rollBack();

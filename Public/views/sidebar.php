@@ -17,8 +17,8 @@ try {
     $stmt->execute();
     $pendingScheduleCount = $stmt->fetchColumn();
 
-    // Overtime Requests
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM overtime_requests WHERE status = 'pending'");
+    // Overtime Requests - Updated to use post_ot_requests table and only count pending
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM post_ot_requests WHERE status = 'Pending'");
     $stmt->execute();
     $pendingOvertimeCount = $stmt->fetchColumn();
 

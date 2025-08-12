@@ -45,6 +45,7 @@ function getStatusBadge($status) {
         'approved' => 'bg-green-100 text-green-800',
         'pending' => 'bg-yellow-100 text-yellow-800',
         'rejected', 'declined' => 'bg-red-100 text-red-800',
+        'cancelled' => 'bg-orange-100 text-orange-800',
         default => 'bg-gray-100 text-gray-800'
     };
     
@@ -52,6 +53,7 @@ function getStatusBadge($status) {
         'approved' => 'fas fa-check',
         'pending' => 'fas fa-clock',
         'rejected', 'declined' => 'fas fa-times',
+        'cancelled' => 'fas fa-ban',
         default => 'fas fa-question'
     };
     
@@ -232,6 +234,30 @@ function getLeaveTypeBadge($type) {
                                                             class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm transition-colors">
                                                         <i class="fas fa-times mr-1"></i>Decline
                                                     </button>
+                                                    <form method="POST" action="process_leave_action.php" class="inline-block">
+                                                        <input type="hidden" name="leave_id" value="<?= $lr['id'] ?>">
+                                                        <input type="hidden" name="action" value="cancel">
+                                                        <button type="submit"
+                                                                onclick="return confirm('Are you sure you want to cancel this leave request? Leave credits will be restored.')"
+                                                                class="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 text-sm transition-colors">
+                                                            <i class="fas fa-ban mr-1"></i>Cancel
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            <?php elseif ($lr['status'] === 'approved'): ?>
+                                                <div class="flex space-x-2">
+                                                    <form method="POST" action="process_leave_action.php" class="inline-block">
+                                                        <input type="hidden" name="leave_id" value="<?= $lr['id'] ?>">
+                                                        <input type="hidden" name="action" value="cancel">
+                                                        <button type="submit"
+                                                                onclick="return confirm('Are you sure you want to cancel this approved leave request? Leave credits will be restored.')"
+                                                                class="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 text-sm transition-colors">
+                                                            <i class="fas fa-ban mr-1"></i>Cancel
+                                                        </button>
+                                                    </form>
+                                                    <span class="text-green-600 italic text-sm">
+                                                        <i class="fas fa-check-circle mr-1"></i>Approved
+                                                    </span>
                                                 </div>
                                             <?php else: ?>
                                                 <span class="text-gray-500 italic">
@@ -258,7 +284,7 @@ function getLeaveTypeBadge($type) {
                 <?php if (!empty($leave_requests)): ?>
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <?php
-                    $summary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'declined' => 0];
+                    $summary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'declined' => 0, 'cancelled' => 0];
                     $totalDays = 0;
                     foreach ($leave_requests as $req) {
                         $status = strtolower($req['status'] ?? 'pending');

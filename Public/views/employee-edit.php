@@ -237,7 +237,7 @@ function getStatusBadge($status) {
     }
 }
 
-$leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'halfday', 'halfday_sick', 'lwop', 'bereavement'];
+$leaveTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'bereavement'];
 
 // Schedule options
 $scheduleOptions = [
@@ -487,6 +487,8 @@ $scheduleOptions = [
 
                             foreach ($credits as $credit):
                                 $leaveType = $credit['leave_type'];
+                                // Skip halfday vacation, halfday sick, lwop, halfday
+                                if (in_array($leaveType, ['halfday_vacation', 'halfday_sick', 'lwop', 'halfday'])) continue;
                                 $label = ucwords(str_replace('_', ' ', $leaveType));
                             ?>
                             <div class="border border-gray-200 p-4 rounded-lg bg-gray-50">

@@ -190,13 +190,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['
 
     // ✅ Check leave credits BEFORE inserting
     if ($leaveType !== 'LWOP') {
+        // Map halfday types to their base credit types for validation
+        $creditTypeToCheck = $leaveType;
+        if ($leaveType === 'halfday') {
+            $creditTypeToCheck = 'vacation';
+        } elseif ($leaveType === 'halfday_sick') {
+            $creditTypeToCheck = 'sick';
+        }
+        
         $stmt = $pdo->prepare("
             SELECT balance FROM leave_credits 
             WHERE employee_id = :employee_id AND leave_type = :leave_type AND year = :year
         ");
         $stmt->execute([
             'employee_id' => $employee_id,
-            'leave_type'  => $leaveType,
+            'leave_type'  => $creditTypeToCheck,  // Use mapped credit type
             'year'        => date('Y')
         ]);
         $creditRow = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -205,12 +213,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['
         $endDate = new DateTime($end);
         $daysRequested = $startDate->diff($endDate)->days + 1; // Inclusive
 
+        // Calculate actual days needed based on leave type
+        $actualDaysNeeded = $daysRequested;
+        if ($leaveType === 'halfday' || $leaveType === 'halfday_sick') {
+            $actualDaysNeeded = $daysRequested * 0.5; // Half days
+        }
+
         if (!$creditRow) {
             header("Location: time_log_create.php?leave_request=no_credit_record");
             exit;
         }
 
-        if ($creditRow['balance'] < $daysRequested) {
+        if ($creditRow['balance'] < $actualDaysNeeded) {
             header("Location: time_log_create.php?leave_request=insufficient_credits");
             exit;
         }
@@ -404,6 +418,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment
             session_destroy();
             header("Location: ../employee/login.php");
             exit;
+        }
+
+        // Handle Overtime Request
+        if (isset($_POST['action']) && $_POST['action'] === 'overtime_request') {
+            $ot_type = $_POST['ot_type'] ?? '';
+            $ot_date = $_POST['ot_date'] ?? '';
+            $time_in = $_POST['time_in'] ?? '';
+            $time_out = $_POST['time_out'] ?? '';
+            $reason = trim($_POST['reason'] ?? '');
+
+            // Validate inputs
+            if (empty($ot_type) || empty($ot_date) || empty($time_in) || empty($time_out) || empty($reason)) {
+                header("Location: time_log_create.php?overtime=invalid_input");
+                exit;
+            }
+
+            // Validate time order
+            $timeInDate = new DateTime($ot_date . ' ' . $time_in);
+            $timeOutDate = new DateTime($ot_date . ' ' . $time_out);
+            
+            if ($timeOutDate <= $timeInDate) {
+                $timeOutDate->add(new DateInterval('P1D')); // Add 1 day for next day overtime
+            }
+
+            // Calculate OT duration (subtract 8 hours)
+            $diffSeconds = $timeOutDate->getTimestamp() - $timeInDate->getTimestamp();
+            $totalHours = $diffSeconds / 3600;
+            $otDuration = max(0, $totalHours - 8);
+
+            if ($otDuration <= 0) {
+                header("Location: time_log_create.php?overtime=no_overtime");
+                exit;
+            }
+
+            // Find corresponding time log
+            $stmt = $pdo->prepare("SELECT id FROM time_logs WHERE employee_id = ? AND log_date = ? AND time_in = ? AND time_out = ?");
+            $stmt->execute([$employee_id, $ot_date, $time_in, $time_out]);
+            $timeLog = $stmt->fetch();
+
+            $time_log_id = $timeLog['id'] ?? null;
+
+            // Insert overtime request
+            $stmt = $pdo->prepare("
+                INSERT INTO new_ot_requests (employee_id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
+            ");
+
+            $success = $stmt->execute([
+                $employee_id,
+                $time_log_id,
+                $time_in,
+                $time_out,
+                $otDuration,
+                $ot_type,
+                $reason
+            ]);
+
+            if ($success) {
+                header("Location: time_log_create.php?overtime=success");
+                exit;
+            } else {
+                header("Location: time_log_create.php?overtime=error");
+                exit;
+            }
         }
     }
 } catch (Exception $e) {
@@ -731,20 +809,48 @@ $announcementCount = $stmt->fetchColumn();
     <?php include 'leave_credits.php'; ?>
 </div>
 
+
+
 <?php include 'leave_request_form.php'; ?>
+
+<?php include 'new_overtime.php'; ?>
 
 <?php
 // PHP: Load leave credits for current user
 $leaveCredits = [];
 if (isset($_SESSION['employee']['id'])) {
     $empId = $_SESSION['employee']['id'];
+    
+    // Fetch all leave credit types for the current year
     $stmt = $pdo->prepare("SELECT leave_type, balance FROM leave_credits WHERE employee_id = ? AND year = ?");
     $stmt->execute([$empId, date('Y')]);
-    $leaveCredits = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    $credits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Convert to key-value pairs for easier JavaScript access
+    foreach ($credits as $credit) {
+        $leaveCredits[$credit['leave_type']] = floatval($credit['balance']);
+    }
+    
+    // Debug: Log what we found
+    error_log("Leave Credits for Employee $empId: " . print_r($leaveCredits, true));
+    
+    // Ensure all expected leave types have entries (default to 0 if missing)
+    $expectedTypes = ['sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'bereavement'];
+    foreach ($expectedTypes as $type) {
+        if (!isset($leaveCredits[$type])) {
+            $leaveCredits[$type] = 0;
+        }
+    }
 
     // Make sure to pass leaveCredits from the backend
 echo "<script>
-  const leaveCredits = " . json_encode($leaveCredits ?? []) . ";
+  const leaveCredits = " . json_encode($leaveCredits) . ";
+  console.log('Leave Credits loaded:', leaveCredits);
+</script>";
+} else {
+    echo "<script>
+  const leaveCredits = {};
+  console.log('No employee session found');
 </script>";
 }
 ?>
@@ -778,11 +884,25 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!selectedType) return;
 
         // Reset state
-        leaveBalanceDisplay.classList.remove("hidden", "text-green-600", "text-red-600", "text-blue-600");
+        leaveBalanceDisplay.classList.remove("hidden");
         enableSubmitButton();
 
-        // Get available balance
-        const balance = leaveCredits[selectedType] ?? 0;
+        // Map halfday types to their base credit types
+        let creditType = selectedType;
+        if (selectedType === 'halfday') {
+            creditType = 'vacation';
+        } else if (selectedType === 'halfday_sick') {
+            creditType = 'sick';
+        }
+
+        // Get available balance for the correct credit type
+        const balance = leaveCredits[creditType] ?? 0;
+        
+        // Debug logging
+        console.log('Selected Type:', selectedType);
+        console.log('Credit Type:', creditType);
+        console.log('Available Leave Credits:', leaveCredits);
+        console.log('Balance for', creditType, ':', balance);
 
         // Calculate requested days
         let requestedDays = 1;
@@ -792,50 +912,82 @@ document.addEventListener("DOMContentLoaded", function () {
                 const startDate = new Date(dates[0]);
                 const endDate = new Date(dates[1]);
                 const timeDiff = endDate.getTime() - startDate.getTime();
+
                 requestedDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
             }
         }
 
+        console.log('Requested Days:', requestedDays);
+
+        // Get the inner container and elements
+        const container = leaveBalanceDisplay.querySelector('div');
+        const icon = container.querySelector('i');
+        const textSpan = container.querySelector('span');
+
         // Handle different leave types
         if (selectedType === "lwop") {
-            leaveBalanceDisplay.classList.add("text-blue-600");
-            leaveBalanceDisplay.textContent = "ℹ️ Leave Without Pay doesn't require credits.";
+            // Update for LWOP (blue/info style)
+            container.className = "bg-blue-50 border border-blue-200 rounded-xl p-4";
+            icon.className = "fas fa-info-circle text-blue-600 mr-3";
+            textSpan.className = "text-blue-700 font-medium";
+            textSpan.textContent = "ℹ️ Leave Without Pay doesn't require credits.";
         } else if (selectedType === "halfday" || selectedType === "halfday_sick") {
             requestedDays = requestedDays * 0.5; // Half days
+            const displayType = creditType.replace('_', ' ').toUpperCase();
             if (balance < requestedDays) {
-                leaveBalanceDisplay.classList.add("text-red-600");
-                leaveBalanceDisplay.textContent = `❌ Not enough credits! You need ${requestedDays} day(s) but only have ${balance} day(s).`;
+                // Insufficient credits (red)
+                container.className = "bg-red-50 border border-red-200 rounded-xl p-4";
+                icon.className = "fas fa-exclamation-circle text-red-600 mr-3";
+                textSpan.className = "text-red-700 font-medium";
+                textSpan.textContent = `❌ Not enough ${displayType} credits! You need ${requestedDays} day(s) but only have ${balance} day(s).`;
                 disableSubmitButton();
             } else {
-                leaveBalanceDisplay.classList.add("text-green-600");
-                leaveBalanceDisplay.textContent = `✅ You have ${balance} day(s) available. `;
+                // Sufficient credits (green)
+                container.className = "bg-green-50 border border-green-200 rounded-xl p-4";
+                icon.className = "fas fa-check-circle text-green-600 mr-3";
+                textSpan.className = "text-green-700 font-medium";
+                textSpan.textContent = `✅ You have ${balance} ${displayType} day(s) available.`;
             }
         } else {
             if (balance < requestedDays) {
-                leaveBalanceDisplay.classList.add("text-red-600");
-                leaveBalanceDisplay.textContent = `❌ Not enough credits! You need ${requestedDays} day(s) but only have ${balance} day(s).`;
+                // Insufficient credits (red)
+                container.className = "bg-red-50 border border-red-200 rounded-xl p-4";
+                icon.className = "fas fa-exclamation-circle text-red-600 mr-3";
+                textSpan.className = "text-red-700 font-medium";
+                textSpan.textContent = `❌ Not enough credits! You need ${requestedDays} day(s) but only have ${balance} day(s).`;
                 disableSubmitButton();
             } else {
-                leaveBalanceDisplay.classList.add("text-green-600");
-                leaveBalanceDisplay.textContent = `✅ You have ${balance} day(s) available. `;
+                // Sufficient credits (green)
+                container.className = "bg-green-50 border border-green-200 rounded-xl p-4";
+                icon.className = "fas fa-check-circle text-green-600 mr-3";
+                textSpan.className = "text-green-700 font-medium";
+                textSpan.textContent = `✅ You have ${balance} day(s) available.`;
             }
         }
-
-        leaveBalanceDisplay.classList.remove("hidden");
     }
 
     function disableSubmitButton() {
         submitBtn.disabled = true;
         submitBtn.classList.remove("bg-green-600", "hover:bg-green-700");
         submitBtn.classList.add("opacity-50", "cursor-not-allowed", "bg-gray-400");
-        submitBtn.textContent = "Insufficient Leave Credits";
+        const btnText = submitBtn.querySelector('span');
+        if (btnText) {
+            btnText.textContent = "Insufficient Leave Credits";
+        } else {
+            submitBtn.textContent = "Insufficient Leave Credits";
+        }
     }
 
     function enableSubmitButton() {
         submitBtn.disabled = false;
         submitBtn.classList.remove("opacity-50", "cursor-not-allowed", "bg-gray-400");
         submitBtn.classList.add("bg-green-600", "hover:bg-green-700");
-        submitBtn.textContent = "Submit Request";
+        const btnText = submitBtn.querySelector('span');
+        if (btnText) {
+            btnText.textContent = "Submit Leave Request";
+        } else {
+            submitBtn.textContent = "Submit Request";
+        }
     }
 
     // Event listeners
@@ -858,7 +1010,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // ... keep all your existing code below this ...
     // Confirmation before submitting schedule change (if present)
     const scheduleForm = document.getElementById('scheduleChangeForm');
     if (scheduleForm) {
@@ -916,9 +1067,9 @@ document.addEventListener("DOMContentLoaded", function () {
     updateAllClocks();
     setInterval(updateAllClocks, 1000);
 });
-// Section toggle
+// Section toggle - Updated to include overtimeView
 function showSection(id) {
-    ['dashboardView', 'requestView', 'scheduleView', 'attendanceView', 'profileView' , 'newsFeedView', 'overtimeRequestView']
+    ['dashboardView', 'requestView', 'scheduleView', 'attendanceView', 'profileView', 'newsFeedView', 'overtimeView', 'leaveCreditsView']
         .forEach(x => document.getElementById(x)?.classList.add('hidden'));
     document.getElementById(id)?.classList.remove('hidden');
 }
@@ -1015,36 +1166,3 @@ function toggleLeaveMenu() {
     icon.classList.toggle('rotate-180'); // Optional: rotate arrow icon
 }
 </script>
-<script>
-  const leaveTypeSelect = document.getElementById("leaveType");
-  const leaveBalanceDisplay = document.getElementById("leaveBalanceDisplay");
-  const submitBtn = document.getElementById("submitBtn");
-
-  leaveTypeSelect.addEventListener("change", function () {
-    const selectedType = this.value;
-    const balance = leaveCredits[selectedType] ?? 0;
-
-    // Reset state
-    leaveBalanceDisplay.classList.remove("hidden", "text-green-600", "text-red-600");
-    submitBtn.disabled = false;
-    submitBtn.classList.remove("opacity-50", "cursor-not-allowed");
-
-    if (selectedType === "lwop") {
-      leaveBalanceDisplay.classList.add("text-green-600");
-      leaveBalanceDisplay.textContent = "Leave Without Pay doesn't require credits.";
-    } else if (balance < 1) {
-      leaveBalanceDisplay.classList.add("text-red-600");
-      leaveBalanceDisplay.textContent = "❌ Not enough leave credits for this leave type.";
-      submitBtn.disabled = true;
-      submitBtn.classList.add("opacity-50", "cursor-not-allowed");
-    } else {
-      leaveBalanceDisplay.classList.add("text-green-600");
-      leaveBalanceDisplay.textContent = `✅ You have ${balance} day(s) available.`;
-    }
-
-    leaveBalanceDisplay.classList.remove("hidden");
-  });
-</script>
-
-</body>
-</html>

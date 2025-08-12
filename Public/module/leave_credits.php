@@ -39,27 +39,6 @@ $leave_config = [
         'icon' => 'fas fa-user-friends',
         'accent' => 'bg-amber-500'
     ],
-    'halfday' => [
-        'label' => 'Half Day Vacation',
-        'class' => 'bg-white border-slate-200',
-        'color' => 'text-slate-700',
-        'icon' => 'fas fa-clock',
-        'accent' => 'bg-indigo-500'
-    ],
-    'halfday_sick' => [
-        'label' => 'Half Day Sick',
-        'class' => 'bg-white border-slate-200',
-        'color' => 'text-slate-700',
-        'icon' => 'fas fa-user-clock',
-        'accent' => 'bg-cyan-500'
-    ],
-    'lwop' => [
-        'label' => 'Leave Without Pay',
-        'class' => 'bg-white border-slate-200',
-        'color' => 'text-slate-700',
-        'icon' => 'fas fa-ban',
-        'accent' => 'bg-slate-500'
-    ],
     'bereavement' => [
         'label' => 'Bereavement Leave',
         'class' => 'bg-white border-slate-200',
@@ -73,13 +52,13 @@ $credits = [];
 $leaveHistory = [];
 
 if ($current_user_id) {
-    // Fetch leave credits
-    $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND year = ?");
+    // Fetch leave credits - only for main leave types
+    $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND year = ? AND leave_type IN ('sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'bereavement')");
     $stmt->execute([$current_user_id, date('Y')]);
     $credits = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Fetch approved leave requests from post_leave_requests
-    $stmt = $pdo->prepare("SELECT * FROM post_leave_requests WHERE employee_id = ? AND status = 'approved' ORDER BY start_date DESC LIMIT 10");
+    // Fetch leave requests from post_leave_requests (all statuses for history)
+    $stmt = $pdo->prepare("SELECT * FROM post_leave_requests WHERE employee_id = ? ORDER BY start_date DESC LIMIT 10");
     $stmt->execute([$current_user_id]);
     $leaveHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -102,8 +81,13 @@ function getStatusBadge($status) {
                         <i class="fas fa-clock mr-1"></i>Pending
                     </span>';
         case 'rejected':
+        case 'declined':
             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                         <i class="fas fa-times-circle mr-1"></i>Rejected
+                    </span>';
+        case 'cancelled':
+            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                        <i class="fas fa-ban mr-1"></i>Cancelled
                     </span>';
         default:
             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">' . ucfirst($status) . '</span>';

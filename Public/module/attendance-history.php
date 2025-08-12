@@ -53,8 +53,7 @@ $schedule_times = [
 $allLogsStmt = $pdo->prepare("
     SELECT 
         t.log_date, t.time_in, t.time_out, 
-        r.requested_time_in, r.requested_time_out, r.status AS request_status, 
-        o.start_time AS startOT, o.end_time AS endOT, o.status AS ot_status
+        r.requested_time_in, r.requested_time_out, r.status AS request_status
     FROM time_logs t
     LEFT JOIN (
         SELECT r1.* 
@@ -66,15 +65,6 @@ $allLogsStmt = $pdo->prepare("
             GROUP BY employee_id, log_date
         ) r2 ON r1.id = r2.latest_id
     ) r ON t.employee_id = r.employee_id AND t.log_date = r.log_date
-    LEFT JOIN (
-        SELECT o1.* 
-        FROM overtime_requests o1 
-        INNER JOIN (
-            SELECT employee_id, date, MAX(id) AS latest_id 
-            FROM overtime_requests 
-            GROUP BY employee_id, date
-        ) o2 ON o1.id = o2.latest_id
-    ) o ON t.employee_id = o.employee_id AND t.log_date = o.date
     WHERE t.employee_id = ? AND t.log_date >= '2025-07-01'
 ");
 $allLogsStmt->execute([$employee_id]);
@@ -188,14 +178,13 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time In</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours Worked</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overtime</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($currentPageDates)): ?>
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                             <div class="flex flex-col items-center gap-2">
                                 <i class="fas fa-search text-4xl text-gray-300"></i>
                                 <?php if (!empty($searchDate)): ?>
@@ -286,15 +275,6 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 }
                             }
 
-                            // Overtime
-                            $overtimeDisplay = '-';
-                            if ($log && strtolower($log['ot_status'] ?? '') === 'approved') {
-                                if ($log['startOT'] && $log['endOT']) {
-                                    $overtimeDisplay = date('h:i A', strtotime($log['startOT'])) . ' - ' . date('h:i A', strtotime($log['endOT']));
-                                }
-                            } elseif ($log && strtolower($log['ot_status'] ?? '') === 'pending') {
-                                $overtimeDisplay = 'Pending';
-                            }
                         ?>
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= $formattedDate ?></td>
@@ -312,7 +292,6 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500"><?= $hoursWorked ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-500"><?= $overtimeDisplay ?></td>
                             <td class="px-6 py-4">
                                 <span class="px-3 py-1 text-xs font-semibold rounded-full <?= $badgeClass ?>">
                                     <?= $status ?>
