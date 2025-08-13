@@ -43,11 +43,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <i class="fas fa-hourglass-half mr-3"></i>
                 <span>Pending Requests</span>
             </a>
-            <a href="request_history.php" 
-               class="flex items-center px-8 py-2 rounded-lg text-sm transition-colors <?= ($current_page == 'request_history.php') ? 'bg-orange-400 text-white' : 'text-orange-100 hover:bg-orange-600 hover:text-white' ?>">
-                <i class="fas fa-history mr-3"></i>
-                <span>Request History</span>
-            </a>
         </div>
         
         <!-- Employee Management -->

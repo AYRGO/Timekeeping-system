@@ -5,8 +5,8 @@
  */
 
 // Configuration
-$phoneNumber = '+639938642974';  // Scott's phone number (international format)
-$apiKey = 'YOUR_CALLMEBOT_API_KEY_HERE';  // Get this from CallMeBot
+$phoneNumber = '+639762477146';  // Your phone number (international format)
+$apiKey = '2833078';  // Your CallMeBot API key
 $message = 'Hello from Bugardi OT System! This is a test message. Time: ' . date('M d, Y H:i A');
 
 // Function to send WhatsApp message via CallMeBot
@@ -83,6 +83,10 @@ function sendWhatsAppMessageCurl($phone, $message, $apiKey) {
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="../../../../../src/output.css?v=<?= time() ?>" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <title>CallMeBot WhatsApp Sender</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
@@ -105,18 +109,19 @@ function sendWhatsAppMessageCurl($phone, $message, $apiKey) {
         <div class="info">
             <h3>🔧 Setup Instructions:</h3>
             <ol>
-                <li><strong>Get API Key:</strong> Add CallMeBot to your contacts: <code>+34 613 07 35 45</code></li>
+                <li><strong>Get API Key:</strong> Add CallMeBot to your contacts: <code>+34684734044</code></li>
                 <li><strong>Send message:</strong> "I allow callmebot to send me messages" to that number</li>
                 <li><strong>Receive API key:</strong> CallMeBot will reply with your personal API key</li>
                 <li><strong>Update code:</strong> Replace 'YOUR_CALLMEBOT_API_KEY_HERE' with your actual key</li>
             </ol>
+            <p><strong>Note:</strong> Messages will come FROM +34684734044 TO your phone number.</p>
         </div>
         
         <form method="post">
             <h3>📝 Test Message</h3>
             
             <label><strong>Phone Number:</strong></label>
-            <input type="text" name="phone" value="<?= htmlspecialchars($_POST['phone'] ?? $phoneNumber) ?>" placeholder="+639938642974">
+            <input type="text" name="phone" value="<?= htmlspecialchars($_POST['phone'] ?? $phoneNumber) ?>" placeholder="+639762477146">
             
             <label><strong>API Key:</strong></label>
             <input type="text" name="apikey" value="<?= htmlspecialchars($_POST['apikey'] ?? $apiKey) ?>" placeholder="Your CallMeBot API Key">
@@ -172,7 +177,7 @@ function sendWhatsAppMessageCurl($phone, $message, $apiKey) {
         
         <div class="code">
             <h4>📋 Sample API Request URL:</h4>
-            <code>https://api.callmebot.com/whatsapp.php?phone=639938642974&text=Hello%20World&apikey=YOUR_API_KEY</code>
+            <code>https://api.callmebot.com/whatsapp.php?phone=639762477146&text=Hello%20World&apikey=YOUR_API_KEY</code>
         </div>
     </div>
 </body>

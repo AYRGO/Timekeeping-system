@@ -17,6 +17,52 @@ $isHistoryView = ($view === 'history');
 
 $pageTitle = $isHistoryView ? 'Overtime Requests History - Bugardi' : 'Overtime Requests - Bugardi';
 
+// Hardcoded schedule times (same as schedule_tracker.php)
+$schedule_times = [
+    3 => ['in' => '07:30:00', 'out' => '16:30:00'],
+    4 => ['in' => '07:00:00', 'out' => '16:00:00'],
+    5 => ['in' => '08:00:00', 'out' => '17:00:00'],
+    6 => ['in' => '09:00:00', 'out' => '18:00:00'],
+    7 => ['in' => '10:00:00', 'out' => '19:00:00'],
+    8 => ['in' => '06:00:00', 'out' => '15:00:00'],
+    9 => ['in' => '08:00:00', 'out' => '16:30:00'],
+    10 => ['in' => '07:40:00', 'out' => '16:40:00'],
+    11 => ['in' => '06:30:00', 'out' => '15:00:00'],
+];
+
+// Function to get current schedule for an employee on a specific date
+function getCurrentScheduleForEmployee($employee_id, $log_date, $pdo, $schedule_times) {
+    // Get employee's default schedule
+    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+    $default_schedule_id = $employee['official_sched'] ?? 4;
+    
+    // Check for active approved schedule changes on that date
+    $stmt = $pdo->prepare("
+        SELECT work_schedule_id 
+        FROM post_schedule_change_requests 
+        WHERE employee_id = ? AND status = 'Approved' 
+        AND ? BETWEEN start_date AND end_date 
+        ORDER BY created_at DESC 
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $log_date]);
+    $activeRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    $schedule_id = $activeRequest ? ($activeRequest['work_schedule_id'] ?? $default_schedule_id) : $default_schedule_id;
+    
+    // Get schedule times
+    $sched_time_in_24h = $schedule_times[$schedule_id]['in'] ?? '07:00:00';
+    $sched_time_out_24h = $schedule_times[$schedule_id]['out'] ?? '16:00:00';
+    
+    return [
+        'schedule_id' => $schedule_id,
+        'time_in' => date('g:i A', strtotime($sched_time_in_24h)),
+        'time_out' => date('g:i A', strtotime($sched_time_out_24h))
+    ];
+}
+
 // Pagination settings
 $recordsPerPage = 10;
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -25,9 +71,9 @@ $offset = ($page - 1) * $recordsPerPage;
 // Get pending requests count for Quick notification
 $pendingStmt = $pdo->query("
     SELECT COUNT(*) as pending_count
-    FROM overtime_requests ot
-    JOIN employees e ON ot.employee_id = e.id
-    WHERE ot.status = 'pending' AND LOWER(TRIM(e.company)) = 'bugardi'
+    FROM post_ot_requests por
+    JOIN employees e ON por.employee_id = e.id
+    WHERE por.status = 'Pending' AND LOWER(TRIM(e.company)) = 'bugardi'
 ");
 $pendingResult = $pendingStmt->fetch(PDO::FETCH_ASSOC);
 $pendingCount = $pendingResult['pending_count'];
@@ -36,16 +82,16 @@ $pendingCount = $pendingResult['pending_count'];
 if ($isHistoryView) {
     $countStmt = $pdo->query("
         SELECT COUNT(*) as total_count
-        FROM post_overtime_requests por
+        FROM post_ot_requests por
         JOIN employees e ON por.employee_id = e.id
         WHERE LOWER(TRIM(e.company)) = 'bugardi'
     ");
 } else {
     $countStmt = $pdo->query("
         SELECT COUNT(*) as total_count
-        FROM overtime_requests o
-        JOIN employees e ON o.employee_id = e.id
-        WHERE o.status = 'pending' AND LOWER(TRIM(e.company)) = 'bugardi'
+        FROM post_ot_requests por
+        JOIN employees e ON por.employee_id = e.id
+        WHERE por.status = 'Pending' AND LOWER(TRIM(e.company)) = 'bugardi'
     ");
 }
 $totalCountResult = $countStmt->fetch(PDO::FETCH_ASSOC);
@@ -54,38 +100,49 @@ $totalPages = ceil($totalRecords / $recordsPerPage);
 
 // Fetch overtime requests with employee names and time logs (filtered for Bugardi company)
 if ($isHistoryView) {
-    // Fetch from post_overtime_requests table (history)
+    // Fetch from post_ot_requests table (history)
     $stmt = $pdo->query("
         SELECT 
-            por.id, por.date, por.start_time, por.end_time, por.reason, por.status, 
-            por.attachment_ot, por.created_at, por.duration_hours, por.explanation,
-            por.time_in, por.time_out, por.employee_id,
-            e.fname, e.lname, e.company
-        FROM post_overtime_requests por
+            por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, 
+            por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, 
+            por.created_at, por.approved_at, por.approved_by,
+            e.fname, e.lname, e.company,
+            tl.log_date
+        FROM post_ot_requests por
         JOIN employees e ON por.employee_id = e.id
+        LEFT JOIN time_logs tl ON por.time_log_id = tl.id
         WHERE LOWER(TRIM(e.company)) = 'bugardi'
         ORDER BY por.created_at DESC
         LIMIT $recordsPerPage OFFSET $offset
     ");
 } else {
-    // Fetch from overtime_requests table (current requests) - only pending for Bugardi company
+    // Fetch from post_ot_requests table for pending requests only (filtered for Bugardi company)
     $stmt = $pdo->query("
         SELECT 
-            o.id, o.date, o.start_time, o.end_time, o.reason, o.status, 
-            o.attachment_ot, o.created_at,
-            TIMESTAMPDIFF(MINUTE, o.start_time, o.end_time) / 60 AS duration_hours,
+            por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, 
+            por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, 
+            por.created_at, por.approved_at, por.approved_by,
             e.fname, e.lname, e.company,
-            t.time_in AS log_time_in, t.time_out AS log_time_out
-        FROM overtime_requests o
-        JOIN employees e ON o.employee_id = e.id
-        LEFT JOIN time_logs t ON o.employee_id = t.employee_id AND o.date = t.log_date
-        WHERE o.status = 'pending' AND LOWER(TRIM(e.company)) = 'bugardi'
-        ORDER BY o.created_at DESC
+            tl.log_date
+        FROM post_ot_requests por
+        JOIN employees e ON por.employee_id = e.id
+        LEFT JOIN time_logs tl ON por.time_log_id = tl.id
+        WHERE por.status = 'Pending' AND LOWER(TRIM(e.company)) = 'bugardi'
+        ORDER BY por.created_at DESC
         LIMIT $recordsPerPage OFFSET $offset
     ");
 }
 
 $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Add schedule information to each request
+foreach ($overtime_requests as &$ot) {
+    if ($ot['log_date']) {
+        $ot['current_schedule'] = getCurrentScheduleForEmployee($ot['employee_id'], $ot['log_date'], $pdo, $schedule_times);
+    } else {
+        $ot['current_schedule'] = ['schedule_id' => 'N/A', 'time_in' => 'N/A', 'time_out' => 'N/A'];
+    }
+}
 
 // Function to get status badge
 function getStatusBadge($status) {
@@ -182,9 +239,10 @@ function getStatusBadge($status) {
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Schedule</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Regular Hours</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Overtime Period</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Duration</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Type</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attachment</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -218,8 +276,18 @@ function getStatusBadge($status) {
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             <div class="flex flex-col">
-                                                <span class="font-medium"><?= date('M d, Y', strtotime($ot['date'])) ?></span>
-                                                <span class="text-xs text-gray-500"><?= date('l', strtotime($ot['date'])) ?></span>
+                                                <span class="font-medium"><?= $ot['log_date'] ? date('M d, Y', strtotime($ot['log_date'])) : 'N/A' ?></span>
+                                                <span class="text-xs text-gray-500"><?= $ot['log_date'] ? date('l', strtotime($ot['log_date'])) : '' ?></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-900">
+                                            <div class="flex flex-col">
+                                                <div class="flex items-center text-xs text-green-600 mb-1">
+                                                    <i class="fas fa-sign-in-alt mr-1"></i>In: <span class="font-medium ml-1"><?= htmlspecialchars($ot['current_schedule']['time_in']) ?></span>
+                                                </div>
+                                                <div class="flex items-center text-xs text-red-600">
+                                                    <i class="fas fa-sign-out-alt mr-1"></i>Out: <span class="font-medium ml-1"><?= htmlspecialchars($ot['current_schedule']['time_out']) ?></span>
+                                                </div>
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 text-sm text-gray-900">
@@ -228,40 +296,27 @@ function getStatusBadge($status) {
                                                     <i class="fas fa-sign-in-alt mr-1"></i>In:
                                                 </div>
                                                 <span class="font-medium text-green-700">
-                                                    <?php 
-                                                    $time_in = $isHistoryView ? ($ot['time_in'] ?? null) : ($ot['log_time_in'] ?? null);
-                                                    echo $time_in ? date('g:i A', strtotime($time_in)) : '<span class="text-gray-400 italic">None</span>';
-                                                    ?>
+                                                    <?= $ot['time_in'] ? date('g:i A', strtotime($ot['time_in'])) : '<span class="text-gray-400 italic">None</span>' ?>
                                                 </span>
                                                 <div class="flex items-center text-xs text-red-600 mb-1 mt-2">
                                                     <i class="fas fa-sign-out-alt mr-1"></i>Out:
                                                 </div>
                                                 <span class="font-medium text-red-700">
-                                                    <?php 
-                                                    $time_out = $isHistoryView ? ($ot['time_out'] ?? null) : ($ot['log_time_out'] ?? null);
-                                                    echo $time_out ? date('g:i A', strtotime($time_out)) : '<span class="text-gray-400 italic">None</span>';
-                                                    ?>
+                                                    <?= $ot['time_out'] ? date('g:i A', strtotime($ot['time_out'])) : '<span class="text-gray-400 italic">None</span>' ?>
                                                 </span>
-                                            </div>
-                                        </td>
-                                  <td class="px-6 py-4 text-sm text-gray-900">
-                                            <div class="flex flex-col">
-                                                <div class="flex items-center text-xs text-green-600 mb-1">
-                                                    <i class="fas fa-play mr-1"></i>Start:
-                                                </div>
-                                                <span class="font-medium text-green-700"><?= date('g:i A', strtotime($ot['start_time'])) ?></span>
-                                                <div class="flex items-center text-xs text-red-600 mb-1 mt-2">
-                                                    <i class="fas fa-stop mr-1"></i>End:
-                                                </div>
-                                                <span class="font-medium text-red-700"><?= date('g:i A', strtotime($ot['end_time'])) ?></span>
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             <div class="flex flex-col items-center">
                                                 <div class="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium">
-                                                    <i class="fas fa-clock mr-1"></i><?= number_format($ot['duration_hours'], 2) ?> hrs
+                                                    <i class="fas fa-clock mr-1"></i><?= number_format($ot['ot_duration'], 2) ?> hrs
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                <?= htmlspecialchars($ot['ot_type']) ?>
+                                            </span>
                                         </td>
                                         <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
                                             <div class="truncate hover:whitespace-normal" title="<?= htmlspecialchars($ot['reason']) ?>">
@@ -269,8 +324,8 @@ function getStatusBadge($status) {
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <?php if (!empty($ot['attachment_ot'])): ?>
-                                                <a href="../module/<?= htmlspecialchars($ot['attachment_ot']) ?>"
+                                            <?php if (!empty($ot['attachment'])): ?>
+                                                <a href="../uploads/overtime_attachments/<?= htmlspecialchars($ot['attachment']) ?>"
                                                    target="_blank"
                                                    class="inline-flex items-center text-blue-600 hover:text-blue-800">
                                                     <i class="fas fa-paperclip mr-1"></i>View
@@ -318,7 +373,7 @@ function getStatusBadge($status) {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="<?= $isHistoryView ? '10' : '11' ?>" class="text-center text-sm py-8 text-gray-500">
+                                    <td colspan="<?= $isHistoryView ? '11' : '12' ?>" class="text-center text-sm py-8 text-gray-500">
                                         <i class="fas fa-clock text-4xl text-gray-300 mb-2"></i>
                                         <div><?= $isHistoryView ? 'No processed overtime requests found for Bugardi employees.' : 'No pending overtime requests found for Bugardi employees.' ?></div>
                                         <div class="text-xs text-gray-400 mt-1">Only Bugardi company records are displayed</div>
@@ -375,7 +430,7 @@ function getStatusBadge($status) {
                         
                         // Calculate total approved hours
                         if ($status === 'approved') {
-                            $totalHours += $req['duration_hours'];
+                            $totalHours += $req['ot_duration'];
                         }
                     }
                     ?>

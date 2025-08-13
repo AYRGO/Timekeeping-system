@@ -70,7 +70,7 @@ _Action completed successfully!_";
 
             // Send confirmation via CallMeBot
             $apiKey = "6561289";
-            $phone = "639938642974";
+            $phone = "639762477146";
             $encodedMessage = urlencode($confirmationMessage);
             $apiUrl = "https://api.callmebot.com/whatsapp.php?phone={$phone}&text={$encodedMessage}&apikey={$apiKey}";
             
@@ -124,6 +124,8 @@ $pendingRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="../../../../../src/output.css?v=<?= time() ?>" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <title>Scott's OT Quick Actions</title>
     <style>
         body { 

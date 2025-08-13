@@ -10,6 +10,92 @@ if (!isset($_SESSION['regenerated'])) {
 
 require_once 'time_logs_helper.php';
 
+// Include schedule tracker to get current schedule information
+include_once 'stats/schedule_tracker.php';
+
+// Function to get schedule for a specific date (historical accuracy)
+function getScheduleForDate($employee_id, $date, $pdo) {
+    // Fetch employee's default schedule
+    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+    $default_schedule_id = $employee['official_sched'] ?? 4;
+    
+    // Hardcoded schedule times
+    $schedule_times = [
+        3 => ['in' => '07:30:00', 'out' => '16:30:00'],
+        4 => ['in' => '07:00:00', 'out' => '16:00:00'],
+        5 => ['in' => '08:00:00', 'out' => '17:00:00'],
+        6 => ['in' => '09:00:00', 'out' => '18:00:00'],
+        7 => ['in' => '10:00:00', 'out' => '19:00:00'],
+        8 => ['in' => '06:00:00', 'out' => '15:00:00'],
+        9 => ['in' => '08:00:00', 'out' => '16:30:00'],
+        10 => ['in' => '07:40:00', 'out' => '16:40:00'],
+        11 => ['in' => '06:30:00', 'out' => '15:00:00'],
+    ];
+    
+    // Check for approved schedule changes that were active on the specific date
+    $stmt = $pdo->prepare("
+        SELECT work_schedule_id, status, start_date, end_date 
+        FROM post_schedule_change_requests 
+        WHERE employee_id = ? AND status = 'Approved' 
+        AND ? BETWEEN start_date AND end_date 
+        ORDER BY created_at DESC 
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $date]);
+    $activeScheduleOnDate = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Determine which schedule was active on that date
+    $schedule_id = $activeScheduleOnDate ? ($activeScheduleOnDate['work_schedule_id'] ?? $default_schedule_id) : $default_schedule_id;
+    
+    // Get schedule times
+    $schedule_in = $schedule_times[$schedule_id]['in'] ?? '07:00:00';
+    $schedule_out = $schedule_times[$schedule_id]['out'] ?? '16:00:00';
+    
+    // Format times for display
+    $formatted_in = date('h:i A', strtotime($schedule_in));
+    $formatted_out = date('h:i A', strtotime($schedule_out));
+    
+    // Determine status for display
+    $today = date('Y-m-d');
+    $isToday = ($date === $today);
+    $isPast = ($date < $today);
+    
+    $status_text = '';
+    $status_color = 'text-blue-600';
+    
+    if ($isPast) {
+        // For past dates, show what was actually active
+        if ($activeScheduleOnDate) {
+            $status_text = 'Changed Schedule';
+            $status_color = 'text-green-600';
+        } else {
+            $status_text = 'Official Schedule';
+            $status_color = 'text-blue-600';
+        }
+    } else {
+        // For current/future dates, show current logic
+        $current_sched = $_SESSION['current_schedule'] ?? [];
+        $status_text = $current_sched['status_text'] ?? 'Official Schedule';
+        $status_color = match($current_sched['status'] ?? 'baseline') {
+            'approved' => 'text-green-600',
+            'pending' => 'text-yellow-600',
+            'declined' => 'text-red-600',
+            default => 'text-blue-600'
+        };
+    }
+    
+    return [
+        'time_in' => $formatted_in,
+        'time_out' => $formatted_out,
+        'schedule_id' => $schedule_id,
+        'status_text' => $status_text,
+        'status_color' => $status_color,
+        'was_changed' => $activeScheduleOnDate ? true : false
+    ];
+}
+
 // Get employee's last 5 time logs that are OT eligible (no null data)
 $employee_id = $_SESSION['employee']['id'] ?? 1; // Use the correct session key
 $sql = "SELECT tl.*, DATE_FORMAT(tl.time_in, '%Y-%m-%d %H:%i') as formatted_time_in, 
@@ -24,10 +110,10 @@ $time_logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Get overtime request history
 $history_sql = "SELECT ot.*, tl.log_date, tl.time_in, tl.time_out,
                        DATE_FORMAT(ot.created_at, '%M %d, %Y at %h:%i %p') as formatted_created_at,
-                       DATE_FORMAT(ot.approved_at, '%M %d, %Y at %h:%i %p') as formatted_reviewed_at,
                        DATE_FORMAT(tl.log_date, '%M %d, %Y') as formatted_log_date,
                        DATE_FORMAT(tl.time_in, '%h:%i %p') as formatted_time_in,
-                       DATE_FORMAT(tl.time_out, '%h:%i %p') as formatted_time_out
+                       DATE_FORMAT(tl.time_out, '%h:%i %p') as formatted_time_out,
+                       ot.status as request_status
                 FROM post_ot_requests ot 
                 LEFT JOIN time_logs tl ON ot.time_log_id = tl.id 
                 WHERE ot.employee_id = ? 
@@ -49,7 +135,7 @@ $default_time_out = $default_sched['time_out'];
 @keyframes fadeInUp {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(20px);
     }
     to {
         opacity: 1;
@@ -60,7 +146,7 @@ $default_time_out = $default_sched['time_out'];
 @keyframes slideInRight {
     from {
         opacity: 0;
-        transform: translateX(10px);
+        transform: translateX(20px);
     }
     to {
         opacity: 1;
@@ -68,92 +154,199 @@ $default_time_out = $default_sched['time_out'];
     }
 }
 
+@keyframes pulse-glow {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+    }
+}
+
 .animate-fade-in-up {
-    animation: fadeInUp 0.4s ease-out;
+    animation: fadeInUp 0.6s ease-out;
 }
 
 .animate-slide-in-right {
-    animation: slideInRight 0.3s ease-out;
+    animation: slideInRight 0.4s ease-out;
 }
 
 .hover-scale {
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hover-scale:hover {
-    transform: scale(1.01);
+    transform: scale(1.02) translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
 }
 
 .tab-active {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     color: white;
     border-color: #10b981;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    transform: translateY(-1px);
 }
 
 .tab-inactive {
     background: white;
     color: #6b7280;
     border-color: #e5e7eb;
+    transition: all 0.3s ease;
 }
 
 .tab-inactive:hover {
     background: #f9fafb;
     color: #374151;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .status-approved {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     color: white;
+    border-color: #10b981;
 }
 
 .status-declined {
     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
     color: white;
+    border-color: #ef4444;
 }
 
 .status-pending {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
     color: white;
+    border-color: #f59e0b;
+}
+
+/* Enhanced table styling */
+.group:hover .group-hover\:scale-105 {
+    transform: scale(1.05);
+}
+
+/* Smooth backdrop blur for modern browsers */
+@supports (backdrop-filter: blur(10px)) {
+    .backdrop-blur-sm {
+        backdrop-filter: blur(10px);
+    }
+}
+
+/* Enhanced responsive table */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .table-responsive th,
+    .table-responsive td {
+        padding: 0.75rem 0.5rem;
+    }
+}
+
+/* Custom scrollbar for better UX */
+.overflow-x-auto::-webkit-scrollbar {
+    height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, #10b981, #059669);
+    border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #059669, #047857);
 }
 </style>
 
 <div id="overtimeView" class="mt-12 hidden animate-fade-in-up">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+  <div class="w-full px-6 lg:px-8">
     
-    <!-- Compact Header Section -->
-    <div class="bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl shadow-lg mb-6">
-      <div class="p-6">
-        <div class="flex flex-col lg:flex-row items-center justify-between">
-          <div class="text-center lg:text-left mb-4 lg:mb-0">
-            <div class="flex items-center justify-center lg:justify-start mb-3">
-              <div class="p-2 bg-white/20 rounded-lg">
-                <i class="fas fa-clock text-2xl text-white"></i>
-              </div>
-            </div>
-            <h1 class="text-2xl lg:text-3xl font-bold text-white mb-1">
-              Overtime Management
-            </h1>
-            <p class="text-emerald-100">
-              Submit and track your overtime requests
-            </p>
-            
-            <!-- Compact Stats -->
-            <div class="flex gap-3 mt-3">
-              <div class="bg-white/10 rounded-lg px-3 py-1.5">
-                <div class="text-lg font-bold text-white"><?= count($time_logs) ?></div>
-                <div class="text-xs text-emerald-100">Recent Logs</div>
-              </div>
-              <div class="bg-white/10 rounded-lg px-3 py-1.5">
-                <div class="text-lg font-bold text-white">
-                  <?= count(array_filter($time_logs, function($log) { 
-                    return !empty($log['time_in']) && !empty($log['time_out']) && isOvertimeEligible($log['time_in'], $log['time_out']); 
-                  })) ?>
+    <!-- Enhanced Header Section with Full Width -->
+    <div class="bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 rounded-2xl shadow-xl mb-8 overflow-hidden">
+      <div class="relative p-8">
+        <!-- Background decoration -->
+        <div class="absolute top-0 right-0 w-64 h-64 opacity-10">
+          <i class="fas fa-clock text-9xl transform rotate-12"></i>
+        </div>
+        
+        <div class="relative z-10">
+          <div class="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
+            <div class="flex-1">
+              <div class="flex items-center mb-4">
+                <div class="p-3 bg-white/20 backdrop-blur-sm rounded-xl mr-4">
+                  <i class="fas fa-clock text-3xl text-white"></i>
                 </div>
-                <div class="text-xs text-emerald-100">OT Eligible</div>
+                <div>
+                  <h1 class="text-3xl xl:text-4xl font-bold text-white mb-2">
+                    Overtime Management 
+                  </h1>
+                  <p class="text-emerald-100 text-lg">
+                    Submit, track, and manage your overtime requests efficiently
+                  </p>
+                </div>
               </div>
-              <div class="bg-white/10 rounded-lg px-3 py-1.5">
-                <div class="text-lg font-bold text-white"><?= count($overtime_history) ?></div>
-                <div class="text-xs text-emerald-100">Total Requests</div>
+              
+              <!-- Enhanced Stats Grid -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                <div class="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-2xl font-bold text-white"><?= count($time_logs) ?></div>
+                      <div class="text-sm text-emerald-100">Recent Logs</div>
+                    </div>
+                    <div class="p-2 bg-white/20 rounded-lg">
+                      <i class="fas fa-list-alt text-white text-lg"></i>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-2xl font-bold text-white">
+                        <?= count(array_filter($time_logs, function($log) { 
+                          return !empty($log['time_in']) && !empty($log['time_out']) && isOvertimeEligible($log['time_in'], $log['time_out']); 
+                        })) ?>
+                      </div>
+                      <div class="text-sm text-emerald-100">OT Eligible</div>
+                    </div>
+                    <div class="p-2 bg-white/20 rounded-lg">
+                      <i class="fas fa-star text-white text-lg"></i>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-2xl font-bold text-white"><?= count($overtime_history) ?></div>
+                      <div class="text-sm text-emerald-100">Total Requests</div>
+                    </div>
+                    <div class="p-2 bg-white/20 rounded-lg">
+                      <i class="fas fa-file-alt text-white text-lg"></i>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-lg font-bold text-white"><?= htmlspecialchars($default_time_in . ' - ' . $default_time_out) ?></div>
+                      <div class="text-sm text-emerald-100">Today's Schedule</div>
+                    </div>
+                    <div class="p-2 bg-white/20 rounded-lg">
+                      <i class="fas fa-calendar-check text-white text-lg"></i>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -161,76 +354,117 @@ $default_time_out = $default_sched['time_out'];
       </div>
     </div>
 
-    <!-- Tab Navigation -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 mb-6">
-      <div class="p-6 border-b border-gray-200">
-        <div class="flex space-x-1 bg-gray-100 rounded-lg p-1">
-          <button id="submitTab" onclick="switchTab('submit')" 
-                  class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 tab-active">
-            <i class="fas fa-plus mr-2"></i>Submit Request
-          </button>
-          <button id="historyTab" onclick="switchTab('history')" 
-                  class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 tab-inactive">
-            <i class="fas fa-history mr-2"></i>Request History
-          </button>
+    <!-- Enhanced Tab Navigation -->
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-200 mb-8 overflow-hidden">
+      <div class="p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">Overtime Request </h2>
+            <p class="text-gray-600 text-sm">Manage your overtime requests and view submission history</p>
+          </div>
+          <div class="flex space-x-2 bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+            <button id="submitTab" onclick="switchTab('submit')" 
+                    class="flex-1 sm:flex-none px-6 py-3 text-sm font-medium rounded-md transition-all duration-200 tab-active">
+              <i class="fas fa-plus mr-2"></i>Submit Request
+            </button>
+            <button id="historyTab" onclick="switchTab('history')" 
+                    class="flex-1 sm:flex-none px-6 py-3 text-sm font-medium rounded-md transition-all duration-200 tab-inactive">
+              <i class="fas fa-history mr-2"></i>Request History
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Submit Request Tab Content -->
-    <div id="submitContent" class="bg-white rounded-2xl shadow-lg border border-gray-200">
+    <!-- Submit Request Tab Content - Full Width -->
+    <div id="submitContent" class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
       
-      <!-- Table Section -->
+      <!-- Table Section with Enhanced Layout -->
       <div class="p-8">
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h3 class="text-xl font-bold text-gray-900 mb-1 flex items-center">
-              <div class="p-2 bg-emerald-100 rounded-lg mr-3">
-                <i class="fas fa-history text-emerald-600"></i>
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
+          <div class="flex-1">
+            <h3 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+              <div class="p-3 bg-emerald-100 rounded-xl mr-4">
+                <i class="fas fa-history text-emerald-600 text-xl"></i>
               </div>
-              Recent Time Logs
+              Recent Time Logs (Overtime Requests)
             </h3>
-            <p class="text-gray-600">
-              Last 5 days • Click "Request OT" for eligible entries
+            <p class="text-gray-600 text-lg">
+              Review your recent work logs and submit overtime requests for eligible entries
             </p>
+          </div>
+          
+          <!-- Legend -->
+          <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <h4 class="text-sm font-semibold text-gray-700 mb-3">Status Legend</h4>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div class="flex items-center">
+                <div class="w-3 h-3 bg-emerald-400 rounded-full mr-2"></div>
+                <span class="text-gray-600">OT Eligible</span>
+              </div>
+              <div class="flex items-center">
+                <div class="w-3 h-3 bg-blue-400 rounded-full mr-2"></div>
+                <span class="text-gray-600">Regular</span>
+              </div>
+              <div class="flex items-center">
+                <div class="w-3 h-3 bg-red-400 rounded-full mr-2"></div>
+                <span class="text-gray-600">Expired</span>
+              </div>
+              <div class="flex items-center">
+                <div class="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
+                <span class="text-gray-600">No Data</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Table -->
-        <div class="overflow-hidden rounded-xl border border-gray-200">
+        <!-- Enhanced Table with Better Responsiveness -->
+        <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-lg">
           <div class="overflow-x-auto">
-            <table class="min-w-full bg-white" id="timeLogsTable">
-              <thead class="bg-gray-50">
+            <table class="min-w-full" id="timeLogsTable">
+              <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
                 <tr>
-                  <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
                       <i class="fas fa-calendar-alt mr-2 text-emerald-500"></i>
-                      Date
+                      Date & Day
                     </div>
                   </th>
-                  <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <div class="flex items-center">
+                      <i class="fas fa-calendar-check mr-2 text-indigo-500"></i>
+                      Active Schedule
+                    </div>
+                  </th>
+                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
                       <i class="fas fa-sign-in-alt mr-2 text-blue-500"></i>
                       Time In
                     </div>
                   </th>
-                  <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
                       <i class="fas fa-sign-out-alt mr-2 text-orange-500"></i>
                       Time Out
                     </div>
                   </th>
-                  <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
                       <i class="fas fa-clock mr-2 text-purple-500"></i>
-                      Actual Work
+                      Work Duration
                     </div>
                   </th>
-                  <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Status
+                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <div class="flex items-center">
+                      <i class="fas fa-chart-line mr-2 text-green-500"></i>
+                      Status
+                    </div>
                   </th>
-                  <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Action
+                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <div class="flex items-center">
+                      <i class="fas fa-cog mr-2 text-gray-500"></i>
+                      Action
+                    </div>
                   </th>
                 </tr>
               </thead>
@@ -256,8 +490,18 @@ $default_time_out = $default_sched['time_out'];
                     $rowStatus = $isOlderThan5Days ? 'noteligible' : ($isOTEligible ? ($hasRequest ? 'submitted' : 'eligible') : 'regular');
                   }
                 ?>
-                <tr class="hover:bg-emerald-50 transition-colors duration-200 animate-slide-in-right
-                  <?= $hasLog ? ($isOlderThan5Days ? 'bg-gray-50 border-l-4 border-l-gray-300' : ($isOTEligible ? 'bg-emerald-50/50 border-l-4 border-l-emerald-400' : '')) : 'bg-gray-50 border-l-4 border-l-gray-200' ?>"
+                <tr class="hover:bg-emerald-50/30 transition-all duration-200 animate-slide-in-right group
+                  <?php 
+                    if (!$hasLog) {
+                      echo 'bg-gray-50 border-l-4 border-l-gray-300';
+                    } elseif ($isOlderThan5Days) {
+                      echo 'bg-red-50/30 border-l-4 border-l-red-300';
+                    } elseif ($isOTEligible) {
+                      echo 'bg-emerald-50/40 border-l-4 border-l-emerald-400 shadow-sm';
+                    } else {
+                      echo 'border-l-4 border-l-blue-300';
+                    }
+                  ?>"
                   style="animation-delay: <?= $index * 0.05 ?>s;"
                   data-date="<?= $hasDate ? date('M d, Y', strtotime($log['log_date'])) : '' ?>"
                   data-status="<?= $hasLog ? $rowStatus : 'rdot' ?>"
@@ -267,85 +511,159 @@ $default_time_out = $default_sched['time_out'];
                   data-ot-hours="<?= $hasLog ? $overtimeHours : '0' ?>"
                   data-is-rdot="<?= $isRdot ? '1' : '0' ?>">
                   
-                  <td class="px-6 py-4">
-                    <div>
-                      <div class="text-base font-semibold text-gray-900">
-                        <?= $hasDate ? date('M d, Y', strtotime($log['log_date'])) : '<span class="italic text-gray-400">N/A</span>' ?>
+                  <td class="px-8 py-6 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-shrink-0 mr-4">
+                        <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                          <i class="fas fa-calendar text-blue-600 text-lg"></i>
+                        </div>
                       </div>
-                      <div class="text-sm text-gray-500">
-                        <?= $hasDate ? date('l', strtotime($log['log_date'])) : '' ?>
-                      </div>
-                    </div>
-                  </td>
-                  
-                  <td class="px-6 py-4">
-                    <span class="text-base font-semibold text-gray-900">
-                      <?= $hasLog ? date('h:i A', strtotime($log['time_in'])) : '—' ?>
-                    </span>
-                  </td>
-                  
-                  <td class="px-6 py-4">
-                    <span class="text-base font-semibold text-gray-900">
-                      <?= $hasLog ? date('h:i A', strtotime($log['time_out'])) : '—' ?>
-                    </span>
-                  </td>
-                  
-                  <td class="px-6 py-4">
-                    <div>
-                      <div class="text-base font-semibold text-gray-900">
-                        <?= $hasLog ? number_format($actualHours, 2) . 'h' : '—' ?>
+                      <div>
+                        <div class="text-lg font-bold text-gray-900">
+                          <?= $hasDate ? date('M d, Y', strtotime($log['log_date'])) : '<span class="italic text-gray-400">No Date</span>' ?>
+                        </div>
+                        <div class="text-sm font-medium text-gray-500">
+                          <?= $hasDate ? date('l', strtotime($log['log_date'])) : '' ?>
+                        </div>
                       </div>
                     </div>
                   </td>
                   
-                  <td class="px-6 py-4">
+                  <td class="px-8 py-6">
+                    <div class="space-y-2">
+                      <?php 
+                      // Get the correct schedule for this specific date
+                      if ($hasDate) {
+                        $dateSchedule = getScheduleForDate($employee_id, $log['log_date'], $pdo);
+                        $scheduleTime = $dateSchedule['time_in'] . ' - ' . $dateSchedule['time_out'];
+                        $statusText = $dateSchedule['status_text'];
+                        $statusColor = $dateSchedule['status_color']; // Use the color returned by the function
+                      } else {
+                        $scheduleTime = '—';
+                        $statusText = '—';
+                        $statusColor = 'text-gray-400';
+                      }
+                      ?>
+                      <div class="text-lg font-bold text-gray-900">
+                        <?= htmlspecialchars($scheduleTime) ?>
+                      </div>
+                      <div class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100">
+                        <span class="<?= $statusColor ?>"><?= htmlspecialchars($statusText) ?></span>
+                      </div>
+                    </div>
+                  </td>
+                  
+                  <td class="px-8 py-6 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-shrink-0 mr-3">
+                        <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                          <i class="fas fa-sign-in-alt text-green-600"></i>
+                        </div>
+                      </div>
+                      <span class="text-lg font-bold text-gray-900">
+                        <?= $hasLog ? date('h:i A', strtotime($log['time_in'])) : '<span class="text-gray-400">—</span>' ?>
+                      </span>
+                    </div>
+                  </td>
+                  
+                  <td class="px-8 py-6 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-shrink-0 mr-3">
+                        <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                          <i class="fas fa-sign-out-alt text-orange-600"></i>
+                        </div>
+                      </div>
+                      <span class="text-lg font-bold text-gray-900">
+                        <?= $hasLog ? date('h:i A', strtotime($log['time_out'])) : '<span class="text-gray-400">—</span>' ?>
+                      </span>
+                    </div>
+                  </td>
+                  
+                  <td class="px-8 py-6 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-shrink-0 mr-3">
+                        <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                          <i class="fas fa-clock text-purple-600"></i>
+                        </div>
+                      </div>
+                      <div>
+                        <?php if ($hasLog): ?>
+                          <?php 
+                            // Calculate regular work hours by deducting OT hours from total actual hours
+                            $regularHours = $actualHours - ($isOTEligible ? $overtimeHours : 0);
+                            $regularHours = max(0, $regularHours); // Ensure it's not negative
+                          ?>
+                          <div class="text-lg font-bold text-gray-900">
+                            <?= number_format($regularHours, 2) ?>h
+                          </div>
+                          <?php if ($isOTEligible): ?>
+                            <div class="text-sm text-emerald-600 font-medium">
+                              +<?= number_format($overtimeHours, 2) ?>h OT
+                            </div>
+                          <?php endif; ?>
+                        <?php else: ?>
+                          <div class="text-lg font-bold text-gray-400">—</div>
+                        <?php endif; ?>
+                      </div>
+                    </div>
+                  </td>
+                  
+                  <td class="px-8 py-6">
                     <?php if (!$hasLog): ?>
-                      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-500">
+                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-gray-100 text-gray-600 border border-gray-200">
                         <i class="fas fa-ban mr-2"></i>
-                        No Data
+                        No Data Available
                       </span>
                     <?php elseif ($isOlderThan5Days): ?>
-                      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">
+                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-700 border border-red-200">
                         <i class="fas fa-clock mr-2"></i>
-                        Expired
+                        Request Expired
                       </span>
                     <?php elseif ($isOTEligible): ?>
-                      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-700">
+                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
                         <i class="fas fa-star mr-2"></i>
                         OT Eligible (<?= number_format($overtimeHours, 2) ?>h)
                       </span>
                     <?php else: ?>
-                      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
+                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200">
                         <i class="fas fa-check mr-2"></i>
-                        Regular
+                        Regular Work Day
                       </span>
                     <?php endif; ?>
                   </td>
                   
-                  <td class="px-6 py-4">
+                  <td class="px-8 py-6">
                     <?php if (!$hasLog): ?>
-                      <span class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-400 rounded-lg text-sm font-medium">
-                        <i class="fas fa-ban mr-2"></i>
-                        Not Available
-                      </span>
+                      <div class="flex items-center justify-center w-full">
+                        <span class="inline-flex items-center px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-medium border border-gray-200">
+                          <i class="fas fa-ban mr-2"></i>
+                          Not Available
+                        </span>
+                      </div>
                     <?php elseif ($isOlderThan5Days): ?>
-                      <span class="inline-flex items-center px-3 py-2 bg-red-100 text-red-600 rounded-lg text-sm font-medium">
-                        <i class="fas fa-clock mr-2"></i>
-                        Expired
-                      </span>
+                      <div class="flex items-center justify-center w-full">
+                        <span class="inline-flex items-center px-4 py-3 bg-red-100 text-red-600 rounded-xl text-sm font-medium border border-red-200">
+                          <i class="fas fa-clock mr-2"></i>
+                          Time Expired
+                        </span>
+                      </div>
                     <?php elseif ($isOTEligible && !$hasRequest): ?>
                       <button onclick="openOvertimeModal(this)" 
-                              class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-all duration-200 hover-scale focus:outline-none focus:ring-2 focus:ring-emerald-300">
-                        <i class="fas fa-plus mr-2"></i>
-                        Request OT
+                              class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-300">
+                        <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
+                        Submit OT Request
                       </button>
                     <?php elseif ($hasRequest): ?>
-                      <span class="inline-flex items-center px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
-                        <i class="fas fa-check-circle mr-2"></i>
-                        Submitted
-                      </span>
+                      <div class="flex items-center justify-center w-full">
+                        <span class="inline-flex items-center px-4 py-3 bg-green-100 text-green-700 rounded-xl text-sm font-medium border border-green-200">
+                          <i class="fas fa-check-circle mr-2"></i>
+                          Request Submitted
+                        </span>
+                      </div>
                     <?php else: ?>
-                      <span class="text-gray-400 text-sm">N/A</span>
+                      <div class="flex items-center justify-center w-full">
+                        <span class="text-gray-400 text-sm">No Action Required</span>
+                      </div>
                     <?php endif; ?>
                   </td>
                 </tr>
@@ -372,20 +690,45 @@ $default_time_out = $default_sched['time_out'];
       </div>
     </div>
 
-    <!-- Request History Tab Content -->
-    <div id="historyContent" class="bg-white rounded-2xl shadow-lg border border-gray-200 hidden">
+    <!-- Request History Tab Content - Full Width -->
+    <div id="historyContent" class="bg-white rounded-2xl shadow-xl border border-gray-200 hidden overflow-hidden">
       <div class="p-8">
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h3 class="text-xl font-bold text-gray-900 mb-1 flex items-center">
-              <div class="p-2 bg-blue-100 rounded-lg mr-3">
-                <i class="fas fa-file-alt text-blue-600"></i>
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
+          <div class="flex-1">
+            <h3 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+              <div class="p-3 bg-blue-100 rounded-xl mr-4">
+                <i class="fas fa-file-alt text-blue-600 text-xl"></i>
               </div>
               Overtime Request History
             </h3>
-            <p class="text-gray-600">
-              Track the status of your overtime requests
+            <p class="text-gray-600 text-lg">
+              Track the status and progress of all your overtime requests
             </p>
+          </div>
+          
+          <!-- Quick Stats for History -->
+          <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <h4 class="text-sm font-semibold text-gray-700 mb-3">Request Summary</h4>
+            <div class="grid grid-cols-3 gap-4 text-xs">
+              <div class="text-center">
+                <div class="text-lg font-bold text-green-600">
+                  <?= count(array_filter($overtime_history, fn($r) => strtolower($r['request_status'] ?? $r['status']) === 'approved')) ?>
+                </div>
+                <div class="text-gray-600">Approved</div>
+              </div>
+              <div class="text-center">
+                <div class="text-lg font-bold text-yellow-600">
+                  <?= count(array_filter($overtime_history, fn($r) => strtolower($r['request_status'] ?? $r['status']) === 'pending')) ?>
+                </div>
+                <div class="text-gray-600">Pending</div>
+              </div>
+              <div class="text-center">
+                <div class="text-lg font-bold text-red-600">
+                  <?= count(array_filter($overtime_history, fn($r) => in_array(strtolower($r['request_status'] ?? $r['status']), ['declined', 'rejected']))) ?>
+                </div>
+                <div class="text-gray-600">Declined</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -405,38 +748,53 @@ $default_time_out = $default_sched['time_out'];
             </button>
           </div>
         <?php else: ?>
-          <!-- History Table -->
-          <div class="overflow-hidden rounded-xl border border-gray-200">
+          <!-- Enhanced History Table -->
+          <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-lg">
             <div class="overflow-x-auto">
-              <table class="min-w-full bg-white">
-                <thead class="bg-gray-50">
+              <table class="min-w-full">
+                <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
                   <tr>
-                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <th class="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                       <div class="flex items-center">
                         <i class="fas fa-calendar-alt mr-2 text-blue-500"></i>
-                        Date & Time
+                        Date & Time Period
                       </div>
                     </th>
-                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <th class="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                       <div class="flex items-center">
-                        <i class="fas fa-clock mr-2 text-purple-500"></i>
-                        OT Details
+                        <i class="fas fa-calendar-check mr-2 text-indigo-500"></i>
+                        Active Schedule
                       </div>
                     </th>
-                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    <th class="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      <div class="flex items-center">
+                        <i class="fas fa-comment-alt mr-2 text-purple-500"></i>
+                        Request Details
+                      </div>
+                    </th>
+                    <th class="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                       <div class="flex items-center">
                         <i class="fas fa-tag mr-2 text-green-500"></i>
-                        Type & Hours
+                        Type & Duration
                       </div>
                     </th>
-                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Status
+                    <th class="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      <div class="flex items-center">
+                        <i class="fas fa-info-circle mr-2 text-orange-500"></i>
+                        Status
+                      </div>
                     </th>
-                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Submitted
+                    <th class="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      <div class="flex items-center">
+                        <i class="fas fa-clock mr-2 text-gray-500"></i>
+                        Submitted
+                      </div>
                     </th>
-                    <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Actions
+                    <th class="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      <div class="flex items-center">
+                        <i class="fas fa-cog mr-2 text-gray-500"></i>
+                        Actions
+                      </div>
                     </th>
                   </tr>
                 </thead>
@@ -446,13 +804,17 @@ $default_time_out = $default_sched['time_out'];
                     $statusIcon = '';
                     $statusText = '';
                     
-                    switch(strtolower($request['status'])) {
+                    // Use request_status to ensure we're getting the correct status
+                    $currentStatus = strtolower($request['request_status'] ?? $request['status'] ?? 'pending');
+                    
+                    switch($currentStatus) {
                       case 'approved':
                         $statusClass = 'status-approved';
                         $statusIcon = 'fas fa-check-circle';
                         $statusText = 'Approved';
                         break;
                       case 'declined':
+                      case 'rejected':
                         $statusClass = 'status-declined';
                         $statusIcon = 'fas fa-times-circle';
                         $statusText = 'Declined';
@@ -463,79 +825,151 @@ $default_time_out = $default_sched['time_out'];
                         $statusText = 'Pending';
                     }
                   ?>
-                  <tr class="hover:bg-gray-50 transition-colors duration-200 animate-slide-in-right"
+                  <tr class="hover:bg-blue-50/30 transition-all duration-200 animate-slide-in-right group border-l-4 
+                    <?php 
+                      switch($currentStatus) {
+                        case 'approved':
+                          echo 'border-l-green-400 bg-green-50/20';
+                          break;
+                        case 'declined':
+                        case 'rejected':
+                          echo 'border-l-red-400 bg-red-50/20';
+                          break;
+                        default:
+                          echo 'border-l-yellow-400 bg-yellow-50/20';
+                      }
+                    ?>"
                       style="animation-delay: <?= $index * 0.05 ?>s;">
                     
-                    <td class="px-6 py-4">
-                      <div>
-                        <div class="text-base font-semibold text-gray-900">
-                          <?= $request['formatted_log_date'] ?? 'N/A' ?>
+                    <td class="px-8 py-6">
+                      <div class="flex items-center">
+                        <div class="flex-shrink-0 mr-4">
+                          <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-calendar text-blue-600 text-lg"></i>
+                          </div>
                         </div>
-                        <div class="text-sm text-gray-500 flex items-center">
-                          <i class="fas fa-sign-in-alt mr-1 text-green-500"></i>
-                          <?= $request['formatted_time_in'] ?? 'N/A' ?>
-                          <span class="mx-2">→</span>
-                          <i class="fas fa-sign-out-alt mr-1 text-orange-500"></i>
-                          <?= $request['formatted_time_out'] ?? 'N/A' ?>
+                        <div>
+                          <div class="text-lg font-bold text-gray-900">
+                            <?= $request['formatted_log_date'] ?? 'N/A' ?>
+                          </div>
+                          <div class="text-sm text-gray-500 flex items-center mt-1">
+                            <div class="flex items-center mr-4">
+                              <i class="fas fa-sign-in-alt mr-1 text-green-500"></i>
+                              <span class="font-medium"><?= $request['formatted_time_in'] ?? 'N/A' ?></span>
+                            </div>
+                            <div class="flex items-center">
+                              <i class="fas fa-sign-out-alt mr-1 text-orange-500"></i>
+                              <span class="font-medium"><?= $request['formatted_time_out'] ?? 'N/A' ?></span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </td>
                     
-                    <td class="px-6 py-4">
-                      <div class="text-sm text-gray-900 max-w-xs">
-                        <div class="font-medium truncate" title="<?= htmlspecialchars($request['reason']) ?>">
-                          <?= htmlspecialchars(substr($request['reason'], 0, 50)) . (strlen($request['reason']) > 50 ? '...' : '') ?>
+                    <td class="px-8 py-6">
+                      <div class="space-y-2">
+                        <?php 
+                        // Get the correct schedule for this specific date from the history
+                        if (!empty($request['log_date'])) {
+                          $historySchedule = getScheduleForDate($employee_id, $request['log_date'], $pdo);
+                          $historyScheduleTime = $historySchedule['time_in'] . ' - ' . $historySchedule['time_out'];
+                          $historyStatusText = $historySchedule['status_text'];
+                          $historyStatusColor = $historySchedule['status_color']; // Use the color returned by the function
+                        } else {
+                          $historyScheduleTime = '—';
+                          $historyStatusText = 'N/A';
+                          $historyStatusColor = 'text-gray-400';
+                        }
+                        ?>
+                        <div class="text-lg font-bold text-gray-900">
+                          <?= htmlspecialchars($historyScheduleTime) ?>
+                        </div>
+                        <div class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100">
+                          <span class="<?= $historyStatusColor ?>"><?= htmlspecialchars($historyStatusText) ?></span>
+                        </div>
+                      </div>
+                    </td>
+                    
+                    <td class="px-8 py-6">
+                      <div class="space-y-2">
+                        <div class="text-base font-medium text-gray-900 max-w-sm">
+                          <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                            <p class="text-sm leading-relaxed" title="<?= htmlspecialchars($request['reason']) ?>">
+                              <?= htmlspecialchars(substr($request['reason'], 0, 120)) . (strlen($request['reason']) > 120 ? '...' : '') ?>
+                            </p>
+                          </div>
                         </div>
                         <?php if (!empty($request['admin_comment'])): ?>
-                          <div class="text-xs text-gray-500 mt-1 italic">
-                            "<?= htmlspecialchars(substr($request['admin_comment'], 0, 40)) . (strlen($request['admin_comment']) > 40 ? '...' : '') ?>"
+                          <div class="text-xs bg-blue-50 border border-blue-200 rounded-lg p-2">
+                            <span class="font-medium text-blue-700">Admin Note:</span>
+                            <p class="text-blue-600 italic mt-1">
+                              "<?= htmlspecialchars(substr($request['admin_comment'], 0, 80)) . (strlen($request['admin_comment']) > 80 ? '...' : '') ?>"
+                            </p>
                           </div>
                         <?php endif; ?>
                       </div>
                     </td>
                     
-                    <td class="px-6 py-4">
-                      <div>
-                        <div class="text-sm font-medium text-gray-900">
-                          <?= htmlspecialchars($request['ot_type']) ?>
+                    <td class="px-8 py-6">
+                      <div class="flex items-center">
+                        <div class="flex-shrink-0 mr-3">
+                          <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-tag text-green-600"></i>
+                          </div>
                         </div>
-                        <div class="text-sm text-gray-500 flex items-center">
-                          <i class="fas fa-hourglass-half mr-1 text-purple-500"></i>
-                          <?= number_format($request['ot_duration'], 2) ?> hours
+                        <div>
+                          <div class="text-base font-bold text-gray-900">
+                            <?= htmlspecialchars($request['ot_type']) ?>
+                          </div>
+                          <div class="text-sm text-gray-500 flex items-center mt-1">
+                            <i class="fas fa-hourglass-half mr-1 text-purple-500"></i>
+                            <span class="font-medium"><?= number_format($request['ot_duration'], 2) ?> hours</span>
+                          </div>
                         </div>
                       </div>
                     </td>
                     
-                    <td class="px-6 py-4">
-                      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium <?= $statusClass ?>">
+                    <td class="px-8 py-6">
+                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold border <?= $statusClass ?> shadow-sm">
                         <i class="<?= $statusIcon ?> mr-2"></i>
                         <?= $statusText ?>
                       </span>
                     </td>
                     
-                    <td class="px-6 py-4">
-                      <div class="text-sm text-gray-900">
-                        <?= $request['formatted_created_at'] ?>
-                      </div>
-                      <?php if ($request['status'] !== 'pending' && $request['formatted_reviewed_at']): ?>
-                        <div class="text-xs text-gray-500">
-                          Reviewed: <?= $request['formatted_reviewed_at'] ?>
+                    <td class="px-8 py-6">
+                      <div class="text-sm">
+                        <div class="font-medium text-gray-900">
+                          <?= $request['formatted_created_at'] ?>
                         </div>
-                      <?php endif; ?>
+                        <div class="text-xs text-gray-500 mt-1">
+                          <?php 
+                            $submittedDate = new DateTime($request['created_at']);
+                            $now = new DateTime();
+                            $diff = $now->diff($submittedDate);
+                            if ($diff->days > 0) {
+                              echo $diff->days . ' day' . ($diff->days > 1 ? 's' : '') . ' ago';
+                            } elseif ($diff->h > 0) {
+                              echo $diff->h . ' hour' . ($diff->h > 1 ? 's' : '') . ' ago';
+                            } else {
+                              echo $diff->i . ' minute' . ($diff->i > 1 ? 's' : '') . ' ago';
+                            }
+                          ?>
+                        </div>
+                      </div>
                     </td>
                     
-                    <td class="px-6 py-4">
-                      <div class="flex space-x-2">
+                    <td class="px-8 py-6">
+                      <div class="flex flex-col space-y-2">
                         <button onclick="viewOTDetails(<?= $request['id'] ?>)" 
-                                class="inline-flex items-center px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-medium transition-colors">
-                          <i class="fas fa-eye mr-1"></i>
-                          View
+                                class="inline-flex items-center px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-xl text-sm font-medium transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                          <i class="fas fa-eye mr-2"></i>
+                          View Details
                         </button>
                         <?php if (!empty($request['attachment'])): ?>
                           <a href="../uploads/overtime_attachments/<?= htmlspecialchars($request['attachment']) ?>" target="_blank"
-                             class="inline-flex items-center px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
-                            <i class="fas fa-paperclip mr-1"></i>
-                            File
+                             class="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                            <i class="fas fa-paperclip mr-2"></i>
+                            Attachment
                           </a>
                         <?php endif; ?>
                       </div>

@@ -153,7 +153,49 @@ try {
     $success = $stmt->execute($insertData);
 
     if ($success) {
-        error_log("Overtime request inserted successfully");
+        $requestId = $pdo->lastInsertId();
+        error_log("Overtime request inserted successfully with ID: $requestId");
+        
+        // Get employee details for WhatsApp notification
+        $empStmt = $pdo->prepare("
+            SELECT CONCAT(fname, ' ', lname) as employee_name, company 
+            FROM employees 
+            WHERE id = ?
+        ");
+        $empStmt->execute([$employee_id]);
+        $employee = $empStmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Send WhatsApp notification if employee is from Bugardi
+        if ($employee && strtolower($employee['company']) === 'bugardi') {
+            try {
+                require_once '../Bugardi/quick-approval-system/whatsapp-notifications/CallMeBotWhatsApp.php';
+                
+                $whatsapp = new CallMeBotWhatsApp();
+                
+                // Prepare OT data for notification
+                $otData = [
+                    'employee_name' => $employee['employee_name'],
+                    'date' => date('Y-m-d', strtotime($time_in)),
+                    'start_time' => date('H:i:s', strtotime($time_in)),
+                    'end_time' => date('H:i:s', strtotime($time_out)),
+                    'duration_hours' => $overtime_hours,
+                    'reason' => $reason_trimmed,
+                    'position' => 'Staff' // You can modify this if position is available
+                ];
+                
+                $whatsappResult = $whatsapp->sendOTNotification($requestId, $otData);
+                
+                if ($whatsappResult) {
+                    error_log("✅ WhatsApp notification sent successfully for OT request #$requestId - " . $employee['employee_name']);
+                } else {
+                    error_log("❌ WhatsApp notification failed for OT request #$requestId - " . $employee['employee_name']);
+                }
+                
+            } catch (Exception $e) {
+                error_log("WhatsApp notification error for OT request #$requestId: " . $e->getMessage());
+            }
+        }
+        
         echo json_encode(['success' => true, 'message' => 'Overtime request submitted successfully!']);
     } else {
         $errorInfo = $stmt->errorInfo();

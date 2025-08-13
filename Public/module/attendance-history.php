@@ -70,6 +70,25 @@ $allLogsStmt = $pdo->prepare("
 $allLogsStmt->execute([$employee_id]);
 $logs = $allLogsStmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch overtime requests for the same period
+$otRequestsStmt = $pdo->prepare("
+    SELECT 
+        DATE(tl.log_date) as log_date,
+        COALESCE(por.status, or_table.status) as ot_status
+    FROM time_logs tl
+    LEFT JOIN overtime_requests or_table ON tl.employee_id = or_table.employee_id AND DATE(tl.log_date) = DATE(or_table.created_at)
+    LEFT JOIN post_ot_requests por ON tl.employee_id = por.employee_id AND DATE(tl.log_date) = DATE(por.created_at)
+    WHERE tl.employee_id = ? AND tl.log_date >= '2025-07-01'
+");
+$otRequestsStmt->execute([$employee_id]);
+$otRequests = $otRequestsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Create OT status map
+$otStatusMap = [];
+foreach ($otRequests as $otRequest) {
+    $otStatusMap[$otRequest['log_date']] = $otRequest['ot_status'];
+}
+
 // Create date-indexed map
 $logMap = [];
 foreach ($logs as $log) {
@@ -179,12 +198,13 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours Worked</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OT Status</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($currentPageDates)): ?>
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
                             <div class="flex flex-col items-center gap-2">
                                 <i class="fas fa-search text-4xl text-gray-300"></i>
                                 <?php if (!empty($searchDate)): ?>
@@ -296,6 +316,32 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 <span class="px-3 py-1 text-xs font-semibold rounded-full <?= $badgeClass ?>">
                                     <?= $status ?>
                                 </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <?php 
+                                $otStatus = $otStatusMap[$logDate] ?? null;
+                                if ($otStatus): 
+                                    $otBadgeClass = '';
+                                    switch (strtolower($otStatus)) {
+                                        case 'pending':
+                                            $otBadgeClass = 'bg-yellow-100 text-yellow-800';
+                                            break;
+                                        case 'approved':
+                                            $otBadgeClass = 'bg-green-100 text-green-800';
+                                            break;
+                                        case 'rejected':
+                                            $otBadgeClass = 'bg-red-100 text-red-800';
+                                            break;
+                                        default:
+                                            $otBadgeClass = 'bg-gray-100 text-gray-800';
+                                    }
+                                ?>
+                                    <span class="px-3 py-1 text-xs font-semibold rounded-full <?= $otBadgeClass ?>">
+                                        <?= ucfirst($otStatus) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-gray-400 text-sm">-</span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>

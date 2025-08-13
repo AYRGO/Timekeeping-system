@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ⏰ **Duration:** {$duration} hours
 📝 **Reason:** {$reason}
 
-📱 **WhatsApp Notification:** Sent to Scott (+639938642974)
+📱 **WhatsApp Notification:** Sent from +34684734044 to +639762477146
 
 🔧 **Scott's Reply Options:**
 • **Approve:** Text `A{$otRequestId}` to WhatsApp
@@ -97,6 +97,8 @@ $pendingCount = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="../../../../../src/output.css?v=<?= time() ?>" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <title>Complete OT Workflow Test</title>
     <style>
         body { 
@@ -215,7 +217,7 @@ $pendingCount = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
                 <p>Reply Format</p>
             </div>
             <div class="stat">
-                <h3>+639938642974</h3>
+                <h3>+639762477146</h3>
                 <p>Scott's WhatsApp</p>
             </div>
         </div>

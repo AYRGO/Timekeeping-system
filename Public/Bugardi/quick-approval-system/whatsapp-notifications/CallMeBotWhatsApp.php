@@ -1,7 +1,8 @@
 <?php
 /**
  * CallMeBot WhatsApp Notification System
- * Simple PHP integration for sending WhatsApp messages to Scott
+ * Simple PHP integration for sending WhatsApp messages
+ * Messages are sent FROM +34684734044 (CallMeBot) TO your phone (+639762477146)
  */
 
 class CallMeBotWhatsApp {
@@ -9,10 +10,21 @@ class CallMeBotWhatsApp {
     private $scottPhone;
     private $approvalLink;
     
-    public function __construct($apiKey = '6561289', $scottPhone = '+639938642974') {
+    public function __construct($apiKey = '2833078', $scottPhone = '+639762477146') {
         $this->apiKey = $apiKey;
         $this->scottPhone = $scottPhone;
-        $this->approvalLink = 'https://harley.resourcestaffonline.com/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=a1b2c3d4e5f6g7h8i9j0&type=permanent';
+        // Generate permanent approval link dynamically
+        $this->approvalLink = $this->generatePermanentApprovalLink();
+    }
+    
+    /**
+     * Generate permanent approval link dynamically
+     */
+    private function generatePermanentApprovalLink() {
+        $secret = 'quick-ot-approval-bugardi-permanent-2025';
+        $permanentToken = hash('sha256', 'quick-permanent' . $secret);
+        $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
+        return $baseUrl . '/Timekeeping-system/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $permanentToken . '&type=permanent';
     }
     
     /**
@@ -77,6 +89,32 @@ class CallMeBotWhatsApp {
             
             // Try to query database if PDO exists
             if (isset($pdo)) {
+                // First try post_ot_requests table (current table used by system)
+                $query = "
+                    SELECT 
+                        ot.id,
+                        CONCAT(emp.fname, ' ', emp.lname) as employee_name,
+                        emp.position,
+                        DATE(ot.time_in) as date,
+                        TIME(ot.time_in) as start_time,
+                        TIME(ot.time_out) as end_time,
+                        ot.ot_duration as duration_hours,
+                        ot.reason,
+                        ot.created_at
+                    FROM post_ot_requests ot
+                    JOIN employees emp ON ot.employee_id = emp.id
+                    WHERE ot.id = ? AND LOWER(emp.company) = 'bugardi'
+                ";
+                
+                $stmt = $pdo->prepare($query);
+                $stmt->execute([$requestId]);
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($result) {
+                    return $result;
+                }
+                
+                // Fallback to overtime_requests table if not found in post_ot_requests
                 $query = "
                     SELECT 
                         ot.id,
@@ -288,8 +326,9 @@ if (isset($_GET['docs'])) {
         
         <h2>✅ Configuration</h2>
         <ul>
-            <li><strong>API Key:</strong> 6561289 (configured)</li>
-            <li><strong>Scott's Phone:</strong> +639938642974</li>
+            <li><strong>API Key:</strong> 2833078 (configured)</li>
+            <li><strong>Your Phone:</strong> +639762477146 (receives messages)</li>
+            <li><strong>CallMeBot Sender:</strong> +34684734044 (sends messages)</li>
             <li><strong>Approval Link:</strong> Ready</li>
         </ul>
         

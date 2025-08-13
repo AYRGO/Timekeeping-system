@@ -1,4 +1,7 @@
 <?php
+// Set timezone to Manila time (UTC+8)
+date_default_timezone_set('Asia/Manila');
+
 // Load environment variables
 require_once __DIR__ . '/env.php';
 
@@ -12,7 +15,7 @@ try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
-    // Set timezone for database connections
+    // Set timezone for database connections to Manila time (UTC+8)
     $pdo->exec("SET time_zone = '+08:00'");
     
 } catch (PDOException $e) {
