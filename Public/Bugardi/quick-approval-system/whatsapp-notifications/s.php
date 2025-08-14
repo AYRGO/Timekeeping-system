@@ -34,7 +34,7 @@ function createShortLink($originalUrl, $requestId, $action) {
     $stmt = $pdo->prepare("INSERT INTO short_links (short_code, original_url, request_id, action) VALUES (?, ?, ?, ?)");
     $stmt->execute([$shortCode, $originalUrl, $requestId, $action]);
     
-    return "http://localhost/Timekeeping-system/Public/Bugardi/quick-approval-system/whatsapp-notifications/s.php?c=" . $shortCode;
+    return "https://harley.resourcestaff.com/Public/Bugardi/quick-approval-system/whatsapp-notifications/s.php?c=" . $shortCode;
 }
 
 // Handle redirect

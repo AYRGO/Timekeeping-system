@@ -21,6 +21,8 @@ $default_schedule_id = $employee['official_sched'] ?? 4;
 
 // Hardcoded schedule times
 $schedule_times = [
+    1 => ['in' => '06:30:00', 'out' => '15:30:00'],
+    2 => ['in' => '08:00:00', 'out' => '19:00:00'],
     3 => ['in' => '07:30:00', 'out' => '16:30:00'],
     4 => ['in' => '07:00:00', 'out' => '16:00:00'],
     5 => ['in' => '08:00:00', 'out' => '17:00:00'],
@@ -30,6 +32,13 @@ $schedule_times = [
     9 => ['in' => '08:00:00', 'out' => '16:30:00'],
     10 => ['in' => '07:40:00', 'out' => '16:40:00'],
     11 => ['in' => '06:30:00', 'out' => '15:00:00'],
+    12 => ['in' => '06:30:00', 'out' => '17:30:00'],
+    13 => ['in' => '07:00:00', 'out' => '18:00:00'],
+    14 => ['in' => '06:00:00', 'out' => '17:00:00'],
+    15 => ['in' => '06:00:00', 'out' => '16:00:00'],
+    16 => ['in' => '08:30:00', 'out' => '16:30:00'],
+    17 => ['in' => '06:00:00', 'out' => '12:00:00'],
+    18 => ['in' => '06:00:00', 'out' => '14:30:00'],
 ];
 
 $today = date('Y-m-d');
@@ -68,7 +77,7 @@ if ($currentActiveSchedule) {
         $status_text = "New Schedule Pending";
     } else {
         $schedule_status = "approved";
-        $status_text = "Active Schedule (" . date('M d', strtotime($currentActiveSchedule['start_date'])) . " - " . date('M d', strtotime($currentActiveSchedule['end_date'])) . ")";
+        $status_text = "Changed Schedule (Active: " . date('M d', strtotime($currentActiveSchedule['start_date'])) . " - " . date('M d', strtotime($currentActiveSchedule['end_date'])) . ")";
     }
 } else {
     // No currently active approved schedule
@@ -157,14 +166,7 @@ function getCurrentRealScheduleId($employee_id, $pdo) {
                 <?= htmlspecialchars($sched_time_in) ?> - <?= htmlspecialchars($sched_time_out) ?>
             </p>
             <!-- Enhanced debug info -->
-            <div class="text-xs text-gray-400 mt-1">
-            
-                <?php if ($currentActiveSchedule && $latestRequest && strtolower(trim($latestRequest['status'])) === 'pending'): ?>
-                <?php elseif ($currentActiveSchedule): ?>
-                <?php else: ?>
-
-                <?php endif; ?>
-            </div>
+            <!-- Debug info removed as requested -->
         </div>
         <div class="w-12 h-12 rounded-full bg-<?= $color ?>-100 flex items-center justify-center">
             <?php if ($currentActiveSchedule): ?>
@@ -175,6 +177,12 @@ function getCurrentRealScheduleId($employee_id, $pdo) {
         </div>
     </div>
     <div class="mt-2 flex items-center text-sm text-<?= $color ?>-600">
-        <span class="bg-<?= $color ?>-100 px-2 py-1 rounded-full"><?= htmlspecialchars($status_text) ?></span>
+        <span class="bg-<?= $color ?>-100 px-1 py-1 rounded-full">
+            <?php 
+            // Remove 'Active:' from status_text if present
+            $clean_status_text = str_replace('Active:', '', $status_text);
+            echo htmlspecialchars(trim($clean_status_text));
+            ?>
+        </span>
     </div>
 </div>

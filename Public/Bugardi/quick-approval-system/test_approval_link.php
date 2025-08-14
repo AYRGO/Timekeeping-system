@@ -10,7 +10,7 @@ echo "<h1>🔗 OT Approval Link Test</h1>";
 $secret = 'quick-ot-approval-bugardi-permanent-2025';
 $permanentToken = hash('sha256', 'quick-permanent' . $secret);
 $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
-$approvalLink = $baseUrl . '/Timekeeping-system/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $permanentToken . '&type=permanent';
+$approvalLink = $baseUrl . '/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $permanentToken . '&type=permanent';
 
 echo "<h2>✅ Generated Approval Link:</h2>";
 echo "<p style='word-break: break-all; background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;'>";

@@ -30,12 +30,12 @@ if ($_POST['action'] ?? false) {
 
 function getPermanentLink($token) {
     $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
-    return $baseUrl . '/Timekeeping-system/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $token . '&type=permanent';
+    return $baseUrl . '/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $token . '&type=permanent';
 }
 
 function getTemporaryLink($token) {
     $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
-    return $baseUrl . '/Timekeeping-system/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $token . '&type=temporary';
+    return $baseUrl . '/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $token . '&type=temporary';
 }
 
 // Get current statistics

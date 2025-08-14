@@ -110,23 +110,107 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
+    
+    /* Reddit-style news image cards */
+    .news-image-card {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        position: relative;
+    }
+    
+    .news-image-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        border-color: #3b82f6;
+    }
+    
+    .news-image-card img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+    
+    .news-image-card:hover img {
+        transform: scale(1.05);
+    }
+    
+    .news-image-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+        padding: 20px 16px 16px;
+        color: white;
+    }
+    
+    .news-image-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+        line-height: 1.25;
+        margin-bottom: 4px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    .news-image-source {
+        font-size: 0.75rem;
+        opacity: 0.9;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .news-image-card .upvote-indicator {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border-radius: 8px;
+        padding: 4px 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #059669;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
 </style>
 
         
 <div class="flex gap-6">
     <!-- Main Content -->
     <div class="flex-1">
-        <!-- News Feed Header -->
-        <div class="mb-4">
-            <div class="rounded-lg p-4 bg-white border border-gray-200 shadow-sm">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="text-xl font-semibold text-gray-800 mb-1 flex items-center">
-                            <span class="mr-2">📰</span> News Feed
-                        </h1>
-                        <p class="text-sm text-gray-500">
-                            Stay updated with the latest announcements and company news
-                        </p>
+        
+        <!-- Reddit-style News Images Section -->
+        <div class="mb-6">
+            <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <span class="mr-2">🖼️</span> Trending News
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <button onclick="refreshNewsImages()" class="text-gray-500 hover:text-gray-700 transition-colors">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button onclick="nextNewsImages()" class="text-gray-500 hover:text-blue-600 transition-colors" title="Next news">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="news-images-container" class="grid grid-cols-3 gap-4 p-4">
+                    <!-- Loading placeholder -->
+                    <div class="flex items-center justify-center col-span-full py-8">
+                        <div class="loading-spinner mx-auto"></div>
+                        <p class="text-center text-gray-500 ml-3">Loading trending news...</p>
                     </div>
                 </div>
             </div>
@@ -274,17 +358,8 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     $filePath = str_replace(['\\', '//'], '/', $filePath);
                                     $filePath = ltrim($filePath, '/');
                                     
-                                    // Construct proper file URL - simplified path construction
-                                    if (strpos($filePath, 'uploads/') === 0) {
-                                        // File is already in uploads folder
-                                        $fileUrl = '/Timekeeping-system/Public/views/' . $filePath;
-                                    } elseif (strpos($filePath, 'views/uploads/') === 0) {
-                                        // File path includes views/uploads
-                                        $fileUrl = '/Timekeeping-system/Public/' . $filePath;
-                                    } else {
-                                        // Default case - assume it's in uploads
-                                        $fileUrl = '/Timekeeping-system/Public/views/uploads/' . basename($filePath);
-                                    }
+                                    // Construct proper file URL for download
+                                    $fileUrl = '/Timekeeping-system/Public/views/' . $filePath;
                                     
                                     $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
                                     $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']);
@@ -740,6 +815,142 @@ async function loadNews() {
     }
 }
 
+// Reddit-style News Images Loader
+async function loadNewsImages() {
+    try {
+        // For demo purposes, we'll use curated fallback news with realistic images
+        // In production, you can integrate with NewsAPI or other news services
+        const fallbackNewsImages = [
+            {
+                title: "Philippine Stock Exchange Reaches New Heights in Technology Sector",
+                image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=300&fit=crop&auto=format",
+                source: "Business World",
+                url: "https://www.bworldonline.com/",
+                upvotes: Math.floor(Math.random() * 500) + 100,
+                timeAgo: "2 hours ago"
+            },
+            {
+                title: "Clark International Airport Expansion Project Shows Significant Progress",
+                image: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400&h=300&fit=crop&auto=format",
+                source: "Philippine News Agency",
+                url: "https://www.pna.gov.ph/",
+                upvotes: Math.floor(Math.random() * 400) + 150,
+                timeAgo: "4 hours ago"
+            },
+            {
+                title: "New Digital Infrastructure Initiative Launched in Metro Manila",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop&auto=format",
+                source: "Tech News PH",
+                url: "https://technews.ph/",
+                upvotes: Math.floor(Math.random() * 600) + 200,
+                timeAgo: "6 hours ago"
+            },
+            {
+                title: "Renewable Energy Projects Boost Philippines' Sustainability Goals",
+                image: "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=400&h=300&fit=crop&auto=format",
+                source: "Environmental News",
+                url: "https://www.doe.gov.ph/",
+                upvotes: Math.floor(Math.random() * 350) + 80,
+                timeAgo: "8 hours ago"
+            },
+            {
+                title: "Healthcare Digitization Program Improves Patient Services Nationwide",
+                image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop&auto=format",
+                source: "DOH Philippines",
+                url: "https://www.doh.gov.ph/",
+                upvotes: Math.floor(Math.random() * 450) + 120,
+                timeAgo: "12 hours ago"
+            },
+            {
+                title: "Education Technology Integration Shows Promising Results in Public Schools",
+                image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=300&fit=crop&auto=format",
+                source: "DepEd Official",
+                url: "https://www.deped.gov.ph/",
+                upvotes: Math.floor(Math.random() * 300) + 90,
+                timeAgo: "1 day ago"
+            }
+        ];
+
+        // Shuffle and select random articles for variety
+        const shuffled = fallbackNewsImages.sort(() => 0.5 - Math.random());
+        const selectedNews = shuffled.slice(0, 3); // Show 3 news items
+
+        let newsHtml = '';
+        selectedNews.forEach(news => {
+            newsHtml += `
+                <div class="news-image-card" onclick="openNewsArticle('${news.url}', '${news.title.replace(/'/g, "\\'")}')">
+                    <div class="upvote-indicator">
+                        <i class="fas fa-arrow-up"></i>
+                        ${news.upvotes}
+                    </div>
+                    <img src="${news.image}" alt="${news.title}" onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=300&fit=crop&auto=format'">
+                    <div class="news-image-overlay">
+                        <h3 class="news-image-title">${news.title}</h3>
+                        <div class="news-image-source">
+                            <i class="fas fa-newspaper"></i>
+                            ${news.source} • ${news.timeAgo}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        document.getElementById('news-images-container').innerHTML = newsHtml;
+    } catch (error) {
+        console.error('News images loading error:', error);
+        document.getElementById('news-images-container').innerHTML = `
+            <div class="col-span-full text-center py-8">
+                <i class="fas fa-exclamation-triangle text-red-400 text-2xl mb-2"></i>
+                <p class="text-gray-500">Unable to load news images</p>
+            </div>
+        `;
+    }
+}
+
+// Function to handle news article clicks
+function openNewsArticle(url, title) {
+    // Add click animation
+    const clickedCard = event.currentTarget;
+    clickedCard.style.transform = 'scale(0.95)';
+    setTimeout(() => {
+        clickedCard.style.transform = '';
+    }, 150);
+
+    // Open article in new tab
+    window.open(url, '_blank');
+    
+    // Optional: Track clicks for analytics
+    console.log(`Clicked news article: ${title}`);
+}
+
+// Refresh function for news images
+function refreshNewsImages() {
+    document.getElementById('news-images-container').innerHTML = `
+        <div class="flex items-center justify-center col-span-full py-8">
+            <div class="loading-spinner mx-auto"></div>
+            <p class="text-center text-gray-500 ml-3">Refreshing news...</p>
+        </div>
+    `;
+    
+    setTimeout(() => {
+        loadNewsImages();
+    }, 1000); // Add slight delay for better UX
+}
+
+// Next news function for navigation
+function nextNewsImages() {
+    document.getElementById('news-images-container').innerHTML = `
+        <div class="flex items-center justify-center col-span-full py-8">
+            <div class="loading-spinner mx-auto"></div>
+            <p class="text-center text-gray-500 ml-3">Loading next news...</p>
+        </div>
+    `;
+    
+    setTimeout(() => {
+        loadNewsImages();
+    }, 800); // Slightly faster than refresh for better UX
+}
+
 async function loadFact() {
     try {
         const response = await fetch('https://uselessfacts.jsph.pl/random.json?language=en');
@@ -823,12 +1034,14 @@ document.addEventListener('DOMContentLoaded', function() {
     loadQuote();
     loadNews();
     loadFact();
+    loadNewsImages(); // Load the Reddit-style news images
     
     // Auto-refresh every 30 minutes for weather and news
     setInterval(() => {
         console.log('Auto-refreshing weather and news...');
         loadWeather();
         loadNews();
+        loadNewsImages(); // Also refresh news images
     }, 30 * 60 * 1000);
     
     // Refresh quote and fact every hour

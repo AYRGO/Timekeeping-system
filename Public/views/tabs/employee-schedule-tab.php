@@ -37,11 +37,18 @@
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Select New Schedule</label>
+                            <?php 
+                            // Sort scheduleOptions by time in (earliest to latest)
+                            $sortedOptions = $scheduleOptions;
+                            uasort($sortedOptions, function($a, $b) {
+                                return strtotime($a['in']) - strtotime($b['in']);
+                            });
+                            ?>
                             <select name="official_sched" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">Select a schedule...</option>
-                                <?php foreach ($scheduleOptions as $id => $times): ?>
-                                    <option value="<?= $id ?>" <?= $currentSched == $id ? 'selected' : '' ?>>
-                                        Schedule <?= $id ?> - <?= $times['in'] ?> to <?= $times['out'] ?>
+                                <?php foreach ($sortedOptions as $id => $times): ?>
+                                    <option value="<?= $id ?>" <?= $currentSched == $id ? 'selected' : '' ?> >
+                                        <?= $times['in'] ?> to <?= $times['out'] ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -52,7 +59,7 @@
                             <?php foreach ($scheduleOptions as $id => $times): ?>
                                 <div class="border border-gray-200 rounded-lg p-4 <?= $currentSched == $id ? 'bg-blue-50 border-blue-300' : 'hover:bg-gray-50' ?>">
                                     <div class="text-center">
-                                        <h4 class="font-semibold text-gray-800">Schedule <?= $id ?></h4>
+                                        <h4 class="font-semibold text-gray-800">&nbsp;</h4>
                                         <p class="text-sm text-gray-600 mt-1"><?= $times['in'] ?> - <?= $times['out'] ?></p>
                                         <?php if ($currentSched == $id): ?>
                                             <span class="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Current</span>

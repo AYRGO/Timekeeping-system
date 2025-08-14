@@ -60,6 +60,35 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                                     'pending' => 'bg-yellow-100 text-yellow-800',
                                     default => 'bg-gray-100 text-gray-700',
                                 };
+
+                                // Try to extract hours, leave type, and other info from message
+                                preg_match('/(\d+(?:\.\d+)?)(?:\s*hours?|hrs?)/i', $msg, $hrsMatch);
+                                $hrs = $hrsMatch[1] ?? null;
+                                preg_match('/(Sick|Vacation|Emergency|Maternity|Paternity|Bereavement|Leave)/i', $msg, $leaveMatch);
+                                $leaveType = $leaveMatch[1] ?? null;
+                                preg_match('/(\d{4}-\d{2}-\d{2})/i', $msg, $dateMatch);
+                                $activityDate = $dateMatch[1] ?? $created;
+
+                                // Build sentence-style summary
+                                $sentence = "On $created: ";
+                                if ($type === 'Leave' && $leaveType) {
+                                    $sentence .= "$leaveType leave";
+                                } elseif ($type === 'Overtime') {
+                                    $sentence .= "Overtime";
+                                } elseif ($type === 'Schedule') {
+                                    $sentence .= "Schedule change";
+                                } elseif ($type === 'Time') {
+                                    $sentence .= "Time adjustment";
+                                } else {
+                                    $sentence .= "$type request";
+                                }
+                                if ($hrs) {
+                                    $sentence .= " for $hrs hour" . ($hrs > 1 ? 's' : '');
+                                }
+                                if ($activityDate && $activityDate !== $created) {
+                                    $sentence .= " on $activityDate";
+                                }
+                                $sentence .= " was $status.";
                             ?>
                             <tr>
                                 <td class="px-4 py-3 text-gray-500"><?= $created ?></td>
@@ -70,7 +99,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-green-600 hover:text-green-900">
-                                    <button onclick="alert(`<?= htmlspecialchars_decode($msg) ?>`)">View</button>
+                                    <button onclick="alert(`<?= htmlspecialchars_decode($sentence) ?>`)">View</button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

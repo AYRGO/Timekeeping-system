@@ -24,7 +24,7 @@ class CallMeBotWhatsApp {
         $secret = 'quick-ot-approval-bugardi-permanent-2025';
         $permanentToken = hash('sha256', 'quick-permanent' . $secret);
         $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
-        return $baseUrl . '/Timekeeping-system/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $permanentToken . '&type=permanent';
+        return $baseUrl . '/Public/Bugardi/quick-approval-system/approval-pages/quick_ot_approval.php?token=' . $permanentToken . '&type=permanent';
     }
     
     /**
@@ -69,7 +69,7 @@ class CallMeBotWhatsApp {
             $possiblePaths = [
                 dirname(__FILE__) . '/../../../config/db.php',
                 dirname(__FILE__) . '/../../../../config/db.php',
-                $_SERVER['DOCUMENT_ROOT'] . '/Timekeeping-system/Public/config/db.php',
+                $_SERVER['DOCUMENT_ROOT'] . '/Public/config/db.php',
                 dirname(__FILE__) . '/../../config/db.php'
             ];
             

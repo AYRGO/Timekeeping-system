@@ -76,7 +76,7 @@ function showSuccess($action, $request) {
     // Generate link back to main dashboard
     $secret = 'quick-ot-approval-bugardi-temporary-2025';
     $token = hash('sha256', 'quick-temporary' . $secret . date('Y-m-d'));
-    $dashboardLink = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/Timekeeping-system/Public/Bugardi/quick_ot_approval.php?token=' . $token . '&type=temporary';
+    $dashboardLink = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/Public/Bugardi/quick_ot_approval.php?token=' . $token . '&type=temporary';
     
     echo "
     <!DOCTYPE html>

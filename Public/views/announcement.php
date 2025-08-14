@@ -32,6 +32,7 @@ if (
     $content = trim($_POST['content']);
     $uploadedFiles = [];
 
+    // Use only one file input for all attachments
     if (!empty($_FILES['attachments']['name'][0])) {
         $allowedTypes = [
             'application/pdf', 'application/msword',
@@ -43,6 +44,7 @@ if (
             'image/jpeg', 'image/png', 'image/gif', 'image/webp',
         ];
 
+        // Use correct upload directory (relative to Public/views)
         $uploadDir = __DIR__ . '/uploads';
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
 
@@ -70,7 +72,7 @@ if (
 
             if (in_array($fileType, $allowedTypes)) {
                 $uniqueName = uniqid('file_', true) . '.' . $ext;
-                $filePath = 'uploads/' . $uniqueName;
+                $filePath = 'uploads/' . $uniqueName; // Save relative to Public/views
                 
                 if (move_uploaded_file($tmpName, $uploadDir . '/' . $uniqueName)) {
                     $uploadedFiles[] = ['original' => $fileName, 'stored' => $filePath];
@@ -273,15 +275,9 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                         <div class="flex items-center space-x-4">
                                             <label for="attachmentUpload" class="flex items-center space-x-2 cursor-pointer text-green-600 hover:text-green-700 px-3 py-2 rounded-lg hover:bg-green-50">
                                                 <i class="fas fa-image"></i>
-                                                <span>Photo/Video</span>
+                                                <span>Photo/Video/Document</span>
                                             </label>
                                             <input type="file" id="attachmentUpload" name="attachments[]" multiple class="hidden" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
-                                            
-                                            <label for="documentUpload" class="flex items-center space-x-2 cursor-pointer text-blue-600 hover:text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-50">
-                                                <i class="fas fa-file-alt"></i>
-                                                <span>Document</span>
-                                            </label>
-                                            <input type="file" id="documentUpload" name="attachments[]" multiple class="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
                                         </div>
                                         
                                         <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
@@ -429,18 +425,14 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                             <?php foreach ($files as $fileInfo):
                                                 $filePath = is_array($fileInfo) ? $fileInfo['stored'] : $fileInfo;
                                                 $originalName = is_array($fileInfo) ? $fileInfo['original'] : basename($fileInfo);
-                                                
+
                                                 // Clean up the file path
                                                 $filePath = str_replace(['\\', '//'], '/', $filePath);
                                                 $filePath = ltrim($filePath, '/');
-                                                
-                                                // Construct proper file URL
-                                                if (strpos($filePath, 'uploads/') === 0) {
-                                                    $fileUrl = $filePath;
-                                                } else {
-                                                    $fileUrl = 'uploads/' . basename($filePath);
-                                                }
-                                                
+
+                                                // Construct proper file URL for download
+                                                $fileUrl = '/Timekeeping-system/Public/views/uploads/' . basename($filePath);
+
                                                 $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
                                                 $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']);
                                             ?>

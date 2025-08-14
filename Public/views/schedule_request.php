@@ -44,6 +44,8 @@ $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Function to get schedule time display
 function getScheduleTime($schedule_id) {
     switch ((int)$schedule_id) {
+        case 1: return '6:30 AM – 3:30 PM';
+        case 2: return '8:00 AM – 7:00 PM';
         case 3: return '7:30 AM – 4:30 PM';
         case 4: return '7:00 AM – 4:00 PM';
         case 5: return '8:00 AM – 5:00 PM';
@@ -52,6 +54,14 @@ function getScheduleTime($schedule_id) {
         case 8: return '6:00 AM – 3:00 PM';
         case 9: return '8:00 AM – 4:30 PM';
         case 10: return '7:40 AM – 4:40 PM';
+        case 11: return '6:30 AM – 3:30 PM';
+        case 12: return '6:30 AM – 5:30 PM';
+        case 13: return '7:00 AM – 6:00 PM';
+        case 14: return '6:00 AM – 5:00 PM';
+        case 15: return '6:00 AM – 4:00 PM';
+        case 16: return '8:30 AM – 4:30 PM';
+        case 17: return '6:00 AM – 12:00 PM';
+        case 18: return '6:00 AM – 2:30 PM';
         default: return 'N/A';
     }
 }
@@ -60,6 +70,8 @@ function getScheduleTime($schedule_id) {
 function getCurrentScheduleForEmployee($employee_id, $pdo) {
     // Hardcoded schedule times
     $schedule_times = [
+        1 => ['in' => '06:30:00', 'out' => '15:30:00'],
+        2 => ['in' => '08:00:00', 'out' => '19:00:00'],
         3 => ['in' => '07:30:00', 'out' => '16:30:00'],
         4 => ['in' => '07:00:00', 'out' => '16:00:00'],
         5 => ['in' => '08:00:00', 'out' => '17:00:00'],
@@ -69,8 +81,17 @@ function getCurrentScheduleForEmployee($employee_id, $pdo) {
         9 => ['in' => '08:00:00', 'out' => '16:30:00'],
         10 => ['in' => '07:40:00', 'out' => '16:40:00'],
         11 => ['in' => '06:30:00', 'out' => '15:00:00'],
+            12 => ['in' => '06:30:00', 'out' => '17:30:00'],
+    13 => ['in' => '07:00:00', 'out' => '18:00:00'],
+    14 => ['in' => '06:00:00', 'out' => '17:00:00'],
+    15 => ['in' => '06:00:00', 'out' => '16:00:00'],
+    16 => ['in' => '08:30:00', 'out' => '16:30:00'],
+    17 => ['in' => '06:00:00', 'out' => '12:00:00'],
+    18 => ['in' => '06:00:00', 'out' => '14:30:00'],
+
     ];
     $today = date('Y-m-d');
+    
     // Get official_sched
     $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
     $stmt->execute([$employee_id]);

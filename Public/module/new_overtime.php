@@ -13,6 +13,84 @@ require_once 'time_logs_helper.php';
 // Include schedule tracker to get current schedule information
 include_once 'stats/schedule_tracker.php';
 
+// Updated overtime eligibility function based on active schedule
+
+// Overtime eligibility and calculation with grace period and late deduction
+function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo) {
+  if (empty($time_in) || empty($time_out)) {
+    return false;
+  }
+  $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
+  $schedule_in = $scheduleInfo['time_in'];
+  $schedule_out = $scheduleInfo['time_out'];
+  $schedule_in_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_in)));
+  $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  $actual_in_dt = new DateTime($time_in);
+  $actual_out_dt = new DateTime($time_out);
+
+  // Grace period: 15 minutes after scheduled time in
+  $grace_in_dt = clone $schedule_in_dt;
+  $grace_in_dt->modify('+15 minutes');
+
+  // Calculate late minutes beyond grace
+  $late_minutes = 0;
+  if ($actual_in_dt > $grace_in_dt) {
+    $late_interval = $grace_in_dt->diff($actual_in_dt);
+    $late_minutes = ($late_interval->h * 60) + $late_interval->i;
+  }
+
+  // Overtime is any time worked past scheduled out
+  if ($actual_out_dt <= $schedule_out_dt) {
+    return false;
+  }
+
+  // Calculate raw OT minutes
+  $ot_interval = $schedule_out_dt->diff($actual_out_dt);
+  $ot_minutes = ($ot_interval->h * 60) + $ot_interval->i;
+
+  // Deduct late minutes from OT
+  $net_ot_minutes = $ot_minutes - $late_minutes;
+  return $net_ot_minutes >= 30; // Eligible if net OT is 30+ minutes
+}
+
+function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo) {
+  if (empty($time_in) || empty($time_out)) {
+    return 0;
+  }
+  $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
+  $schedule_in = $scheduleInfo['time_in'];
+  $schedule_out = $scheduleInfo['time_out'];
+  $schedule_in_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_in)));
+  $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  $actual_in_dt = new DateTime($time_in);
+  $actual_out_dt = new DateTime($time_out);
+
+  // Grace period: 15 minutes after scheduled time in
+  $grace_in_dt = clone $schedule_in_dt;
+  $grace_in_dt->modify('+15 minutes');
+
+  // Calculate late minutes beyond grace
+  $late_minutes = 0;
+  if ($actual_in_dt > $grace_in_dt) {
+    $late_interval = $grace_in_dt->diff($actual_in_dt);
+    $late_minutes = ($late_interval->h * 60) + $late_interval->i;
+  }
+
+  // Overtime is any time worked past scheduled out
+  if ($actual_out_dt <= $schedule_out_dt) {
+    return 0;
+  }
+
+  // Calculate raw OT minutes
+  $ot_interval = $schedule_out_dt->diff($actual_out_dt);
+  $ot_minutes = ($ot_interval->h * 60) + $ot_interval->i;
+
+  // Deduct late minutes from OT
+  $net_ot_minutes = $ot_minutes - $late_minutes;
+  if ($net_ot_minutes < 1) return 0;
+  return round($net_ot_minutes / 60, 2); // Return hours, rounded to 2 decimals
+}
+
 // Function to get schedule for a specific date (historical accuracy)
 function getScheduleForDate($employee_id, $date, $pdo) {
     // Fetch employee's default schedule
@@ -21,8 +99,10 @@ function getScheduleForDate($employee_id, $date, $pdo) {
     $employee = $stmt->fetch(PDO::FETCH_ASSOC);
     $default_schedule_id = $employee['official_sched'] ?? 4;
     
-    // Hardcoded schedule times
+    // Hardcoded schedule times (matching schedule_tracker.php)
     $schedule_times = [
+        1 => ['in' => '06:30:00', 'out' => '15:30:00'],
+        2 => ['in' => '08:00:00', 'out' => '19:00:00'],
         3 => ['in' => '07:30:00', 'out' => '16:30:00'],
         4 => ['in' => '07:00:00', 'out' => '16:00:00'],
         5 => ['in' => '08:00:00', 'out' => '17:00:00'],
@@ -32,6 +112,13 @@ function getScheduleForDate($employee_id, $date, $pdo) {
         9 => ['in' => '08:00:00', 'out' => '16:30:00'],
         10 => ['in' => '07:40:00', 'out' => '16:40:00'],
         11 => ['in' => '06:30:00', 'out' => '15:00:00'],
+        12 => ['in' => '06:30:00', 'out' => '17:30:00'],
+        13 => ['in' => '07:00:00', 'out' => '18:00:00'],
+        14 => ['in' => '06:00:00', 'out' => '17:00:00'],
+        15 => ['in' => '06:00:00', 'out' => '16:00:00'],
+        16 => ['in' => '08:30:00', 'out' => '16:30:00'],
+        17 => ['in' => '06:00:00', 'out' => '12:00:00'],
+        18 => ['in' => '06:00:00', 'out' => '14:30:00'],
     ];
     
     // Check for approved schedule changes that were active on the specific date
@@ -57,7 +144,7 @@ function getScheduleForDate($employee_id, $date, $pdo) {
     $formatted_in = date('h:i A', strtotime($schedule_in));
     $formatted_out = date('h:i A', strtotime($schedule_out));
     
-    // Determine status for display
+    // Determine status for display (matching schedule_tracker.php logic)
     $today = date('Y-m-d');
     $isToday = ($date === $today);
     $isPast = ($date < $today);
@@ -68,22 +155,35 @@ function getScheduleForDate($employee_id, $date, $pdo) {
     if ($isPast) {
         // For past dates, show what was actually active
         if ($activeScheduleOnDate) {
-            $status_text = 'Changed Schedule';
+            $status_text = "Changed Schedule (ID: {$schedule_id})";
             $status_color = 'text-green-600';
         } else {
-            $status_text = 'Official Schedule';
+            $status_text = "Default Schedule";
             $status_color = 'text-blue-600';
         }
     } else {
-        // For current/future dates, show current logic
+        // For current/future dates, use session data from schedule_tracker.php
         $current_sched = $_SESSION['current_schedule'] ?? [];
-        $status_text = $current_sched['status_text'] ?? 'Official Schedule';
-        $status_color = match($current_sched['status'] ?? 'baseline') {
-            'approved' => 'text-green-600',
-            'pending' => 'text-yellow-600',
-            'declined' => 'text-red-600',
-            default => 'text-blue-600'
-        };
+        
+        if ($isToday && isset($current_sched['status_text'])) {
+            // Use the exact status from schedule tracker for today
+            $status_text = $current_sched['status_text'];
+            $status_color = match($current_sched['status'] ?? 'baseline') {
+                'approved' => 'text-green-600',
+                'pending' => 'text-yellow-600',
+                'declined' => 'text-red-600',
+                default => 'text-blue-600'
+            };
+        } else {
+            // For future dates, determine based on schedule change
+            if ($activeScheduleOnDate) {
+                $status_text = "Changed Schedule (ID: {$schedule_id})";
+                $status_color = 'text-green-600';
+            } else {
+                $status_text = "Default Schedule (ID: {$default_schedule_id})";
+                $status_color = 'text-blue-600';
+            }
+        }
     }
     
     return [
@@ -92,7 +192,8 @@ function getScheduleForDate($employee_id, $date, $pdo) {
         'schedule_id' => $schedule_id,
         'status_text' => $status_text,
         'status_color' => $status_color,
-        'was_changed' => $activeScheduleOnDate ? true : false
+        'was_changed' => $activeScheduleOnDate ? true : false,
+        'is_default' => !$activeScheduleOnDate
     ];
 }
 
@@ -312,8 +413,11 @@ $default_time_out = $default_sched['time_out'];
                   <div class="flex items-center justify-between">
                     <div>
                       <div class="text-2xl font-bold text-white">
-                        <?= count(array_filter($time_logs, function($log) { 
-                          return !empty($log['time_in']) && !empty($log['time_out']) && isOvertimeEligible($log['time_in'], $log['time_out']); 
+                        <?= count(array_filter($time_logs, function($log) use ($employee_id, $pdo) { 
+                          if (empty($log['time_in']) || empty($log['time_out'])) return false;
+                          $isEligible = isOvertimeEligibleBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
+                          $otHours = calculateOvertimeHoursBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
+                          return $isEligible && $otHours >= 0.5; // Only count if OT is 30+ minutes
                         })) ?>
                       </div>
                       <div class="text-sm text-emerald-100">OT Eligible</div>
@@ -474,8 +578,15 @@ $default_time_out = $default_sched['time_out'];
                   $hasLog = !empty($log['time_in']) && !empty($log['time_out']);
                   $isRdot = false;
                   if ($hasLog) {
-                    $isOTEligible = isOvertimeEligible($log['time_in'], $log['time_out']);
-                    $overtimeHours = calculateOvertimeHours($log['time_in'], $log['time_out']);
+                    // Use new schedule-based overtime eligibility
+                    $isOTEligible = isOvertimeEligibleBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
+                    $overtimeHours = calculateOvertimeHoursBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
+                    
+                    // Don't show as OT eligible if overtime is less than 30 minutes (0.5 hours)
+                    if ($overtimeHours < 0.5) {
+                        $isOTEligible = false;
+                    }
+                    
                     $actualHours = calculateActualHoursWorked($log['time_in'], $log['time_out']);
                     $hasRequest = hasExistingOTRequest($log['id']);
                     $timeIn = new DateTime($log['time_in']);
@@ -627,7 +738,7 @@ $default_time_out = $default_sched['time_out'];
                     <?php else: ?>
                       <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200">
                         <i class="fas fa-check mr-2"></i>
-                        Regular Work Day
+                        Not OT Eligible
                       </span>
                     <?php endif; ?>
                   </td>

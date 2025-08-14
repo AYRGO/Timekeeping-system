@@ -99,7 +99,7 @@ class QuickNotificationSystem {
         
         // Get base URL - use localhost as fallback for command line testing
         $baseUrl = $this->getBaseUrl();
-        return $baseUrl . '/Timekeeping-system/Public/Bugardi/quick_approval.php?id=' . $requestId . '&action=' . $action . '&token=' . $token;
+    return $baseUrl . '/Public/Bugardi/quick_approval.php?id=' . $requestId . '&action=' . $action . '&token=' . $token;
     }
     
     /**
@@ -111,7 +111,7 @@ class QuickNotificationSystem {
         
         // Get base URL - use localhost as fallback for command line testing
         $baseUrl = $this->getBaseUrl();
-        return $baseUrl . '/Timekeeping-system/Public/Bugardi/quick_ot_approval.php?token=' . $token . '&type=temporary';
+    return $baseUrl . '/Public/Bugardi/quick_ot_approval.php?token=' . $token . '&type=temporary';
     }
     
     /**

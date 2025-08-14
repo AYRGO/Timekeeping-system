@@ -41,22 +41,28 @@
                 <i class="fas fa-clock text-green-600 mr-2"></i>
                 New Work Hours
               </label>
-              <select name="work_schedule_id" id="work_schedule_id" required
-                      class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white">
-                <option value="" disabled selected>Choose your work hours</option>
-                <?php 
-                $allowed = [3, 4, 5, 6, 7, 8, 9, 10];
-                foreach ($work_schedules as $ws):
-                    if (in_array($ws['id'], $allowed)):
-                ?>
-                    <option value="<?= $ws['id'] ?>">
-                        <?= date("g:i A", strtotime($ws['time_in'])) ?> - <?= date("g:i A", strtotime($ws['time_out'])) ?>
-                    </option>
-                <?php 
-                    endif;
-                endforeach;
-                ?>
-              </select>
+              <div class="relative">
+                <select name="work_schedule_id" id="work_schedule_id" required
+                        class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white"
+                        style="max-height: 220px; overflow-y: auto;">
+                  <option value="" disabled selected>Choose your work hours</option>
+                  <?php 
+                  $allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,]; // Allowed schedule IDs
+                  // Sort schedules by time_in ascending
+                  $sorted_schedules = array_filter($work_schedules, function($ws) use ($allowed) {
+                      return in_array($ws['id'], $allowed);
+                  });
+                  usort($sorted_schedules, function($a, $b) {
+                      return strtotime($a['time_in']) - strtotime($b['time_in']);
+                  });
+                  foreach ($sorted_schedules as $ws):
+                  ?>
+                      <option value="<?= $ws['id'] ?>">
+                          <?= date("g:i A", strtotime($ws['time_in'])) ?> - <?= date("g:i A", strtotime($ws['time_out'])) ?>
+                      </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
             </div>
           </div>
 

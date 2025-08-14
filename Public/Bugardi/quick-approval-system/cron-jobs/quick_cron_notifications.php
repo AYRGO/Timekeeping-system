@@ -10,7 +10,7 @@
  * 
  * 2. For Windows Task Scheduler:
  *    Program: C:\xampp\php\php.exe
- *    Arguments: C:\xampp\htdocs\Timekeeping-system\Public\Bugardi\scott_cron_notifications.php
+ *    Arguments: C:\xampp\htdocs\Public\Bugardi\scott_cron_notifications.php
  *    Schedule: Daily at 9:00 AM, Monday-Friday
  */
 

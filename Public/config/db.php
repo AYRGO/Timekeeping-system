@@ -4,6 +4,9 @@ date_default_timezone_set('Asia/Manila');
 
 // Load environment variables
 require_once __DIR__ . '/env.php';
+if (class_exists('EnvLoader')) {
+    EnvLoader::load();
+}
 
 // Database configuration from environment variables
 $host = EnvLoader::get('DB_HOST', 'localhost');

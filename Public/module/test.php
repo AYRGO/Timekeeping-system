@@ -38,71 +38,28 @@ if (isset($_GET['verified']) && $_GET['verified'] === '1') {
 }
 
 if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_adjustment'] !== true) {
-    // Handle verification form submission
+    // Word scramble puzzle for human verification
+    $words = ['orange', 'banana', 'apple', 'grape', 'mango', 'peach', 'lemon', 'melon', 'berry', 'cherry'];
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_human'])) {
-        error_log("Processing verification form submission");
-        $recaptcha_response = $_POST['g-recaptcha-response'] ?? '';
-        
-        if (empty($recaptcha_response)) {
-            $verification_error = "Please complete the reCAPTCHA verification.";
-            error_log("No reCAPTCHA response found");
+        $user_answer = strtolower(trim($_POST['puzzle_answer'] ?? ''));
+        $expected_answer = $_SESSION['puzzle_expected'] ?? null;
+        if ($expected_answer !== null && $user_answer === $expected_answer) {
+            $_SESSION['human_verified_adjustment'] = true;
+            session_write_close();
+            session_start();
+            header('Location: ' . $_SERVER['PHP_SELF']);
+            exit;
         } else {
-            error_log("reCAPTCHA response received: " . substr($recaptcha_response, 0, 20) . "...");
-            // Verify reCAPTCHA v2 with Google
-            $secret_key = EnvLoader::get('RECAPTCHA_SECRET_KEY');
-            
-            if (!$secret_key) {
-                $verification_error = "reCAPTCHA configuration error. Please contact administrator.";
-                error_log("reCAPTCHA secret key not configured");
-            } else {
-                $verify_url = "https://www.google.com/recaptcha/api/siteverify";
-                
-                $post_data = [
-                    'secret' => $secret_key,
-                    'response' => $recaptcha_response,
-                    'remoteip' => $_SERVER['REMOTE_ADDR']
-                ];
-                
-                $options = [
-                    'http' => [
-                        'header' => "Content-type: application/x-www-form-urlencoded\r\n",
-                        'method' => 'POST',
-                        'content' => http_build_query($post_data)
-                    ]
-                ];
-                
-                $context = stream_context_create($options);
-                $response = file_get_contents($verify_url, false, $context);
-                $response_data = json_decode($response);
-                
-                error_log("Google response: " . json_encode($response_data));
-                
-                if ($response_data && $response_data->success) {
-                    $_SESSION['human_verified_adjustment'] = true;
-                    // Force session write to ensure it's saved
-                    session_write_close();
-                    session_start();
-                    error_log("Verification successful, setting session and redirecting");
-                    
-                    // Clean redirect without parameters to avoid loops
-                    header('Location: ' . $_SERVER['PHP_SELF']);
-                    exit;
-                } else {
-                    $error_codes = isset($response_data->{'error-codes'}) ? implode(', ', $response_data->{'error-codes'}) : 'Unknown error';
-                    $verification_error = "reCAPTCHA verification failed. Error: " . $error_codes;
-                    error_log("Verification failed: " . $verification_error);
-                }
-            }
+            $verification_error = "Incorrect answer. Please try again.";
         }
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // If it's a POST request but not a verification, redirect to prevent time adjustment form submission
-        error_log("Non-verification POST request detected, redirecting to prevent form submission");
-        error_log("POST keys: " . implode(', ', array_keys($_POST)));
-        header('Location: ' . $_SERVER['PHP_SELF']);
-        exit;
     }
-    
-    // Show verification page
+    // Generate a new puzzle
+    $word = $words[array_rand($words)];
+    // Only scramble the first 3 letters, keep the rest in order
+    $first = substr($word, 0, 3);
+    $rest = substr($word, 3);
+    $scrambled = str_shuffle($first) . $rest;
+    $_SESSION['puzzle_expected'] = $word;
     ?>
     <!DOCTYPE html>
     <html lang="en">
@@ -110,435 +67,33 @@ if (!isset($_SESSION['human_verified_adjustment']) || $_SESSION['human_verified_
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Human Verification - Time Adjustment Request</title>
-        <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>
         <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: #f8f9fa;
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #333;
-            }
-            
-            .container {
-                max-width: 1000px;
-                width: 100%;
-                background: white;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                border-radius: 12px;
-                overflow: hidden;
-                display: flex;
-                min-height: 500px;
-            }
-            
-            .left-panel {
-                flex: 1;
-                background: #333;
-                color: white;
-                padding: 40px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            }
-            
-            .right-panel {
-                flex: 1;
-                padding: 40px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            }
-            
-            .logo {
-                width: 60px;
-                height: 60px;
-                background: white;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-bottom: 30px;
-                font-size: 24px;
-                color: #333;
-            }
-            
-            .title {
-                font-size: 28px;
-                font-weight: 700;
-                margin-bottom: 15px;
-                line-height: 1.2;
-            }
-            
-            .subtitle {
-                font-size: 16px;
-                opacity: 0.9;
-                margin-bottom: 30px;
-                line-height: 1.5;
-            }
-            
-            .features {
-                list-style: none;
-            }
-            
-            .features li {
-                margin-bottom: 12px;
-                display: flex;
-                align-items: center;
-                font-size: 14px;
-            }
-            
-            .features li:before {
-                content: "✓";
-                margin-right: 12px;
-                font-weight: bold;
-                color: #4ade80;
-            }
-            
-            .form-title {
-                font-size: 24px;
-                font-weight: 600;
-                margin-bottom: 10px;
-                color: #333;
-            }
-            
-            .form-subtitle {
-                color: #666;
-                margin-bottom: 30px;
-                font-size: 14px;
-            }
-            
-            .error-message {
-                background: #fee;
-                border: 1px solid #fcc;
-                color: #c33;
-                padding: 12px;
-                border-radius: 6px;
-                margin-bottom: 20px;
-                font-size: 14px;
-            }
-            
-            .recaptcha-container {
-                margin: 20px 0;
-                display: flex;
-                justify-content: center;
-                min-height: 78px;
-                align-items: center;
-            }
-            
-            .loading-message {
-                color: #666;
-                font-style: italic;
-                text-align: center;
-            }
-            
-            .submit-btn {
-                width: 100%;
-                padding: 14px;
-                background: #333;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                font-size: 16px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                margin-top: 20px;
-            }
-            
-            .submit-btn:hover:not(:disabled) {
-                background: #222;
-                transform: translateY(-1px);
-            }
-            
-            .submit-btn:disabled {
-                background: #ccc;
-                cursor: not-allowed;
-                transform: none;
-            }
-            
-            .status-text {
-                text-align: center;
-                margin-top: 15px;
-                font-size: 14px;
-                color: #666;
-            }
-            
-            .status-text.success {
-                color: #22c55e;
-            }
-            
-            .status-text.error {
-                color: #ef4444;
-            }
-            
-            .help-section {
-                margin-top: 30px;
-                padding: 20px;
-                background: #f8f9fa;
-                border-radius: 6px;
-                border-left: 4px solid #333;
-            }
-            
-            .help-title {
-                font-weight: 600;
-                margin-bottom: 10px;
-                color: #333;
-            }
-            
-            .help-list {
-                list-style: none;
-                font-size: 13px;
-                color: #666;
-            }
-            
-            .help-list li {
-                margin-bottom: 6px;
-                padding-left: 15px;
-                position: relative;
-            }
-            
-            .help-list li:before {
-                content: "•";
-                position: absolute;
-                left: 0;
-                color: #333;
-            }
-            
-            @media (max-width: 768px) {
-                .container {
-                    flex-direction: column;
-                    margin: 20px;
-                    max-width: none;
-                }
-                
-                .left-panel, .right-panel {
-                    padding: 30px;
-                }
-                
-                .title {
-                    font-size: 24px;
-                }
-                
-                .form-title {
-                    font-size: 20px;
-                }
-            }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #333; }
+            .container { max-width: 500px; width: 100%; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 12px; overflow: hidden; padding: 40px; }
+            .title { font-size: 28px; font-weight: 700; margin-bottom: 15px; line-height: 1.2; }
+            .subtitle { font-size: 16px; opacity: 0.9; margin-bottom: 30px; line-height: 1.5; }
+            .error-message { background: #fee; border: 1px solid #fcc; color: #c33; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
+            .form-title { font-size: 24px; font-weight: 600; margin-bottom: 10px; color: #333; }
+            .form-subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+            .submit-btn { width: 100%; padding: 14px; background: #333; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; margin-top: 20px; }
+            .submit-btn:hover:not(:disabled) { background: #222; transform: translateY(-1px); }
+            .submit-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
         </style>
     </head>
     <body>
         <div class="container">
-            <!-- Left Panel -->
-            <div class="left-panel">
-                <div class="logo">🛡️</div>
-                <h1 class="title">Security Verification Required</h1>
-                <p class="subtitle">Please complete the human verification to access the time adjustment request system.</p>
-                
-                <ul class="features">
-                    <li>Secure access protection</li>
-                    <li>Bot prevention system</li>
-                    <li>Data integrity protection</li>
-                    <li>Quick verification process</li>
-                </ul>
-            </div>
-            
-            <!-- Right Panel -->
-            <div class="right-panel">
-                <h2 class="form-title">Human Verification</h2>
-                <p class="form-subtitle">Complete the puzzle below to continue</p>
-                
-                <?php if (isset($verification_error)): ?>
-                    <div class="error-message">
-                        ⚠️ <?= htmlspecialchars($verification_error) ?>
-                    </div>
-                <?php endif; ?>
-                
-                <form method="POST" id="verificationForm">
-                    <!-- Hidden field to ensure verify_human is always sent -->
-                    <input type="hidden" name="verify_human" value="1">
-                    
-                    <div class="recaptcha-container" id="recaptchaContainer">
-                        <div class="loading-message" id="loadingMessage">
-                            🔄 Loading verification puzzle...
-                        </div>
-                        <div id="recaptcha-widget"></div>
-                    </div>
-                    
-                    <div id="statusMessage" class="status-text">
-                        Waiting for puzzle to load...
-                    </div>
-                    
-                    <button type="submit" name="verify_human" id="submitBtn" class="submit-btn" disabled>
-                        Complete Puzzle to Continue
-                    </button>
-                </form>
-                
-                <div class="help-section">
-                    <div class="help-title">How to complete verification:</div>
-                    <ul class="help-list">
-                        <li>Wait for the puzzle to load completely</li>
-                        <li>Click the checkbox "I'm not a robot"</li>
-                        <li>Complete the image challenge if prompted</li>
-                        <li>Select all squares with the specified object</li>
-                        <li>Click "VERIFY" when done selecting</li>
-                        <li>The form will unlock automatically</li>
-                    </ul>
-                </div>
-            </div>
+            <h1 class="title">Human Verification</h1>
+            <p class="subtitle">Unscramble the word below to continue.<br>We use this to prevent bots and abuse.</p>
+            <?php if (isset($verification_error)): ?>
+                <div class="error-message">⚠️ <?= htmlspecialchars($verification_error) ?></div>
+            <?php endif; ?>
+            <form method="POST" id="verificationForm">
+                <input type="hidden" name="verify_human" value="1">
+                <div class="form-title">Unscramble: <b><?= $scrambled ?></b></div>
+                <input type="text" name="puzzle_answer" required class="form-control" style="width:100%;padding:12px;font-size:18px;margin-bottom:20px;border-radius:6px;border:1px solid #ccc;" autocomplete="off">
+                <button type="submit" class="submit-btn">Submit Answer</button>
+            </form>
         </div>
-        
-        <script>
-            let recaptchaLoaded = false;
-            let recaptchaRendered = false;
-            let widgetId = null;
-            
-            // Global callback function - called when reCAPTCHA API loads
-            window.onRecaptchaLoad = function() {
-                console.log('reCAPTCHA API loaded successfully');
-                recaptchaLoaded = true;
-                
-                try {
-                    // Hide loading message
-                    document.getElementById('loadingMessage').style.display = 'none';
-                    
-                    // Render the reCAPTCHA widget
-                    widgetId = grecaptcha.render('recaptcha-widget', {
-                        'sitekey': '<?= EnvLoader::get('RECAPTCHA_SITE_KEY') ?>',
-                        'theme': 'light',
-                        'size': 'normal',
-                        'hl': 'en',
-                        'callback': onRecaptchaSuccess,
-                        'expired-callback': onRecaptchaExpired,
-                        'error-callback': onRecaptchaError
-                    });
-                    
-                    recaptchaRendered = true;
-                    document.getElementById('statusMessage').textContent = 'Complete the puzzle above to proceed';
-                    console.log('reCAPTCHA rendered successfully with widget ID:', widgetId);
-                    
-                } catch (error) {
-                    console.error('Error rendering reCAPTCHA:', error);
-                    showError('Failed to load puzzle. Please refresh the page.');
-                }
-            };
-            
-            function onRecaptchaSuccess(token) {
-                console.log('reCAPTCHA completed successfully!', token);
-
-                const submitBtn = document.getElementById('submitBtn');
-                const statusMessage = document.getElementById('statusMessage');
-
-                // Enable submit button
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Verification Complete - Continue';
-                submitBtn.style.background = '#22c55e';
-
-                // Update status
-                statusMessage.textContent = 'Puzzle completed successfully! Click the button below to continue.';
-                statusMessage.className = 'status-text success';
-            }
-            function onRecaptchaExpired() {
-                console.log('reCAPTCHA expired');
-                
-                const submitBtn = document.getElementById('submitBtn');
-                const statusMessage = document.getElementById('statusMessage');
-                
-                // Reset button
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Complete Puzzle to Continue';
-                submitBtn.style.background = '#ccc';
-                
-                // Update status
-                statusMessage.textContent = 'Puzzle expired. Please solve it again.';
-                statusMessage.className = 'status-text error';
-            }
-            
-            function onRecaptchaError() {
-                console.log('reCAPTCHA error occurred');
-                showError('Error loading puzzle. Please refresh the page.');
-            }
-            
-            function showError(message) {
-                const statusMessage = document.getElementById('statusMessage');
-                statusMessage.textContent = message;
-                statusMessage.className = 'status-text error';
-                
-                // Show refresh suggestion
-                setTimeout(() => {
-                    statusMessage.innerHTML = message + ' <a href="javascript:window.location.reload()" style="color: #ef4444; text-decoration: underline;">Click here to refresh</a>';
-                }, 2000);
-            }
-            
-            // Form validation
-            document.getElementById('verificationForm').addEventListener('submit', function(e) {
-                console.log('Form submission attempted...');
-                console.log('reCAPTCHA loaded:', recaptchaLoaded);
-                console.log('reCAPTCHA rendered:', recaptchaRendered);
-                console.log('Widget ID:', widgetId);
-                
-                if (!recaptchaLoaded || !recaptchaRendered || widgetId === null) {
-                    e.preventDefault();
-                    alert('Please wait for the reCAPTCHA to load completely.');
-                    return false;
-                }
-                
-                const response = grecaptcha.getResponse(widgetId);
-                console.log('reCAPTCHA response:', response ? 'Present' : 'Missing');
-                
-                if (!response) {
-                    e.preventDefault();
-                    alert('Please complete the reCAPTCHA puzzle first.');
-                    return false;
-                }
-                
-                // Ensure verify_human is present
-                const verifyInput = document.querySelector('input[name="verify_human"]');
-                if (!verifyInput) {
-                    console.error('verify_human input missing!');
-                    const hiddenInput = document.createElement('input');
-                    hiddenInput.type = 'hidden';
-                    hiddenInput.name = 'verify_human';
-                    hiddenInput.value = '1';
-                    this.appendChild(hiddenInput);
-                }
-                
-                // Show loading and allow form to submit
-                const submitBtn = document.getElementById('submitBtn');
-                const statusMessage = document.getElementById('statusMessage');
-                
-                submitBtn.textContent = 'Verifying & Redirecting...';
-                submitBtn.disabled = true;
-                statusMessage.textContent = 'Processing verification, please wait...';
-                statusMessage.className = 'status-text';
-                
-                console.log('Form validation passed, submitting with verify_human...');
-                // Let the form submit naturally
-                return true;
-            });
-            
-            // Fallback check after page loads
-            window.addEventListener('load', function() {
-                console.log('Page loaded, checking reCAPTCHA status');
-                
-                setTimeout(function() {
-                    if (typeof grecaptcha === 'undefined') {
-                        console.log('reCAPTCHA API failed to load');
-                        document.getElementById('loadingMessage').textContent = '❌ Failed to load verification system';
-                        showError('Network error. Please check your connection and refresh.');
-                    } else if (!recaptchaRendered) {
-                        console.log('reCAPTCHA API loaded but not rendered, manually triggering');
-                        window.onRecaptchaLoad();
-                    }
-                }, 5000);
-            });
-        </script>
     </body>
     </html>
     <?php
