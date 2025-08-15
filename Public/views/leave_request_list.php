@@ -45,7 +45,6 @@ function getStatusBadge($status) {
         'approved' => 'bg-green-100 text-green-800',
         'pending' => 'bg-yellow-100 text-yellow-800',
         'rejected', 'declined' => 'bg-red-100 text-red-800',
-        'cancelled' => 'bg-orange-100 text-orange-800',
         default => 'bg-gray-100 text-gray-800'
     };
     
@@ -53,7 +52,6 @@ function getStatusBadge($status) {
         'approved' => 'fas fa-check',
         'pending' => 'fas fa-clock',
         'rejected', 'declined' => 'fas fa-times',
-        'cancelled' => 'fas fa-ban',
         default => 'fas fa-question'
     };
     
@@ -154,13 +152,15 @@ function getLeaveTypeBadge($type) {
                                 </th>
                                 <?php if (!$isHistoryView): ?>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                                <?php else: ?>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                                 <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             <?php if (!empty($leave_requests)): ?>
                                 <?php foreach ($leave_requests as $lr): ?>
-                                    <tr class="hover:bg-gray-50">
+                                    <tr class="hover:bg-gray-50" id="leave-row-<?= htmlspecialchars($lr['id']) ?>">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                             #<?= htmlspecialchars($lr['id']) ?>
                                         </td>
@@ -220,48 +220,47 @@ function getLeaveTypeBadge($type) {
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             <?php if ($lr['status'] === 'pending'): ?>
                                                 <div class="flex space-x-2">
-                                                    <form method="POST" action="process_leave_action.php" class="inline-block">
-                                                        <input type="hidden" name="leave_id" value="<?= $lr['id'] ?>">
-                                                        <input type="hidden" name="action" value="approve">
-                                                        <button type="submit"
-                                                                onclick="return confirm('Are you sure you want to approve this leave request?')"
-                                                                class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition-colors">
-                                                            <i class="fas fa-check mr-1"></i>Approve
-                                                        </button>
-                                                    </form>
+                                                    <button type="button"
+                                                            onclick="approveLeave(<?= $lr['id'] ?>)"
+                                                            class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition-colors"
+                                                            id="approve-btn-<?= $lr['id'] ?>">
+                                                        <i class="fas fa-check mr-1"></i>Approve
+                                                    </button>
                                                     <button type="button"
                                                             onclick="openDeclineModal(<?= $lr['id'] ?>)"
                                                             class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm transition-colors">
                                                         <i class="fas fa-times mr-1"></i>Decline
                                                     </button>
-                                                    <form method="POST" action="process_leave_action.php" class="inline-block">
-                                                        <input type="hidden" name="leave_id" value="<?= $lr['id'] ?>">
-                                                        <input type="hidden" name="action" value="cancel">
-                                                        <button type="submit"
-                                                                onclick="return confirm('Are you sure you want to cancel this leave request? Leave credits will be restored.')"
-                                                                class="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 text-sm transition-colors">
-                                                            <i class="fas fa-ban mr-1"></i>Cancel
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            <?php elseif ($lr['status'] === 'approved'): ?>
-                                                <div class="flex space-x-2">
-                                                    <form method="POST" action="process_leave_action.php" class="inline-block">
-                                                        <input type="hidden" name="leave_id" value="<?= $lr['id'] ?>">
-                                                        <input type="hidden" name="action" value="cancel">
-                                                        <button type="submit"
-                                                                onclick="return confirm('Are you sure you want to cancel this approved leave request? Leave credits will be restored.')"
-                                                                class="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 text-sm transition-colors">
-                                                            <i class="fas fa-ban mr-1"></i>Cancel
-                                                        </button>
-                                                    </form>
-                                                    <span class="text-green-600 italic text-sm">
-                                                        <i class="fas fa-check-circle mr-1"></i>Approved
-                                                    </span>
                                                 </div>
                                             <?php else: ?>
                                                 <span class="text-gray-500 italic">
                                                     <i class="fas fa-check-circle mr-1"></i>Done
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <?php else: ?>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <?php if ($lr['status'] === 'approved'): ?>
+                                                <?php 
+                                                // Check if the leave has already started
+                                                $today = new DateTime();
+                                                $startDate = new DateTime($lr['start_date']);
+                                                $canCancel = $startDate > $today;
+                                                ?>
+                                                <?php if ($canCancel): ?>
+                                                    <button type="button"
+                                                            onclick="openCancelModal(<?= $lr['id'] ?>, '<?= htmlspecialchars($lr['fname'] . ' ' . $lr['lname']) ?>', '<?= date('M d, Y', strtotime($lr['start_date'])) ?> - <?= date('M d, Y', strtotime($lr['end_date'])) ?>')"
+                                                            class="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 text-sm transition-colors">
+                                                        <i class="fas fa-ban mr-1"></i>Cancel
+                                                    </button>
+                                                <?php else: ?>
+                                                    <span class="text-gray-500 italic text-xs">
+                                                        <i class="fas fa-clock mr-1"></i>Cannot cancel<br>(Leave started)
+                                                    </span>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <span class="text-gray-500 italic">
+                                                    <i class="fas fa-check-circle mr-1"></i>Processed
                                                 </span>
                                             <?php endif; ?>
                                         </td>
@@ -270,7 +269,7 @@ function getLeaveTypeBadge($type) {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="<?= $isHistoryView ? '8' : '9' ?>" class="text-center text-sm py-8 text-gray-500">
+                                    <td colspan="<?= $isHistoryView ? '9' : '9' ?>" class="text-center text-sm py-8 text-gray-500">
                                         <i class="fas fa-calendar-times text-4xl text-gray-300 mb-2"></i>
                                         <div><?= $isHistoryView ? 'No processed leave requests found.' : 'No leave requests found.' ?></div>
                                     </td>
@@ -284,7 +283,7 @@ function getLeaveTypeBadge($type) {
                 <?php if (!empty($leave_requests)): ?>
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <?php
-                    $summary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'declined' => 0, 'cancelled' => 0];
+                    $summary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'declined' => 0];
                     $totalDays = 0;
                     foreach ($leave_requests as $req) {
                         $status = strtolower($req['status'] ?? 'pending');
@@ -380,6 +379,56 @@ function getLeaveTypeBadge($type) {
         </div>
     </div>
 
+    <!-- Cancel Modal -->
+    <div id="cancelModal" class="fixed inset-0 items-center justify-center bg-black bg-opacity-50 hidden z-50" style="display: none;">
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">
+                <i class="fas fa-ban text-orange-600 mr-2"></i>Cancel Leave Request
+            </h2>
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 mb-2">Employee: <span id="cancelEmployeeName" class="font-medium"></span></p>
+                <p class="text-sm text-gray-600 mb-4">Leave Period: <span id="cancelLeavePeriod" class="font-medium"></span></p>
+                <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-orange-600"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-orange-800">Warning</h3>
+                            <div class="mt-2 text-sm text-orange-700">
+                                <p>Cancelling this leave request will restore the leave credits that were deducted. This action cannot be undone.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <form method="POST" action="process_leave_action.php">
+                <input type="hidden" name="leave_id" id="modalCancelLeaveId">
+                <input type="hidden" name="action" value="cancel">
+
+                <label for="cancel_reason" class="block text-sm font-medium text-gray-700 mb-1">Reason for cancellation:</label>
+                <textarea name="cancel_reason" id="cancel_reason" rows="3"
+                          class="w-full border rounded-md px-3 py-2 text-sm focus:ring focus:ring-orange-200"
+                          placeholder="Provide reason for cancelling..." required></textarea>
+
+                <div class="mt-4 flex justify-end space-x-2">
+                    <button type="button" onclick="closeCancelModal()"
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded text-sm">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            onclick="return confirm('Are you sure you want to cancel this leave request? Leave credits will be restored.')"
+                            class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm">
+                        <i class="fas fa-ban mr-1"></i>Cancel Leave
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Message -->
+    <div id="toast" class="fixed top-5 right-5 z-50 hidden px-4 py-2 rounded shadow text-white font-semibold"></div>
+
     <script>
         function openDeclineModal(leaveId) {
             document.getElementById('modalLeaveId').value = leaveId;
@@ -389,6 +438,81 @@ function getLeaveTypeBadge($type) {
 
         function closeDeclineModal() {
             document.getElementById('declineModal').classList.add('hidden');
+        }
+
+        function openCancelModal(leaveId, employeeName, leavePeriod) {
+            document.getElementById('modalCancelLeaveId').value = leaveId;
+            document.getElementById('cancelEmployeeName').textContent = employeeName;
+            document.getElementById('cancelLeavePeriod').textContent = leavePeriod;
+            document.getElementById('cancel_reason').value = '';
+            
+            const modal = document.getElementById('cancelModal');
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+        }
+
+        function closeCancelModal() {
+            const modal = document.getElementById('cancelModal');
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
+        }
+
+        function approveLeave(leaveId) {
+            if (!confirm('Are you sure you want to approve this leave request?')) return;
+            const btn = document.getElementById('approve-btn-' + leaveId);
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+
+            fetch('process_leave_action.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'leave_id=' + encodeURIComponent(leaveId) + '&action=approve'
+            })
+            .then(response => response.text())
+            .then(html => {
+                // Try to extract message from returned HTML
+                let msg = 'Leave approved successfully!';
+                try {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const p = doc.querySelector('p');
+                    if (p) msg = p.textContent;
+                } catch {}
+                showToast(msg, true);
+
+                // Update row status and remove action buttons
+                const row = document.getElementById('leave-row-' + leaveId);
+                if (row) {
+                    // Find status cell and update
+                    const statusCell = row.querySelector('td:nth-child(7)');
+                    if (statusCell) {
+                        statusCell.innerHTML = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <i class="fas fa-check mr-1"></i>Approved
+                        </span>`;
+                    }
+                    // Remove action buttons
+                    const actionCell = row.querySelector('td:nth-last-child(1)');
+                    if (actionCell) {
+                        actionCell.innerHTML = `<span class="text-gray-500 italic">
+                            <i class="fas fa-check-circle mr-1"></i>Done
+                        </span>`;
+                    }
+                }
+            })
+            .catch(() => {
+                showToast('Error approving leave request.', false);
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            });
+        }
+
+        function showToast(message, success) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'fixed top-5 right-5 z-50 px-4 py-2 rounded shadow text-white font-semibold ' +
+                (success ? 'bg-green-600' : 'bg-red-600');
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
         }
     </script>
 

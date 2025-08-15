@@ -21,10 +21,10 @@ function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_
     return false;
   }
   $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
-  $schedule_in = $scheduleInfo['time_in'];
-  $schedule_out = $scheduleInfo['time_out'];
-  $schedule_in_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_in)));
-  $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  $schedule_in = $scheduleInfo['time_in'];      // raw time
+  $schedule_out = $scheduleInfo['time_out'];    // raw time
+  $schedule_in_dt = new DateTime($log_date . ' ' . $schedule_in);
+  $schedule_out_dt = new DateTime($log_date . ' ' . $schedule_out);
   $actual_in_dt = new DateTime($time_in);
   $actual_out_dt = new DateTime($time_out);
 
@@ -58,10 +58,10 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
     return 0;
   }
   $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
-  $schedule_in = $scheduleInfo['time_in'];
-  $schedule_out = $scheduleInfo['time_out'];
-  $schedule_in_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_in)));
-  $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  $schedule_in = $scheduleInfo['time_in'];      // raw time
+  $schedule_out = $scheduleInfo['time_out'];    // raw time
+  $schedule_in_dt = new DateTime($log_date . ' ' . $schedule_in);
+  $schedule_out_dt = new DateTime($log_date . ' ' . $schedule_out);
   $actual_in_dt = new DateTime($time_in);
   $actual_out_dt = new DateTime($time_out);
 
@@ -137,12 +137,12 @@ function getScheduleForDate($employee_id, $date, $pdo) {
     $schedule_id = $activeScheduleOnDate ? ($activeScheduleOnDate['work_schedule_id'] ?? $default_schedule_id) : $default_schedule_id;
     
     // Get schedule times
-    $schedule_in = $schedule_times[$schedule_id]['in'] ?? '07:00:00';
-    $schedule_out = $schedule_times[$schedule_id]['out'] ?? '16:00:00';
-    
+    $schedule_in_raw = $schedule_times[$schedule_id]['in'] ?? '07:00:00';
+    $schedule_out_raw = $schedule_times[$schedule_id]['out'] ?? '16:00:00';
+
     // Format times for display
-    $formatted_in = date('h:i A', strtotime($schedule_in));
-    $formatted_out = date('h:i A', strtotime($schedule_out));
+    $formatted_in = date('h:i A', strtotime($schedule_in_raw));
+    $formatted_out = date('h:i A', strtotime($schedule_out_raw));
     
     // Determine status for display (matching schedule_tracker.php logic)
     $today = date('Y-m-d');
@@ -187,14 +187,16 @@ function getScheduleForDate($employee_id, $date, $pdo) {
     }
     
     return [
-        'time_in' => $formatted_in,
-        'time_out' => $formatted_out,
+        'time_in' => $schedule_in_raw,      // <-- use raw for calculation
+        'time_out' => $schedule_out_raw,    // <-- use raw for calculation
+        'formatted_in' => $formatted_in,    // <-- use for display
+        'formatted_out' => $formatted_out,  // <-- use for display
         'schedule_id' => $schedule_id,
         'status_text' => $status_text,
         'status_color' => $status_color,
         'was_changed' => $activeScheduleOnDate ? true : false,
         'is_default' => !$activeScheduleOnDate
-    ];
+    };
 }
 
 // Get employee's last 5 time logs that are OT eligible (no null data)

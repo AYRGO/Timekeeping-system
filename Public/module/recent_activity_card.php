@@ -45,65 +45,113 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                    <?php if (!empty($recentActivities)): ?>
-                        <?php foreach ($recentActivities as $activity): ?>
-                            <?php
-                                $created = date('M j, Y', strtotime($activity['created_at']));
-                                $msg = strip_tags($activity['message']);
-                                preg_match('/\b(Leave|Schedule|Time|Overtime)\b/i', $msg, $typeMatch);
-                                preg_match('/\b(Approved|Rejected|Pending|Declined)\b/i', $msg, $statusMatch);
-                                $type = $typeMatch[0] ?? 'Request';
-                                $status = ucfirst(strtolower($statusMatch[0] ?? 'Pending'));
-                                $badgeColor = match (strtolower($status)) {
-                                    'approved' => 'bg-green-100 text-green-800',
-                                    'rejected', 'declined' => 'bg-red-100 text-red-800',
-                                    'pending' => 'bg-yellow-100 text-yellow-800',
-                                    default => 'bg-gray-100 text-gray-700',
-                                };
+<?php if (!empty($recentActivities)): ?>
+    <?php foreach ($recentActivities as $activity): ?>
+        <?php
+            $created = date('M j, Y', strtotime($activity['created_at']));
+            $msg = strip_tags($activity['message']);
 
-                                // Try to extract hours, leave type, and other info from message
-                                preg_match('/(\d+(?:\.\d+)?)(?:\s*hours?|hrs?)/i', $msg, $hrsMatch);
-                                $hrs = $hrsMatch[1] ?? null;
-                                preg_match('/(Sick|Vacation|Emergency|Maternity|Paternity|Bereavement|Leave)/i', $msg, $leaveMatch);
-                                $leaveType = $leaveMatch[1] ?? null;
-                                preg_match('/(\d{4}-\d{2}-\d{2})/i', $msg, $dateMatch);
-                                $activityDate = $dateMatch[1] ?? $created;
+            // Detect type
+            preg_match('/\b(Leave|Schedule|Time|Overtime)\b/i', $msg, $typeMatch);
+            $type = $typeMatch[0] ?? 'Request';
 
-                                // Build sentence-style summary
-                                $sentence = "On $created: ";
-                                if ($type === 'Leave' && $leaveType) {
-                                    $sentence .= "$leaveType leave";
-                                } elseif ($type === 'Overtime') {
-                                    $sentence .= "Overtime";
-                                } elseif ($type === 'Schedule') {
-                                    $sentence .= "Schedule change";
-                                } elseif ($type === 'Time') {
-                                    $sentence .= "Time adjustment";
-                                } else {
-                                    $sentence .= "$type request";
-                                }
-                                if ($hrs) {
-                                    $sentence .= " for $hrs hour" . ($hrs > 1 ? 's' : '');
-                                }
-                                if ($activityDate && $activityDate !== $created) {
-                                    $sentence .= " on $activityDate";
-                                }
-                                $sentence .= " was $status.";
-                            ?>
-                            <tr>
-                                <td class="px-4 py-3 text-gray-500"><?= $created ?></td>
-                                <td class="px-4 py-3 font-medium text-gray-900"><?= $type ?> Request</td>
-                                <td class="px-4 py-3">
-                                    <span class="inline-flex px-2 text-xs font-semibold rounded-full <?= $badgeColor ?>">
-                                        <?= $status ?>
-                                    </span>
-                                </td>
-                                <td class="px-4 py-3 text-green-600 hover:text-green-900">
-                                    <button onclick="alert(`<?= htmlspecialchars_decode($sentence) ?>`)">View</button>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
+            // For Leave requests, fetch status directly from post_leave_requests table column 'status'
+            if ($type === 'Leave' && isset($activity['leave_status'])) {
+                $status = strtolower($activity['leave_status']);
+                if ($status === 'approved') {
+                    $status = 'Approved';
+                } elseif ($status === 'declined' || $status === 'rejected') {
+                    $status = 'Declined';
+                } else {
+                    $status = 'Pending';
+                }
+            }
+            // For Time requests, fetch status directly from post_time_adjustment_requests table
+            elseif ($type === 'Time' && isset($activity['time_adjust_status'])) {
+                $status = strtolower($activity['time_adjust_status']);
+                if ($status === 'approved') {
+                    $status = 'Approved';
+                } elseif ($status === 'declined' || $status === 'rejected') {
+                    $status = 'Declined';
+                } else {
+                    $status = 'Pending';
+                }
+            }
+            // For Overtime requests, fetch status directly from post_ot_requests table
+            elseif ($type === 'Overtime' && isset($activity['ot_status'])) {
+                $status = strtolower($activity['ot_status']);
+                if ($status === 'approved') {
+                    $status = 'Approved';
+                } elseif ($status === 'declined' || $status === 'rejected') {
+                    $status = 'Declined';
+                } else {
+                    $status = 'Pending';
+                }
+            }
+            // For Schedule requests, use status from DB
+            elseif ($type === 'Schedule' && isset($activity['status'])) {
+                $status = ucfirst(strtolower($activity['status']));
+            } else {
+                preg_match('/\b(Approved|Rejected|Pending|Declined|Cancelled)\b/i', $msg, $statusMatch);
+                $status = ucfirst(strtolower($statusMatch[0] ?? 'Pending'));
+            }
+
+            $badgeColor = match (strtolower($status)) {
+                'approved' => 'bg-green-100 text-green-800',
+                'rejected', 'declined', 'cancelled' => 'bg-red-100 text-red-800',
+                'pending' => 'bg-yellow-100 text-yellow-800',
+                default => 'bg-gray-100 text-gray-700',
+            };
+
+            // Build sentence-style summary
+            $sentence = "On $created: ";
+            if ($type === 'Schedule') {
+                $sentence .= "Schedule change was $status.";
+                if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected']) && !empty($activity['explanation'])) {
+                    $sentence .= "\nReason: " . htmlspecialchars($activity['explanation']);
+                }
+            } elseif ($type === 'Leave') {
+                $sentence .= "Leave request was $status.";
+                if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected']) && !empty($activity['explanation'])) {
+                    $sentence .= "\nReason: " . htmlspecialchars($activity['explanation']);
+                }
+            } elseif ($type === 'Time') {
+                $sentence .= "Time adjustment request was $status.";
+                if (!empty($activity['reason'])) {
+                    $sentence .= "\nReason: " . htmlspecialchars($activity['reason']);
+                }
+            } elseif ($type === 'Overtime') {
+                $sentence .= "Overtime request was $status.";
+                if (!empty($activity['ot_reason'])) {
+                    $sentence .= "\nReason: " . htmlspecialchars($activity['ot_reason']);
+                }
+            } else {
+                $sentence .= "$type request was $status.";
+            }
+        ?>
+        <tr>
+            <td class="px-4 py-3 text-gray-500"><?= $created ?></td>
+            <td class="px-4 py-3 font-medium text-gray-900"><?= $type ?> Request</td>
+            <td class="px-4 py-3">
+                <span class="inline-flex px-2 text-xs font-semibold rounded-full <?= $badgeColor ?>">
+                    <?= $status ?>
+                </span>
+                <!-- Reason display removed as requested -->
+            </td>
+            <td class="px-4 py-3 text-green-600 hover:text-green-900">
+                <?php
+                if ($type === 'Time' && !empty($activity['reason'])) {
+                    ?>
+                    <button onclick="alert('Reason: <?= htmlspecialchars_decode($activity['reason']) ?>')">View</button>
+                <?php } elseif ($type === 'Overtime' && !empty($activity['ot_reason'])) { ?>
+                    <button onclick="alert('Reason: <?= htmlspecialchars_decode($activity['ot_reason']) ?>')">View</button>
+                <?php } else { ?>
+                    <button onclick="alert(`<?= htmlspecialchars_decode($sentence) ?>`)">View</button>
+                <?php } ?>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+<?php else: ?>
                         <tr>
                             <td colspan="4" class="px-4 py-4 text-center text-gray-500">No recent activity found.</td>
                         </tr>

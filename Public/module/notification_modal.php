@@ -73,7 +73,7 @@ $leave_stmt = $pdo->prepare("
     FROM leave_requests 
     WHERE employee_id = ?
     UNION ALL
-    SELECT id, leave_type, 'approved' as status, start_date, end_date, created_at, notified, '' as explanation, 'approved' as source_table
+    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, 'approved' as source_table
     FROM post_leave_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
@@ -84,22 +84,34 @@ $leave_results = $leave_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($leave_results as $leave) {
     $raw_status = strtolower($leave['status']);
-    $status = ucfirst($raw_status);
+    // Treat both 'declined' and 'rejected' as 'Declined'
+    if ($raw_status === 'approved') {
+        $status = 'Approved';
+    } elseif ($raw_status === 'declined' || $raw_status === 'rejected') {
+        $status = 'Declined';
+    } else {
+        $status = 'Pending';
+    }
     $range = date('F j', strtotime($leave['start_date'])) . ' to ' . date('F j', strtotime($leave['end_date']));
     $message = "Leave request for <strong>{$leave['leave_type']}</strong> ($range) was <strong>$status</strong>.";
 
-    if ($raw_status === 'rejected' && !empty($leave['explanation'])) {
+    if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($leave['explanation'])) {
         $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($leave['explanation']) . "</span>";
     }
 
-    $notifications[] = ['message' => $message, 'created_at' => $leave['created_at']];
+    $notifications[] = [
+        'message' => $message,
+        'created_at' => $leave['created_at'],
+        'leave_status' => $status,
+        'explanation' => $leave['explanation'] ?? ''
+    ];
 
     // Only send email notifications for pending table entries that changed status
-    if (in_array($raw_status, ['approved', 'rejected']) && !$leave['notified'] && $leave['source_table'] === 'pending') {
+    if (in_array($raw_status, ['approved', 'rejected', 'declined']) && !$leave['notified'] && $leave['source_table'] === 'pending') {
         $subject = "Leave Request {$status}";
         $body = "<p>Hi {$employee['fname']},<br>Your leave request from <strong>$range</strong> for <strong>{$leave['leave_type']}</strong> was <strong>$status</strong>.</p>";
 
-        if ($raw_status === 'rejected' && !empty($leave['explanation'])) {
+        if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($leave['explanation'])) {
             $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($leave['explanation'])) . "</p>";
         }
 
@@ -116,7 +128,7 @@ $schedule_stmt = $pdo->prepare("
     FROM schedule_change_requests 
     WHERE employee_id = ?
     UNION ALL
-    SELECT id, work_schedule_id, 'approved' as status, start_date, end_date, created_at, notified, '' as explanation, 'approved' as source_table
+    SELECT id, work_schedule_id, status, start_date, end_date, created_at, notified, explanation, 'approved' as source_table
     FROM post_schedule_change_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
@@ -134,7 +146,12 @@ foreach ($schedule_results as $sched) {
         $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($sched['explanation']) . "</span>";
     }
 
-    $notifications[] = ['message' => $message, 'created_at' => $sched['created_at']];
+    $notifications[] = [
+    'message' => $message,
+    'created_at' => $sched['created_at'],
+    'status' => $sched['status'],
+    'explanation' => $sched['explanation'] ?? ''
+];
 
     if (in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified'] && $sched['source_table'] === 'pending') {
         $subject = "Schedule Change Request {$status}";
@@ -155,7 +172,7 @@ $adjust_stmt = $pdo->prepare("
     FROM time_adjustment_requests 
     WHERE employee_id = ?
     UNION ALL
-    SELECT id, log_date, 'approved' as status, '' as reason, created_at, notified, 'approved' as source_table
+    SELECT id, log_date, status, '' as reason, created_at, notified, 'approved' as source_table
     FROM post_time_adjustment_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
@@ -165,21 +182,34 @@ $adjust_stmt->execute([$current_user_id, $current_user_id]);
 $adjust_results = $adjust_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($adjust_results as $adjustment) {
-    $status = ucfirst(strtolower($adjustment['status']));
+    $raw_status = strtolower($adjustment['status']);
+    // Always show Declined if status is declined or rejected, even for post_time_adjustment_requests
+    if ($raw_status === 'approved') {
+        $status = 'Approved';
+    } elseif ($raw_status === 'declined' || $raw_status === 'rejected') {
+        $status = 'Declined';
+    } else {
+        $status = 'Pending';
+    }
     $date = date('F j', strtotime($adjustment['log_date']));
     $message = "Time adjustment request for <strong>$date</strong> was <strong>$status</strong>.";
 
-    if (strtolower($adjustment['status']) === 'declined' && !empty($adjustment['reason'])) {
+    if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($adjustment['reason'])) {
         $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($adjustment['reason']) . "</span>";
     }
 
-    $notifications[] = ['message' => $message, 'created_at' => $adjustment['created_at']];
+    $notifications[] = [
+        'message' => $message,
+        'created_at' => $adjustment['created_at'],
+        'time_adjust_status' => $status,
+        'reason' => $adjustment['reason'] ?? ''
+    ];
 
-    if (in_array(strtolower($adjustment['status']), ['approved', 'declined']) && !$adjustment['notified'] && $adjustment['source_table'] === 'pending') {
+    if (in_array($raw_status, ['approved', 'declined', 'rejected']) && !$adjustment['notified'] && $adjustment['source_table'] === 'pending') {
         $subject = "Time Adjustment Request {$status}";
         $body = "<p>Hi {$employee['fname']},<br>Your time adjustment request for <strong>$date</strong> was <strong>$status</strong>.</p>";
 
-        if (strtolower($adjustment['status']) === 'declined' && !empty($adjustment['reason'])) {
+        if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($adjustment['reason'])) {
             $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>";
         }
 
@@ -194,7 +224,7 @@ foreach ($adjust_results as $adjustment) {
 $ot_stmt = $pdo->prepare("
     SELECT id, time_log_id, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified
     FROM post_ot_requests
-    WHERE employee_id = ? AND status IN ('Approved', 'Rejected') AND (approved_at IS NOT NULL OR status != 'Pending')
+    WHERE employee_id = ?
     ORDER BY COALESCE(approved_at, created_at) DESC
     LIMIT 10
 ");
@@ -202,42 +232,24 @@ $ot_stmt->execute([$current_user_id]);
 $ot_results = $ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($ot_results as $ot) {
-    $status = ucfirst(strtolower($ot['status']));
+    $raw_status = strtolower($ot['status']);
+    if ($raw_status === 'approved') {
+        $status = 'Approved';
+    } elseif ($raw_status === 'declined' || $raw_status === 'rejected') {
+        $status = 'Declined';
+    } else {
+        $status = 'Pending';
+    }
     $duration = number_format($ot['ot_duration'], 2);
     $ot_type = $ot['ot_type'] ?? 'Regular OT';
-    
-    $message = "Overtime request for <strong>{$ot_type}</strong> ({$duration} hours) was <strong>{$status}</strong>.";
-
-    // Check if there's an admin note in the reason field
-    $admin_note = null;
-    if (strtolower($ot['status']) === 'rejected' && strpos($ot['reason'], '[Admin Note:') !== false) {
-        preg_match('/\[Admin Note: (.*?)\]/', $ot['reason'], $matches);
-        if (isset($matches[1])) {
-            $admin_note = trim($matches[1]);
-            $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($admin_note) . "</span>";
-        }
-    }
+    $created_at = $ot['approved_at'] ?? $ot['created_at'];
 
     $notifications[] = [
-        'message' => $message, 
-        'created_at' => $ot['approved_at'] ?? $ot['created_at']
+        'message' => "Overtime request for <strong>{$ot_type}</strong> ({$duration} hours) was <strong>{$status}</strong>.",
+        'created_at' => $created_at,
+        'ot_status' => $status,
+        'ot_reason' => $ot['reason'],
     ];
-
-    // Send email notification ONLY for requests that haven't been notified yet
-    if (in_array(strtolower($ot['status']), ['approved', 'rejected']) && !$ot['notified']) {
-        $subject = "Overtime Request $status";
-        $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$ot_type}</strong> ({$duration} hours) was <strong>$status</strong>.</p>";
-
-        if (strtolower($ot['status']) === 'rejected' && $admin_note) {
-            $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($admin_note)) . "</p>";
-        }
-
-        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
-            // Mark as notified to prevent duplicate emails
-            $update_ot = $pdo->prepare("UPDATE post_ot_requests SET notified = 1 WHERE id = ?");
-            $update_ot->execute([$ot['id']]);
-        }
-    }
 }
 
 
@@ -271,6 +283,24 @@ foreach ($ot_results as $ot) {
 </div>
 
 <script>
+function toggleModal() {
+    const modal = document.getElementById('notificationModal');
+    if (modal) {
+        modal.classList.toggle('hidden');
+    }
+}
+
+// Optional: Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('notificationModal');
+    const button = document.querySelector('.notification-button');
+    // Only close if modal is visible and click is outside modal and button
+    if (modal && !modal.classList.contains('hidden') && !modal.contains(event.target) && !button?.contains(event.target)) {
+        modal.classList.add('hidden');
+    }
+});
+
+
     function toggleModal() {
         const modal = document.getElementById('notificationModal');
         if (modal) {
@@ -287,4 +317,5 @@ foreach ($ot_results as $ot) {
             modal.classList.add('hidden');
         }
     });
+
 </script>

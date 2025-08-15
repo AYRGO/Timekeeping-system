@@ -865,7 +865,13 @@ document.addEventListener("DOMContentLoaded", function () {
     flatpickr("#date_range", {
         mode: "range",
         dateFormat: "Y-m-d",
-        minDate: "today",
+        minDate: (() => {
+            // Allow backtrack for 5 days
+            const today = new Date();
+            today.setDate(today.getDate() - 5);
+            return today;
+        })(),
+        // Remove any disabling/blocking of days before today
         onChange: function(selectedDates) {
             checkLeaveCredits(); // Check credits when dates change
         }

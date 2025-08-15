@@ -257,10 +257,23 @@ $scheduleOptions = [
     14 => ['in' => '06:00 AM', 'out' => '05:00 PM'],
     15 => ['in' => '06:00 AM', 'out' => '04:00 PM'],
     16 => ['in' => '08:30 AM', 'out' => '04:30 PM'],
-    17 => ['in' => '06:00 pP', 'out' => '12:00:00'],
-    18 => ['in' => '06:00:00', 'out' => '14:30:00'],
-
+    17 => ['in' => '06:00 AM', 'out' => '12:00 PM'],
+    18 => ['in' => '06:00 AM', 'out' => '14:30 PM'],
 ];
+
+// Sort schedule options by 'in' time (earliest to latest)
+function timeToSortable($time) {
+    // Handles both AM/PM and 24hr formats
+    $dt = DateTime::createFromFormat('h:i A', $time);
+    if (!$dt) $dt = DateTime::createFromFormat('H:i:s', $time);
+    if (!$dt) $dt = DateTime::createFromFormat('H:i', $time);
+    return $dt ? $dt->format('H:i:s') : $time;
+}
+$sortedScheduleOptions = $scheduleOptions;
+uasort($sortedScheduleOptions, function($a, $b) {
+    return strcmp(timeToSortable($a['in']), timeToSortable($b['in']));
+});
+
 ?>
 
 <!DOCTYPE html>
@@ -467,7 +480,48 @@ $scheduleOptions = [
                 </div>
             </div>
 
-            <?php include('../views/tabs/employee-schedule-tab.php'); ?>
+            <!-- Current Schedule Tab -->
+            <div id="current-schedule" class="tab-content">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-2">Current Schedule</h2>
+                    <p class="text-gray-500 mb-6">Click a schedule box below to change the employee's official work schedule.<br>
+                    <span class="text-xs text-blue-600">A confirmation will be required before applying changes.</span></p>
+                    <form id="scheduleForm" method="post">
+                        <input type="hidden" name="update_schedule" value="1">
+                        <input type="hidden" name="official_sched" id="official_sched_input" value="<?= htmlspecialchars($employee['official_sched']) ?>">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                            <?php foreach ($sortedScheduleOptions as $key => $sched): 
+                                $isCurrent = ($employee['official_sched'] == $key);
+                            ?>
+                            <div 
+                                class="relative cursor-pointer border-2 <?= $isCurrent ? 'border-blue-600 bg-blue-50 shadow-lg' : 'border-gray-200 bg-gray-50' ?> rounded-xl p-6 flex flex-col items-center justify-center transition-all duration-150 hover:border-blue-500 hover:shadow-lg group"
+                                onclick="confirmScheduleChange(<?= $key ?>, '<?= $sched['in'] ?>', '<?= $sched['out'] ?>', <?= $isCurrent ? 'true' : 'false' ?>)"
+                                style="min-height:120px;"
+                            >
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-2xl text-blue-500">
+                                        <i class="fa-regular fa-clock"></i>
+                                    </span>
+                                    <span class="text-lg font-semibold text-gray-800"><?= $sched['in'] ?> - <?= $sched['out'] ?></span>
+                                </div>
+                                <?php if ($isCurrent): ?>
+                                    <span class="absolute top-2 right-2 text-blue-600">
+                                        <i class="fa-solid fa-check-circle text-2xl"></i>
+                                    </span>
+                                    <span class="mt-2 px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold shadow">Current Schedule</span>
+                                <?php else: ?>
+                                    <span class="absolute inset-0 flex flex-col items-center justify-center bg-blue-600 bg-opacity-0 group-hover:bg-opacity-10 transition pointer-events-none">
+                                        <span class="flex items-center gap-2 text-blue-700 opacity-0 group-hover:opacity-100 transition text-sm font-medium">
+                                            <i class="fa-solid fa-hand-pointer"></i> Click to select
+                                        </span>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
             <?php include('../views/tabs/employee-checklist-tab.php'); ?>
 
@@ -1136,6 +1190,14 @@ function openTab(evt, tabName) {
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('default-tab').click();
 });
+
+function confirmScheduleChange(scheduleId, inTime, outTime, isCurrent) {
+    if (isCurrent) return; // Don't allow changing to current schedule
+    if (confirm(`Change schedule to ${inTime} - ${outTime}?`)) {
+        document.getElementById('official_sched_input').value = scheduleId;
+        document.getElementById('scheduleForm').submit();
+    }
+}
 </script>
 
 </body>

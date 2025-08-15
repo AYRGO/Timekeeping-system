@@ -8,11 +8,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
     $request_id = intval($_POST['request_id']);
     $action = trim($_POST['action']);
 
-    // Validate action
-    if (!in_array($action, ['approve', 'rejected'])) {
+    // Allow approve, rejected, and decline actions
+    if (!in_array($action, ['approve', 'rejected', 'decline'])) {
         $message = "Invalid action specified.";
     } else {
-        $new_status = $action === 'approve' ? 'Approved' : 'Rejected';
+        // Set status based on action
+        if ($action === 'approve') {
+            $new_status = 'Approved';
+        } elseif ($action === 'decline') {
+            $new_status = 'Declined';
+        } else {
+            $new_status = 'Rejected';
+        }
 
         try {
             $pdo->beginTransaction();
@@ -68,7 +75,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
 
             $pdo->commit();
 
-            $action_text = $action === 'approve' ? 'approved' : 'rejected';
+            // Set action_text for message
+            if ($action === 'approve') {
+                $action_text = 'approved';
+            } elseif ($action === 'decline') {
+                $action_text = 'declined';
+            } else {
+                $action_text = 'rejected';
+            }
             header("Location: schedule_request.php?message=Request%20ID%20%23$request_id%20has%20been%20$action_text");
             exit;
 

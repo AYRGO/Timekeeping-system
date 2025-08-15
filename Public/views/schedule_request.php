@@ -419,11 +419,22 @@ function getCurrentScheduleForEmployee($employee_id, $pdo) {
             document.getElementById('modalRequestId').value = requestId;
             document.getElementById('explanation').value = '';
             document.getElementById('declineModal').classList.remove('hidden');
+            // Debug: log to verify modal opens and requestId is set
+            console.log('Decline modal opened for requestId:', requestId);
         }
 
         function closeDeclineModal() {
             document.getElementById('declineModal').classList.add('hidden');
         }
+
+        // Optional: Prevent form submit if request_id is missing
+        document.querySelector('#declineModal form').addEventListener('submit', function(e) {
+            var reqId = document.getElementById('modalRequestId').value;
+            if (!reqId) {
+                alert('Request ID missing. Please try again.');
+                e.preventDefault();
+            }
+        });
     </script>
 
 </body>
