@@ -196,8 +196,8 @@ function getScheduleForDate($employee_id, $date, $pdo) {
         'status_color' => $status_color,
         'was_changed' => $activeScheduleOnDate ? true : false,
         'is_default' => !$activeScheduleOnDate
-    };
-}
+    ];
+  };
 
 // Get employee's last 5 time logs that are OT eligible (no null data)
 $employee_id = $_SESSION['employee']['id'] ?? 1; // Use the correct session key
