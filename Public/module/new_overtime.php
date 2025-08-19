@@ -195,9 +195,8 @@ function getScheduleForDate($employee_id, $date, $pdo) {
         'status_text' => $status_text,
         'status_color' => $status_color,
         'was_changed' => $activeScheduleOnDate ? true : false,
-        'is_default' => !$activeScheduleOnDate
+        'is_default' => !$activeScheduleOnDate];
     };
-}
 
 // Get employee's last 5 time logs that are OT eligible (no null data)
 $employee_id = $_SESSION['employee']['id'] ?? 1; // Use the correct session key
@@ -580,27 +579,10 @@ $default_time_out = $default_sched['time_out'];
                   $hasLog = !empty($log['time_in']) && !empty($log['time_out']);
                   $isRdot = false;
                   if ($hasLog) {
-                    // Use new schedule-based overtime eligibility
-                    $isOTEligible = isOvertimeEligibleBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
                     $overtimeHours = calculateOvertimeHoursBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
-                    
-                    // Don't show as OT eligible if overtime is less than 30 minutes (0.5 hours)
-                    if ($overtimeHours < 0.5) {
-                        $isOTEligible = false;
-                    }
-                    
                     $actualHours = calculateActualHoursWorked($log['time_in'], $log['time_out']);
                     $hasRequest = hasExistingOTRequest($log['id']);
-                    $timeIn = new DateTime($log['time_in']);
-                    $timeOut = new DateTime($log['time_out']);
-                    $interval = $timeIn->diff($timeOut);
-                    $totalHours = $interval->h + ($interval->i / 60);
-
-                    $logDate = new DateTime($log['log_date']);
-                    $now = new DateTime();
-                    $daysPassed = $logDate->diff($now)->days;
-                    $isOlderThan5Days = $daysPassed > 5;
-                    $rowStatus = $isOlderThan5Days ? 'noteligible' : ($isOTEligible ? ($hasRequest ? 'submitted' : 'eligible') : 'regular');
+                    $rowStatus = $hasRequest ? 'submitted' : 'eligible';
                   }
                 ?>
                 <tr class="hover:bg-emerald-50/30 transition-all duration-200 animate-slide-in-right group
@@ -703,17 +685,15 @@ $default_time_out = $default_sched['time_out'];
                         <?php if ($hasLog): ?>
                           <?php 
                             // Calculate regular work hours by deducting OT hours from total actual hours
-                            $regularHours = $actualHours - ($isOTEligible ? $overtimeHours : 0);
+                            $regularHours = $actualHours - $overtimeHours;
                             $regularHours = max(0, $regularHours); // Ensure it's not negative
                           ?>
                           <div class="text-lg font-bold text-gray-900">
                             <?= number_format($regularHours, 2) ?>h
                           </div>
-                          <?php if ($isOTEligible): ?>
-                            <div class="text-sm text-emerald-600 font-medium">
-                              +<?= number_format($overtimeHours, 2) ?>h OT
-                            </div>
-                          <?php endif; ?>
+                          <div class="text-sm text-emerald-600 font-medium">
+                            +<?= number_format($overtimeHours, 2) ?>h OT
+                          </div>
                         <?php else: ?>
                           <div class="text-lg font-bold text-gray-400">—</div>
                         <?php endif; ?>
@@ -727,20 +707,10 @@ $default_time_out = $default_sched['time_out'];
                         <i class="fas fa-ban mr-2"></i>
                         No Data Available
                       </span>
-                    <?php elseif ($isOlderThan5Days): ?>
-                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-700 border border-red-200">
-                        <i class="fas fa-clock mr-2"></i>
-                        Request Expired
-                      </span>
-                    <?php elseif ($isOTEligible): ?>
+                    <?php else: ?>
                       <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
                         <i class="fas fa-star mr-2"></i>
                         OT Eligible (<?= number_format($overtimeHours, 2) ?>h)
-                      </span>
-                    <?php else: ?>
-                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                        <i class="fas fa-check mr-2"></i>
-                        Not OT Eligible
                       </span>
                     <?php endif; ?>
                   </td>
@@ -753,14 +723,7 @@ $default_time_out = $default_sched['time_out'];
                           Not Available
                         </span>
                       </div>
-                    <?php elseif ($isOlderThan5Days): ?>
-                      <div class="flex items-center justify-center w-full">
-                        <span class="inline-flex items-center px-4 py-3 bg-red-100 text-red-600 rounded-xl text-sm font-medium border border-red-200">
-                          <i class="fas fa-clock mr-2"></i>
-                          Time Expired
-                        </span>
-                      </div>
-                    <?php elseif ($isOTEligible && !$hasRequest): ?>
+                    <?php elseif (!$hasRequest): ?>
                       <button onclick="openOvertimeModal(this)" 
                               class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-300">
                         <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
@@ -772,10 +735,6 @@ $default_time_out = $default_sched['time_out'];
                           <i class="fas fa-check-circle mr-2"></i>
                           Request Submitted
                         </span>
-                      </div>
-                    <?php else: ?>
-                      <div class="flex items-center justify-center w-full">
-                        <span class="text-gray-400 text-sm">No Action Required</span>
                       </div>
                     <?php endif; ?>
                   </td>
@@ -1474,8 +1433,13 @@ function submitOvertimeForm(form) {
     }
     
     if (!overtimeHours || parseFloat(overtimeHours) <= 0) {
-        alert('Error: Invalid overtime hours: ' + overtimeHours);
+    // Allow submission even if overtime hours are zero
+    // Optionally, show a warning but do not block submission
+    if (parseFloat(overtimeHours) <= 0) {
+      if (!confirm('Warning: Overtime hours are zero. Do you still want to submit?')) {
         return;
+      }
+    }
     }
     
     // Create FormData manually with additional validation
