@@ -655,55 +655,26 @@ $default_time_out = $default_sched['time_out'];
                   $hasDate = !empty($log['log_date']);
                   $hasLog = !empty($log['time_in']) && !empty($log['time_out']);
                   $isRdot = false;
+                  $actualHours = 0;
+                  $hasRequest = false;
                   if ($hasLog) {
-                    // Use the corrected detailed calculation for eligibility
-                    $detailedCalc = getOvertimeCalculationDetails($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
-                    $isOTEligible = $detailedCalc['eligible'];
-                    $overtimeHours = $detailedCalc['details']['net_overtime_hours'];
-                    
-                    // Debug logging for button logic
-                    error_log("BUTTON DEBUG for {$log['log_date']}: Eligible={$isOTEligible}, OT Hours={$overtimeHours}, Reason=" . $detailedCalc['reason']);
-                    
-                    // Fallback to old calculation if detailed calc fails
-                    if ($overtimeHours <= 0) {
-                        $isOTEligible = false;
-                        $overtimeHours = 0;
-                    }
-                    
                     $actualHours = calculateActualHoursWorked($log['time_in'], $log['time_out']);
                     $hasRequest = hasExistingOTRequest($log['id']);
-                    $timeIn = new DateTime($log['time_in']);
-                    $timeOut = new DateTime($log['time_out']);
-                    $interval = $timeIn->diff($timeOut);
-                    $totalHours = $interval->h + ($interval->i / 60);
-
-                    $logDate = new DateTime($log['log_date']);
-                    $now = new DateTime();
-                    $daysPassed = $logDate->diff($now)->days;
-                    $isOlderThan5Days = $daysPassed > 5;
-                    $rowStatus = $isOlderThan5Days ? 'noteligible' : ($isOTEligible ? ($hasRequest ? 'submitted' : 'eligible') : 'regular');
                   }
                 ?>
                 <tr class="hover:bg-emerald-50/30 transition-all duration-200 animate-slide-in-right group
                   <?php 
                     if (!$hasLog) {
                       echo 'bg-gray-50 border-l-4 border-l-gray-300';
-                    } elseif ($isOlderThan5Days) {
-                      echo 'bg-red-50/30 border-l-4 border-l-red-300';
-                    } elseif ($isOTEligible) {
-                      echo 'bg-emerald-50/40 border-l-4 border-l-emerald-400 shadow-sm';
                     } else {
-                      echo 'border-l-4 border-l-blue-300';
+                      echo 'border-l-4 border-l-emerald-400 shadow-sm';
                     }
                   ?>"
                   style="animation-delay: <?= $index * 0.05 ?>s;"
                   data-date="<?= $hasDate ? date('M d, Y', strtotime($log['log_date'])) : '' ?>"
-                  data-status="<?= $hasLog ? $rowStatus : 'rdot' ?>"
                   data-log-id="<?= $hasLog ? $log['id'] : '' ?>"
                   data-time-in="<?= $hasLog ? $log['time_in'] : '' ?>"
-                  data-time-out="<?= $hasLog ? $log['time_out'] : '' ?>"
-                  data-ot-hours="<?= $hasLog ? $overtimeHours : '0' ?>"
-                  data-is-rdot="<?= $isRdot ? '1' : '0' ?>">
+                  data-time-out="<?= $hasLog ? $log['time_out'] : '' ?>">
                   
                   <td class="px-8 py-6 whitespace-nowrap">
                     <div class="flex items-center">
@@ -797,11 +768,6 @@ $default_time_out = $default_sched['time_out'];
                           <div class="text-xs text-gray-500">
                             (<?= number_format($totalHours, 2) ?>h total - 1h lunch)
                           </div>
-                          <?php if ($isOTEligible): ?>
-                            <div class="text-sm text-emerald-600 font-medium">
-                              +<?= number_format($overtimeHours, 2) ?>h OT
-                            </div>
-                          <?php endif; ?>
                         <?php else: ?>
                           <div class="text-lg font-bold text-gray-400">—</div>
                         <?php endif; ?>
@@ -815,47 +781,11 @@ $default_time_out = $default_sched['time_out'];
                         <i class="fas fa-ban mr-2"></i>
                         No Data Available
                       </span>
-                    <?php elseif ($isOlderThan5Days): ?>
-                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-700 border border-red-200">
-                        <i class="fas fa-clock mr-2"></i>
-                        Request Expired
-                      </span>
-                    <?php elseif ($isOTEligible): ?>
+                    <?php else: ?>
                       <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
                         <i class="fas fa-star mr-2"></i>
-                        OT Eligible (<?= number_format($overtimeHours, 2) ?>h)
+                        OT Request Available
                       </span>
-                    <?php else: ?>
-                      <?php 
-                        // Get detailed calculation for troubleshooting
-                        $otDetails = getOvertimeCalculationDetails($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
-                        $isExtremelyLate = isset($otDetails['details']['is_extremely_late']) && $otDetails['details']['is_extremely_late'];
-                      ?>
-                      <div class="space-y-1">
-                        <?php if ($isExtremelyLate): ?>
-                          <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-700 border border-red-200">
-                            <i class="fas fa-exclamation-triangle mr-2"></i>
-                            Data Error
-                          </span>
-                          <div class="text-xs text-red-600 bg-red-50 rounded-lg p-2 border border-red-200" title="<?= htmlspecialchars($otDetails['reason']) ?>">
-                            <strong>⚠️ Possible Time Data Error</strong><br>
-                            Late: <?= round($otDetails['details']['late_minutes']/60, 1) ?>h 
-                            (<?= $otDetails['details']['late_minutes'] ?> min)<br>
-                            <em>Contact IT/HR to verify time data</em>
-                          </div>
-                        <?php else: ?>
-                          <div class="space-y-1">
-                            <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                              <i class="fas fa-info-circle mr-2"></i>
-                              Not OT Eligible
-                            </span>
-                            <div class="text-xs text-gray-600 bg-gray-50 rounded-lg p-2 border" title="<?= htmlspecialchars($otDetails['reason']) ?>">
-                              <strong>Need 30+ min past <?= $otDetails['details']['schedule']['out'] ?></strong><br>
-                              <em>Ended at <?= $otDetails['details']['actual']['out'] ?></em>
-                            </div>
-                          </div>
-                        <?php endif; ?>
-                      </div>
                     <?php endif; ?>
                   </td>
                   
@@ -867,19 +797,6 @@ $default_time_out = $default_sched['time_out'];
                           Not Available
                         </span>
                       </div>
-                    <?php elseif ($isOlderThan5Days): ?>
-                      <div class="flex items-center justify-center w-full">
-                        <span class="inline-flex items-center px-4 py-3 bg-red-100 text-red-600 rounded-xl text-sm font-medium border border-red-200">
-                          <i class="fas fa-clock mr-2"></i>
-                          Time Expired
-                        </span>
-                      </div>
-                    <?php elseif ($isOTEligible && !$hasRequest): ?>
-                      <button onclick="openOvertimeModal(this)" 
-                              class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-300">
-                        <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
-                        Submit OT Request
-                      </button>
                     <?php elseif ($hasRequest): ?>
                       <div class="flex items-center justify-center w-full">
                         <span class="inline-flex items-center px-4 py-3 bg-green-100 text-green-700 rounded-xl text-sm font-medium border border-green-200">
@@ -888,9 +805,11 @@ $default_time_out = $default_sched['time_out'];
                         </span>
                       </div>
                     <?php else: ?>
-                      <div class="flex items-center justify-center w-full">
-                        <span class="text-gray-400 text-sm">No Action Required</span>
-                      </div>
+                      <button onclick="openOvertimeModal(this)" 
+                              class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-300">
+                        <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
+                        Submit OT Request
+                      </button>
                     <?php endif; ?>
                   </td>
                 </tr>

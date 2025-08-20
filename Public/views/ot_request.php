@@ -59,36 +59,12 @@ function getCurrentScheduleForEmployee($employee_id, $log_date, $pdo, $schedule_
 
 // Fetch overtime requests with employee names and time logs
 if ($isHistoryView) {
-    // Fetch from post_ot_requests table (history)
-    $stmt = $pdo->query("
-        SELECT 
-            por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, 
-            por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, 
-            por.created_at, por.approved_at, por.approved_by,
-            e.fname, e.lname,
-            tl.log_date
-        FROM post_ot_requests por
-        JOIN employees e ON por.employee_id = e.id
-        LEFT JOIN time_logs tl ON por.time_log_id = tl.id
-        ORDER BY por.created_at DESC
-    ");
+    // Fetch from post_ot_requests table (history) with DISTINCT to avoid duplicates
+    $stmt = $pdo->query("SELECT DISTINCT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date FROM post_ot_requests por JOIN employees e ON por.employee_id = e.id LEFT JOIN time_logs tl ON por.time_log_id = tl.id ORDER BY por.created_at DESC");
 } else {
-    // Fetch from post_ot_requests table for pending requests only
-    $stmt = $pdo->query("
-        SELECT 
-            por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, 
-            por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, 
-            por.created_at, por.approved_at, por.approved_by,
-            e.fname, e.lname,
-            tl.log_date
-        FROM post_ot_requests por
-        JOIN employees e ON por.employee_id = e.id
-        LEFT JOIN time_logs tl ON por.time_log_id = tl.id
-        WHERE por.status = 'Pending'
-        ORDER BY por.created_at DESC
-    ");
+    // Fetch from post_ot_requests table for pending requests only with DISTINCT
+    $stmt = $pdo->query("SELECT DISTINCT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date FROM post_ot_requests por JOIN employees e ON por.employee_id = e.id LEFT JOIN time_logs tl ON por.time_log_id = tl.id WHERE por.status = 'Pending' ORDER BY por.created_at DESC");
 }
-
 $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Add schedule information to each request
@@ -179,8 +155,13 @@ function getStatusBadge($status) {
                     </div>
                 </div>
 
+                <!-- Search and Pagination Controls -->
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+                    <input type="text" id="searchInput" placeholder="Search by employee, date, status, OT type, reason..." class="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:ring focus:ring-blue-200" />
+                    <div id="pagination" class="flex items-center space-x-2 mt-2 md:mt-0"></div>
+                </div>
                 <div class="overflow-x-auto bg-white shadow rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200" id="otTable">
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
@@ -196,138 +177,176 @@ function getStatusBadge($status) {
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                                     <?= $isHistoryView ? 'Processed' : 'Submitted' ?>
                                 </th>
-                                <?php if (!$isHistoryView): ?>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                                <?php endif; ?>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <?php if (!empty($overtime_requests)): ?>
-                                <?php foreach ($overtime_requests as $ot): ?>
-                                    <tr class="hover:bg-gray-50" id="row-<?= $ot['id'] ?>">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            #<?= htmlspecialchars($ot['id']) ?>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-900">
-                                            <div class="flex items-center">
-                                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                                                    <span class="text-blue-600 font-medium text-sm">
-                                                        <?= strtoupper(substr($ot['fname'], 0, 1) . substr($ot['lname'], 0, 1)) ?>
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <div class="font-medium text-gray-900"><?= htmlspecialchars($ot['fname'] . ' ' . $ot['lname']) ?></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <div class="flex flex-col">
-                                                <span class="font-medium"><?= $ot['log_date'] ? date('M d, Y', strtotime($ot['log_date'])) : 'N/A' ?></span>
-                                                <span class="text-xs text-gray-500"><?= $ot['log_date'] ? date('l', strtotime($ot['log_date'])) : '' ?></span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-900">
-                                            <div class="flex flex-col">
-                                                <div class="flex items-center text-xs text-green-600 mb-1">
-                                                    <i class="fas fa-sign-in-alt mr-1"></i>In: <span class="font-medium ml-1"><?= htmlspecialchars($ot['current_schedule']['time_in']) ?></span>
-                                                </div>
-                                                <div class="flex items-center text-xs text-red-600">
-                                                    <i class="fas fa-sign-out-alt mr-1"></i>Out: <span class="font-medium ml-1"><?= htmlspecialchars($ot['current_schedule']['time_out']) ?></span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-900">
-                                            <div class="flex flex-col">
-                                                <div class="flex items-center text-xs text-green-600 mb-1">
-                                                    <i class="fas fa-sign-in-alt mr-1"></i>In:
-                                                </div>
-                                                <span class="font-medium text-green-700">
-                                                    <?= $ot['time_in'] ? date('g:i A', strtotime($ot['time_in'])) : '<span class="text-gray-400 italic">None</span>' ?>
-                                                </span>
-                                                <div class="flex items-center text-xs text-red-600 mb-1 mt-2">
-                                                    <i class="fas fa-sign-out-alt mr-1"></i>Out:
-                                                </div>
-                                                <span class="font-medium text-red-700">
-                                                    <?= $ot['time_out'] ? date('g:i A', strtotime($ot['time_out'])) : '<span class="text-gray-400 italic">None</span>' ?>
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <div class="flex flex-col items-center">
-                                                <div class="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium">
-                                                    <i class="fas fa-clock mr-1"></i><?= number_format($ot['ot_duration'], 2) ?> hrs
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                <?= htmlspecialchars($ot['ot_type']) ?>
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
-                                            <div class="truncate hover:whitespace-normal" title="<?= htmlspecialchars($ot['reason']) ?>">
-                                                <?= htmlspecialchars($ot['reason']) ?>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <?php if (!empty($ot['attachment'])): ?>
-                                                <a href="../uploads/overtime_attachments/<?= htmlspecialchars($ot['attachment']) ?>"
-                                                   target="_blank"
-                                                   class="inline-flex items-center text-blue-600 hover:text-blue-800">
-                                                    <i class="fas fa-paperclip mr-1"></i>View
-                                                </a>
-                                            <?php else: ?>
-                                                <span class="text-gray-400 italic">None</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <?= getStatusBadge($ot['status'] ?? 'pending') ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <div class="flex flex-col">
-                                                <span><?= date('M d, Y', strtotime($ot['created_at'])) ?></span>
-                                                <span class="text-xs"><?= date('g:i A', strtotime($ot['created_at'])) ?></span>
-                                            </div>
-                                        </td>
-                                        <?php if (!$isHistoryView): ?>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <div class="flex space-x-1">
-                                                <?php if (strtolower($ot['status']) === 'pending'): ?>
-                                                    <form method="post" action="process_ot_action.php" class="inline-block">
-                                                        <input type="hidden" name="request_id" value="<?= $ot['id'] ?>">
-                                                        <input type="hidden" name="action" value="approve">
-                                                        <button type="submit" 
-                                                                onclick="return confirm('Are you sure you want to approve this overtime request?')"
-                                                                class="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 text-xs transition-colors">
-                                                            <i class="fas fa-check mr-1"></i>Approve
-                                                        </button>
-                                                    </form>
-                                                    <button type="button"
-                                                            onclick="openDeclineModal(<?= $ot['id'] ?>)"
-                                                            class="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 text-xs transition-colors">
-                                                        <i class="fas fa-times mr-1"></i>Decline
-                                                    </button>
-                                                <?php else: ?>
-                                                    <span class="text-gray-500 italic">
-                                                        <i class="fas fa-check-circle mr-1"></i>Done
-                                                    </span>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                        <?php endif; ?>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="<?= $isHistoryView ? '11' : '12' ?>" class="text-center text-sm py-8 text-gray-500">
-                                        <i class="fas fa-clock text-4xl text-gray-300 mb-2"></i>
-                                        <div><?= $isHistoryView ? 'No processed overtime requests found.' : 'No overtime requests found.' ?></div>
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
+                        <tbody class="bg-white divide-y divide-gray-200" id="otTableBody">
+                            <!-- Table rows will be rendered by JS -->
                         </tbody>
                     </table>
                 </div>
+                <script>
+                let otRequests = <?php echo json_encode($overtime_requests); ?>;
+                const isHistoryView = <?php echo json_encode($isHistoryView); ?>;
+                const rowsPerPage = 10;
+                let currentPage = 1;
+                let filteredRequests = otRequests;
+                otRequests = otRequests.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                function renderTable() {
+                    const tbody = document.getElementById('otTableBody');
+                    tbody.innerHTML = '';
+                    const startIdx = (currentPage - 1) * rowsPerPage;
+                    const endIdx = startIdx + rowsPerPage;
+                    const pageData = filteredRequests.slice(startIdx, endIdx);
+                    if (pageData.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="12" class="text-center text-sm py-8 text-gray-500"><i class='fas fa-clock text-4xl text-gray-300 mb-2'></i><div>No overtime requests found.</div></td></tr>`;
+                        return;
+                    }
+                    pageData.forEach(ot => {
+                        const statusBadge = getStatusBadgeJS(ot.status);
+                        const otTypeBadge = getOtTypeBadgeJS(ot.ot_type);
+                        const actionCell = renderActionCell(ot);
+                        tbody.innerHTML += `
+                        <tr class="hover:bg-gray-50" id="row-${ot.id}">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${ot.id}</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                                        <span class="text-blue-600 font-medium text-sm">${ot.fname.charAt(0).toUpperCase() + ot.lname.charAt(0).toUpperCase()}</span>
+                                    </div>
+                                    <div><div class="font-medium text-gray-900">${escapeHtml(ot.fname + ' ' + ot.lname)}</div></div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div class="flex flex-col">
+                                    <span class="font-medium">${ot.log_date ? formatDate(ot.log_date) : 'N/A'}</span>
+                                    <span class="text-xs text-gray-500">${ot.log_date ? formatDay(ot.log_date) : ''}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <div class="flex flex-col">
+                                    <div class="flex items-center text-xs text-green-600 mb-1"><i class="fas fa-sign-in-alt mr-1"></i>In: <span class="font-medium ml-1">${escapeHtml(ot.current_schedule.time_in)}</span></div>
+                                    <div class="flex items-center text-xs text-red-600"><i class="fas fa-sign-out-alt mr-1"></i>Out: <span class="font-medium ml-1">${escapeHtml(ot.current_schedule.time_out)}</span></div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <div class="flex flex-col">
+                                    <div class="flex items-center text-xs text-green-600 mb-1"><i class="fas fa-sign-in-alt mr-1"></i>In:</div>
+                                    <span class="font-medium text-green-700">${isValidTime(ot.time_in) ? formatTime(ot.time_in) : '<span class="text-gray-400 italic">None</span>'}</span>
+                                    <div class="flex items-center text-xs text-red-600 mb-1 mt-2"><i class="fas fa-sign-out-alt mr-1"></i>Out:</div>
+                                    <span class="font-medium text-red-700">${isValidTime(ot.time_out) ? formatTime(ot.time_out) : '<span class="text-gray-400 italic">None</span>'}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><div class="flex flex-col items-center"><div class="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium"><i class="fas fa-clock mr-1"></i>${parseFloat(ot.ot_duration).toFixed(2)} hrs</div></div></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${otTypeBadge}</td>
+                            <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden"><div class="truncate hover:whitespace-normal" title="${escapeHtml(ot.reason)}">${escapeHtml(ot.reason)}</div></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">${ot.attachment ? `<a href="../uploads/overtime_attachments/${escapeHtml(ot.attachment)}" target="_blank" class="inline-flex items-center text-blue-600 hover:text-blue-800"><i class="fas fa-paperclip mr-1"></i>View</a>` : `<span class="text-gray-400 italic">None</span>`}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">${statusBadge}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><div class="flex flex-col"><span>${formatDate(ot.created_at)}</span><span class="text-xs">${formatTime(ot.created_at)}</span></div></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${actionCell}</td>
+                        </tr>`;
+                    });
+                }
+                function escapeHtml(text) {
+                    return text ? text.replace(/[&<>'"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'}[c]; }) : '';
+                }
+                function formatDate(dateStr) {
+                    const d = new Date(dateStr);
+                    return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                }
+                function formatDay(dateStr) {
+                    const d = new Date(dateStr);
+                    return d.toLocaleDateString('en-US', { weekday: 'long' });
+                }
+                function formatTime(dateStr) {
+                    // If time-only string (e.g., '07:30:00'), format as time
+                    if (/^\d{2}:\d{2}:\d{2}$/.test(dateStr)) {
+                        const [h, m, s] = dateStr.split(':');
+                        const d = new Date();
+                        d.setHours(h, m, s, 0);
+                        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    }
+                    // Otherwise, try to parse as datetime
+                    const d = new Date(dateStr);
+                    if (isNaN(d.getTime())) return 'None';
+                    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                }
+                function isValidTime(dateStr) {
+                    if (!dateStr) return false;
+                    // Accept time-only strings like '07:30:00'
+                    if (/^\d{2}:\d{2}:\d{2}$/.test(dateStr)) return true;
+                    const d = new Date(dateStr);
+                    return !isNaN(d.getTime());
+                }
+                function getStatusBadgeJS(status) {
+                    status = (status || 'pending').toLowerCase();
+                    const classes = { 'approved': 'bg-green-100 text-green-800', 'pending': 'bg-yellow-100 text-yellow-800', 'rejected': 'bg-red-100 text-red-800', 'declined': 'bg-red-100 text-red-800', };
+                    const icons = { 'approved': 'fas fa-check', 'pending': 'fas fa-clock', 'rejected': 'fas fa-times', 'declined': 'fas fa-times', };
+                    const cls = classes[status] || 'bg-gray-100 text-gray-800';
+                    const icon = icons[status] || 'fas fa-question';
+                    return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}"><i class="${icon} mr-1"></i>${status.charAt(0).toUpperCase() + status.slice(1)}</span>`;
+                }
+                function getOtTypeBadgeJS(type) {
+                    type = (type || '').toLowerCase();
+                    return `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">${escapeHtml(type)}</span>`;
+                }
+                function renderActionCell(ot) {
+                    if (!isHistoryView) {
+                        if ((ot.status || '').toLowerCase() === 'pending') {
+                            return `<div class="flex space-x-1"><form method="post" action="process_ot_action.php" class="inline-block"><input type="hidden" name="request_id" value="${ot.id}"><input type="hidden" name="action" value="approve"><button type="submit" onclick="return confirm('Are you sure you want to approve this overtime request?')" class="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 text-xs transition-colors"><i class="fas fa-check mr-1"></i>Approve</button></form><button type="button" onclick="openDeclineModal(${ot.id})" class="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 text-xs transition-colors"><i class="fas fa-times mr-1"></i>Decline</button></div>`;
+                        } else {
+                            return `<span class="text-gray-500 italic"><i class="fas fa-check-circle mr-1"></i>Done</span>`;
+                        }
+                    } else {
+                        return '';
+                    }
+                }
+                function renderPagination() {
+                    const pagDiv = document.getElementById('pagination');
+                    pagDiv.innerHTML = '';
+                    const totalPages = Math.ceil(filteredRequests.length / rowsPerPage);
+                    if (totalPages <= 1) return;
+                    const prevBtn = document.createElement('button');
+                    prevBtn.textContent = 'Prev';
+                    prevBtn.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700';
+                    prevBtn.disabled = currentPage === 1;
+                    prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; updateTable(); } };
+                    pagDiv.appendChild(prevBtn);
+                    for (let i = 1; i <= totalPages; i++) {
+                        const btn = document.createElement('button');
+                        btn.textContent = i;
+                        btn.className = `px-3 py-1 rounded ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+                        btn.onclick = () => { currentPage = i; updateTable(); };
+                        pagDiv.appendChild(btn);
+                    }
+                    const nextBtn = document.createElement('button');
+                    nextBtn.textContent = 'Next';
+                    nextBtn.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700';
+                    nextBtn.disabled = currentPage === totalPages;
+                    nextBtn.onclick = () => { if (currentPage < totalPages) { currentPage++; updateTable(); } };
+                    pagDiv.appendChild(nextBtn);
+                }
+                function updateTable() {
+                    renderTable();
+                    renderPagination();
+                }
+                document.getElementById('searchInput').addEventListener('input', function(e) {
+                    const val = e.target.value.toLowerCase();
+                    filteredRequests = otRequests.filter(ot => {
+                        return (
+                            (ot.fname + ' ' + ot.lname).toLowerCase().includes(val) ||
+                            (ot.log_date || '').toLowerCase().includes(val) ||
+                            (ot.status || '').toLowerCase().includes(val) ||
+                            (ot.ot_type || '').toLowerCase().includes(val) ||
+                            (ot.reason || '').toLowerCase().includes(val)
+                        );
+                    });
+                    currentPage = 1;
+                    updateTable();
+                });
+                // Initial render
+                updateTable();
+                </script>
 
                 <!-- Summary Cards -->
                 <?php if (!empty($overtime_requests)): ?>
