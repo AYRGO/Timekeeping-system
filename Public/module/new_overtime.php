@@ -16,9 +16,21 @@ include_once 'stats/schedule_tracker.php';
 // Updated overtime eligibility function based on active schedule
 
 // Overtime eligibility based on simple rule: 30+ minutes past scheduled end time
-function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo) {
+function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo, $ot_type = null) {
   if (empty($time_in) || empty($time_out)) {
     return false;
+  }
+  
+  // Special handling for Restday OT - only needs 8+ hours
+  if ($ot_type === 'Restday OT') {
+    $timeIn = new DateTime($time_in);
+    $timeOut = new DateTime($time_out);
+    $interval = $timeIn->diff($timeOut);
+    $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
+    $totalHours = $totalMinutes / 60;
+    $workHours = max(0, $totalHours - 1); // Minus 1hr lunch
+    
+    return $workHours >= 8; // 8+ hours for Restday OT
   }
   
   $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
@@ -48,9 +60,21 @@ function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_
 }
 
 // Calculate overtime hours: time worked past scheduled end time (with 1hr lunch deduction)
-function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo) {
+function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo, $ot_type = null) {
   if (empty($time_in) || empty($time_out)) {
     return 0;
+  }
+  
+  // Special handling for Restday OT - return total work hours minus lunch
+  if ($ot_type === 'Restday OT') {
+    $timeIn = new DateTime($time_in);
+    $timeOut = new DateTime($time_out);
+    $interval = $timeIn->diff($timeOut);
+    $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
+    $totalHours = $totalMinutes / 60;
+    $workHours = max(0, $totalHours - 1); // Minus 1hr lunch
+    
+    return round($workHours, 2);
   }
   
   $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
@@ -80,12 +104,59 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
 }
 
 // Helper function to get detailed OT calculation breakdown - SIMPLIFIED VERSION
-function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee_id, $pdo) {
+function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee_id, $pdo, $ot_type = null) {
   if (empty($time_in) || empty($time_out)) {
     return [
       'eligible' => false,
       'reason' => 'Missing time in or time out data',
       'details' => []
+    ];
+  }
+  
+  // Special handling for Restday OT
+  if ($ot_type === 'Restday OT') {
+    $actual_in_dt = new DateTime($time_in);
+    $actual_out_dt = new DateTime($time_out);
+    
+    // Calculate actual hours worked (minus 1hr lunch)
+    $actual_interval = $actual_in_dt->diff($actual_out_dt);
+    $actual_minutes = ($actual_interval->h * 60) + $actual_interval->i;
+    $actual_hours_with_lunch = round($actual_minutes / 60, 2);
+    $actual_hours = max(0, $actual_hours_with_lunch - 1); // Minus 1hr lunch
+    
+    $eligible = $actual_hours >= 8; // 8+ hours for Restday OT
+    
+    $details = [
+      'schedule' => [
+        'in' => 'N/A (Rest Day)',
+        'out' => 'N/A (Rest Day)',
+        'hours' => 0,
+        'hours_minus_lunch' => 0
+      ],
+      'actual' => [
+        'in' => $actual_in_dt->format('H:i:s'),
+        'out' => $actual_out_dt->format('H:i:s'),
+        'hours' => $actual_hours_with_lunch,
+        'hours_minus_lunch' => $actual_hours
+      ],
+      'overtime_minutes' => $actual_hours * 60,
+      'overtime_hours' => $actual_hours,
+      'net_overtime_minutes' => $actual_hours * 60,
+      'net_overtime_hours' => $actual_hours,
+      'minimum_required' => 8, // hours for Restday OT
+      'eligible' => $eligible,
+      'lunch_deducted' => true,
+      'is_restday_ot' => true
+    ];
+    
+    $reason = $eligible 
+      ? "Eligible for {$actual_hours} hours of Restday OT (worked {$actual_hours_with_lunch}h total - 1h lunch)"
+      : "Need 8+ hours of work for Restday OT (worked only {$actual_hours}h after lunch deduction)";
+    
+    return [
+      'eligible' => $eligible,
+      'reason' => $reason,
+      'details' => $details
     ];
   }
   
@@ -888,8 +959,15 @@ $default_time_out = $default_sched['time_out'];
                         </span>
                       </div>
                     <?php else: ?>
-                      <div class="flex items-center justify-center w-full">
+                      <div class="flex flex-col items-center space-y-2">
                         <span class="text-gray-400 text-sm">No Action Required</span>
+                        <?php if ($hasLog && !$isOlderThan5Days): ?>
+                          <button onclick="openRDOTModal(this)" 
+                                  class="group inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 text-sm">
+                            <i class="fas fa-calendar-plus mr-2 group-hover:rotate-12 transition-transform duration-200"></i>
+                            Request RDOT
+                          </button>
+                        <?php endif; ?>
                       </div>
                     <?php endif; ?>
                   </td>
@@ -1429,9 +1507,110 @@ function openOvertimeModal(button) {
     document.getElementById('attachment').removeAttribute('disabled');
 }
 
+// Open RDOT modal with data
+function openRDOTModal(button) {
+    const row = button.closest('tr');
+    const timeLogId = row.dataset.logId;
+    const timeIn = row.dataset.timeIn;
+    const timeOut = row.dataset.timeOut;
+    const date = row.dataset.date;
+    
+    console.log('RDOT Modal Data:', { timeLogId, timeIn, timeOut, date });
+    
+    // Calculate work hours for RDOT
+    let workHours = 0;
+    let isEligible = false;
+    if (timeIn && timeOut) {
+        const timeInDate = new Date('2000-01-01 ' + timeIn);
+        const timeOutDate = new Date('2000-01-01 ' + timeOut);
+        const diffMs = timeOutDate - timeInDate;
+        const diffHours = diffMs / (1000 * 60 * 60);
+        workHours = Math.max(0, diffHours - 1); // Subtract 1 hour for lunch
+        isEligible = workHours >= 8; // Restday OT needs 8+ hours
+    }
+    
+    // Show warning if not eligible for Restday OT
+    if (!isEligible) {
+        const proceed = confirm(
+            `Warning: This time log may not meet Restday OT requirements.\n\n` +
+            `Work Hours: ${workHours.toFixed(2)} hours (need 8+ hours)\n\n` +
+            `Do you want to proceed anyway?`
+        );
+        if (!proceed) return;
+    }
+    
+    // Populate form fields
+    document.getElementById('selected_time_log_id').value = timeLogId || '';
+    document.getElementById('selected_time_in').value = timeIn || '';
+    document.getElementById('selected_time_out').value = timeOut || '';
+    document.getElementById('overtime_hours').value = workHours.toFixed(2);
+    document.getElementById('selected_date').value = date || '';
+    
+    // Format and display times
+    if (timeIn && timeOut) {
+        try {
+            const timeInFormatted = new Date('2000-01-01 ' + timeIn).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+            const timeOutFormatted = new Date('2000-01-01 ' + timeOut).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+            
+            document.getElementById('display_time_in').value = timeInFormatted;
+            document.getElementById('display_time_out').value = timeOutFormatted;
+        } catch (error) {
+            console.error('Time formatting error:', error);
+            document.getElementById('display_time_in').value = timeIn;
+            document.getElementById('display_time_out').value = timeOut;
+        }
+    }
+    
+    // Set RDOT as default type
+    document.getElementById('ot_type').value = 'Restday OT';
+    
+    // Clear previous values
+    document.getElementById('reason').value = '';
+    document.getElementById('attachment').value = '';
+    
+    // Update modal title for RDOT
+    const modalTitle = document.querySelector('#overtimeModal h3');
+    if (modalTitle) {
+        modalTitle.textContent = 'Submit Rest Day Overtime Request';
+    }
+    
+    // Show modal
+    document.getElementById('overtimeModal').classList.remove('hidden');
+    
+    // Focus on reason field since OT type is pre-selected
+    setTimeout(() => {
+        document.getElementById('reason').focus();
+    }, 100);
+
+    // Enable all fields for RDOT
+    document.getElementById('ot_type').removeAttribute('disabled');
+    document.getElementById('selected_time_in').removeAttribute('readonly');
+    document.getElementById('selected_time_out').removeAttribute('readonly');
+    document.getElementById('selected_date').setAttribute('readonly', 'readonly');
+    document.getElementById('overtime_hours').setAttribute('readonly', 'readonly');
+    document.getElementById('display_time_in').setAttribute('readonly', 'readonly');
+    document.getElementById('display_time_out').setAttribute('readonly', 'readonly');
+    document.getElementById('reason').removeAttribute('readonly');
+    document.getElementById('attachment').removeAttribute('disabled');
+}
+
 // Add missing close function for modal
 function closeOvertimeModal() {
     document.getElementById('overtimeModal').classList.add('hidden');
+    
+    // Reset modal title
+    const modalTitle = document.querySelector('#overtimeModal h3');
+    if (modalTitle) {
+        modalTitle.textContent = 'Submit Overtime Request';
+    }
 }
 
 // Tab switching functionality
@@ -1454,14 +1633,12 @@ function switchTab(tab) {
     }
 }
 
-// View OT details function
+// Replace incomplete or broken call with working fetch for OT details
 function viewOTDetails(requestId) {
-    // You can implement a modal or redirect to a detailed view
     fetch('get_overtime_details.php?id=' + requestId)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Display details in a modal or alert
                 let details = `Overtime Request Details:\n\n`;
                 details += `Date: ${data.request.log_date}\n`;
                 details += `Type: ${data.request.ot_type}\n`;
@@ -1488,7 +1665,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!form) {
         console.error('Overtime form not found!');
         return;
-    }
+       }
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -1500,6 +1677,15 @@ document.addEventListener('DOMContentLoaded', function() {
             submitOvertimeForm(this);
         }, 100);
     });
+    
+    // Add event listener for OT type change to recalculate eligibility
+    const otTypeSelect = document.getElementById('ot_type');
+    if (otTypeSelect) {
+        otTypeSelect.addEventListener('change', function() {
+            console.log('OT Type changed to:', this.value);
+            // No need to recalculate here as modal handles this during opening
+        });
+    }
 });
 
 function submitOvertimeForm(form) {
@@ -1587,9 +1773,19 @@ function submitOvertimeForm(form) {
         return;
     }
     
-    if (!overtimeHours || parseFloat(overtimeHours) <= 0) {
-        alert('Error: Invalid overtime hours: ' + overtimeHours);
-        return;
+    // Special validation for Restday OT - only needs 8+ hours
+    if (otType === 'Restday OT') {
+        const hours = parseFloat(overtimeHours);
+        if (hours < 8) {
+            alert('Error: Restday OT requires at least 8 hours of work. Current: ' + hours.toFixed(2) + ' hours.');
+            return;
+        }
+    } else {
+        // Regular OT validation - needs to be past scheduled time
+        if (!overtimeHours || parseFloat(overtimeHours) <= 0) {
+            alert('Error: Invalid overtime hours: ' + overtimeHours);
+            return;
+        }
     }
     
     // Create FormData manually with additional validation

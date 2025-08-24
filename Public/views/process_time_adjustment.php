@@ -27,6 +27,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'approve') {
             $request['status'] = 'approved';
+            // Update time_logs table with approved time in/out
+            $updateStmt = $pdo->prepare("UPDATE time_logs SET time_in = ?, time_out = ? WHERE employee_id = ? AND log_date = ?");
+            $updateStmt->execute([
+                $request['requested_time_in'],
+                $request['requested_time_out'],
+                $request['employee_id'],
+                $request['log_date']
+            ]);
         } elseif ($action === 'decline') {
             $explanation = trim($_POST['explanation'] ?? '');
 

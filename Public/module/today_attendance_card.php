@@ -10,14 +10,31 @@ if (!$employee_id) {
 }
 
 // Prepare today's time in/out
-$time_in = isset($time_in) ? date('H:i:s', strtotime($time_in)) : null;
-$time_out = isset($time_out) ? date('H:i:s', strtotime($time_out)) : null;
 
-// Optional: set $time_in and $time_out if not yet set
-$time_in = $time_in ?? null;
-$time_out = $time_out ?? null;
+// Get today's date
+$today = date('Y-m-d');
+
+// Fetch today's time log
+include_once('../config/db.php');
+$stmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs WHERE employee_id = ? AND log_date = ?");
+$stmt->execute([$employee_id, $today]);
+$log = $stmt->fetch(PDO::FETCH_ASSOC);
+$time_in = $log['time_in'] ?? null;
+$time_out = $log['time_out'] ?? null;
+
+// Check for approved time adjustment for today
+$adjStmt = $pdo->prepare("SELECT requested_time_in, requested_time_out FROM post_time_adjustment_requests WHERE employee_id = ? AND log_date = ? AND status = 'approved' ORDER BY id DESC LIMIT 1");
+$adjStmt->execute([$employee_id, $today]);
+$adj = $adjStmt->fetch(PDO::FETCH_ASSOC);
+if ($adj) {
+    // Use adjusted time if available
+    $time_in = $adj['requested_time_in'] ?? $time_in;
+    $time_out = $adj['requested_time_out'] ?? $time_out;
+}
+
+$time_in = $time_in ? date('H:i:s', strtotime($time_in)) : null;
+$time_out = $time_out ? date('H:i:s', strtotime($time_out)) : null;
 $workingDuration = '';
-
 if ($time_in && $time_out) {
     $start = new DateTime($time_in);
     $end = new DateTime($time_out);

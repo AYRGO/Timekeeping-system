@@ -83,8 +83,14 @@ try {
 
     // Double-check OT eligibility on server side
     require_once 'time_logs_helper.php';
-    if (!isOvertimeEligible($time_in, $time_out)) {
-        echo json_encode(['success' => false, 'message' => 'This time log is not eligible for overtime. Must work at least 8 hours and 30 minutes.']);
+    if (!isOvertimeEligible($time_in, $time_out, $ot_type)) {
+        $errorMessage = 'This time log is not eligible for overtime.';
+        if ($ot_type === 'Restday OT') {
+            $errorMessage .= ' Must work at least 8 hours for Rest Day OT.';
+        } else {
+            $errorMessage .= ' Must work at least 8 hours and 30 minutes.';
+        }
+        echo json_encode(['success' => false, 'message' => $errorMessage]);
         exit;
     }
 
