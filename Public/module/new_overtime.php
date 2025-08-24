@@ -15,24 +15,11 @@ include_once 'stats/schedule_tracker.php';
 
 // Updated overtime eligibility function based on active schedule
 
-// Overtime eligibility based on simple rule: 30+ minutes past scheduled end time
-function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo, $ot_type = null) {
+// Overtime eligibility and calculation with grace period and late deduction
+function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo) {
   if (empty($time_in) || empty($time_out)) {
     return false;
   }
-  
-  // Special handling for Restday OT - only needs 8+ hours
-  if ($ot_type === 'Restday OT') {
-    $timeIn = new DateTime($time_in);
-    $timeOut = new DateTime($time_out);
-    $interval = $timeIn->diff($timeOut);
-    $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
-    $totalHours = $totalMinutes / 60;
-    $workHours = max(0, $totalHours - 1); // Minus 1hr lunch
-    
-    return $workHours >= 8; // 8+ hours for Restday OT
-  }
-  
   $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
   $schedule_out = $scheduleInfo['time_out'];
   
@@ -55,189 +42,47 @@ function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_
   $past_end_interval = $schedule_out_dt->diff($actual_out_dt);
   $minutes_past_end = ($past_end_interval->days * 24 * 60) + ($past_end_interval->h * 60) + $past_end_interval->i;
 
-  // Must work 30+ minutes past scheduled end time to qualify for OT
-  return $minutes_past_end >= 30;
+  // Deduct late minutes from OT
+  $net_ot_minutes = $ot_minutes - $late_minutes;
+  return $net_ot_minutes >= 30; // Eligible if net OT is 30+ minutes
 }
 
-// Calculate overtime hours: time worked past scheduled end time (with 1hr lunch deduction)
-function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo, $ot_type = null) {
+function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo) {
   if (empty($time_in) || empty($time_out)) {
     return 0;
   }
-  
-  // Special handling for Restday OT - return total work hours minus lunch
-  if ($ot_type === 'Restday OT') {
-    $timeIn = new DateTime($time_in);
-    $timeOut = new DateTime($time_out);
-    $interval = $timeIn->diff($timeOut);
-    $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
-    $totalHours = $totalMinutes / 60;
-    $workHours = max(0, $totalHours - 1); // Minus 1hr lunch
-    
-    return round($workHours, 2);
-  }
-  
   $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
-  $schedule_out = $scheduleInfo['time_out'];
-  
-  // Convert to DateTime objects
-  $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
-  $actual_out_dt = new DateTime($time_out);
-  
-  // If actual times are on different dates, adjust schedule time accordingly
-  $actual_date = $actual_out_dt->format('Y-m-d');
-  if ($actual_date !== $log_date) {
-    $schedule_out_dt = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_out)));
-  }
-
-  // Check if worked past scheduled end time
-  if ($actual_out_dt <= $schedule_out_dt) {
-    return 0; // No overtime if didn't work past scheduled end
-  }
-
-  // Calculate minutes worked past scheduled end time
-  $past_end_interval = $schedule_out_dt->diff($actual_out_dt);
-  $ot_minutes = ($past_end_interval->days * 24 * 60) + ($past_end_interval->h * 60) + $past_end_interval->i;
-
-  // Convert to hours and round to 2 decimals
-  return round($ot_minutes / 60, 2);
-}
-
-// Helper function to get detailed OT calculation breakdown - SIMPLIFIED VERSION
-function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee_id, $pdo, $ot_type = null) {
-  if (empty($time_in) || empty($time_out)) {
-    return [
-      'eligible' => false,
-      'reason' => 'Missing time in or time out data',
-      'details' => []
-    ];
-  }
-  
-  // Special handling for Restday OT
-  if ($ot_type === 'Restday OT') {
-    $actual_in_dt = new DateTime($time_in);
-    $actual_out_dt = new DateTime($time_out);
-    
-    // Calculate actual hours worked (minus 1hr lunch)
-    $actual_interval = $actual_in_dt->diff($actual_out_dt);
-    $actual_minutes = ($actual_interval->h * 60) + $actual_interval->i;
-    $actual_hours_with_lunch = round($actual_minutes / 60, 2);
-    $actual_hours = max(0, $actual_hours_with_lunch - 1); // Minus 1hr lunch
-    
-    $eligible = $actual_hours >= 8; // 8+ hours for Restday OT
-    
-    $details = [
-      'schedule' => [
-        'in' => 'N/A (Rest Day)',
-        'out' => 'N/A (Rest Day)',
-        'hours' => 0,
-        'hours_minus_lunch' => 0
-      ],
-      'actual' => [
-        'in' => $actual_in_dt->format('H:i:s'),
-        'out' => $actual_out_dt->format('H:i:s'),
-        'hours' => $actual_hours_with_lunch,
-        'hours_minus_lunch' => $actual_hours
-      ],
-      'overtime_minutes' => $actual_hours * 60,
-      'overtime_hours' => $actual_hours,
-      'net_overtime_minutes' => $actual_hours * 60,
-      'net_overtime_hours' => $actual_hours,
-      'minimum_required' => 8, // hours for Restday OT
-      'eligible' => $eligible,
-      'lunch_deducted' => true,
-      'is_restday_ot' => true
-    ];
-    
-    $reason = $eligible 
-      ? "Eligible for {$actual_hours} hours of Restday OT (worked {$actual_hours_with_lunch}h total - 1h lunch)"
-      : "Need 8+ hours of work for Restday OT (worked only {$actual_hours}h after lunch deduction)";
-    
-    return [
-      'eligible' => $eligible,
-      'reason' => $reason,
-      'details' => $details
-    ];
-  }
-  
-  $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
-  $schedule_in = $scheduleInfo['time_in'];
-  $schedule_out = $scheduleInfo['time_out'];
-  
-  // Convert to DateTime objects
-  $schedule_in_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_in)));
-  $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  $schedule_in = $scheduleInfo['time_in'];      // raw time
+  $schedule_out = $scheduleInfo['time_out'];    // raw time
+  $schedule_in_dt = new DateTime($log_date . ' ' . $schedule_in);
+  $schedule_out_dt = new DateTime($log_date . ' ' . $schedule_out);
   $actual_in_dt = new DateTime($time_in);
   $actual_out_dt = new DateTime($time_out);
 
-  // If actual times are on different dates, adjust schedule times accordingly
-  $actual_date = $actual_out_dt->format('Y-m-d');
-  if ($actual_date !== $log_date) {
-    $schedule_in_dt = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_in)));
-    $schedule_out_dt = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  // Grace period: 15 minutes after scheduled time in
+  $grace_in_dt = clone $schedule_in_dt;
+  $grace_in_dt->modify('+15 minutes');
+
+  // Calculate late minutes beyond grace
+  $late_minutes = 0;
+  if ($actual_in_dt > $grace_in_dt) {
+    $late_interval = $grace_in_dt->diff($actual_in_dt);
+    $late_minutes = ($late_interval->h * 60) + $late_interval->i;
   }
 
-  // Calculate scheduled hours (minus 1hr lunch)
-  $scheduled_interval = $schedule_in_dt->diff($schedule_out_dt);
-  $scheduled_minutes = ($scheduled_interval->h * 60) + $scheduled_interval->i;
-  $scheduled_hours_with_lunch = round($scheduled_minutes / 60, 2);
-  $scheduled_hours = max(0, $scheduled_hours_with_lunch - 1); // Minus 1hr lunch
-  
-  // Calculate actual hours worked (minus 1hr lunch)
-  $actual_interval = $actual_in_dt->diff($actual_out_dt);
-  $actual_minutes = ($actual_interval->h * 60) + $actual_interval->i;
-  $actual_hours_with_lunch = round($actual_minutes / 60, 2);
-  $actual_hours = max(0, $actual_hours_with_lunch - 1); // Minus 1hr lunch
-  
-  // Calculate overtime: time worked past scheduled end time
-  $ot_minutes = 0;
-  if ($actual_out_dt > $schedule_out_dt) {
-    $past_end_interval = $schedule_out_dt->diff($actual_out_dt);
-    $ot_minutes = ($past_end_interval->days * 24 * 60) + ($past_end_interval->h * 60) + $past_end_interval->i;
+  // Overtime is any time worked past scheduled out
+  if ($actual_out_dt <= $schedule_out_dt) {
+    return 0;
   }
-  
-  $ot_hours = round($ot_minutes / 60, 2);
-  $eligible = $ot_minutes >= 30; // Must work 30+ minutes past scheduled end
-  
-  $details = [
-    'schedule' => [
-      'in' => $schedule_in,
-      'out' => $schedule_out,
-      'hours' => $scheduled_hours_with_lunch,
-      'hours_minus_lunch' => $scheduled_hours
-    ],
-    'actual' => [
-      'in' => $actual_in_dt->format('H:i:s'),
-      'out' => $actual_out_dt->format('H:i:s'),
-      'hours' => $actual_hours_with_lunch,
-      'hours_minus_lunch' => $actual_hours
-    ],
-    'overtime_minutes' => $ot_minutes,
-    'overtime_hours' => $ot_hours,
-    'net_overtime_minutes' => $ot_minutes,
-    'net_overtime_hours' => $ot_hours,
-    'minimum_required' => 30, // minutes past scheduled end
-    'eligible' => $eligible,
-    'lunch_deducted' => true
-  ];
-  
-  // Determine reason
-  $reason = '';
-  if (!$eligible) {
-    if ($ot_minutes <= 0) {
-      $reason = "Did not work past scheduled end time ({$schedule_out})";
-    } elseif ($ot_minutes < 30) {
-      $reason = "Worked only {$ot_minutes} minutes past scheduled end (need 30+ minutes)";
-    }
-  } else {
-    $reason = "Eligible for {$ot_hours} hours of overtime (worked {$ot_minutes} min past scheduled end)";
-  }
-  
-  return [
-    'eligible' => $eligible,
-    'reason' => $reason,
-    'details' => $details
-  ];
+
+  // Calculate raw OT minutes
+  $ot_interval = $schedule_out_dt->diff($actual_out_dt);
+  $ot_minutes = ($ot_interval->h * 60) + $ot_interval->i;
+
+  // Deduct late minutes from OT
+  $net_ot_minutes = $ot_minutes - $late_minutes;
+  if ($net_ot_minutes < 1) return 0;
+  return round($net_ot_minutes / 60, 2); // Return hours, rounded to 2 decimals
 }
 
 // Function to get schedule for a specific date (historical accuracy)
@@ -726,55 +571,35 @@ $default_time_out = $default_sched['time_out'];
                   $hasDate = !empty($log['log_date']);
                   $hasLog = !empty($log['time_in']) && !empty($log['time_out']);
                   $isRdot = false;
+                  $actualHours = 0;
+                  $hasRequest = false;
                   if ($hasLog) {
-                    // Use the corrected detailed calculation for eligibility
-                    $detailedCalc = getOvertimeCalculationDetails($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
-                    $isOTEligible = $detailedCalc['eligible'];
-                    $overtimeHours = $detailedCalc['details']['net_overtime_hours'];
+                    // Use new schedule-based overtime eligibility
+                    $isOTEligible = isOvertimeEligibleBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
+                    $overtimeHours = calculateOvertimeHoursBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
                     
-                    // Debug logging for button logic
-                    error_log("BUTTON DEBUG for {$log['log_date']}: Eligible={$isOTEligible}, OT Hours={$overtimeHours}, Reason=" . $detailedCalc['reason']);
-                    
-                    // Fallback to old calculation if detailed calc fails
-                    if ($overtimeHours <= 0) {
+                    // Don't show as OT eligible if overtime is less than 30 minutes (0.5 hours)
+                    if ($overtimeHours < 0.5) {
                         $isOTEligible = false;
-                        $overtimeHours = 0;
                     }
                     
                     $actualHours = calculateActualHoursWorked($log['time_in'], $log['time_out']);
                     $hasRequest = hasExistingOTRequest($log['id']);
-                    $timeIn = new DateTime($log['time_in']);
-                    $timeOut = new DateTime($log['time_out']);
-                    $interval = $timeIn->diff($timeOut);
-                    $totalHours = $interval->h + ($interval->i / 60);
-
-                    $logDate = new DateTime($log['log_date']);
-                    $now = new DateTime();
-                    $daysPassed = $logDate->diff($now)->days;
-                    $isOlderThan5Days = $daysPassed > 5;
-                    $rowStatus = $isOlderThan5Days ? 'noteligible' : ($isOTEligible ? ($hasRequest ? 'submitted' : 'eligible') : 'regular');
                   }
                 ?>
                 <tr class="hover:bg-emerald-50/30 transition-all duration-200 animate-slide-in-right group
                   <?php 
                     if (!$hasLog) {
                       echo 'bg-gray-50 border-l-4 border-l-gray-300';
-                    } elseif ($isOlderThan5Days) {
-                      echo 'bg-red-50/30 border-l-4 border-l-red-300';
-                    } elseif ($isOTEligible) {
-                      echo 'bg-emerald-50/40 border-l-4 border-l-emerald-400 shadow-sm';
                     } else {
-                      echo 'border-l-4 border-l-blue-300';
+                      echo 'border-l-4 border-l-emerald-400 shadow-sm';
                     }
                   ?>"
                   style="animation-delay: <?= $index * 0.05 ?>s;"
                   data-date="<?= $hasDate ? date('M d, Y', strtotime($log['log_date'])) : '' ?>"
-                  data-status="<?= $hasLog ? $rowStatus : 'rdot' ?>"
                   data-log-id="<?= $hasLog ? $log['id'] : '' ?>"
                   data-time-in="<?= $hasLog ? $log['time_in'] : '' ?>"
-                  data-time-out="<?= $hasLog ? $log['time_out'] : '' ?>"
-                  data-ot-hours="<?= $hasLog ? $overtimeHours : '0' ?>"
-                  data-is-rdot="<?= $isRdot ? '1' : '0' ?>">
+                  data-time-out="<?= $hasLog ? $log['time_out'] : '' ?>">
                   
                   <td class="px-8 py-6 whitespace-nowrap">
                     <div class="flex items-center">
@@ -863,16 +688,11 @@ $default_time_out = $default_sched['time_out'];
                             $workHours = max(0, $totalHours - 1); // Minus 1hr lunch
                           ?>
                           <div class="text-lg font-bold text-gray-900">
-                            <?= number_format($workHours, 2) ?>h
+                            <?= number_format($regularHours, 2) ?>h
                           </div>
                           <div class="text-xs text-gray-500">
                             (<?= number_format($totalHours, 2) ?>h total - 1h lunch)
                           </div>
-                          <?php if ($isOTEligible): ?>
-                            <div class="text-sm text-emerald-600 font-medium">
-                              +<?= number_format($overtimeHours, 2) ?>h OT
-                            </div>
-                          <?php endif; ?>
                         <?php else: ?>
                           <div class="text-lg font-bold text-gray-400">—</div>
                         <?php endif; ?>
@@ -886,47 +706,16 @@ $default_time_out = $default_sched['time_out'];
                         <i class="fas fa-ban mr-2"></i>
                         No Data Available
                       </span>
-                    <?php elseif ($isOlderThan5Days): ?>
-                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-700 border border-red-200">
-                        <i class="fas fa-clock mr-2"></i>
-                        Request Expired
-                      </span>
-                    <?php elseif ($isOTEligible): ?>
+                    <?php else: ?>
                       <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
                         <i class="fas fa-star mr-2"></i>
                         OT Eligible (<?= number_format($overtimeHours, 2) ?>h)
                       </span>
                     <?php else: ?>
-                      <?php 
-                        // Get detailed calculation for troubleshooting
-                        $otDetails = getOvertimeCalculationDetails($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
-                        $isExtremelyLate = isset($otDetails['details']['is_extremely_late']) && $otDetails['details']['is_extremely_late'];
-                      ?>
-                      <div class="space-y-1">
-                        <?php if ($isExtremelyLate): ?>
-                          <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-700 border border-red-200">
-                            <i class="fas fa-exclamation-triangle mr-2"></i>
-                            Data Error
-                          </span>
-                          <div class="text-xs text-red-600 bg-red-50 rounded-lg p-2 border border-red-200" title="<?= htmlspecialchars($otDetails['reason']) ?>">
-                            <strong>⚠️ Possible Time Data Error</strong><br>
-                            Late: <?= round($otDetails['details']['late_minutes']/60, 1) ?>h 
-                            (<?= $otDetails['details']['late_minutes'] ?> min)<br>
-                            <em>Contact IT/HR to verify time data</em>
-                          </div>
-                        <?php else: ?>
-                          <div class="space-y-1">
-                            <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                              <i class="fas fa-info-circle mr-2"></i>
-                              Not OT Eligible
-                            </span>
-                            <div class="text-xs text-gray-600 bg-gray-50 rounded-lg p-2 border" title="<?= htmlspecialchars($otDetails['reason']) ?>">
-                              <strong>Need 30+ min past <?= $otDetails['details']['schedule']['out'] ?></strong><br>
-                              <em>Ended at <?= $otDetails['details']['actual']['out'] ?></em>
-                            </div>
-                          </div>
-                        <?php endif; ?>
-                      </div>
+                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                        <i class="fas fa-check mr-2"></i>
+                        Not OT Eligible
+                      </span>
                     <?php endif; ?>
                   </td>
                   
@@ -938,19 +727,6 @@ $default_time_out = $default_sched['time_out'];
                           Not Available
                         </span>
                       </div>
-                    <?php elseif ($isOlderThan5Days): ?>
-                      <div class="flex items-center justify-center w-full">
-                        <span class="inline-flex items-center px-4 py-3 bg-red-100 text-red-600 rounded-xl text-sm font-medium border border-red-200">
-                          <i class="fas fa-clock mr-2"></i>
-                          Time Expired
-                        </span>
-                      </div>
-                    <?php elseif ($isOTEligible && !$hasRequest): ?>
-                      <button onclick="openOvertimeModal(this)" 
-                              class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-300">
-                        <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
-                        Submit OT Request
-                      </button>
                     <?php elseif ($hasRequest): ?>
                       <div class="flex items-center justify-center w-full">
                         <span class="inline-flex items-center px-4 py-3 bg-green-100 text-green-700 rounded-xl text-sm font-medium border border-green-200">
@@ -959,15 +735,8 @@ $default_time_out = $default_sched['time_out'];
                         </span>
                       </div>
                     <?php else: ?>
-                      <div class="flex flex-col items-center space-y-2">
+                      <div class="flex items-center justify-center w-full">
                         <span class="text-gray-400 text-sm">No Action Required</span>
-                        <?php if ($hasLog && !$isOlderThan5Days): ?>
-                          <button onclick="openRDOTModal(this)" 
-                                  class="group inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 text-sm">
-                            <i class="fas fa-calendar-plus mr-2 group-hover:rotate-12 transition-transform duration-200"></i>
-                            Request RDOT
-                          </button>
-                        <?php endif; ?>
                       </div>
                     <?php endif; ?>
                   </td>

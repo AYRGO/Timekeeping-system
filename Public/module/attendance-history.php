@@ -259,8 +259,14 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 
                             // Handle times
                             $isApproved = isset($log) && strtolower($log['request_status'] ?? '') === 'approved';
-                            $timeIn = $isApproved ? ($log['requested_time_in'] ?? null) : ($log['time_in'] ?? null);
-                            $timeOut = $isApproved ? ($log['requested_time_out'] ?? null) : ($log['time_out'] ?? null);
+                            if ($isApproved) {
+                                $timeIn = $log['requested_time_in'] ?? $log['time_in'] ?? null;
+                                // If requested_time_out is empty, fallback to time_out
+                                $timeOut = !empty($log['requested_time_out']) ? $log['requested_time_out'] : ($log['time_out'] ?? null);
+                            } else {
+                                $timeIn = $log['time_in'] ?? null;
+                                $timeOut = $log['time_out'] ?? null;
+                            }
 
                             $timeInDisplay = $timeIn ? date('h:i A', strtotime($timeIn)) : '-';
                             $timeOutDisplay = $timeOut ? date('h:i A', strtotime($timeOut)) : '-';

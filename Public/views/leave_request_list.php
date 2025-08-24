@@ -12,15 +12,25 @@ $isHistoryView = ($view === 'history');
 $pageTitle = $isHistoryView ? 'Leave Requests History' : 'Leave Requests';
 
 // Fetch leave requests with employee names and attachments 
+
 if ($isHistoryView) {
-    // Fetch from post_leave_requests table (history)
+    // Fetch all from both tables
     $sql = "
-        SELECT plr.id, plr.leave_type, plr.start_date, plr.end_date, plr.reason, plr.status, plr.attachment_lr,
-               plr.created_at, plr.explanation, plr.employee_id,
-               e.fname, e.lname
-        FROM post_leave_requests plr
-        JOIN employees e ON plr.employee_id = e.id
-        ORDER BY plr.created_at DESC
+        SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, explanation, employee_id, fname, lname
+        FROM (
+            SELECT lr.id, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.attachment_lr,
+                   lr.created_at, '' AS explanation, lr.employee_id,
+                   e.fname, e.lname
+            FROM leave_requests lr
+            JOIN employees e ON lr.employee_id = e.id
+            UNION ALL
+            SELECT plr.id, plr.leave_type, plr.start_date, plr.end_date, plr.reason, plr.status, plr.attachment_lr,
+                   plr.created_at, plr.explanation, plr.employee_id,
+                   e.fname, e.lname
+            FROM post_leave_requests plr
+            JOIN employees e ON plr.employee_id = e.id
+        ) AS all_requests
+        ORDER BY created_at DESC
     ";
 } else {
     // Fetch from leave_requests table (current requests) - only pending
@@ -135,8 +145,15 @@ function getLeaveTypeBadge($type) {
                     </div>
                 </div>
 
+
+                <!-- Search and Pagination Controls -->
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+                    <input type="text" id="searchInput" placeholder="Search by employee, leave type, status..." class="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:ring focus:ring-blue-200" />
+                    <div id="pagination" class="flex items-center space-x-2 mt-2 md:mt-0"></div>
+                </div>
+
                 <div class="overflow-x-auto bg-white shadow rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200" id="leaveTable">
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
@@ -150,134 +167,211 @@ function getLeaveTypeBadge($type) {
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                                     <?= $isHistoryView ? 'Processed' : 'Submitted' ?>
                                 </th>
-                                <?php if (!$isHistoryView): ?>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                                <?php else: ?>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                                <?php endif; ?>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <?php if (!empty($leave_requests)): ?>
-                                <?php foreach ($leave_requests as $lr): ?>
-                                    <tr class="hover:bg-gray-50" id="leave-row-<?= htmlspecialchars($lr['id']) ?>">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            #<?= htmlspecialchars($lr['id']) ?>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-900">
-                                            <div class="flex items-center">
-                                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                                                    <span class="text-blue-600 font-medium text-sm">
-                                                        <?= strtoupper(substr($lr['fname'], 0, 1) . substr($lr['lname'], 0, 1)) ?>
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <div class="font-medium text-gray-900"><?= htmlspecialchars($lr['fname'] . ' ' . $lr['lname']) ?></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <?= getLeaveTypeBadge($lr['leave_type'] ?? 'unknown') ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <div class="flex flex-col">
-                                                <span class="font-medium"><?= date('M d, Y', strtotime($lr['start_date'])) ?></span>
-                                                <span class="text-xs text-gray-500"><?= date('l', strtotime($lr['start_date'])) ?></span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <div class="flex flex-col">
-                                                <span class="font-medium"><?= date('M d, Y', strtotime($lr['end_date'])) ?></span>
-                                                <span class="text-xs text-gray-500"><?= date('l', strtotime($lr['end_date'])) ?></span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
-                                            <div class="truncate hover:whitespace-normal" title="<?= htmlspecialchars($lr['reason']) ?>">
-                                                <?= htmlspecialchars($lr['reason']) ?>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <?= getStatusBadge($lr['status'] ?? 'pending') ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <?php if (!empty($lr['attachment_lr'])): ?>
-                                                <a href="../uploads/leave_attachments/<?= htmlspecialchars($lr['attachment_lr']) ?>"
-                                                   target="_blank"
-                                                   class="inline-flex items-center text-blue-600 hover:text-blue-800">
-                                                    <i class="fas fa-paperclip mr-1"></i>View
-                                                </a>
-                                            <?php else: ?>
-                                                <span class="text-gray-400 italic">None</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <div class="flex flex-col">
-                                                <span><?= date('M d, Y', strtotime($lr['created_at'] ?? $lr['start_date'])) ?></span>
-                                                <span class="text-xs"><?= date('g:i A', strtotime($lr['created_at'] ?? $lr['start_date'])) ?></span>
-                                            </div>
-                                        </td>
-                                        <?php if (!$isHistoryView): ?>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <?php if ($lr['status'] === 'pending'): ?>
-                                                <div class="flex space-x-2">
-                                                    <button type="button"
-                                                            onclick="approveLeave(<?= $lr['id'] ?>)"
-                                                            class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition-colors"
-                                                            id="approve-btn-<?= $lr['id'] ?>">
-                                                        <i class="fas fa-check mr-1"></i>Approve
-                                                    </button>
-                                                    <button type="button"
-                                                            onclick="openDeclineModal(<?= $lr['id'] ?>)"
-                                                            class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm transition-colors">
-                                                        <i class="fas fa-times mr-1"></i>Decline
-                                                    </button>
-                                                </div>
-                                            <?php else: ?>
-                                                <span class="text-gray-500 italic">
-                                                    <i class="fas fa-check-circle mr-1"></i>Done
-                                                </span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <?php else: ?>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <?php if ($lr['status'] === 'approved'): ?>
-                                                <?php 
-                                                // Check if the leave has already started
-                                                $today = new DateTime();
-                                                $startDate = new DateTime($lr['start_date']);
-                                                $canCancel = $startDate > $today;
-                                                ?>
-                                                <?php if ($canCancel): ?>
-                                                    <button type="button"
-                                                            onclick="openCancelModal(<?= $lr['id'] ?>, '<?= htmlspecialchars($lr['fname'] . ' ' . $lr['lname']) ?>', '<?= date('M d, Y', strtotime($lr['start_date'])) ?> - <?= date('M d, Y', strtotime($lr['end_date'])) ?>')"
-                                                            class="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 text-sm transition-colors">
-                                                        <i class="fas fa-ban mr-1"></i>Cancel
-                                                    </button>
-                                                <?php else: ?>
-                                                    <span class="text-gray-500 italic text-xs">
-                                                        <i class="fas fa-clock mr-1"></i>Cannot cancel<br>(Leave started)
-                                                    </span>
-                                                <?php endif; ?>
-                                            <?php else: ?>
-                                                <span class="text-gray-500 italic">
-                                                    <i class="fas fa-check-circle mr-1"></i>Processed
-                                                </span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <?php endif; ?>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="<?= $isHistoryView ? '9' : '9' ?>" class="text-center text-sm py-8 text-gray-500">
-                                        <i class="fas fa-calendar-times text-4xl text-gray-300 mb-2"></i>
-                                        <div><?= $isHistoryView ? 'No processed leave requests found.' : 'No leave requests found.' ?></div>
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
+                        <tbody class="bg-white divide-y divide-gray-200" id="leaveTableBody">
+                            <!-- Table rows will be rendered by JS -->
                         </tbody>
                     </table>
                 </div>
+
+                <script>
+                // Prepare leave requests data for JS
+                let leaveRequests = <?php echo json_encode($leave_requests); ?>;
+                // Sort by ID ascending
+                leaveRequests = leaveRequests.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                const isHistoryView = <?php echo json_encode($isHistoryView); ?>;
+                const rowsPerPage = 10;
+                let currentPage = 1;
+                let filteredRequests = leaveRequests;
+
+                function renderTable() {
+                    const tbody = document.getElementById('leaveTableBody');
+                    tbody.innerHTML = '';
+                    const startIdx = (currentPage - 1) * rowsPerPage;
+                    const endIdx = startIdx + rowsPerPage;
+                    const pageData = filteredRequests.slice(startIdx, endIdx);
+                    if (pageData.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-sm py-8 text-gray-500">
+                            <i class='fas fa-calendar-times text-4xl text-gray-300 mb-2'></i>
+                            <div>No leave requests found.</div>
+                        </td></tr>`;
+                        return;
+                    }
+                    pageData.forEach(lr => {
+                        const statusBadge = getStatusBadgeJS(lr.status);
+                        const leaveTypeBadge = getLeaveTypeBadgeJS(lr.leave_type);
+                        const actionCell = isHistoryView ? renderHistoryAction(lr) : renderCurrentAction(lr);
+                        tbody.innerHTML += `
+                        <tr class="hover:bg-gray-50" id="leave-row-${lr.id}">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${lr.id}</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                                        <span class="text-blue-600 font-medium text-sm">
+                                            ${lr.fname.charAt(0).toUpperCase() + lr.lname.charAt(0).toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div class="font-medium text-gray-900">${escapeHtml(lr.fname + ' ' + lr.lname)}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${leaveTypeBadge}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div class="flex flex-col">
+                                    <span class="font-medium">${formatDate(lr.start_date)}</span>
+                                    <span class="text-xs text-gray-500">${formatDay(lr.start_date)}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div class="flex flex-col">
+                                    <span class="font-medium">${formatDate(lr.end_date)}</span>
+                                    <span class="text-xs text-gray-500">${formatDay(lr.end_date)}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden">
+                                <div class="truncate hover:whitespace-normal" title="${escapeHtml(lr.reason)}">
+                                    ${escapeHtml(lr.reason)}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">${statusBadge}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                ${lr.attachment_lr ? `<a href="../uploads/leave_attachments/${escapeHtml(lr.attachment_lr)}" target="_blank" class="inline-flex items-center text-blue-600 hover:text-blue-800"><i class="fas fa-paperclip mr-1"></i>View</a>` : `<span class="text-gray-400 italic">None</span>`}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="flex flex-col">
+                                    <span>${formatDate(lr.created_at || lr.start_date)}</span>
+                                    <span class="text-xs">${formatTime(lr.created_at || lr.start_date)}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${actionCell}</td>
+                        </tr>`;
+                    });
+                }
+
+                function escapeHtml(text) {
+                    return text ? text.replace(/[&<>'"]/g, function (c) {
+                        return {'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'}[c];
+                    }) : '';
+                }
+                function formatDate(dateStr) {
+                    const d = new Date(dateStr);
+                    return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                }
+                function formatDay(dateStr) {
+                    const d = new Date(dateStr);
+                    return d.toLocaleDateString('en-US', { weekday: 'long' });
+                }
+                function formatTime(dateStr) {
+                    const d = new Date(dateStr);
+                    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                }
+                function getStatusBadgeJS(status) {
+                    status = (status || 'pending').toLowerCase();
+                    const classes = {
+                        'approved': 'bg-green-100 text-green-800',
+                        'pending': 'bg-yellow-100 text-yellow-800',
+                        'rejected': 'bg-red-100 text-red-800',
+                        'declined': 'bg-red-100 text-red-800',
+                    };
+                    const icons = {
+                        'approved': 'fas fa-check',
+                        'pending': 'fas fa-clock',
+                        'rejected': 'fas fa-times',
+                        'declined': 'fas fa-times',
+                    };
+                    const cls = classes[status] || 'bg-gray-100 text-gray-800';
+                    const icon = icons[status] || 'fas fa-question';
+                    return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}"><i class="${icon} mr-1"></i>${status.charAt(0).toUpperCase() + status.slice(1)}</span>`;
+                }
+                function getLeaveTypeBadgeJS(type) {
+                    type = (type || 'unknown').toLowerCase();
+                    const classes = {
+                        'sick_leave': 'bg-red-100 text-red-800',
+                        'vacation_leave': 'bg-blue-100 text-blue-800',
+                        'emergency_leave': 'bg-orange-100 text-orange-800',
+                        'maternity_leave': 'bg-pink-100 text-pink-800',
+                        'paternity_leave': 'bg-indigo-100 text-indigo-800',
+                    };
+                    const cls = classes[type] || 'bg-gray-100 text-gray-800';
+                    const displayName = type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}">${displayName}</span>`;
+                }
+                function renderCurrentAction(lr) {
+                    if (lr.status === 'pending') {
+                        return `<div class="flex space-x-2">
+                            <button type="button" onclick="approveLeave(${lr.id})" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition-colors" id="approve-btn-${lr.id}"><i class="fas fa-check mr-1"></i>Approve</button>
+                            <button type="button" onclick="openDeclineModal(${lr.id})" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm transition-colors"><i class="fas fa-times mr-1"></i>Decline</button>
+                        </div>`;
+                    } else {
+                        return `<span class="text-gray-500 italic"><i class="fas fa-check-circle mr-1"></i>Done</span>`;
+                    }
+                }
+                function renderHistoryAction(lr) {
+                    if (lr.status === 'approved') {
+                        const today = new Date();
+                        const startDate = new Date(lr.start_date);
+                        const canCancel = startDate > today;
+                        if (canCancel) {
+                            return `<button type="button" onclick="openCancelModal(${lr.id}, '${escapeHtml(lr.fname + ' ' + lr.lname)}', '${formatDate(lr.start_date)} - ${formatDate(lr.end_date)}')" class="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 text-sm transition-colors"><i class="fas fa-ban mr-1"></i>Cancel</button>`;
+                        } else {
+                            return `<span class="text-gray-500 italic text-xs"><i class="fas fa-clock mr-1"></i>Cannot cancel<br>(Leave started)</span>`;
+                        }
+                    } else {
+                        return `<span class="text-gray-500 italic"><i class="fas fa-check-circle mr-1"></i>Processed</span>`;
+                    }
+                }
+
+                function renderPagination() {
+                    const pagDiv = document.getElementById('pagination');
+                    pagDiv.innerHTML = '';
+                    const totalPages = Math.ceil(filteredRequests.length / rowsPerPage);
+                    if (totalPages <= 1) return;
+                    const prevBtn = document.createElement('button');
+                    prevBtn.textContent = 'Prev';
+                    prevBtn.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700';
+                    prevBtn.disabled = currentPage === 1;
+                    prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; updateTable(); } };
+                    pagDiv.appendChild(prevBtn);
+                    for (let i = 1; i <= totalPages; i++) {
+                        const btn = document.createElement('button');
+                        btn.textContent = i;
+                        btn.className = `px-3 py-1 rounded ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+                        btn.onclick = () => { currentPage = i; updateTable(); };
+                        pagDiv.appendChild(btn);
+                    }
+                    const nextBtn = document.createElement('button');
+                    nextBtn.textContent = 'Next';
+                    nextBtn.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700';
+                    nextBtn.disabled = currentPage === totalPages;
+                    nextBtn.onclick = () => { if (currentPage < totalPages) { currentPage++; updateTable(); } };
+                    pagDiv.appendChild(nextBtn);
+                }
+
+                function updateTable() {
+                    renderTable();
+                    renderPagination();
+                }
+
+                document.getElementById('searchInput').addEventListener('input', function(e) {
+                    const val = e.target.value.toLowerCase();
+                    filteredRequests = leaveRequests.filter(lr => {
+                        return (
+                            (lr.fname + ' ' + lr.lname).toLowerCase().includes(val) ||
+                            (lr.leave_type || '').toLowerCase().includes(val) ||
+                            (lr.status || '').toLowerCase().includes(val) ||
+                            (lr.reason || '').toLowerCase().includes(val)
+                        );
+                    });
+                    currentPage = 1;
+                    updateTable();
+                });
+
+                // Initial render
+                updateTable();
+                </script>
 
                 <!-- Summary Cards -->
                 <?php if (!empty($leave_requests)): ?>

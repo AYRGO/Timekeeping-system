@@ -10,7 +10,7 @@ class CallMeBotWhatsApp {
     private $scottPhone;
     private $approvalLink;
     
-    public function __construct($apiKey = '2833078', $scottPhone = '+639762477146') {
+    public function __construct($apiKey = '6561289', $scottPhone = '+639938642974') {
         $this->apiKey = $apiKey;
         $this->scottPhone = $scottPhone;
         // Generate permanent approval link dynamically
