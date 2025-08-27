@@ -46,9 +46,20 @@ try {
         exit;
     }
     
-    if (empty($overtime_hours) || $overtime_hours <= 0) {
-        echo json_encode(['success' => false, 'message' => 'Valid overtime hours are required']);
-        exit;
+    // Validate overtime hours numerically; then for RDOT compute server-side for source of truth
+    $overtime_hours_num = is_null($overtime_hours) ? null : floatval($overtime_hours);
+    if ($ot_type === 'Restday OT') {
+        // Compute RDOT hours on server (actual worked minus 1h lunch)
+        require_once 'time_logs_helper.php';
+        $computed_rdot_hours = calculateOvertimeHours($time_in, $time_out, 'Restday OT');
+        $overtime_hours_num = round(max(0, (float)$computed_rdot_hours), 2);
+        error_log("Computed RDOT hours (server): {$overtime_hours_num} for time_in={$time_in} time_out={$time_out}");
+    } else {
+        // Non-RDOT: ensure provided hours is a positive number
+        if (is_null($overtime_hours_num) || $overtime_hours_num <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Valid overtime hours are required']);
+            exit;
+        }
     }
     
     if (empty($reason_trimmed)) {
@@ -86,7 +97,7 @@ try {
     if (!isOvertimeEligible($time_in, $time_out, $ot_type)) {
         $errorMessage = 'This time log is not eligible for overtime.';
         if ($ot_type === 'Restday OT') {
-            $errorMessage .= ' Must work at least 8 hours for Rest Day OT.';
+            $errorMessage .= ' Please ensure valid time in/out and at least some hours worked.';
         } else {
             $errorMessage .= ' Must work at least 8 hours and 30 minutes.';
         }
@@ -146,7 +157,7 @@ try {
     $insertData = [
         $employee_id,
         $time_log_id,
-        $overtime_hours,
+        $overtime_hours_num,
         $reason_trimmed, // Use the trimmed version
         $time_in,
         $time_out,
@@ -184,7 +195,7 @@ try {
                     'date' => date('Y-m-d', strtotime($time_in)),
                     'start_time' => date('H:i:s', strtotime($time_in)),
                     'end_time' => date('H:i:s', strtotime($time_out)),
-                    'duration_hours' => $overtime_hours,
+                    'duration_hours' => $overtime_hours_num,
                     'reason' => $reason_trimmed,
                     'position' => 'Staff' // You can modify this if position is available
                 ];

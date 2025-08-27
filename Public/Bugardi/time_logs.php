@@ -106,12 +106,12 @@ $employees = $emp_stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <h1 class="text-2xl font-bold text-white">Bugardi Time Logs</h1>
                                 <p class="text-white mt-1 opacity-90">Bugardi employee time tracking records</p>
                             </div>
-                            <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg px-4 py-2">
+                            <div class="bg-gray-500 bg-opacity-30 backdrop-blur-sm rounded-lg px-4 py-2">
                                 <div class="flex items-center text-white">
                                     <i class="fas fa-clock mr-2"></i>
-                                    <span class="font-semibold"><?= $totalRecords ?> Total Records</span>
+                                     <span class="font-semibold text-white"><?= $totalRecords ?> Total Records</span>
                                 </div>
-                            </div>
+                                </div>
                         </div>
                     </div>
                 </div>
