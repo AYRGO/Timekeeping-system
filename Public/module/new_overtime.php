@@ -1439,6 +1439,49 @@ $default_time_out = $default_sched['time_out'];
 </div>
 
 <script>
+// Utility: compute Restday OT hours from hidden time fields
+function computeRDOTHrsFromHiddenFields() {
+    const timeInStr = document.getElementById('selected_time_in')?.value || '';
+    const timeOutStr = document.getElementById('selected_time_out')?.value || '';
+    if (!timeInStr || !timeOutStr) {
+        return 0;
+    }
+
+    // Try a few parsing strategies to be resilient to formats
+    const parseDateTime = (s) => {
+        if (!s) return null;
+        // 1) ISO-like: YYYY-MM-DD HH:MM[:SS]
+        const isoLike = new Date(s.replace(' ', 'T'));
+        if (!isNaN(isoLike.getTime())) return isoLike;
+        // 2) If only time provided, pair with arbitrary date
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) {
+            const d = new Date('2000-01-01T' + s.padStart(5, '0'));
+            if (!isNaN(d.getTime())) return d;
+        }
+        // 3) Manual parse fallback
+        const m = s.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        if (m) {
+            const [_, Y, M, D, h, i, sec] = m;
+            const d = new Date(Number(Y), Number(M) - 1, Number(D), Number(h), Number(i), Number(sec || 0));
+            if (!isNaN(d.getTime())) return d;
+        }
+        return null;
+    };
+
+    try {
+        const inDate = parseDateTime(timeInStr);
+        const outDate = parseDateTime(timeOutStr);
+        if (!inDate || !outDate) return 0;
+        let diffMs = outDate.getTime() - inDate.getTime();
+        if (diffMs < 0) diffMs = Math.abs(diffMs);
+        const diffHours = diffMs / (1000 * 60 * 60);
+        const workHours = Math.max(0, diffHours - 1);
+        return Number.isFinite(workHours) ? workHours : 0;
+    } catch (e) {
+        console.error('computeRDOTHrsFromHiddenFields error:', e);
+        return 0;
+    }
+}
 // Open overtime modal with data
 function openOvertimeModal(button) {
     const row = button.closest('tr');
@@ -1482,6 +1525,11 @@ function openOvertimeModal(button) {
     
     // Set default OT type
     document.getElementById('ot_type').value = 'Regular OT';
+    // Store regular OT hours for restoration when switching types
+    const overtimeForm = document.getElementById('overtimeForm');
+    if (overtimeForm) {
+        overtimeForm.dataset.regularOtHours = (otHours || 0).toFixed(2);
+    }
     
     // Clear previous values
     document.getElementById('reason').value = '';
@@ -1593,6 +1641,20 @@ function openRDOTModal(button) {
     document.getElementById('display_time_out').setAttribute('readonly', 'readonly');
     document.getElementById('reason').removeAttribute('readonly');
     document.getElementById('attachment').removeAttribute('disabled');
+
+    // Auto-compute RDOT hours immediately on modal open
+    try {
+        if (typeof computeRDOTHrsFromHiddenFields === 'function') {
+            const workHours = computeRDOTHrsFromHiddenFields();
+            const hoursInput = document.getElementById('overtime_hours');
+            if (hoursInput) {
+                hoursInput.value = workHours.toFixed(2);
+                try { hoursInput.dispatchEvent(new Event('input', { bubbles: true })); } catch(e) {}
+            }
+        }
+    } catch (e) {
+        console.error('Auto-compute RDOT hours on open failed:', e);
+    }
 }
 
 // Add missing close function for modal
@@ -1676,8 +1738,32 @@ document.addEventListener('DOMContentLoaded', function() {
     if (otTypeSelect) {
         otTypeSelect.addEventListener('change', function() {
             console.log('OT Type changed to:', this.value);
-            // No need to recalculate here as modal handles this during opening
+            const type = this.value;
+            const hoursInput = document.getElementById('overtime_hours');
+            const formEl = document.getElementById('overtimeForm');
+            if (!hoursInput) return;
+            if (type === 'Restday OT') {
+                const workHours = computeRDOTHrsFromHiddenFields();
+                hoursInput.value = workHours.toFixed(2);
+            } else {
+                // Restore regular OT hours captured when modal opened
+                const fallback = formEl?.dataset?.regularOtHours;
+                if (fallback !== undefined && fallback !== null) {
+                    hoursInput.value = fallback;
+                }
+            }
+            // Trigger an input event to ensure any UI bindings react
+            try { hoursInput.dispatchEvent(new Event('input', { bubbles: true })); } catch(e) {}
         });
+        // If modal opens with RDOT already selected, compute immediately
+        if (otTypeSelect.value === 'Restday OT') {
+            const hoursInput = document.getElementById('overtime_hours');
+            if (hoursInput) {
+                const workHours = computeRDOTHrsFromHiddenFields();
+                hoursInput.value = workHours.toFixed(2);
+                try { hoursInput.dispatchEvent(new Event('input', { bubbles: true })); } catch(e) {}
+            }
+        }
     }
 });
 

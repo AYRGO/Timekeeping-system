@@ -39,14 +39,14 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     }
 }
 
-// ✅ Overtime Requests
-$stmt = $pdo->prepare("SELECT status, COUNT(*) as count FROM overtime_requests WHERE employee_id = ? GROUP BY status");
+// ✅ Overtime Requests (by type, pending only)
+$stmt = $pdo->prepare("SELECT ot_type, COUNT(*) as count FROM post_ot_requests WHERE employee_id = ? AND LOWER(status) = 'pending' GROUP BY ot_type");
 $stmt->execute([$employee_id]);
 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-    if (strtolower($row['status']) === 'pending') {
-        $pending_total += $row['count'];
-        $pending_breakdown[] = add_request_count($row['count'], "OT");
-    }
+    $typeLabel = trim($row['ot_type'] ?? 'OT');
+    if ($typeLabel === '') { $typeLabel = 'OT'; }
+    $pending_total += (int)$row['count'];
+    $pending_breakdown[] = add_request_count($row['count'], 'OT (' . $typeLabel . ')');
 }
 
 // ✅ Time Adjustment Requests
