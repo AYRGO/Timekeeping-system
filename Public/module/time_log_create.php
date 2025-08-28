@@ -139,9 +139,34 @@ if (!$checklist) {
 
         // Time Out
         if (isset($_POST['time_out'])) {
-            $stmt = $pdo->prepare("UPDATE time_logs SET time_out = ? 
-                                   WHERE employee_id = ? AND log_date = ?");
-            $stmt->execute([date("H:i:s"), $employee_id, $current_date]);
+            // Handle overnight shifts by updating the most recent open time log
+            $pdo->beginTransaction();
+            try {
+                // Find the latest log without time_out regardless of date
+                $openStmt = $pdo->prepare("SELECT id FROM time_logs 
+                    WHERE employee_id = ? AND time_out IS NULL 
+                    ORDER BY log_date DESC, id DESC 
+                    LIMIT 1");
+                $openStmt->execute([$employee_id]);
+                $openLog = $openStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($openLog) {
+                    $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE id = ?");
+                    $updateStmt->execute([date("H:i:s"), $openLog['id']]);
+                } else {
+                    // Fallback to today's row if no open log found
+                    $fallbackStmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE employee_id = ? AND log_date = ?");
+                    $fallbackStmt->execute([date("H:i:s"), $employee_id, $current_date]);
+                }
+
+                $pdo->commit();
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+
             header("Location: time_log_create.php");
             exit;
         }
