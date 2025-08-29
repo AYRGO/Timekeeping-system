@@ -15,7 +15,7 @@ $employee_id = $_SESSION['employee']['id'];
 // Get employee details
 $stmt = $pdo->prepare("SELECT fname, lname, email, position, company FROM employees WHERE id = ?");
 $stmt->execute([$employee_id]);
-$employee = $stmt->fetch(PDO::FETCH_ASSOC);
+$employee = $stmt->fetch();
 
 // Get available dates with time logs for the employee (last 30 days)
 $available_dates_sql = "SELECT DISTINCT 

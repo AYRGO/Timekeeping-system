@@ -130,6 +130,41 @@ if (!$checklist) {
 
         // Time In
         if (isset($_POST['time_in'])) {
+            // Check schedule validation for overnight shifts
+            $current_day_of_week = date('N');
+            $today_schedule = $grouped_schedule[$current_day_of_week] ?? null;
+            
+            if ($today_schedule) {
+                $schedule_time_in = $today_schedule['time_in'];
+                $schedule_time_out = $today_schedule['time_out'];
+                $current_datetime = date("Y-m-d H:i:s");
+                
+                // Check if it's an overnight shift (time_out < time_in)
+                if ($schedule_time_out < $schedule_time_in) {
+                    // Overnight shift logic
+                    $current = new DateTime($current_datetime);
+                    $timeIn = new DateTime($schedule_time_in);
+                    $timeOut = new DateTime($schedule_time_out);
+                    $timeOutNextDay = clone $timeOut;
+                    $timeOutNextDay->add(new DateInterval('P1D'));
+                    
+                    if (!(($current >= $timeIn) || ($current <= $timeOutNextDay))) {
+                        header("Location: time_log_create.php?error=outside_schedule&schedule_in=" . urlencode($schedule_time_in) . "&schedule_out=" . urlencode($schedule_time_out));
+                        exit;
+                    }
+                } else {
+                    // Regular shift logic - NO CHANGES TO EXISTING FUNCTIONALITY
+                    $current = new DateTime($current_datetime);
+                    $timeIn = new DateTime($schedule_time_in);
+                    $timeOut = new DateTime($schedule_time_out);
+                    
+                    if (!(($current >= $timeIn) && ($current <= $timeOut))) {
+                        header("Location: time_log_create.php?error=outside_schedule&schedule_in=" . urlencode($schedule_time_in) . "&schedule_out=" . urlencode($schedule_time_out));
+                        exit;
+                    }
+                }
+            }
+            
             $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) 
                                    VALUES (?, ?, ?)");
             $stmt->execute([$employee_id, $current_date, date("H:i:s")]);
