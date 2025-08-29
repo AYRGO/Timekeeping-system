@@ -177,44 +177,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Overtime Request - RSS Timekeeping</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-</head>
-<body class="bg-gray-50">
-    <div class="min-h-screen">
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <!-- Header -->
-        <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="bg-white shadow-sm border-b border-gray-200">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center py-4">
+                <div class="flex justify-between items-center py-6">
                     <div class="flex items-center">
-                        <img src="../asset/RSS-logo-colour.png" alt="RSS Logo" class="h-8 w-auto">
-                        <h1 class="ml-4 text-xl font-semibold text-gray-900">Overtime Request</h1>
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-clock text-white text-lg"></i>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <h1 class="text-2xl font-bold text-gray-900">Overtime Management</h1>
+                            <p class="text-sm text-gray-600">Submit and manage your overtime requests</p>
+                        </div>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <span class="text-sm text-gray-600">Welcome, <?= htmlspecialchars($employee['fname'] . ' ' . $employee['lname']) ?></span>
-                        <a href="../module/time_log_create.php" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                            <i class="fas fa-arrow-left mr-1"></i>Back to Dashboard
-                        </a>
+                        <div class="text-right">
+                            <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($employee['fname'] . ' ' . $employee['lname']) ?></p>
+                            <p class="text-xs text-gray-500"><?= htmlspecialchars($employee['position']) ?></p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </header>
+        </div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <!-- Success/Error Messages -->
             <?php if (isset($success_message)): ?>
-                <div class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 shadow-sm">
                     <div class="flex">
                         <div class="flex-shrink-0">
-                            <i class="fas fa-check-circle text-green-400"></i>
+                            <i class="fas fa-check-circle text-green-400 text-xl"></i>
                         </div>
                         <div class="ml-3">
                             <p class="text-sm font-medium text-green-800"><?= htmlspecialchars($success_message) ?></p>
@@ -224,10 +219,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
 
             <?php if (isset($error_message)): ?>
-                <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
                     <div class="flex">
                         <div class="flex-shrink-0">
-                            <i class="fas fa-exclamation-circle text-red-400"></i>
+                            <i class="fas fa-exclamation-circle text-red-400 text-xl"></i>
                         </div>
                         <div class="ml-3">
                             <p class="text-sm font-medium text-red-800"><?= htmlspecialchars($error_message) ?></p>
@@ -236,95 +231,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="grid grid-cols-1 xl:grid-cols-4 gap-8">
                 <!-- Overtime Request Form -->
-                <div class="lg:col-span-2">
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h2 class="text-lg font-medium text-gray-900 flex items-center">
-                                <i class="fas fa-clock text-blue-600 mr-2"></i>
-                                Submit Overtime Request
+                <div class="xl:col-span-3">
+                    <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                        <div class="px-8 py-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                            <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                                <i class="fas fa-plus-circle text-blue-600 mr-3"></i>
+                                Submit New Overtime Request
                             </h2>
-                            <p class="text-sm text-gray-600 mt-1">Fill out the form below to submit your overtime request</p>
+                            <p class="text-sm text-gray-600 mt-2">Fill out the form below to submit your overtime request</p>
                         </div>
                         
-                        <form method="POST" enctype="multipart/form-data" class="p-6 space-y-6">
+                        <form method="POST" enctype="multipart/form-data" class="p-8 space-y-8" id="overtimeForm">
                             <!-- Date Selection -->
                             <div>
-                                <label for="ot_date" class="block text-sm font-medium text-gray-700 mb-2">
-                                    <i class="fas fa-calendar text-blue-600 mr-1"></i>
+                                <label for="ot_date" class="block text-base font-medium text-gray-700 mb-3">
+                                    <i class="fas fa-calendar text-blue-600 mr-2"></i>
                                     Select Date <span class="text-red-500">*</span>
                                 </label>
                                 <input type="text" 
                                        id="ot_date" 
                                        name="ot_date" 
                                        required
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                       class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base"
                                        placeholder="Click to select date">
-                                <p class="text-xs text-gray-500 mt-1">Choose the date for your overtime request (only dates with time logs are available)</p>
+                                <p class="text-sm text-gray-500 mt-3 flex items-center">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    Choose the date for your overtime request (only dates with time logs are available)
+                                </p>
                             </div>
 
                             <!-- Time Selection -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label for="time_in" class="block text-sm font-medium text-gray-700 mb-2">
-                                        <i class="fas fa-sign-in-alt text-green-600 mr-1"></i>
+                                    <label for="time_in" class="block text-base font-medium text-gray-700 mb-3">
+                                        <i class="fas fa-sign-in-alt text-green-600 mr-2"></i>
                                         Time In <span class="text-red-500">*</span>
                                     </label>
                                     <input type="time" 
                                            id="time_in" 
                                            name="time_in" 
                                            required
-                                           readonly
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
-                                    <p class="text-xs text-gray-500 mt-1">Automatically filled from your time log</p>
+                                           class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base">
+                                    <p class="text-sm text-gray-500 mt-3" id="time_in_help">Automatically filled from your time log</p>
                                 </div>
                                 
                                 <div>
-                                    <label for="time_out" class="block text-sm font-medium text-gray-700 mb-2">
-                                        <i class="fas fa-sign-out-alt text-red-600 mr-1"></i>
+                                    <label for="time_out" class="block text-base font-medium text-gray-700 mb-3">
+                                        <i class="fas fa-sign-out-alt text-red-600 mr-2"></i>
                                         Time Out <span class="text-red-500">*</span>
                                     </label>
                                     <input type="time" 
                                            id="time_out" 
                                            name="time_out" 
                                            required
-                                           readonly
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50">
-                                    <p class="text-xs text-gray-500 mt-1">Automatically filled from your time log</p>
+                                           class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base">
+                                    <p class="text-sm text-gray-500 mt-3" id="time_out_help">Automatically filled from your time log</p>
                                 </div>
                             </div>
 
                             <!-- Work Hours Display -->
-                            <div id="work_hours_display" class="hidden bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div id="work_hours_display" class="hidden bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
                                 <div class="flex items-center">
-                                    <i class="fas fa-clock text-green-600 mr-2"></i>
-                                    <span class="text-sm font-medium text-green-800">
-                                        Work Hours on Selected Date: <span id="work_hours">0</span> hours
+                                    <i class="fas fa-clock text-green-600 mr-3 text-lg"></i>
+                                    <span class="text-base font-medium text-green-800">
+                                        Work Hours on Selected Date: <span id="work_hours" class="font-bold text-lg">0</span> hours
                                     </span>
                                 </div>
                             </div>
 
                             <!-- Overtime Duration Display -->
-                            <div id="ot_duration_display" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div id="ot_duration_display" class="hidden bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
                                 <div class="flex items-center">
-                                    <i class="fas fa-clock text-blue-600 mr-2"></i>
-                                    <span class="text-sm font-medium text-blue-800">
-                                        Overtime Duration: <span id="duration_hours">0</span> hours
+                                    <i class="fas fa-clock text-blue-600 mr-3 text-lg"></i>
+                                    <span class="text-base font-medium text-blue-800">
+                                        <span id="ot_duration_label">Overtime Duration:</span> <span id="duration_hours" class="font-bold text-lg">0</span> hours
                                     </span>
+                                </div>
+                                <div class="mt-3 text-sm text-blue-600">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    <span id="ot_calculation_note">This shows the calculated overtime hours based on your selected times.</span>
                                 </div>
                             </div>
 
                             <!-- Overtime Type -->
                             <div>
-                                <label for="ot_type" class="block text-sm font-medium text-gray-700 mb-2">
-                                    <i class="fas fa-tag text-purple-600 mr-1"></i>
+                                <label for="ot_type" class="block text-base font-medium text-gray-700 mb-3">
+                                    <i class="fas fa-tag text-purple-600 mr-2"></i>
                                     Overtime Type <span class="text-red-500">*</span>
                                 </label>
                                 <select id="ot_type" 
                                         name="ot_type" 
                                         required
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base">
                                     <option value="">Select overtime type</option>
                                     <option value="Regular OT">Regular OT</option>
                                     <option value="Rest Day OT">Rest Day OT</option>
@@ -333,7 +333,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </select>
                                 
                                 <!-- OT Type Information -->
-                                <div id="ot_type_info" class="mt-2 p-3 bg-gray-50 rounded-md text-sm text-gray-600 hidden">
+                                <div id="ot_type_info" class="mt-4 p-5 bg-gray-50 rounded-lg text-sm text-gray-600 hidden">
                                     <div id="regular_ot_info" class="hidden">
                                         <i class="fas fa-info-circle text-blue-600 mr-1"></i>
                                         <strong>Regular OT:</strong> You must work at least 8 hours on the selected date to be eligible.
@@ -347,39 +347,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                             <!-- Reason -->
                             <div>
-                                <label for="reason" class="block text-sm font-medium text-gray-700 mb-2">
-                                    <i class="fas fa-comment text-orange-600 mr-1"></i>
+                                <label for="reason" class="block text-base font-medium text-gray-700 mb-3">
+                                    <i class="fas fa-comment text-orange-600 mr-2"></i>
                                     Reason for Overtime <span class="text-red-500">*</span>
                                 </label>
                                 <textarea id="reason" 
                                           name="reason" 
-                                          rows="4" 
+                                          rows="5" 
                                           required
-                                          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                          class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base"
                                           placeholder="Please provide a detailed explanation for your overtime work..."></textarea>
-                                <p class="text-xs text-gray-500 mt-1">Explain why overtime is necessary</p>
+                                <p class="text-sm text-gray-500 mt-3">Explain why overtime is necessary</p>
                             </div>
 
                             <!-- Attachment -->
                             <div>
-                                <label for="attachment" class="block text-sm font-medium text-gray-700 mb-2">
-                                    <i class="fas fa-paperclip text-gray-600 mr-1"></i>
+                                <label for="attachment" class="block text-base font-medium text-gray-700 mb-3">
+                                    <i class="fas fa-paperclip text-gray-600 mr-2"></i>
                                     Supporting Document
                                 </label>
                                 <input type="file" 
                                        id="attachment" 
                                        name="attachment" 
                                        accept=".pdf,.jpg,.jpeg,.png"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                <p class="text-xs text-gray-500 mt-1">Upload PDF, JPG, or PNG (optional but recommended)</p>
+                                       class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base file:mr-4 file:py-3 file:px-6 file:rounded-md file:border-0 file:text-base file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                <p class="text-sm text-gray-500 mt-3">Upload PDF, JPG, or PNG (optional but recommended)</p>
                             </div>
 
                             <!-- Submit Button -->
-                            <div class="pt-4 border-t border-gray-200">
+                            <div class="pt-8 border-t border-gray-200">
                                 <button type="submit" 
-                                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                                    <i class="fas fa-paper-plane mr-2"></i>
-                                    Submit Overtime Request
+                                        id="submitBtn"
+                                        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 px-8 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-lg">
+                                    <i class="fas fa-paper-plane mr-3" id="submitIcon"></i>
+                                    <span id="submitText">Submit Overtime Request</span>
+                                    <i class="fas fa-spinner fa-spin hidden mr-3" id="loadingIcon"></i>
                                 </button>
                             </div>
                         </form>
@@ -387,10 +389,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <!-- Sidebar - Recent Requests & Info -->
-                <div class="space-y-6">
+                <div class="space-y-8">
                     <!-- Quick Info Card -->
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                             <i class="fas fa-info-circle text-blue-600 mr-2"></i>
                             Overtime Guidelines
                         </h3>
@@ -415,33 +417,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
 
                     <!-- Recent Requests -->
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                        <div class="px-6 py-4 border-b border-gray-200">
-                            <h3 class="text-lg font-medium text-gray-900 flex items-center">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                        <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+                            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
                                 <i class="fas fa-history text-gray-600 mr-2"></i>
                                 Recent Requests
                             </h3>
                         </div>
                         <div class="p-6">
                             <?php if (empty($overtime_history)): ?>
-                                <div class="text-center py-4">
-                                    <i class="fas fa-inbox text-gray-400 text-2xl mb-2"></i>
+                                <div class="text-center py-8">
+                                    <i class="fas fa-inbox text-gray-400 text-3xl mb-3"></i>
                                     <p class="text-sm text-gray-500">No overtime requests yet</p>
+                                    <p class="text-xs text-gray-400 mt-1">Submit your first request above</p>
                                 </div>
                             <?php else: ?>
                                 <div class="space-y-3">
                                     <?php foreach (array_slice($overtime_history, 0, 5) as $request): ?>
-                                        <div class="border-l-4 border-blue-500 pl-3 py-2">
+                                        <div class="border-l-4 border-blue-500 pl-4 py-3 bg-gray-50 rounded-r-lg">
                                             <div class="flex items-center justify-between">
                                                 <div class="flex-1">
-                                                    <div class="text-sm font-medium text-gray-900">
+                                                    <div class="text-sm font-semibold text-gray-900">
                                                         <?= htmlspecialchars($request['ot_type']) ?>
                                                     </div>
                                                     <div class="text-xs text-gray-500">
                                                         <?= $request['formatted_log_date'] ?? 'N/A' ?>
                                                     </div>
+                                                    <div class="text-xs text-gray-400 mt-1">
+                                                        Duration: <?= $request['ot_duration'] ?? '0' ?> hours
+                                                    </div>
                                                 </div>
-                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
                                                     <?php
                                                     $status = strtolower($request['request_status'] ?? $request['status'] ?? 'pending');
                                                     switch($status) {
@@ -490,18 +496,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             onChange: function(selectedDates, dateStr, instance) {
                 if (dateStr && dateTimeData[dateStr]) {
                     const dateData = dateTimeData[dateStr];
+                    const otType = document.getElementById('ot_type').value;
                     
-                    // Auto-fill time fields
-                    document.getElementById('time_in').value = dateData.time_in;
-                    document.getElementById('time_out').value = dateData.time_out;
+                    // Only auto-fill time fields for Regular OT or when no OT type is selected
+                    if (otType === '' || otType === 'Regular OT') {
+                        document.getElementById('time_in').value = dateData.time_in;
+                        document.getElementById('time_out').value = dateData.time_out;
+                    }
                     
                     // Show work hours
                     document.getElementById('work_hours').textContent = dateData.work_hours;
                     document.getElementById('work_hours_display').classList.remove('hidden');
                     
-                    // Show overtime duration display and calculate duration
-                    document.getElementById('ot_duration_display').classList.remove('hidden');
-                    calculateOTDuration();
+                    // Only show overtime duration if OT type is selected
+                    if (otType) {
+                        document.getElementById('ot_duration_display').classList.remove('hidden');
+                        calculateOTDuration();
+                    }
                     
                     // Update OT type eligibility
                     updateOTTypeEligibility(dateData.can_regular_ot);
@@ -510,9 +521,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     document.getElementById('work_hours_display').classList.add('hidden');
                     document.getElementById('ot_duration_display').classList.add('hidden');
                     
-                    // Clear time fields
-                    document.getElementById('time_in').value = '';
-                    document.getElementById('time_out').value = '';
+                    // Clear time fields only if not Rest Day OT
+                    const currentOtType = document.getElementById('ot_type').value;
+                    if (currentOtType !== 'Rest Day OT') {
+                        document.getElementById('time_in').value = '';
+                        document.getElementById('time_out').value = '';
+                    }
                 }
             }
         });
@@ -521,8 +535,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function calculateOTDuration() {
             const timeIn = document.getElementById('time_in').value;
             const timeOut = document.getElementById('time_out').value;
+            const otType = document.getElementById('ot_type').value;
             const durationDisplay = document.getElementById('ot_duration_display');
             const durationHours = document.getElementById('duration_hours');
+            const durationLabel = document.getElementById('ot_duration_label');
+            const calculationNote = document.getElementById('ot_calculation_note');
             
             if (timeIn && timeOut) {
                 const timeInDt = new Date('2000-01-01 ' + timeIn);
@@ -533,10 +550,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 const diffMs = timeOutDt - timeInDt;
-                const diffHours = diffMs / (1000 * 60 * 60);
+                const totalHours = diffMs / (1000 * 60 * 60);
+                
+                let otHours = 0;
+                
+                if (otType === 'Regular OT') {
+                    // For Regular OT, calculate overtime beyond 8 hours
+                    otHours = Math.max(0, totalHours - 8);
+                    durationLabel.textContent = 'Overtime Duration (beyond 8 hours):';
+                    calculationNote.textContent = 'Regular OT: Hours worked beyond the standard 8-hour workday.';
+                } else if (otType === 'Rest Day OT') {
+                    // For Rest Day OT, the entire duration is overtime
+                    otHours = totalHours;
+                    durationLabel.textContent = 'Total Overtime Duration:';
+                    calculationNote.textContent = 'Rest Day OT: All hours worked on rest days are considered overtime.';
+                } else {
+                    // For other OT types, use total hours as overtime
+                    otHours = totalHours;
+                    durationLabel.textContent = 'Overtime Duration:';
+                    calculationNote.textContent = 'Holiday OT: All hours worked on holidays are considered overtime.';
+                }
                 
                 // Ensure minimum duration is 0.01 hours (about 36 seconds)
-                const finalHours = Math.max(diffHours, 0.01);
+                const finalHours = Math.max(otHours, 0.01);
                 
                 durationHours.textContent = finalHours.toFixed(2);
                 durationDisplay.classList.remove('hidden');
@@ -544,8 +580,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 durationDisplay.classList.add('hidden');
             }
         }
-
-        // Time fields are now read-only and auto-filled, so no change event listeners needed
 
         // Function to update OT type eligibility based on work hours
         function updateOTTypeEligibility(canRegularOT) {
@@ -568,35 +602,126 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const otTypeInfo = document.getElementById('ot_type_info');
             const regularOtInfo = document.getElementById('regular_ot_info');
             const restdayOtInfo = document.getElementById('restday_ot_info');
+            const timeIn = document.getElementById('time_in');
+            const timeOut = document.getElementById('time_out');
+            const timeInHelp = document.getElementById('time_in_help');
+            const timeOutHelp = document.getElementById('time_out_help');
             
             otTypeInfo.classList.remove('hidden');
             
             if (this.value === 'Regular OT') {
                 regularOtInfo.classList.remove('hidden');
                 restdayOtInfo.classList.add('hidden');
+                
+                // For Regular OT, make time fields readonly and auto-filled
+                timeIn.readOnly = true;
+                timeOut.readOnly = true;
+                timeIn.classList.add('bg-gray-50');
+                timeOut.classList.add('bg-gray-50');
+                timeInHelp.textContent = 'Automatically filled from your time log';
+                timeOutHelp.textContent = 'Automatically filled from your time log';
+                
             } else if (this.value === 'Rest Day OT') {
                 regularOtInfo.classList.add('hidden');
                 restdayOtInfo.classList.remove('hidden');
+                
+                // For Rest Day OT, make time fields editable
+                timeIn.readOnly = false;
+                timeOut.readOnly = false;
+                timeIn.classList.remove('bg-gray-50');
+                timeOut.classList.remove('bg-gray-50');
+                timeInHelp.textContent = 'Enter your overtime start time';
+                timeOutHelp.textContent = 'Enter your overtime end time';
+                
+                // Clear time fields for manual entry
+                timeIn.value = '';
+                timeOut.value = '';
+                
             } else {
                 regularOtInfo.classList.add('hidden');
                 restdayOtInfo.classList.add('hidden');
+                
+                // Reset to default state
+                timeIn.readOnly = true;
+                timeOut.readOnly = true;
+                timeIn.classList.add('bg-gray-50');
+                timeOut.classList.add('bg-gray-50');
+                timeInHelp.textContent = 'Automatically filled from your time log';
+                timeOutHelp.textContent = 'Automatically filled from your time log';
             }
             
-            // Recalculate duration when OT type changes
-            calculateOTDuration();
+            // Show/hide overtime duration display and recalculate
+            if (this.value) {
+                document.getElementById('ot_duration_display').classList.remove('hidden');
+                calculateOTDuration();
+            } else {
+                document.getElementById('ot_duration_display').classList.add('hidden');
+            }
         });
+
+        // Add event listeners for time fields to recalculate duration
+        document.getElementById('time_in').addEventListener('change', calculateOTDuration);
+        document.getElementById('time_out').addEventListener('change', calculateOTDuration);
 
         // Calculate duration on page load if time fields have values
         if (document.getElementById('time_in').value && document.getElementById('time_out').value) {
             calculateOTDuration();
         }
 
+        // Loading state management
+        function setLoadingState(loading) {
+            const submitBtn = document.getElementById('submitBtn');
+            const submitIcon = document.getElementById('submitIcon');
+            const submitText = document.getElementById('submitText');
+            const loadingIcon = document.getElementById('loadingIcon');
+            
+            if (loading) {
+                submitBtn.disabled = true;
+                submitIcon.classList.add('hidden');
+                submitText.textContent = 'Submitting...';
+                loadingIcon.classList.remove('hidden');
+            } else {
+                submitBtn.disabled = false;
+                submitIcon.classList.remove('hidden');
+                submitText.textContent = 'Submit Overtime Request';
+                loadingIcon.classList.add('hidden');
+            }
+        }
+
         // Form validation
-        document.querySelector('form').addEventListener('submit', function(e) {
+        document.getElementById('overtimeForm').addEventListener('submit', function(e) {
             const timeIn = document.getElementById('time_in').value;
             const timeOut = document.getElementById('time_out').value;
             const otType = document.getElementById('ot_type').value;
+            const selectedDate = document.getElementById('ot_date').value;
+            const reason = document.getElementById('reason').value.trim();
             
+            // Validate required fields
+            if (!selectedDate) {
+                e.preventDefault();
+                alert('Please select a date for your overtime request.');
+                return false;
+            }
+            
+            if (!otType) {
+                e.preventDefault();
+                alert('Please select an overtime type.');
+                return false;
+            }
+            
+            if (!timeIn || !timeOut) {
+                e.preventDefault();
+                alert('Please enter both start and end times for your overtime.');
+                return false;
+            }
+            
+            if (!reason) {
+                e.preventDefault();
+                alert('Please provide a reason for your overtime request.');
+                return false;
+            }
+            
+            // Validate time duration
             if (timeIn && timeOut) {
                 const timeInDt = new Date('2000-01-01 ' + timeIn);
                 const timeOutDt = new Date('2000-01-01 ' + timeOut);
@@ -613,8 +738,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     alert('Overtime duration must be at least 30 minutes.');
                     return false;
                 }
+                
+                if (diffHours > 12) {
+                    e.preventDefault();
+                    alert('Overtime duration cannot exceed 12 hours. Please check your time entries.');
+                    return false;
+                }
             }
+            
+            // Check if Regular OT is selected but not eligible
+            if (otType === 'Regular OT') {
+                const selectedDateData = dateTimeData[selectedDate];
+                if (selectedDateData && !selectedDateData.can_regular_ot) {
+                    e.preventDefault();
+                    alert('Regular OT is not available for this date. You worked less than 8 hours. Please select "Rest Day OT" instead.');
+                    return false;
+                }
+            }
+            
+            // Show confirmation dialog
+            if (!confirm('Are you sure you want to submit this overtime request?')) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // Set loading state
+            setLoadingState(true);
         });
     </script>
-</body>
-</html>

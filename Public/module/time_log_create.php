@@ -880,7 +880,10 @@ $announcementCount = $stmt->fetchColumn();
 
 <?php include 'leave_request_form.php'; ?>
 
-<?php include 'new_overtime.php'; ?>
+<!-- Overtime Section -->
+<div id="overtimeView" class="hidden">
+    <?php include 'new_overtime.php'; ?>
+</div>
 
 <?php
 // PHP: Load leave credits for current user
