@@ -145,7 +145,13 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 
 <div class="bg-white rounded-lg shadow p-6 mt-6">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h3 class="text-lg font-semibold text-gray-800">My Attendance History</h3>
+        <div>
+            <h3 class="text-lg font-semibold text-gray-800">My Attendance History</h3>
+            <p class="text-sm text-gray-600 mt-1">
+                <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                Orange "Incomplete" status indicates missing time out records
+            </p>
+        </div>
         
         <!-- Search Form -->
         <form method="GET" class="flex items-center gap-2">
@@ -193,6 +199,23 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
             <div class="flex items-center gap-2">
                 <i class="fas fa-calendar text-green-500"></i>
                 <span>Showing <?= count($currentPageDates) ?> of <?= $totalItems ?> records</span>
+            </div>
+        <?php endif; ?>
+        
+        <?php
+        // Count incomplete logs in current page
+        $incompleteCount = 0;
+        foreach ($currentPageDates as $dateObj) {
+            $logDate = $dateObj->format('Y-m-d');
+            $log = $logMap[$logDate] ?? null;
+            if ($log && $log['time_in'] && !$log['time_out']) {
+                $incompleteCount++;
+            }
+        }
+        if ($incompleteCount > 0): ?>
+            <div class="flex items-center gap-2 mt-2">
+                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                <span class="text-orange-600 font-medium"><?= $incompleteCount ?> incomplete time log(s) found</span>
             </div>
         <?php endif; ?>
     </div>
@@ -268,6 +291,16 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 $timeOut = $log['time_out'] ?? null;
                             }
 
+                            // Check for night shift (time in after 6 PM)
+                            $isNightShift = $timeIn && strtotime($timeIn) > strtotime('18:00:00');
+                            
+                            // Check for incomplete night shift from previous day
+                            $yesterday = date('Y-m-d', strtotime($logDate . ' -1 day'));
+                            $yesterdayLogStmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs WHERE employee_id = ? AND log_date = ?");
+                            $yesterdayLogStmt->execute([$employee_id, $yesterday]);
+                            $yesterdayLog = $yesterdayLogStmt->fetch(PDO::FETCH_ASSOC);
+                            $hasIncompleteNightShift = $yesterdayLog && $yesterdayLog['time_in'] && !$yesterdayLog['time_out'] && strtotime($yesterdayLog['time_in']) > strtotime('18:00:00');
+
                             $timeInDisplay = $timeIn ? date('h:i A', strtotime($timeIn)) : '-';
                             $timeOutDisplay = $timeOut ? date('h:i A', strtotime($timeOut)) : '-';
 
@@ -294,19 +327,25 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 $graceTimeIn = date('H:i:s', strtotime($scheduledTimeIn . ' +15 minutes'));
                                 $scheduledTimeOut = $schedule_out_24h;
 
-                                // Check if on time (within 15-minute grace period)
-                                if ($actualTimeIn <= $graceTimeIn) {
-                                    $status = 'On Time';
-                                    $badgeClass = 'bg-green-100 text-green-800';
+                                // Check if time out is missing
+                                if (!$timeOut) {
+                                    $status = 'Incomplete';
+                                    $badgeClass = 'bg-orange-100 text-orange-800';
                                 } else {
-                                    $status = 'Late';
-                                    $badgeClass = 'bg-yellow-100 text-yellow-800';
-                                }
+                                    // Check if on time (within 15-minute grace period)
+                                    if ($actualTimeIn <= $graceTimeIn) {
+                                        $status = 'On Time';
+                                        $badgeClass = 'bg-green-100 text-green-800';
+                                    } else {
+                                        $status = 'Late';
+                                        $badgeClass = 'bg-yellow-100 text-yellow-800';
+                                    }
 
-                                // Check for early departure
-                                if ($actualTimeOut && $actualTimeOut < $scheduledTimeOut) {
-                                    $status = 'Left Early';
-                                    $badgeClass = 'bg-red-100 text-red-800';
+                                    // Check for early departure
+                                    if ($actualTimeOut && $actualTimeOut < $scheduledTimeOut) {
+                                        $status = 'Left Early';
+                                        $badgeClass = 'bg-red-100 text-red-800';
+                                    }
                                 }
                             }
 
@@ -316,12 +355,21 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             <td class="px-6 py-4 text-sm text-gray-500"><?= $dayName ?></td>
                             <td class="px-6 py-4 text-sm text-gray-500">
                                 <?= $timeInDisplay ?>
+                                <?php if ($isNightShift): ?>
+                                    <div class="text-xs text-blue-600 mt-1">
+                                        <i class="fas fa-moon mr-1"></i>Night Shift
+                                    </div>
+                                <?php endif; ?>
                                 <div class="text-xs text-gray-400 mt-1">
                                     Sched: <?= $schedule_in ?>
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500">
-                                <?= $timeOutDisplay ?>
+                                <?php if ($timeOut): ?>
+                                    <?= $timeOutDisplay ?>
+                                <?php else: ?>
+                                    <span class="text-orange-600 font-medium">Missing</span>
+                                <?php endif; ?>
                                 <div class="text-xs text-gray-400 mt-1">
                                     Sched: <?= $schedule_out ?>
                                 </div>

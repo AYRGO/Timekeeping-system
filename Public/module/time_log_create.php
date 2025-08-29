@@ -560,9 +560,16 @@ $todayLog = $todayLogStmt->fetch();
 if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
     $timeIn = new DateTime($todayLog['time_in']);
     $timeOut = new DateTime($todayLog['time_out']);
-    $diffInSeconds = $timeOut->getTimestamp() - $timeIn->getTimestamp();
-
-    if ($diffInSeconds >= (7 * 3600 + 58 * 60)) { // 7hrs 58mins = 28680 secs
+    
+    // Calculate total hours worked (including lunch) and include days span
+    $interval = $timeIn->diff($timeOut);
+    $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
+    
+    // Subtract 1 hour for lunch break
+    $actualWorkedHours = max(0, $totalHours - 1);
+    
+    // For regular OT, require 8.5 hours (8hrs 30mins) - consistent with helper function
+    if ($actualWorkedHours >= 8.5) {
         $overtimeEligible = true;
     }
 }

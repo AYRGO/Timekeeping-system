@@ -13,6 +13,7 @@ if (!$employee_id) {
 
 // Get today's date
 $today = date('Y-m-d');
+$yesterday = date('Y-m-d', strtotime('-1 day'));
 
 // Fetch today's time log
 include_once('../config/db.php');
@@ -30,6 +31,18 @@ if ($adj) {
     // Use adjusted time if available
     $time_in = $adj['requested_time_in'] ?? $time_in;
     $time_out = $adj['requested_time_out'] ?? $time_out;
+}
+
+// Check for night shift from yesterday (if no time log today)
+if (!$time_in && !$time_out) {
+    $stmt->execute([$employee_id, $yesterday]);
+    $yesterdayLog = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // If there's a time in from yesterday but no time out, it might be a night shift
+    if ($yesterdayLog && $yesterdayLog['time_in'] && !$yesterdayLog['time_out']) {
+        $time_in = $yesterdayLog['time_in'];
+        $time_out = null; // Still need to time out
+    }
 }
 
 $time_in = $time_in ? date('H:i:s', strtotime($time_in)) : null;
@@ -102,6 +115,17 @@ if ($time_in && $time_out) {
 <?php endif; ?>
 
     </form>
+
+    <!-- Night Shift Info -->
+    <?php if ($time_in && !$time_out && strtotime($time_in) > strtotime('18:00:00')): ?>
+    <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div class="flex items-center">
+            <i class="fas fa-moon text-blue-600 mr-2"></i>
+            <span class="text-sm text-blue-700 font-medium">Night Shift Active</span>
+        </div>
+        <p class="text-xs text-blue-600 mt-1">You're currently on a night shift. Time out when your shift ends.</p>
+    </div>
+    <?php endif; ?>
 
     <div class="mt-4 text-center">
         <a href="test.php"
