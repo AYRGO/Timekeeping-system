@@ -346,15 +346,35 @@ function getScheduleForDate($employee_id, $date, $pdo) {
     ];
 }
 
-// Get employee's last 5 time logs that are OT eligible (no null data)
+// Get employee's time logs with pagination
 $employee_id = $_SESSION['employee']['id'] ?? 1; // Use the correct session key
+
+// Pagination settings
+$records_per_page = isset($_GET['per_page']) ? max(5, min(50, intval($_GET['per_page']))) : 10; // Allow 5-50 records per page
+$current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$offset = ($current_page - 1) * $records_per_page;
+
+// Get total count for pagination
+$count_sql = "SELECT COUNT(*) as total FROM time_logs tl 
+              WHERE tl.employee_id = ? AND tl.time_out IS NOT NULL";
+$count_stmt = $pdo->prepare($count_sql);
+$count_stmt->bindValue(1, $employee_id, PDO::PARAM_INT);
+$count_stmt->execute();
+$total_records = $count_stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$total_pages = ceil($total_records / $records_per_page);
+
+// Get paginated time logs
 $sql = "SELECT tl.*, DATE_FORMAT(tl.time_in, '%Y-%m-%d %H:%i') as formatted_time_in, 
                DATE_FORMAT(tl.time_out, '%Y-%m-%d %H:%i') as formatted_time_out
         FROM time_logs tl 
         WHERE tl.employee_id = ? AND tl.time_out IS NOT NULL 
-        ORDER BY tl.log_date DESC LIMIT 5";
+        ORDER BY tl.log_date DESC 
+        LIMIT ? OFFSET ?";
 $stmt = $pdo->prepare($sql);
-$stmt->execute([$employee_id]);
+$stmt->bindValue(1, $employee_id, PDO::PARAM_INT);
+$stmt->bindValue(2, $records_per_page, PDO::PARAM_INT);
+$stmt->bindValue(3, $offset, PDO::PARAM_INT);
+$stmt->execute();
 $time_logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get overtime request history
@@ -369,7 +389,8 @@ $history_sql = "SELECT ot.*, tl.log_date, tl.time_in, tl.time_out,
                 WHERE ot.employee_id = ? 
                 ORDER BY ot.created_at DESC LIMIT 20";
 $history_stmt = $pdo->prepare($history_sql);
-$history_stmt->execute([$employee_id]);
+$history_stmt->bindValue(1, $employee_id, PDO::PARAM_INT);
+$history_stmt->execute();
 $overtime_history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get default schedule from session (set by schedule_tracker.php)
@@ -671,8 +692,27 @@ $default_time_out = $default_sched['time_out'];
           </div>
         </div>
 
+        <!-- Records Per Page Selector -->
+        <div class="bg-white rounded-t-2xl border border-gray-200 px-6 py-4 border-b-0">
+          <div class="flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+              <span class="font-medium"><?= $total_records ?></span> total time logs found
+            </div>
+            <div class="flex items-center space-x-3">
+              <label for="per_page" class="text-sm font-medium text-gray-700">Show:</label>
+              <select id="per_page" onchange="changePerPage(this.value)" 
+                      class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-gray-500 focus:border-gray-500">
+                <option value="5" <?= $records_per_page == 5 ? 'selected' : '' ?>>5 per page</option>
+                <option value="10" <?= $records_per_page == 10 ? 'selected' : '' ?>>10 per page</option>
+                <option value="20" <?= $records_per_page == 20 ? 'selected' : '' ?>>20 per page</option>
+                <option value="50" <?= $records_per_page == 50 ? 'selected' : '' ?>>50 per page</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <!-- Enhanced Table with Better Responsiveness -->
-        <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-lg">
+        <div class="bg-white rounded-b-2xl border border-gray-200 overflow-hidden shadow-lg border-t-0">
           <div class="overflow-x-auto">
             <table class="min-w-full" id="timeLogsTable">
               <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
@@ -709,12 +749,6 @@ $default_time_out = $default_sched['time_out'];
                   </th>
                   <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
-                      <i class="fas fa-chart-line mr-2 text-green-500"></i>
-                      Status
-                    </div>
-                  </th>
-                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <div class="flex items-center">
                       <i class="fas fa-cog mr-2 text-gray-500"></i>
                       Action
                     </div>
@@ -725,7 +759,6 @@ $default_time_out = $default_sched['time_out'];
                 <?php foreach ($time_logs as $index => $log): 
                   $hasDate = !empty($log['log_date']);
                   $hasLog = !empty($log['time_in']) && !empty($log['time_out']);
-                  $isRdot = false;
                   if ($hasLog) {
                     // Use the corrected detailed calculation for eligibility
                     $detailedCalc = getOvertimeCalculationDetails($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
@@ -751,15 +784,15 @@ $default_time_out = $default_sched['time_out'];
                     $logDate = new DateTime($log['log_date']);
                     $now = new DateTime();
                     $daysPassed = $logDate->diff($now)->days;
-                    $isOlderThan5Days = $daysPassed > 5;
-                    $rowStatus = $isOlderThan5Days ? 'noteligible' : ($isOTEligible ? ($hasRequest ? 'submitted' : 'eligible') : 'regular');
+                    $isOlderThan30Days = $daysPassed > 30; // Changed from hardcoded August 16 to 30 days
+                    $rowStatus = $isOlderThan30Days ? 'noteligible' : ($isOTEligible ? ($hasRequest ? 'submitted' : 'eligible') : 'regular');
                   }
                 ?>
                 <tr class="hover:bg-emerald-50/30 transition-all duration-200 animate-slide-in-right group
                   <?php 
                     if (!$hasLog) {
                       echo 'bg-gray-50 border-l-4 border-l-gray-300';
-                    } elseif ($isOlderThan5Days) {
+                    } elseif ($isOlderThan30Days) {
                       echo 'bg-red-50/30 border-l-4 border-l-red-300';
                     } elseif ($isOTEligible) {
                       echo 'bg-emerald-50/40 border-l-4 border-l-emerald-400 shadow-sm';
@@ -773,8 +806,7 @@ $default_time_out = $default_sched['time_out'];
                   data-log-id="<?= $hasLog ? $log['id'] : '' ?>"
                   data-time-in="<?= $hasLog ? $log['time_in'] : '' ?>"
                   data-time-out="<?= $hasLog ? $log['time_out'] : '' ?>"
-                  data-ot-hours="<?= $hasLog ? $overtimeHours : '0' ?>"
-                  data-is-rdot="<?= $isRdot ? '1' : '0' ?>">
+                  data-ot-hours="<?= $hasLog ? $overtimeHours : '0' ?>">
                   
                   <td class="px-8 py-6 whitespace-nowrap">
                     <div class="flex items-center">
@@ -882,75 +914,19 @@ $default_time_out = $default_sched['time_out'];
                   
                   <td class="px-8 py-6">
                     <?php if (!$hasLog): ?>
-                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-gray-100 text-gray-600 border border-gray-200">
-                        <i class="fas fa-ban mr-2"></i>
-                        No Data Available
-                      </span>
-                    <?php elseif ($isOlderThan5Days): ?>
-                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-700 border border-red-200">
-                        <i class="fas fa-clock mr-2"></i>
-                        Request Expired
-                      </span>
-                    <?php elseif ($isOTEligible): ?>
-                      <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
-                        <i class="fas fa-star mr-2"></i>
-                        OT Eligible (<?= number_format($overtimeHours, 2) ?>h)
-                      </span>
-                    <?php else: ?>
-                      <?php 
-                        // Get detailed calculation for troubleshooting
-                        $otDetails = getOvertimeCalculationDetails($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
-                        $isExtremelyLate = isset($otDetails['details']['is_extremely_late']) && $otDetails['details']['is_extremely_late'];
-                      ?>
-                      <div class="space-y-1">
-                        <?php if ($isExtremelyLate): ?>
-                          <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-red-100 text-red-700 border border-red-200">
-                            <i class="fas fa-exclamation-triangle mr-2"></i>
-                            Data Error
-                          </span>
-                          <div class="text-xs text-red-600 bg-red-50 rounded-lg p-2 border border-red-200" title="<?= htmlspecialchars($otDetails['reason']) ?>">
-                            <strong>⚠️ Possible Time Data Error</strong><br>
-                            Late: <?= round($otDetails['details']['late_minutes']/60, 1) ?>h 
-                            (<?= $otDetails['details']['late_minutes'] ?> min)<br>
-                            <em>Contact IT/HR to verify time data</em>
-                          </div>
-                        <?php else: ?>
-                          <div class="space-y-1">
-                            <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                              <i class="fas fa-info-circle mr-2"></i>
-                              Not OT Eligible
-                            </span>
-                            <div class="text-xs text-gray-600 bg-gray-50 rounded-lg p-2 border" title="<?= htmlspecialchars($otDetails['reason']) ?>">
-                              <strong>Need 30+ min past <?= $otDetails['details']['schedule']['out'] ?></strong><br>
-                              <em>Ended at <?= $otDetails['details']['actual']['out'] ?></em>
-                            </div>
-                          </div>
-                        <?php endif; ?>
-                      </div>
-                    <?php endif; ?>
-                  </td>
-                  
-                  <td class="px-8 py-6">
-                    <?php if (!$hasLog): ?>
                       <div class="flex items-center justify-center w-full">
                         <span class="inline-flex items-center px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-medium border border-gray-200">
                           <i class="fas fa-ban mr-2"></i>
                           Not Available
                         </span>
                       </div>
-                    <?php elseif ($isOlderThan5Days): ?>
+                    <?php elseif ($isOlderThan30Days): ?>
                       <div class="flex items-center justify-center w-full">
                         <span class="inline-flex items-center px-4 py-3 bg-red-100 text-red-600 rounded-xl text-sm font-medium border border-red-200">
                           <i class="fas fa-clock mr-2"></i>
-                          Time Expired
+                          Request Expired (30+ days old)
                         </span>
                       </div>
-                    <?php elseif ($isOTEligible && !$hasRequest): ?>
-                      <button onclick="openOvertimeModal(this)" 
-                              class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-300">
-                        <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
-                        Submit OT Request
-                      </button>
                     <?php elseif ($hasRequest): ?>
                       <div class="flex items-center justify-center w-full">
                         <span class="inline-flex items-center px-4 py-3 bg-green-100 text-green-700 rounded-xl text-sm font-medium border border-green-200">
@@ -959,16 +935,11 @@ $default_time_out = $default_sched['time_out'];
                         </span>
                       </div>
                     <?php else: ?>
-                      <div class="flex flex-col items-center space-y-2">
-                        <span class="text-gray-400 text-sm">No Action Required</span>
-                        <?php if ($hasLog && !$isOlderThan5Days): ?>
-                          <button onclick="openRDOTModal(this)" 
-                                  class="group inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300 text-sm">
-                            <i class="fas fa-calendar-plus mr-2 group-hover:rotate-12 transition-transform duration-200"></i>
-                            Request RDOT
-                          </button>
-                        <?php endif; ?>
-                      </div>
+                      <button onclick="openOvertimeModal(this)"
+                              class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300">
+                        <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
+                        OT Request
+                      </button>
                     <?php endif; ?>
                   </td>
                 </tr>
@@ -976,21 +947,126 @@ $default_time_out = $default_sched['time_out'];
               </tbody>
             </table>
           </div>
-        </div>
-
-        <!-- No Results Message -->
-        <div id="noResults" class="hidden text-center py-12">
-          <div class="w-16 h-16 mx-auto mb-4 bg-emerald-100 rounded-full flex items-center justify-center">
-            <i class="fas fa-search text-2xl text-emerald-600"></i>
+          
+          <!-- Pagination Controls -->
+          <?php if ($total_pages > 1): ?>
+          <div class="bg-white px-6 py-4 border-t border-gray-200">
+            <div class="flex items-center justify-between">
+              <!-- Page Info -->
+              <div class="text-sm text-gray-700">
+                Showing <span class="font-medium"><?= $offset + 1 ?></span> to 
+                <span class="font-medium"><?= min($offset + $records_per_page, $total_records) ?></span> of 
+                <span class="font-medium"><?= $total_records ?></span> results
+              </div>
+              
+                             <!-- Pagination Navigation -->
+               <div class="flex items-center space-x-2">
+                 <?php if ($total_pages > 10): ?>
+                   <!-- Go to Page Input for Large Page Counts -->
+                   <div class="flex items-center space-x-2 mr-4">
+                     <label class="text-xs text-gray-600">Go to:</label>
+                     <input type="number" id="goToPage" min="1" max="<?= $total_pages ?>" 
+                            class="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                            placeholder="<?= $current_page ?>">
+                     <button onclick="goToPage()" 
+                             class="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
+                       Go
+                     </button>
+                   </div>
+                 <?php endif; ?>
+                <!-- Previous Page -->
+                <?php if ($current_page > 1): ?>
+                  <a href="?page=<?= $current_page - 1 ?>&per_page=<?= $records_per_page ?>" 
+                     class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors">
+                    <i class="fas fa-chevron-left mr-1"></i>
+                    Previous
+                  </a>
+                <?php else: ?>
+                  <span class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-300 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+                    <i class="fas fa-chevron-left mr-1"></i>
+                    Previous
+                  </span>
+                <?php endif; ?>
+                
+                                 <!-- Page Numbers -->
+                 <div class="flex items-center space-x-1">
+                   <?php
+                   // Smart pagination logic - only show ellipsis when there are many pages
+                   $show_ellipsis = $total_pages > 7;
+                   
+                   if ($show_ellipsis): ?>
+                     <?php
+                     // Show first page if we're not near the beginning
+                     if ($current_page > 3): ?>
+                       <a href="?page=1&per_page=<?= $records_per_page ?>" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors">
+                         1
+                       </a>
+                       <?php if ($current_page > 4): ?>
+                         <span class="inline-flex items-center px-2 py-2 text-sm font-medium text-gray-400">...</span>
+                       <?php endif; ?>
+                     <?php endif; ?>
+                     
+                     <?php
+                     // Show pages around current page (but limit to reasonable range)
+                     $start_page = max(1, $current_page - 1);
+                     $end_page = min($total_pages, $current_page + 1);
+                     
+                     for ($i = $start_page; $i <= $end_page; $i++): ?>
+                       <?php if ($i == $current_page): ?>
+                         <span class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-gray-600 border border-gray-600 rounded-lg">
+                           <?= $i ?>
+                         </span>
+                       <?php else: ?>
+                         <a href="?page=<?= $i ?>&per_page=<?= $records_per_page ?>" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors">
+                           <?= $i ?>
+                         </a>
+                       <?php endif; ?>
+                     <?php endfor; ?>
+                     
+                     <?php
+                     // Show last page if we're not near the end
+                     if ($current_page < $total_pages - 2): ?>
+                       <?php if ($current_page < $total_pages - 3): ?>
+                         <span class="inline-flex items-center px-2 py-2 text-sm font-medium text-gray-400">...</span>
+                       <?php endif; ?>
+                       <a href="?page=<?= $total_pages ?>&per_page=<?= $records_per_page ?>" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors">
+                         <?= $total_pages ?>
+                       </a>
+                     <?php endif; ?>
+                   <?php else: ?>
+                     <?php
+                     // For small numbers of pages, show all pages without ellipsis
+                     for ($i = 1; $i <= $total_pages; $i++): ?>
+                       <?php if ($i == $current_page): ?>
+                         <span class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-gray-600 border border-gray-600 rounded-lg">
+                           <?= $i ?>
+                         </span>
+                       <?php else: ?>
+                         <a href="?page=<?= $i ?>&per_page=<?= $records_per_page ?>" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors">
+                           <?= $i ?>
+                         </a>
+                       <?php endif; ?>
+                     <?php endfor; ?>
+                   <?php endif; ?>
+                 </div>
+                
+                <!-- Next Page -->
+                <?php if ($current_page < $total_pages): ?>
+                  <a href="?page=<?= $current_page + 1 ?>&per_page=<?= $records_per_page ?>" 
+                     class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-700 transition-colors">
+                    Next
+                    <i class="fas fa-chevron-right ml-1"></i>
+                  </a>
+                <?php else: ?>
+                  <span class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-300 bg-gray-100 border border-gray-200 rounded-lg cursor-not-allowed">
+                    Next
+                    <i class="fas fa-chevron-right ml-1"></i>
+                  </span>
+                <?php endif; ?>
+              </div>
+            </div>
           </div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">No Records Found</h3>
-          <p class="text-gray-600 mb-4">
-            No matching time logs found. Try adjusting your search criteria.
-          </p>
-          <button class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
-            <i class="fas fa-refresh mr-2"></i>
-            Refresh Page
-          </button>
+          <?php endif; ?>
         </div>
       </div>
     </div>
@@ -1047,7 +1123,7 @@ $default_time_out = $default_sched['time_out'];
             <p class="text-gray-600 mb-4">
               You haven't submitted any overtime requests yet.
             </p>
-            <button onclick="switchTab('submit')" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors">
+            <button onclick="switchTab('submit')" class="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors">
               <i class="fas fa-plus mr-2"></i>
               Submit Your First Request
             </button>
@@ -1301,7 +1377,7 @@ $default_time_out = $default_sched['time_out'];
         <div class="inline-block w-full max-w-3xl px-0 pt-0 pb-0 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl shadow-xl sm:my-8 sm:align-middle border border-gray-200 animate-fade-in-up">
             
             <!-- Modal Header -->
-            <div class="bg-emerald-600 px-6 py-4">
+            <div class="bg-gray-600 px-6 py-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
                         <div class="p-2 bg-white/20 rounded-lg mr-3">
@@ -1309,7 +1385,7 @@ $default_time_out = $default_sched['time_out'];
                         </div>
                         <div>
                             <h3 class="text-xl font-bold text-white">Submit Overtime Request</h3>
-                            <p class="text-emerald-100 text-sm">Fill out the details for your overtime request</p>
+                            <p class="text-gray-100 text-sm">Fill out the details for your overtime request</p>
                         </div>
                     </div>
                     <button onclick="closeOvertimeModal()" class="p-2 text-white/80 hover:text-white rounded-lg hover:bg-white/20 transition-colors focus:outline-none">
@@ -1337,9 +1413,9 @@ $default_time_out = $default_sched['time_out'];
                                 <label class="block text-sm font-medium text-gray-700">Overtime Hours</label>
                                 <div class="relative">
                                     <input type="number" id="overtime_hours" name="overtime_hours" step="0.25" min="0.25" max="12" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white font-semibold text-center text-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white font-semibold text-center text-gray-600 focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all"
                                            readonly>
-                                    <i class="fas fa-clock absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-500"></i>
+                                    <i class="fas fa-clock absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
                                 </div>
                             </div>
                             
@@ -1347,7 +1423,7 @@ $default_time_out = $default_sched['time_out'];
                                 <label class="block text-sm font-medium text-gray-700">Date</label>
                                 <div class="relative">
                                     <input type="text" id="selected_date" name="selected_date" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all"
                                            readonly>
                                     <i class="fas fa-calendar absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500"></i>
                                 </div>
@@ -1357,7 +1433,7 @@ $default_time_out = $default_sched['time_out'];
                                 <label class="block text-sm font-medium text-gray-700">Time In</label>
                                 <div class="relative">
                                     <input type="text" id="display_time_in" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all"
                                            readonly>
                                     <i class="fas fa-sign-in-alt absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500"></i>
                                 </div>
@@ -1367,7 +1443,7 @@ $default_time_out = $default_sched['time_out'];
                                 <label class="block text-sm font-medium text-gray-700">Time Out</label>
                                 <div class="relative">
                                     <input type="text" id="display_time_out" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all"
                                            readonly>
                                     <i class="fas fa-sign-out-alt absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-500"></i>
                                 </div>
@@ -1383,7 +1459,7 @@ $default_time_out = $default_sched['time_out'];
                             </label>
                             <div class="relative">
                                 <select name="ot_type" id="ot_type" required
-                                        class="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all appearance-none bg-white">
+                                        class="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all appearance-none bg-white">
                                     <option value="">Select OT Type</option>
                                     <option value="Regular OT">Regular OT</option>
                                     <option value="Special Holiday OT">Special Holiday OT</option>
@@ -1417,7 +1493,7 @@ $default_time_out = $default_sched['time_out'];
                         </label>
                         <textarea name="reason" id="reason" rows="4" required
                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-none"
-                                  placeholder="Please provide a detailed explanation for your overtime work..."></textarea>
+                                  placeholder="Please provide a detailed explanation for your overtime work(please indicate if with or without break)"></textarea>
                         <p class="text-xs text-gray-600">Provide a clear reason for your overtime request</p>
                     </div>
 
@@ -1428,7 +1504,7 @@ $default_time_out = $default_sched['time_out'];
                             <i class="fas fa-times mr-2"></i>Cancel
                         </button>
                         <button type="submit" 
-                                class="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                class="w-full sm:w-auto px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500">
                             <i class="fas fa-paper-plane mr-2"></i>Submit Request
                         </button>
                     </div>
@@ -1523,8 +1599,9 @@ function openOvertimeModal(button) {
         }
     }
     
-    // Set default OT type
+    // Set default OT type to Regular OT
     document.getElementById('ot_type').value = 'Regular OT';
+    
     // Store regular OT hours for restoration when switching types
     const overtimeForm = document.getElementById('overtimeForm');
     if (overtimeForm) {
@@ -1534,6 +1611,12 @@ function openOvertimeModal(button) {
     // Clear previous values
     document.getElementById('reason').value = '';
     document.getElementById('attachment').value = '';
+    
+    // Set modal title to default
+    const modalTitle = document.querySelector('#overtimeModal h3');
+    if (modalTitle) {
+        modalTitle.textContent = 'Submit Overtime Request';
+    }
     
     // Show modal
     document.getElementById('overtimeModal').classList.remove('hidden');
@@ -1712,6 +1795,156 @@ function viewOTDetails(requestId) {
             console.error('Error:', error);
             alert('Error fetching details');
         });
+}
+
+// Function to change records per page
+function changePerPage(value) {
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('per_page', value);
+    urlParams.delete('page'); // Reset to first page when changing per page
+    
+    // Update URL without reloading
+    const newUrl = window.location.pathname + '?' + urlParams.toString();
+    window.history.pushState({}, '', newUrl);
+    
+    // Load the new page content via AJAX
+    loadPageContent(1, value);
+}
+
+// Function to go to specific page
+function goToPage() {
+    const pageInput = document.getElementById('goToPage');
+    const page = parseInt(pageInput.value);
+    const maxPage = parseInt(pageInput.max);
+    
+    if (isNaN(page) || page < 1 || page > maxPage) {
+        showNotification('Please enter a valid page number between 1 and ' + maxPage, 'error');
+        pageInput.focus();
+        return;
+    }
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('page', page);
+    
+    // Update URL without reloading
+    const newUrl = window.location.pathname + '?' + urlParams.toString();
+    window.history.pushState({}, '', newUrl);
+    
+    // Load the new page content via AJAX
+    loadPageContent(page, urlParams.get('per_page') || 10);
+}
+
+// Function to navigate to a specific page
+function navigateToPage(page, perPage = null) {
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('page', page);
+    if (perPage !== null) {
+        urlParams.set('per_page', perPage);
+    }
+    
+    // Update URL without reloading
+    const newUrl = window.location.pathname + '?' + urlParams.toString();
+    window.history.pushState({}, '', newUrl);
+    
+    // Load the new page content via AJAX
+    loadPageContent(page, perPage || urlParams.get('per_page') || 10);
+}
+
+// Function to load page content via AJAX
+function loadPageContent(page, perPage) {
+    // Show loading state
+    const tableBody = document.querySelector('#timeLogsTable tbody');
+    if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto"></div><p class="mt-2 text-gray-500">Loading...</p></td></tr>';
+    }
+    
+    // Build the AJAX URL
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', page);
+    url.searchParams.set('per_page', perPage);
+    url.searchParams.set('ajax', '1'); // Flag to indicate AJAX request
+    
+    // Fetch the new page content
+    fetch(url.toString())
+        .then(response => response.text())
+        .then(html => {
+            // Parse the HTML and extract the table content and pagination
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Update the table body
+            const newTableBody = doc.querySelector('#timeLogsTable tbody');
+            if (newTableBody && tableBody) {
+                tableBody.innerHTML = newTableBody.innerHTML;
+            }
+            
+            // Update the pagination section
+            const newPagination = doc.querySelector('.bg-white.px-6.py-4.border-t.border-gray-200');
+            const currentPagination = document.querySelector('.bg-white.px-6.py-4.border-t.border-gray-200');
+            if (newPagination && currentPagination) {
+                currentPagination.innerHTML = newPagination.innerHTML;
+            }
+            
+            // Update the records per page selector
+            const newPerPageSelector = doc.querySelector('#recordsPerPage');
+            const currentPerPageSelector = document.getElementById('recordsPerPage');
+            if (newPerPageSelector && currentPerPageSelector) {
+                currentPerPageSelector.value = newPerPageSelector.value;
+            }
+            
+            // Update the go to page input
+            const newGoToPageInput = doc.querySelector('#goToPage');
+            const currentGoToPageInput = document.getElementById('goToPage');
+            if (newGoToPageInput && currentGoToPageInput) {
+                currentGoToPageInput.placeholder = newGoToPageInput.placeholder;
+                currentGoToPageInput.max = newGoToPageInput.max;
+            }
+            
+            // Re-attach event listeners to new pagination elements
+            attachPaginationEventListeners();
+            
+            // Show success notification
+            showNotification(`Page ${page} loaded successfully`, 'success');
+        })
+        .catch(error => {
+            console.error('Error loading page:', error);
+            showNotification('Error loading page content. Please refresh the page.', 'error');
+            
+            // Restore original content on error
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-red-500">Error loading content. Please refresh the page.</td></tr>';
+            }
+        });
+}
+
+// Function to attach event listeners to pagination elements
+function attachPaginationEventListeners() {
+    // Add click event listeners to all pagination links
+    const paginationLinks = document.querySelectorAll('.bg-white.px-6.py-4.border-t.border-gray-200 a[href*="page="]');
+    paginationLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const href = this.getAttribute('href');
+            const urlParams = new URLSearchParams(href);
+            const page = urlParams.get('page');
+            const perPage = urlParams.get('per_page');
+            
+            if (page) {
+                navigateToPage(parseInt(page), perPage ? parseInt(perPage) : null);
+            }
+        });
+    });
+    
+    // Add event listener for go to page input
+    const goToPageInput = document.getElementById('goToPage');
+    if (goToPageInput) {
+        goToPageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                goToPage();
+            }
+        });
+    }
 }
 
 // Enhanced form submission handler - submit to dedicated processor
@@ -1942,5 +2175,126 @@ function submitOvertimeForm(form) {
             reasonElement.style.border = '';
         }
     });
+}
+
+// Notification system
+function showNotification(message, type = 'info') {
+    // Create notification container if it doesn't exist
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'fixed top-4 right-4 z-50 space-y-2';
+        document.body.appendChild(container);
+    }
+    
+    const notification = document.createElement('div');
+    
+    const bgColor = type === 'success' ? 'bg-emerald-500' : 
+                    type === 'error' ? 'bg-red-500' : 
+                    type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+    
+    notification.className = `${bgColor} text-white px-6 py-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
+    notification.innerHTML = `
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : 
+                               type === 'error' ? 'fa-times-circle' : 
+                               type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'} mr-3"></i>
+                <span class="font-medium">${message}</span>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white/80 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    container.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+        notification.classList.remove('translate-x-full');
+    }, 100);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 300);
+        }
+    }, 5000);
+}
+
+// Initialize pagination event listeners when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing pagination...');
+    
+    // Attach pagination event listeners
+    attachPaginationEventListeners();
+    
+    // Add event listener for go to page input
+    const goToPageInput = document.getElementById('goToPage');
+    if (goToPageInput) {
+        goToPageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                goToPage();
+            }
+        });
+    }
+    
+    console.log('Pagination initialization complete');
+});
+
+// Function to validate overtime hours in real-time
+function validateOvertimeHours() {
+    const otType = document.getElementById('ot_type').value;
+    const hoursInput = document.getElementById('overtime_hours');
+    const submitBtn = document.querySelector('#overtimeForm button[type="submit"]');
+    
+    if (!hoursInput || !submitBtn) return;
+    
+    const hours = parseFloat(hoursInput.value) || 0;
+    let isValid = true;
+    let message = '';
+    
+    if (otType === 'Restday OT') {
+        // RDOT allows any hours > 0
+        if (hours <= 0) {
+            isValid = false;
+            message = 'Rest day overtime hours must be greater than 0';
+        }
+    } else {
+        // Regular OT must exceed 8 hours
+        if (hours < 8) {
+            isValid = false;
+            message = 'Regular overtime must exceed 8 hours to be eligible';
+        }
+    }
+    
+    // Update submit button state
+    submitBtn.disabled = !isValid;
+    
+    // Show/hide validation message
+    let validationMsg = document.getElementById('otValidationMsg');
+    if (!validationMsg) {
+        validationMsg = document.createElement('div');
+        validationMsg.id = 'otValidationMsg';
+        validationMsg.className = 'text-sm mt-2';
+        hoursInput.parentNode.appendChild(validationMsg);
+    }
+    
+    if (!isValid) {
+        validationMsg.className = 'text-sm mt-2 text-red-600';
+        validationMsg.innerHTML = `<i class="fas fa-exclamation-triangle mr-1"></i>${message}`;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    } else {
+        validationMsg.className = 'text-sm mt-2 text-green-600';
+        validationMsg.innerHTML = `<i class="fas fa-check-circle mr-1"></i>Hours are valid for ${otType}`;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
 }
 </script>
