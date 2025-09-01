@@ -135,6 +135,19 @@ if ($isHistoryView) {
 
 $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Debug: Check for duplicate IDs in the results
+$ids = array_column($overtime_requests, 'id');
+$duplicateIds = array_diff_assoc($ids, array_unique($ids));
+if (!empty($duplicateIds)) {
+    error_log("Duplicate IDs found in overtime requests: " . implode(', ', $duplicateIds));
+}
+
+// Debug: Log the actual data being displayed
+error_log("Overtime requests count: " . count($overtime_requests));
+foreach ($overtime_requests as $ot) {
+    error_log("OT Request ID: " . $ot['id'] . ", Employee: " . $ot['fname'] . " " . $ot['lname'] . ", Status: " . $ot['status']);
+}
+
 // Add schedule information to each request
 foreach ($overtime_requests as &$ot) {
     if ($ot['log_date']) {
