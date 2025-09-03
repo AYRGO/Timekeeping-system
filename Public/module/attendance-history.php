@@ -329,8 +329,33 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 
                                 // Check if time out is missing
                                 if (!$timeOut) {
-                                    $status = 'Incomplete';
-                                    $badgeClass = 'bg-orange-100 text-orange-800';
+                                    // Check if it's today
+                                    $isToday = ($logDate === date('Y-m-d'));
+                                    $isNightShift = strtotime($timeIn) > strtotime('18:00:00');
+                                    
+                                    if ($isToday) {
+                                        if ($isNightShift) {
+                                            // For night shifts today, check if it's still within the shift period
+                                            $currentTime = date('H:i:s');
+                                            $scheduledOut = $schedule_out_24h;
+                                            
+                                            if ($currentTime < $scheduledOut) {
+                                                $status = 'In Progress';
+                                                $badgeClass = 'bg-blue-100 text-blue-800';
+                                            } else {
+                                                $status = 'Incomplete';
+                                                $badgeClass = 'bg-orange-100 text-orange-800';
+                                            }
+                                        } else {
+                                            // For regular shifts today, show as in progress
+                                            $status = 'In Progress';
+                                            $badgeClass = 'bg-blue-100 text-blue-800';
+                                        }
+                                    } else {
+                                        // Past dates show incomplete
+                                        $status = 'Incomplete';
+                                        $badgeClass = 'bg-orange-100 text-orange-800';
+                                    }
                                 } else {
                                     // Check if on time (within 15-minute grace period)
                                     if ($actualTimeIn <= $graceTimeIn) {
@@ -347,6 +372,10 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                         $badgeClass = 'bg-red-100 text-red-800';
                                     }
                                 }
+                            } else {
+                                // No time in record - show as absent or no record
+                                $status = 'No Record';
+                                $badgeClass = 'bg-gray-100 text-gray-600';
                             }
 
                         ?>
@@ -367,8 +396,35 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             <td class="px-6 py-4 text-sm text-gray-500">
                                 <?php if ($timeOut): ?>
                                     <?= $timeOutDisplay ?>
+                                <?php elseif ($timeIn): ?>
+                                    <?php 
+                                    // Check if it's today and handle night shifts
+                                    $isToday = ($logDate === date('Y-m-d'));
+                                    $isNightShift = $timeIn && strtotime($timeIn) > strtotime('18:00:00');
+                                    
+                                    if ($isToday) {
+                                        if ($isNightShift) {
+                                            // For night shifts today, check if it's still within the shift period
+                                            $currentTime = date('H:i:s');
+                                            $scheduledOut = $schedule_out_24h;
+                                            
+                                            // If current time is before scheduled out, don't show missing yet
+                                            if ($currentTime < $scheduledOut) {
+                                                echo '<span class="text-blue-600 font-medium">In Progress</span>';
+                                            } else {
+                                                echo '<span class="text-orange-600 font-medium">Missing</span>';
+                                            }
+                                        } else {
+                                            // For regular shifts today, don't show missing yet
+                                            echo '<span class="text-blue-600 font-medium">In Progress</span>';
+                                        }
+                                    } else {
+                                        // Past dates show missing
+                                        echo '<span class="text-orange-600 font-medium">Missing</span>';
+                                    }
+                                    ?>
                                 <?php else: ?>
-                                    <span class="text-orange-600 font-medium">Missing</span>
+                                    <span class="text-gray-400">-</span>
                                 <?php endif; ?>
                                 <div class="text-xs text-gray-400 mt-1">
                                     Sched: <?= $schedule_out ?>

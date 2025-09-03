@@ -334,6 +334,11 @@ function sort_link($column, $label) {
                                                             <i class="fas fa-edit mr-1"></i>
                                                             Edit
                                                         </a>
+                                                        <a href="../views/time_log_list.php?employee_id=<?= $emp['id'] ?>" 
+                                                           class="text-green-600 hover:text-green-900 transition-colors">
+                                                            <i class="fas fa-clock mr-1"></i>
+                                                            Time Logs
+                                                        </a>
                                                         <form method="POST" action="employee-delete.php" 
                                                               onsubmit="return confirm('Are you sure you want to delete this employee?');" 
                                                               class="inline">

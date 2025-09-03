@@ -8,8 +8,7 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 }
 $employeeId = (int)$_GET['id'];
 
-$adjustmentField = 'employment_adjustment_form';
-$documents[$adjustmentField] = 'Employment Adjustment Form';
+
 
 // Documents array reorganized
 $documents = [
@@ -217,6 +216,37 @@ $stmt = $pdo->prepare("SELECT * FROM time_adjustment_requests WHERE employee_id 
 $stmt->execute([$employeeId]);
 $timeAdjustmentRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Time Logs with pagination - Simple approach like time_log_list.php
+$timeLogsPerPage = 10;
+$timeLogsPage = isset($_GET['time_logs_page']) ? max(1, intval($_GET['time_logs_page'])) : 1;
+$timeLogsOffset = ($timeLogsPage - 1) * $timeLogsPerPage;
+
+// Initialize variables
+$totalTimeLogs = 0;
+$totalTimeLogsPages = 1;
+$timeLogs = [];
+
+// Fetch time logs for this employee - fixed approach
+try {
+    // Get total count
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM time_logs WHERE employee_id = ?");
+    $countStmt->execute([$employeeId]);
+    $totalTimeLogs = $countStmt->fetchColumn();
+    
+    $totalTimeLogsPages = max(1, ceil($totalTimeLogs / $timeLogsPerPage));
+    
+    // Fetch paginated time logs - using the working approach from direct query
+    $stmt = $pdo->prepare("SELECT * FROM time_logs WHERE employee_id = ? ORDER BY log_date DESC LIMIT ? OFFSET ?");
+    $stmt->execute([$employeeId, $timeLogsPerPage, $timeLogsOffset]);
+    $timeLogs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+} catch (Exception $e) {
+    error_log("Time logs error: " . $e->getMessage());
+    $totalTimeLogs = 0;
+    $timeLogs = [];
+    $totalTimeLogsPages = 1;
+}
+
 // Helper function for status badges
 function getStatusBadge($status) {
     switch($status) {
@@ -296,7 +326,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
     <div class="flex-1 flex flex-col">
         <?php 
         $pageTitle = "Employee Profile - " . htmlspecialchars($employee['fname'] . ' ' . $employee['lname']);
-        include('../views/header.php'); 
+        include('header.php'); 
         ?>
         
         <main class="flex-1 p-6 overflow-y-auto">
@@ -523,7 +553,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                 </div>
             </div>
 
-            <?php include('../views/tabs/employee-checklist-tab.php'); ?>
+            <?php include('tabs/employee-checklist-tab.php'); ?>
 
             <!-- Leave Credits Tab -->
             <div id="leave-credits" class="tab-content">
@@ -1147,6 +1177,8 @@ uasort($sortedScheduleOptions, function($a, $b) {
                     <?php endif; ?>
                 </div>
             </div>
+
+                
 <script>
 function toggleEditMode() {
     const editForm = document.getElementById('editForm');

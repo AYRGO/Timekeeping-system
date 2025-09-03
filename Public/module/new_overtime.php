@@ -273,8 +273,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                            id="time_in" 
                                            name="time_in" 
                                            required
-                                           class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base">
-                                    <p class="text-sm text-gray-500 mt-3" id="time_in_help">Automatically filled from your time log</p>
+                                           readonly
+                                           class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base bg-gray-50 cursor-not-allowed">
+                                    <p class="text-sm text-gray-500 mt-3" id="time_in_help">Automatically filled from your time log (not editable)</p>
                                 </div>
                                 
                                 <div>
@@ -286,8 +287,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                            id="time_out" 
                                            name="time_out" 
                                            required
-                                           class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base">
-                                    <p class="text-sm text-gray-500 mt-3" id="time_out_help">Automatically filled from your time log</p>
+                                           readonly
+                                           class="w-full px-6 py-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base bg-gray-50 cursor-not-allowed">
+                                    <p class="text-sm text-gray-500 mt-3" id="time_out_help">Automatically filled from your time log (not editable)</p>
                                 </div>
                             </div>
 
@@ -496,23 +498,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             onChange: function(selectedDates, dateStr, instance) {
                 if (dateStr && dateTimeData[dateStr]) {
                     const dateData = dateTimeData[dateStr];
-                    const otType = document.getElementById('ot_type').value;
                     
-                    // Only auto-fill time fields for Regular OT or when no OT type is selected
-                    if (otType === '' || otType === 'Regular OT') {
-                        document.getElementById('time_in').value = dateData.time_in;
-                        document.getElementById('time_out').value = dateData.time_out;
-                    }
+                    // Always auto-fill time fields from time log data
+                    document.getElementById('time_in').value = dateData.time_in;
+                    document.getElementById('time_out').value = dateData.time_out;
                     
                     // Show work hours
                     document.getElementById('work_hours').textContent = dateData.work_hours;
                     document.getElementById('work_hours_display').classList.remove('hidden');
                     
-                    // Only show overtime duration if OT type is selected
-                    if (otType) {
-                        document.getElementById('ot_duration_display').classList.remove('hidden');
-                        calculateOTDuration();
-                    }
+                    // Show overtime duration display
+                    document.getElementById('ot_duration_display').classList.remove('hidden');
+                    calculateOTDuration();
                     
                     // Update OT type eligibility
                     updateOTTypeEligibility(dateData.can_regular_ot);
@@ -521,12 +518,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     document.getElementById('work_hours_display').classList.add('hidden');
                     document.getElementById('ot_duration_display').classList.add('hidden');
                     
-                    // Clear time fields only if not Rest Day OT
-                    const currentOtType = document.getElementById('ot_type').value;
-                    if (currentOtType !== 'Rest Day OT') {
-                        document.getElementById('time_in').value = '';
-                        document.getElementById('time_out').value = '';
-                    }
+                    // Clear time fields
+                    document.getElementById('time_in').value = '';
+                    document.getElementById('time_out').value = '';
                 }
             }
         });
@@ -556,9 +550,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if (otType === 'Regular OT') {
                     // For Regular OT, calculate overtime beyond 8 hours
-                    otHours = Math.max(0, totalHours - 8);
-                    durationLabel.textContent = 'Overtime Duration (beyond 8 hours):';
-                    calculationNote.textContent = 'Regular OT: Hours worked beyond the standard 8-hour workday.';
+                    // Use the actual work hours from the selected date data
+                    const selectedDate = document.getElementById('ot_date').value;
+                    if (selectedDate && dateTimeData[selectedDate]) {
+                        const workHours = dateTimeData[selectedDate].work_hours;
+                        otHours = Math.max(0, workHours - 8);
+                        durationLabel.textContent = 'Overtime Duration (beyond 8 hours):';
+                        calculationNote.textContent = `Regular OT: You worked ${workHours} hours, so overtime is ${workHours - 8} hours beyond the standard 8-hour workday.`;
+                    } else {
+                        otHours = Math.max(0, totalHours - 8);
+                        durationLabel.textContent = 'Overtime Duration (beyond 8 hours):';
+                        calculationNote.textContent = 'Regular OT: Hours worked beyond the standard 8-hour workday.';
+                    }
                 } else if (otType === 'Rest Day OT') {
                     // For Rest Day OT, the entire duration is overtime
                     otHours = totalHours;
@@ -602,10 +605,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const otTypeInfo = document.getElementById('ot_type_info');
             const regularOtInfo = document.getElementById('regular_ot_info');
             const restdayOtInfo = document.getElementById('restday_ot_info');
-            const timeIn = document.getElementById('time_in');
-            const timeOut = document.getElementById('time_out');
-            const timeInHelp = document.getElementById('time_in_help');
-            const timeOutHelp = document.getElementById('time_out_help');
             
             otTypeInfo.classList.remove('hidden');
             
@@ -613,41 +612,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 regularOtInfo.classList.remove('hidden');
                 restdayOtInfo.classList.add('hidden');
                 
-                // For Regular OT, make time fields readonly and auto-filled
-                timeIn.readOnly = true;
-                timeOut.readOnly = true;
-                timeIn.classList.add('bg-gray-50');
-                timeOut.classList.add('bg-gray-50');
-                timeInHelp.textContent = 'Automatically filled from your time log';
-                timeOutHelp.textContent = 'Automatically filled from your time log';
-                
             } else if (this.value === 'Rest Day OT') {
                 regularOtInfo.classList.add('hidden');
                 restdayOtInfo.classList.remove('hidden');
                 
-                // For Rest Day OT, make time fields editable
-                timeIn.readOnly = false;
-                timeOut.readOnly = false;
-                timeIn.classList.remove('bg-gray-50');
-                timeOut.classList.remove('bg-gray-50');
-                timeInHelp.textContent = 'Enter your overtime start time';
-                timeOutHelp.textContent = 'Enter your overtime end time';
-                
-                // Clear time fields for manual entry
-                timeIn.value = '';
-                timeOut.value = '';
-                
             } else {
                 regularOtInfo.classList.add('hidden');
                 restdayOtInfo.classList.add('hidden');
-                
-                // Reset to default state
-                timeIn.readOnly = true;
-                timeOut.readOnly = true;
-                timeIn.classList.add('bg-gray-50');
-                timeOut.classList.add('bg-gray-50');
-                timeInHelp.textContent = 'Automatically filled from your time log';
-                timeOutHelp.textContent = 'Automatically filled from your time log';
             }
             
             // Show/hide overtime duration display and recalculate
@@ -659,9 +630,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         });
 
-        // Add event listeners for time fields to recalculate duration
-        document.getElementById('time_in').addEventListener('change', calculateOTDuration);
-        document.getElementById('time_out').addEventListener('change', calculateOTDuration);
+        // Time fields are now readonly, so no need for change event listeners
+        // Duration is calculated when date is selected and OT type changes
 
         // Calculate duration on page load if time fields have values
         if (document.getElementById('time_in').value && document.getElementById('time_out').value) {
@@ -711,7 +681,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if (!timeIn || !timeOut) {
                 e.preventDefault();
-                alert('Please enter both start and end times for your overtime.');
+                alert('Please select a date to automatically fill the time fields.');
                 return false;
             }
             
