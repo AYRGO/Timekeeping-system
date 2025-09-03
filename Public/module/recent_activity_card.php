@@ -23,7 +23,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
     <div class="flex items-center gap-2 flex-wrap md:flex-nowrap">
         <label for="activityDate" class="text-sm text-gray-600 font-medium">Filter by date:</label>
         <input type="date" id="activityDate" name="activityDate"
-               value="<?= htmlspecialchars($filterDate) ?>"
+                               value="<?= htmlspecialchars($filterDate ?? '') ?>"
                class="border rounded-md px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 max-w-[160px] w-full">
         <button type="submit" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1 rounded">
             Apply
@@ -140,13 +140,35 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
             </td>
             <td class="px-4 py-3 text-green-600 hover:text-green-900">
                 <?php
-                if ($type === 'Time' && !empty($activity['reason'])) {
+                // Check if there's a reason/explanation for declined/rejected/cancelled requests
+                $hasReason = false;
+                $reasonText = '';
+                
+                if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected'])) {
+                    if ($type === 'Schedule' && !empty($activity['explanation'])) {
+                        $hasReason = true;
+                        $reasonText = $activity['explanation'];
+                    } elseif ($type === 'Leave' && !empty($activity['explanation'])) {
+                        $hasReason = true;
+                        $reasonText = $activity['explanation'];
+                    } elseif ($type === 'Time' && !empty($activity['reason'])) {
+                        $hasReason = true;
+                        $reasonText = $activity['reason'];
+                    } elseif ($type === 'Overtime' && !empty($activity['ot_reason'])) {
+                        $hasReason = true;
+                        $reasonText = $activity['ot_reason'];
+                    }
+                }
+                
+                if ($hasReason) {
                     ?>
-                    <button onclick="alert('Reason: <?= htmlspecialchars_decode($activity['reason']) ?>')">View</button>
-                <?php } elseif ($type === 'Overtime' && !empty($activity['ot_reason'])) { ?>
-                    <button onclick="alert('Reason: <?= htmlspecialchars_decode($activity['ot_reason']) ?>')">View</button>
+                    <button onclick="alert('Admin Reason: <?= htmlspecialchars_decode($reasonText) ?>')" class="text-blue-600 hover:text-blue-800 font-medium">
+                        View Reason
+                    </button>
                 <?php } else { ?>
-                    <button onclick="alert(`<?= htmlspecialchars_decode($sentence) ?>`)">View</button>
+                    <button onclick="alert(`<?= htmlspecialchars_decode($sentence) ?>`)" class="text-gray-600 hover:text-gray-800 font-medium">
+                        View Details
+                    </button>
                 <?php } ?>
             </td>
         </tr>

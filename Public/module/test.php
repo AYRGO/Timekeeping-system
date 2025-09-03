@@ -251,6 +251,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
     }
 
     // Handle navigation
+    if (isset($_POST['prev_step']) && empty($error)) {
+        $prev_step = (int)$_POST['prev_step'];
+        header("Location: ?step=" . $prev_step);
+        exit;
+    }
+    
     if (isset($_POST['next_step']) && empty($error)) {
         $next_step = (int)$_POST['next_step'];
         header("Location: ?step=" . $next_step);
@@ -919,30 +925,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
                     <?php endif; ?>
                     
                 <?php endif; ?>
-            </form>
-        </div>
 
-        <div class="navigation">
-            <div>
-                <?php if ($current_step > 1): ?>
-                    <a href="?step=<?= $current_step - 1 ?>" class="btn btn-secondary">
-                        ← Previous
-                    </a>
-                <?php endif; ?>
-            </div>
-            
-            <div>
-                <?php if ($current_step < 5): ?>
-                    <button type="button" class="btn btn-primary" id="nextBtn">
-                        Next →
-                    </button>
-                <?php else: ?>
-                    <button type="button" name="submit_request" class="btn btn-success" id="submitBtn"
-                            <?= (empty($_SESSION['adjustment_form']['log_date']) || empty($_SESSION['adjustment_form']['reason']) || empty($_SESSION['adjustment_form']['attachment'])) ? 'disabled' : '' ?>>
-                        📤 Submit Request
-                    </button>
-                <?php endif; ?>
-            </div>
+                <!-- Navigation buttons inside the form -->
+                <div class="navigation">
+                    <div>
+                        <?php if ($current_step > 1): ?>
+                            <button type="submit" name="prev_step" value="<?= $current_step - 1 ?>" class="btn btn-secondary">
+                                ← Previous
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div>
+                        <?php if ($current_step < 5): ?>
+                            <button type="submit" name="next_step" value="<?= $current_step + 1 ?>" class="btn btn-primary">
+                                Next →
+                            </button>
+                        <?php else: ?>
+                            <button type="submit" name="submit_request" class="btn btn-success"
+                                    <?= (empty($_SESSION['adjustment_form']['log_date']) || empty($_SESSION['adjustment_form']['reason']) || empty($_SESSION['adjustment_form']['attachment'])) ? 'disabled' : '' ?>>
+                                📤 Submit Request
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1008,76 +1015,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
                 fileName.style.display = 'block';
                 fileUpload.classList.add('has-file');
                 
-                // Auto-submit the form to upload the file
-                const form = document.getElementById('mainForm');
-                const nextStepInput = document.createElement('input');
-                nextStepInput.type = 'hidden';
-                nextStepInput.name = 'next_step';
-                nextStepInput.value = '<?= $current_step ?>';
-                form.appendChild(nextStepInput);
-                form.submit();
+                // Update the session with file info without auto-submitting
+                // The file will be processed when the user clicks Next or Submit
             }
         });
     }
 
-    // Navigation button handling
-    const nextBtn = document.getElementById('nextBtn');
-    if (nextBtn) {
-        nextBtn.addEventListener('click', function() {
-            const form = document.getElementById('mainForm');
-            
-            // Validate current step
+    // Form validation before submission
+    const mainForm = document.getElementById('mainForm');
+    if (mainForm) {
+        mainForm.addEventListener('submit', function(e) {
+            // Validate current step before allowing submission
             <?php if ($current_step == 1): ?>
                 const logDate = document.querySelector('select[name="log_date"]').value;
                 if (!logDate) {
+                    e.preventDefault();
                     alert('Please select a date to continue.');
-                    return;
+                    return false;
                 }
             <?php elseif ($current_step == 3): ?>
                 const reason = document.querySelector('textarea[name="reason"]').value;
                 if (!reason.trim()) {
+                    e.preventDefault();
                     alert('Please provide a reason for the adjustment.');
-                    return;
+                    return false;
                 }
             <?php elseif ($current_step == 4): ?>
                 const hasExistingFile = <?= !empty($_SESSION['adjustment_form']['attachment']) ? 'true' : 'false' ?>;
                 const fileInput = document.querySelector('input[name="attachment"]');
                 
                 if (!hasExistingFile && (!fileInput.files || fileInput.files.length === 0)) {
+                    e.preventDefault();
                     alert('Please upload a supporting document before proceeding. This field is required.');
-                    return;
+                    return false;
                 }
             <?php endif; ?>
-            
-            // Add next step parameter
-            const nextStepInput = document.createElement('input');
-            nextStepInput.type = 'hidden';
-            nextStepInput.name = 'next_step';
-            nextStepInput.value = '<?= $current_step + 1 ?>';
-            form.appendChild(nextStepInput);
-            
-            form.submit();
-        });
-    }
-
-    // Submit button handling
-    const submitBtn = document.getElementById('submitBtn');
-    if (submitBtn) {
-        submitBtn.addEventListener('click', function() {
-            if (this.disabled) return;
-            
-            // Show loading state
-            this.innerHTML = '⏳ Submitting...';
-            this.disabled = true;
-            
-            const form = document.getElementById('mainForm');
-            const submitInput = document.createElement('input');
-            submitInput.type = 'hidden';
-            submitInput.name = 'submit_request';
-            submitInput.value = '1';
-            form.appendChild(submitInput);
-            
-            form.submit();
         });
     }
 </script>

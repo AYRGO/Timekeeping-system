@@ -29,7 +29,7 @@
                 Effective Date Range
               </label>
               <div class="relative">
-                <input type="text" name="date_range" id="date_range" placeholder="Select date range"
+                <input type="text" name="date_range" id="schedule_date_range" placeholder="Select date range"
                        class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white pl-12" required>
                 <i class="fas fa-calendar absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
               </div>
@@ -74,7 +74,7 @@
                 <i class="fas fa-comment-alt text-green-600 mr-2"></i>
                 Reason for Change
               </label>
-              <textarea name="reason" id="reason" rows="4" placeholder="Provide details about your schedule change request..."
+                             <textarea name="reason" id="schedule_reason" rows="4" placeholder="Provide details about your schedule change request..."
                         class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white resize-none" required></textarea>
               <p class="text-sm text-gray-500 mt-2">
                 <i class="fas fa-lightbulb mr-1"></i>
@@ -90,7 +90,7 @@
                 <span class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full ml-2 font-bold">Required</span>
               </label>
               <div class="relative">
-                <input type="file" name="attachment_scr" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" required
+                                 <input type="file" name="attachment_scr" id="schedule_fileInput" accept=".pdf,.jpg,.jpeg,.png" required
                        class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
               </div>
               <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
@@ -107,7 +107,7 @@
 
           <!-- Submit Button -->
           <div class="flex justify-center pt-6 border-t border-gray-100">
-            <button type="submit" id="submitBtn"
+                         <button type="submit" id="schedule_submitBtn"
                     class="group relative px-12 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1">
               <div class="flex items-center space-x-3">
                 <i class="fas fa-paper-plane group-hover:translate-x-1 transition-transform duration-200"></i>

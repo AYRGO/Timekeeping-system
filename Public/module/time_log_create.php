@@ -47,33 +47,49 @@ try {
     $profile_picture = $user['profile_picture'] ?? null;
 
     $current_date = date("Y-m-d");
-    
-    // Debug: Check database connection and table structure
-    error_log("Database connection status: " . ($pdo ? "Connected" : "Not connected"));
-    
-    // Check time_logs table structure
-    try {
-        $tableCheck = $pdo->query("DESCRIBE time_logs");
-        $columns = $tableCheck->fetchAll(PDO::FETCH_ASSOC);
-        error_log("Time_logs table columns: " . json_encode($columns));
-    } catch (Exception $e) {
-        error_log("Error checking table structure: " . $e->getMessage());
-    }
+
+try {
+    // Fetch employee details
+    $stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company, profile_picture 
+                           FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $user = $stmt->fetch();
+
+    $fname = $user['fname'] ?? '';
+    $lname = $user['lname'] ?? '';
+    $email = $user['email'] ?? '';
+    $contact = $user['contact'] ?? '';
+    $position = $user['position'] ?? '';
+    $company = $user['company'] ?? '';
+    $profile_picture = $user['profile_picture'] ?? null;
+
+    $current_date = date("Y-m-d");
 
     // Check if checklist exists; if not, create a blank one
-    $stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
-    $stmt->execute([$employee_id]);
+// Check if checklist exists; if not, create a blank one
+$stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
+$stmt->execute([$employee_id]);
+$checklist = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$checklist) {
+    // Insert blank checklist for this employee
+    $insert = $pdo->prepare("INSERT INTO employee_checklist (employee_id) VALUES (?)");
+    $insert->execute([$employee_id]);
+
+    // Re-fetch checklist after insertion
+    $stmt->execute([$employee_id]); // ✅ FIXED - Use $stmt instead of $check_stmt
     $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
+}
+    // Now you have both $user and $checklist available
+} catch (PDOException $e) {
+    // Handle errors gracefully
+    echo "Database error: " . $e->getMessage();
+    exit;
+}
 
-    if (!$checklist) {
-        // Insert blank checklist for this employee
-        $insert = $pdo->prepare("INSERT INTO employee_checklist (employee_id) VALUES (?)");
-        $insert->execute([$employee_id]);
 
-        // Re-fetch checklist after insertion
-        $stmt->execute([$employee_id]);
-        $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
-    }
+
+
     
     // Fetch today's time log
     $stmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs 
@@ -114,80 +130,15 @@ try {
 
         // Time In
         if (isset($_POST['time_in'])) {
-            // Debug: Log the time being processed
-            $current_time = date("H:i:s");
-            error_log("Time In attempt - Employee: $employee_id, Date: $current_date, Time: $current_time");
-            
-            // Check schedule validation for overnight shifts
-            $current_day_of_week = date('N');
-            $today_schedule = $grouped_schedule[$current_day_of_week] ?? null;
-            
-            if ($today_schedule) {
-                $schedule_time_in = $today_schedule['time_in'];
-                $schedule_time_out = $today_schedule['time_out'];
-                $current_datetime = date("Y-m-d H:i:s");
-                
-                // Debug: Log schedule details
-                error_log("Schedule check - Day: $current_day_of_week, Schedule In: $schedule_time_in, Schedule Out: $schedule_time_out, Current: $current_datetime");
-                
-                // Check if it's an overnight shift (time_out < time_in)
-                if ($schedule_time_out < $schedule_time_in) {
-                    // Overnight shift logic
-                    $current = new DateTime($current_datetime);
-                    $timeIn = new DateTime($schedule_time_in);
-                    $timeOut = new DateTime($schedule_time_out);
-                    $timeOutNextDay = clone $timeOut;
-                    $timeOutNextDay->add(new DateInterval('P1D'));
-                    
-                    error_log("Overnight shift - Current: " . $current->format('H:i:s') . ", TimeIn: " . $timeIn->format('H:i:s') . ", TimeOut: " . $timeOutNextDay->format('H:i:s'));
-                    
-                    if (!(($current >= $timeIn) || ($current <= $timeOutNextDay))) {
-                        error_log("Time In REJECTED - Outside overnight schedule");
-                        header("Location: time_log_create.php?error=outside_schedule&schedule_in=" . urlencode($schedule_time_in) . "&schedule_out=" . urlencode($schedule_time_out));
-                        exit;
-                    }
-                } else {
-                    // Regular shift logic - NO CHANGES TO EXISTING FUNCTIONALITY
-                    $current = new DateTime($current_datetime);
-                    $timeIn = new DateTime($schedule_time_in);
-                    $timeOut = new DateTime($schedule_time_out);
-                    
-                    error_log("Regular shift - Current: " . $current->format('H:i:s') . ", TimeIn: " . $timeIn->format('H:i:s') . ", TimeOut: " . $timeOut->format('H:i:s'));
-                    
-                    if (!(($current >= $timeIn) && ($current <= $timeOut))) {
-                        error_log("Time In REJECTED - Outside regular schedule");
-                        header("Location: time_log_create.php?error=outside_schedule&schedule_in=" . urlencode($schedule_time_in) . "&schedule_out=" . urlencode($schedule_time_out));
-                        exit;
-                    }
-                }
-            } else {
-                error_log("No schedule found for day: $current_day_of_week");
-            }
-            
-            // Debug: Log before database insert
-            error_log("Attempting to insert time_in - Employee: $employee_id, Date: $current_date, Time: $current_time");
-            
             $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) 
                                    VALUES (?, ?, ?)");
-            $result = $stmt->execute([$employee_id, $current_date, $current_time]);
-            
-            // Debug: Log insert result
-            if ($result) {
-                error_log("Time In SUCCESS - Inserted into database");
-            } else {
-                error_log("Time In FAILED - Database error: " . implode(" | ", $stmt->errorInfo()));
-            }
-            
+            $stmt->execute([$employee_id, $current_date, date("H:i:s")]);
             header("Location: time_log_create.php");
             exit;
         }
 
         // Time Out
         if (isset($_POST['time_out'])) {
-            // Debug: Log the time being processed
-            $current_time = date("H:i:s");
-            error_log("Time Out attempt - Employee: $employee_id, Date: $current_date, Time: $current_time");
-            
             // Handle overnight shifts by updating the most recent open time log
             $pdo->beginTransaction();
             try {
@@ -199,36 +150,19 @@ try {
                 $openStmt->execute([$employee_id]);
                 $openLog = $openStmt->fetch(PDO::FETCH_ASSOC);
 
-                error_log("Found open log: " . ($openLog ? "ID: " . $openLog['id'] : "None"));
-
                 if ($openLog) {
                     $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE id = ?");
-                    $result = $updateStmt->execute([$current_time, $openLog['id']]);
-                    
-                    if ($result) {
-                        error_log("Time Out SUCCESS - Updated log ID: " . $openLog['id']);
-                    } else {
-                        error_log("Time Out FAILED - Update error: " . implode(" | ", $updateStmt->errorInfo()));
-                    }
+                    $updateStmt->execute([date("H:i:s"), $openLog['id']]);
                 } else {
                     // Fallback to today's row if no open log found
-                    error_log("No open log found, using fallback to today's row");
                     $fallbackStmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE employee_id = ? AND log_date = ?");
-                    $result = $fallbackStmt->execute([$current_time, $employee_id, $current_date]);
-                    
-                    if ($result) {
-                        error_log("Time Out SUCCESS - Fallback update completed");
-                    } else {
-                        error_log("Time Out FAILED - Fallback error: " . implode(" | ", $fallbackStmt->errorInfo()));
-                    }
+                    $fallbackStmt->execute([date("H:i:s"), $employee_id, $current_date]);
                 }
 
                 $pdo->commit();
-                error_log("Transaction committed successfully");
             } catch (Exception $e) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
-                    error_log("Transaction rolled back due to error: " . $e->getMessage());
                 }
                 throw $e;
             }
@@ -591,16 +525,9 @@ $todayLog = $todayLogStmt->fetch();
 if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
     $timeIn = new DateTime($todayLog['time_in']);
     $timeOut = new DateTime($todayLog['time_out']);
-    
-    // Calculate total hours worked (including lunch) and include days span
-    $interval = $timeIn->diff($timeOut);
-    $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
-    
-    // Subtract 1 hour for lunch break
-    $actualWorkedHours = max(0, $totalHours - 1);
-    
-    // For regular OT, require 8.5 hours (8hrs 30mins) - consistent with helper function
-    if ($actualWorkedHours >= 8.5) {
+    $diffInSeconds = $timeOut->getTimestamp() - $timeIn->getTimestamp();
+
+    if ($diffInSeconds >= (7 * 3600 + 58 * 60)) { // 7hrs 58mins = 28680 secs
         $overtimeEligible = true;
     }
 }
@@ -907,12 +834,28 @@ $announcementCount = $stmt->fetchColumn();
     <?php include 'leave_credits.php'; ?>
 </div>
 
+<!-- Profile Section -->
+<div id="profileView" class="hidden mt-12">
+    <?php include 'profile_section.php'; ?>
+</div>
 
+<!-- Request Section -->
+<div id="requestView" class="hidden mt-12">
+    <?php include 'leave_request_form.php'; ?>
+</div>
 
-<?php include 'leave_request_form.php'; ?>
+<!-- Schedule Section -->
+<div id="scheduleView" class="hidden mt-12">
+    <?php include 'schedule_change_form.php'; ?>
+</div>
+
+<!-- Attendance Section -->
+<div id="attendanceView" class="hidden mt-12">
+    <?php include 'attendance-history.php'; ?>
+</div>
 
 <!-- Overtime Section -->
-<div id="overtimeView" class="hidden">
+<div id="overtimeView" class="hidden mt-12">
     <?php include 'new_overtime.php'; ?>
 </div>
 
@@ -1240,16 +1183,6 @@ s0.parentNode.insertBefore(s1,s0);
 <!--End of Tawk.to Script-->
 
 <script>
-function showSection(sectionId) {
-  // Hide all sections
-  document.querySelectorAll('[id$="View"]').forEach(el => el.classList.add('hidden'));
-
-  // Show the selected section
-  document.getElementById(sectionId).classList.remove('hidden');
-}
-</script>
-
-<script>
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const sidebar = document.getElementById('sidebar');
 
@@ -1273,6 +1206,3 @@ function toggleLeaveMenu() {
     icon.classList.toggle('rotate-180'); // Optional: rotate arrow icon
 }
 </script>
-
-//compare to this
-
