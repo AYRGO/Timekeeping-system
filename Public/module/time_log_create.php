@@ -48,38 +48,20 @@ try {
 
     $current_date = date("Y-m-d");
 
-try {
-    // Fetch employee details
-    $stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company, profile_picture 
-                           FROM employees WHERE id = ?");
-    $stmt->execute([$employee_id]);
-    $user = $stmt->fetch();
-
-    $fname = $user['fname'] ?? '';
-    $lname = $user['lname'] ?? '';
-    $email = $user['email'] ?? '';
-    $contact = $user['contact'] ?? '';
-    $position = $user['position'] ?? '';
-    $company = $user['company'] ?? '';
-    $profile_picture = $user['profile_picture'] ?? null;
-
-    $current_date = date("Y-m-d");
-
     // Check if checklist exists; if not, create a blank one
-// Check if checklist exists; if not, create a blank one
-$stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
-$stmt->execute([$employee_id]);
-$checklist = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$checklist) {
-    // Insert blank checklist for this employee
-    $insert = $pdo->prepare("INSERT INTO employee_checklist (employee_id) VALUES (?)");
-    $insert->execute([$employee_id]);
-
-    // Re-fetch checklist after insertion
-    $stmt->execute([$employee_id]); // ✅ FIXED - Use $stmt instead of $check_stmt
+    $stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
+    $stmt->execute([$employee_id]);
     $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
-}
+
+    if (!$checklist) {
+        // Insert blank checklist for this employee
+        $insert = $pdo->prepare("INSERT INTO employee_checklist (employee_id) VALUES (?)");
+        $insert->execute([$employee_id]);
+
+        // Re-fetch checklist after insertion
+        $stmt->execute([$employee_id]);
+        $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
     // Now you have both $user and $checklist available
 } catch (PDOException $e) {
     // Handle errors gracefully
@@ -122,6 +104,7 @@ if (!$checklist) {
     }
 
     // Handle POST actions
+    try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = $_POST['csrf_token'] ?? '';
         if (!hash_equals($_SESSION['csrf_token'], $token)) {
@@ -130,11 +113,26 @@ if (!$checklist) {
 
         // Time In
         if (isset($_POST['time_in'])) {
-            $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) 
-                                   VALUES (?, ?, ?)");
-            $stmt->execute([$employee_id, $current_date, date("H:i:s")]);
-            header("Location: time_log_create.php");
-            exit;
+            try {
+                // Check if there's already a time_in for today
+                $checkStmt = $pdo->prepare("SELECT id FROM time_logs WHERE employee_id = ? AND log_date = ? AND time_in IS NOT NULL");
+                $checkStmt->execute([$employee_id, $current_date]);
+                $existingLog = $checkStmt->fetch();
+                
+                if ($existingLog) {
+                    header("Location: time_log_create.php?time_in=already_logged");
+                    exit;
+                }
+                
+                $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) 
+                                       VALUES (?, ?, ?)");
+                $stmt->execute([$employee_id, $current_date, date("H:i:s")]);
+                header("Location: time_log_create.php?time_in=success");
+                exit;
+            } catch (Exception $e) {
+                header("Location: time_log_create.php?time_in=error");
+                exit;
+            }
         }
 
         // Time Out
@@ -151,6 +149,7 @@ if (!$checklist) {
                 $openLog = $openStmt->fetch(PDO::FETCH_ASSOC);
 
                 if ($openLog) {
+                    // ✅ FIXED: Added missing prepare statement
                     $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE id = ?");
                     $updateStmt->execute([date("H:i:s"), $openLog['id']]);
                 } else {
@@ -160,25 +159,19 @@ if (!$checklist) {
                 }
 
                 $pdo->commit();
+                header("Location: time_log_create.php?time_out=success");
+                exit;
             } catch (Exception $e) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
-                throw $e;
+                header("Location: time_log_create.php?time_out=error");
+                exit;
             }
-
-            header("Location: time_log_create.php");
-            exit;
         }
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['date_range'])) {
-    require '../config/db.php';
 
-    $employee_id = $_SESSION['employee']['id'] ?? null;
-
-    if (!$employee_id) {
-        header("Location: time_log_create.php?leave_request=unauthorized");
-        exit;
-    }
+        // Leave Request Handling
+        if (isset($_POST['leaveType'], $_POST['date_range'])) {
 
     $leaveTypeInput = trim($_POST['leaveType']);
     $reason = trim($_POST['reason'] ?? '');
@@ -303,9 +296,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['
 }
 
 
-         /// Schedule Change Request Check
-if (isset($_POST['submit_schedule_change'])) {
-    $employee_id = $_SESSION['employee']['id'] ?? null;
+        // Schedule Change Request Check
+        if (isset($_POST['submit_schedule_change'])) {
     $work_schedule_id = $_POST['work_schedule_id'] ?? null;
     $reason = trim($_POST['reason'] ?? '');
     $date_range = trim($_POST['date_range'] ?? '');
@@ -401,11 +393,11 @@ if (isset($_POST['submit_schedule_change'])) {
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment') {
-    $csrf_token = $_POST['csrf_token'] ?? '';
-    $announcement_id = intval($_POST['announcement_id'] ?? 0);
-    $comment_content = trim($_POST['comment'] ?? '');
-    $employee_id = $_SESSION['employee']['id'] ?? null;
+        // Comment Handling
+        if (($_POST['type'] ?? '') === 'comment') {
+            $csrf_token = $_POST['csrf_token'] ?? '';
+            $announcement_id = intval($_POST['announcement_id'] ?? 0);
+            $comment_content = trim($_POST['comment'] ?? '');
 
     // Validate CSRF token
     if ($csrf_token !== ($_SESSION['csrf_token'] ?? '')) {
@@ -891,12 +883,10 @@ document.addEventListener("DOMContentLoaded", function () {
         mode: "range",
         dateFormat: "Y-m-d",
         minDate: (() => {
-            // Allow backtrack for 5 days
-            const today = new Date();
-            today.setDate(today.getDate() - 5);
-            return today;
+            // Allow dates from August 20th of current year
+            const currentYear = new Date().getFullYear();
+            return new Date(currentYear, 7, 20); // Month is 0-indexed, so 7 = August
         })(),
-        // Remove any disabling/blocking of days before today
         onChange: function(selectedDates) {
             checkLeaveCredits(); // Check credits when dates change
         }
@@ -1054,6 +1044,15 @@ document.addEventListener("DOMContentLoaded", function () {
     // Show alerts based on query parameters
     const urlParams = new URLSearchParams(window.location.search);
     const alerts = {
+        time_in: {
+            success: "✅ Time in recorded successfully!",
+            already_logged: "⚠️ You have already logged time in for today.",
+            error: "❌ Error recording time in. Please try again."
+        },
+        time_out: {
+            success: "✅ Time out recorded successfully!",
+            error: "❌ Error recording time out. Please try again."
+        },
         leave_request: {
             success: "Leave request submitted successfully!",
             invalid_dates: "Invalid leave date range submitted.",
@@ -1078,7 +1077,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Remove query parameters from URL after alert
-    if (['leave_request', 'schedule_change', 'overtime'].some(key => urlParams.has(key))) {
+    if (['time_in', 'time_out', 'leave_request', 'schedule_change', 'overtime'].some(key => urlParams.has(key))) {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -1164,13 +1163,7 @@ s0.parentNode.insertBefore(s1,s0);
 <!--End of Tawk.to Script-->
 
 <script>
-function showSection(sectionId) {
-  // Hide all sections
-  document.querySelectorAll('[id$="View"]').forEach(el => el.classList.add('hidden'));
-
-  // Show the selected section
-  document.getElementById(sectionId).classList.remove('hidden');
-}
+// Remove duplicate showSection function - using the one defined above
 </script>
 
 <script>

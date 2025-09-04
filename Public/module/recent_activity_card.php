@@ -1,7 +1,19 @@
 <?php
 $filterDate = $_GET['activityDate'] ?? null;
 
-$filteredActivities = array_filter($notifications, function ($activity) use ($filterDate) {
+// First, remove any potential duplicates based on message content and date
+$unique_notifications = [];
+$seen_activities = [];
+
+foreach ($notifications as $notification) {
+    $activity_key = md5($notification['message'] . $notification['created_at']);
+    if (!in_array($activity_key, $seen_activities)) {
+        $seen_activities[] = $activity_key;
+        $unique_notifications[] = $notification;
+    }
+}
+
+$filteredActivities = array_filter($unique_notifications, function ($activity) use ($filterDate) {
     if (!$filterDate) return true;
     return date('Y-m-d', strtotime($activity['created_at'])) === $filterDate;
 });
@@ -23,7 +35,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
     <div class="flex items-center gap-2 flex-wrap md:flex-nowrap">
         <label for="activityDate" class="text-sm text-gray-600 font-medium">Filter by date:</label>
         <input type="date" id="activityDate" name="activityDate"
-               value="<?= htmlspecialchars($filterDate) ?>"
+                               value="<?= htmlspecialchars($filterDate ?? '') ?>"
                class="border rounded-md px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 max-w-[160px] w-full">
         <button type="submit" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1 rounded">
             Apply
