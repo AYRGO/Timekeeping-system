@@ -1,9 +1,12 @@
 <?php
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
-if (!isset($_SESSION['regenerated'])) {
+if (!isset($_SESSION['regenerated']) && !headers_sent()) {
     session_regenerate_id(true);
     $_SESSION['regenerated'] = true;
 }
@@ -1953,7 +1956,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!form) {
         console.error('Overtime form not found!');
         return;
-       }
+    }
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();

@@ -7,74 +7,19 @@ session_start();
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
-// Enhanced session security
-$session_timeout = 3600; // 1 hour timeout
-$csrf_timeout = 1800; // 30 minutes CSRF token timeout
-
-// Check if session is expired
-if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > $session_timeout)) {
-    session_unset();
-    session_destroy();
-    session_start();
-    header("Location: ../employee/login.php?expired=1");
-    exit;
-}
-
-// Update last activity time
-$_SESSION['last_activity'] = time();
-
-// Regenerate session ID periodically (every 15 minutes)
-if (!isset($_SESSION['last_regeneration']) || (time() - $_SESSION['last_regeneration'] > 900)) {
+if (!isset($_SESSION['regenerated'])) {
     session_regenerate_id(true);
-    $_SESSION['last_regeneration'] = time();
+    $_SESSION['regenerated'] = true;
 }
 
-// Enhanced employee ID validation
 $employee_id = $_SESSION['employee']['id'] ?? null;
-if (!$employee_id || !is_numeric($employee_id)) {
-    error_log("SECURITY: Invalid employee ID in session - " . ($employee_id ?? 'NULL'));
-    session_unset();
-    session_destroy();
-    header("Location: ../employee/login.php?invalid_session=1");
+if (!$employee_id) {
+    header("Location: ../employee/login.php");
     exit;
 }
 
-// Verify employee still exists and is active
-try {
-    $stmt = $pdo->prepare("SELECT id, status FROM employees WHERE id = ?");
-    $stmt->execute([$employee_id]);
-    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$employee) {
-        error_log("SECURITY: Employee ID $employee_id not found in database");
-        session_unset();
-        session_destroy();
-        header("Location: ../employee/login.php?employee_not_found=1");
-        exit;
-    }
-    
-    if ($employee['status'] !== 'active') {
-        error_log("SECURITY: Inactive employee $employee_id attempted access");
-        session_unset();
-        session_destroy();
-        header("Location: ../employee/login.php?account_inactive=1");
-        exit;
-    }
-} catch (Exception $e) {
-    error_log("SECURITY: Database error during employee validation - " . $e->getMessage());
-    session_unset();
-    session_destroy();
-    header("Location: ../employee/login.php?db_error=1");
-    exit;
-}
-
-// Enhanced CSRF token management
-if (empty($_SESSION['csrf_token']) || 
-    !isset($_SESSION['csrf_token_time']) || 
-    (time() - $_SESSION['csrf_token_time'] > $csrf_timeout)) {
+if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    $_SESSION['csrf_token_time'] = time();
-    error_log("CSRF: New token generated for employee $employee_id");
 }
 
 $employee_role = $_SESSION['employee']['role'] ?? 'employee';
@@ -103,20 +48,38 @@ try {
 
     $current_date = date("Y-m-d");
 
-    // Check if checklist exists; if not, create a blank one
-    $stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
+try {
+    // Fetch employee details
+    $stmt = $pdo->prepare("SELECT fname, lname, email, contact, position, company, profile_picture 
+                           FROM employees WHERE id = ?");
     $stmt->execute([$employee_id]);
+    $user = $stmt->fetch();
+
+    $fname = $user['fname'] ?? '';
+    $lname = $user['lname'] ?? '';
+    $email = $user['email'] ?? '';
+    $contact = $user['contact'] ?? '';
+    $position = $user['position'] ?? '';
+    $company = $user['company'] ?? '';
+    $profile_picture = $user['profile_picture'] ?? null;
+
+    $current_date = date("Y-m-d");
+
+    // Check if checklist exists; if not, create a blank one
+// Check if checklist exists; if not, create a blank one
+$stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
+$stmt->execute([$employee_id]);
+$checklist = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$checklist) {
+    // Insert blank checklist for this employee
+    $insert = $pdo->prepare("INSERT INTO employee_checklist (employee_id) VALUES (?)");
+    $insert->execute([$employee_id]);
+
+    // Re-fetch checklist after insertion
+    $stmt->execute([$employee_id]); // ✅ FIXED - Use $stmt instead of $check_stmt
     $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$checklist) {
-        // Insert blank checklist for this employee
-        $insert = $pdo->prepare("INSERT INTO employee_checklist (employee_id) VALUES (?)");
-        $insert->execute([$employee_id]);
-
-        // Re-fetch checklist after insertion
-        $stmt->execute([$employee_id]);
-        $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
-    }
+}
     // Now you have both $user and $checklist available
 } catch (PDOException $e) {
     // Handle errors gracefully
@@ -159,200 +122,63 @@ try {
     }
 
     // Handle POST actions
-    try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Enhanced CSRF token validation
         $token = $_POST['csrf_token'] ?? '';
-        $sessionToken = $_SESSION['csrf_token'] ?? '';
-        $tokenTime = $_SESSION['csrf_token_time'] ?? 0;
-        
-        error_log("POST REQUEST - Employee ID: $employee_id, CSRF Token: " . substr($token, 0, 8) . "...");
-        error_log("SESSION TOKEN - " . substr($sessionToken, 0, 8) . "...");
-        error_log("TOKEN AGE - " . (time() - $tokenTime) . " seconds");
-        
-        // Check if CSRF token exists
-        if (empty($token)) {
-            error_log("SECURITY: CSRF TOKEN MISSING - Employee ID: $employee_id, IP: " . $_SERVER['REMOTE_ADDR']);
-            header("Location: time_log_create.php?error=missing_csrf_token");
-            exit;
+        if (!hash_equals($_SESSION['csrf_token'], $token)) {
+            die("Invalid CSRF token.");
         }
-        
-        // Check if session token exists
-        if (empty($sessionToken)) {
-            error_log("SECURITY: SESSION CSRF TOKEN MISSING - Employee ID: $employee_id, IP: " . $_SERVER['REMOTE_ADDR']);
-            // Regenerate CSRF token
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-            $_SESSION['csrf_token_time'] = time();
-            header("Location: time_log_create.php?error=session_expired");
-            exit;
-        }
-        
-        // Check if CSRF token is expired
-        if ((time() - $tokenTime) > $csrf_timeout) {
-            error_log("SECURITY: CSRF TOKEN EXPIRED - Employee ID: $employee_id, Age: " . (time() - $tokenTime) . " seconds");
-            // Regenerate CSRF token
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-            $_SESSION['csrf_token_time'] = time();
-            header("Location: time_log_create.php?error=csrf_expired");
-            exit;
-        }
-        
-        // Validate CSRF token
-        if (!hash_equals($sessionToken, $token)) {
-            error_log("SECURITY: CSRF TOKEN MISMATCH - Employee ID: $employee_id, IP: " . $_SERVER['REMOTE_ADDR']);
-            // Regenerate CSRF token to prevent replay attacks
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-            $_SESSION['csrf_token_time'] = time();
-            header("Location: time_log_create.php?error=invalid_csrf_token");
-            exit;
-        }
-        
-        // Rate limiting check
-        $rate_limit_key = "rate_limit_" . $employee_id;
-        if (!isset($_SESSION[$rate_limit_key])) {
-            $_SESSION[$rate_limit_key] = ['count' => 0, 'last_reset' => time()];
-        }
-        
-        $rate_data = $_SESSION[$rate_limit_key];
-        if ((time() - $rate_data['last_reset']) > 60) { // Reset every minute
-            $rate_data = ['count' => 0, 'last_reset' => time()];
-        }
-        
-        if ($rate_data['count'] > 10) { // Max 10 requests per minute
-            error_log("SECURITY: RATE LIMIT EXCEEDED - Employee ID: $employee_id, Count: " . $rate_data['count']);
-            header("Location: time_log_create.php?error=rate_limit_exceeded");
-            exit;
-        }
-        
-        $rate_data['count']++;
-        $_SESSION[$rate_limit_key] = $rate_data;
-        
-        error_log("CSRF TOKEN VALID - Employee ID: $employee_id, Rate: " . $rate_data['count'] . "/10");
 
         // Time In
         if (isset($_POST['time_in'])) {
-            try {
-                // Log the attempt
-                error_log("TIME IN ATTEMPT - Employee ID: $employee_id, Date: $current_date, Time: " . date("H:i:s"));
+            // Check schedule validation for overnight shifts
+            $current_day_of_week = date('N');
+            $today_schedule = $grouped_schedule[$current_day_of_week] ?? null;
+            
+            if ($today_schedule) {
+                $schedule_time_in = $today_schedule['time_in'];
+                $schedule_time_out = $today_schedule['time_out'];
+                $current_datetime = date("Y-m-d H:i:s");
                 
-                // Validate employee ID
-                if (!$employee_id || !is_numeric($employee_id)) {
-                    error_log("TIME IN FAILED - Invalid employee ID: $employee_id");
-                    header("Location: time_log_create.php?time_in=error&reason=invalid_employee");
-                    exit;
-                }
-                
-                // Check if there's already a time_in for today
-                $checkStmt = $pdo->prepare("SELECT id FROM time_logs WHERE employee_id = ? AND log_date = ? AND time_in IS NOT NULL");
-                $checkStmt->execute([$employee_id, $current_date]);
-                $existingLog = $checkStmt->fetch();
-                
-                if ($existingLog) {
-                    error_log("TIME IN FAILED - Already logged for today. Employee ID: $employee_id, Log ID: " . $existingLog['id']);
-                    header("Location: time_log_create.php?time_in=already_logged");
-                    exit;
-                }
-                
-                // Try to insert time in with multiple fallback approaches
-                $success = false;
-                $attempts = 0;
-                $maxAttempts = 3;
-                
-                while (!$success && $attempts < $maxAttempts) {
-                    $attempts++;
-                    error_log("TIME IN ATTEMPT $attempts - Employee ID: $employee_id");
+                // Check if it's an overnight shift (time_out < time_in)
+                if ($schedule_time_out < $schedule_time_in) {
+                    // Overnight shift logic
+                    $current = new DateTime($current_datetime);
+                    $timeIn = new DateTime($schedule_time_in);
+                    $timeOut = new DateTime($schedule_time_out);
+                    $timeOutNextDay = clone $timeOut;
+                    $timeOutNextDay->add(new DateInterval('P1D'));
                     
-                    try {
-                        // Method 1: Direct insert
-                        $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) VALUES (?, ?, ?)");
-                        $result = $stmt->execute([$employee_id, $current_date, date("H:i:s")]);
-                        
-                        if ($result && $stmt->rowCount() > 0) {
-                            $success = true;
-                            error_log("TIME IN SUCCESS - Method 1 (Direct insert) - Employee ID: $employee_id");
-                        } else {
-                            error_log("TIME IN FAILED - Method 1 failed, trying Method 2 - Employee ID: $employee_id");
-                            
-                            // Method 2: Insert or update approach
-                            $stmt2 = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE time_in = VALUES(time_in)");
-                            $result2 = $stmt2->execute([$employee_id, $current_date, date("H:i:s")]);
-                            
-                            if ($result2) {
-                                $success = true;
-                                error_log("TIME IN SUCCESS - Method 2 (Insert or update) - Employee ID: $employee_id");
-                            } else {
-                                error_log("TIME IN FAILED - Method 2 failed, trying Method 3 - Employee ID: $employee_id");
-                                
-                                // Method 3: Check if record exists and update, otherwise insert
-                                $checkStmt2 = $pdo->prepare("SELECT id FROM time_logs WHERE employee_id = ? AND log_date = ?");
-                                $checkStmt2->execute([$employee_id, $current_date]);
-                                $existingRecord = $checkStmt2->fetch();
-                                
-                                if ($existingRecord) {
-                                    $updateStmt = $pdo->prepare("UPDATE time_logs SET time_in = ? WHERE id = ?");
-                                    $result3 = $updateStmt->execute([date("H:i:s"), $existingRecord['id']]);
-                                } else {
-                                    $insertStmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) VALUES (?, ?, ?)");
-                                    $result3 = $insertStmt->execute([$employee_id, $current_date, date("H:i:s")]);
-                                }
-                                
-                                if ($result3) {
-                                    $success = true;
-                                    error_log("TIME IN SUCCESS - Method 3 (Check and update/insert) - Employee ID: $employee_id");
-                                }
-                            }
-                        }
-                    } catch (Exception $e) {
-                        error_log("TIME IN ATTEMPT $attempts ERROR - Employee ID: $employee_id, Error: " . $e->getMessage());
-                        if ($attempts < $maxAttempts) {
-                            sleep(1); // Wait 1 second before retry
-                        }
+                    if (!(($current >= $timeIn) || ($current <= $timeOutNextDay))) {
+                        header("Location: time_log_create.php?error=outside_schedule&schedule_in=" . urlencode($schedule_time_in) . "&schedule_out=" . urlencode($schedule_time_out));
+                        exit;
+                    }
+                } else {
+                    // Regular shift logic - NO CHANGES TO EXISTING FUNCTIONALITY
+                    $current = new DateTime($current_datetime);
+                    $timeIn = new DateTime($schedule_time_in);
+                    $timeOut = new DateTime($schedule_time_out);
+                    
+                    if (!(($current >= $timeIn) && ($current <= $timeOut))) {
+                        header("Location: time_log_create.php?error=outside_schedule&schedule_in=" . urlencode($schedule_time_in) . "&schedule_out=" . urlencode($schedule_time_out));
+                        exit;
                     }
                 }
-                
-                if ($success) {
-                    // Regenerate CSRF token after successful operation
-                    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-                    $_SESSION['csrf_token_time'] = time();
-                    error_log("CSRF: Token regenerated after successful time in for employee $employee_id");
-                    header("Location: time_log_create.php?time_in=success");
-                } else {
-                    error_log("TIME IN FAILED - All methods failed after $maxAttempts attempts - Employee ID: $employee_id");
-                    header("Location: time_log_create.php?time_in=error&reason=all_methods_failed");
-                }
-                exit;
-            } catch (Exception $e) {
-                error_log("TIME IN CRITICAL ERROR - Employee ID: $employee_id, Error: " . $e->getMessage());
-                header("Location: time_log_create.php?time_in=error&reason=critical_error");
-                exit;
             }
+            
+            $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in) 
+                                   VALUES (?, ?, ?)");
+            $stmt->execute([$employee_id, $current_date, date("H:i:s")]);
+            header("Location: time_log_create.php");
+            exit;
         }
 
         // Time Out
         if (isset($_POST['time_out'])) {
             // Handle overnight shifts by updating the most recent open time log
-            error_log("TIME OUT ATTEMPT - Employee ID: $employee_id, Date: $current_date, Time: " . date("H:i:s"));
-            
-            // Validate employee ID
-            if (!$employee_id || !is_numeric($employee_id)) {
-                error_log("TIME OUT FAILED - Invalid employee ID: $employee_id");
-                header("Location: time_log_create.php?time_out=error&reason=invalid_employee");
-                exit;
-            }
-            
-            $success = false;
-            $attempts = 0;
-            $maxAttempts = 3;
-            
-            while (!$success && $attempts < $maxAttempts) {
-                $attempts++;
-                error_log("TIME OUT ATTEMPT $attempts - Employee ID: $employee_id");
-                
-                try {
-                    $pdo->beginTransaction();
-                    
-                    // Method 1: Find and update open log
-                    $openStmt = $pdo->prepare("SELECT id, log_date FROM time_logs 
+            $pdo->beginTransaction();
+            try {
+                // Find the latest log without time_out regardless of date
+                $openStmt = $pdo->prepare("SELECT id FROM time_logs 
                     WHERE employee_id = ? AND time_out IS NULL 
                     ORDER BY log_date DESC, id DESC 
                     LIMIT 1");
@@ -360,120 +186,34 @@ try {
                 $openLog = $openStmt->fetch(PDO::FETCH_ASSOC);
 
                 if ($openLog) {
-                        error_log("TIME OUT - Found open log ID: " . $openLog['id'] . ", Date: " . $openLog['log_date']);
                     $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE id = ?");
-                        $result = $updateStmt->execute([date("H:i:s"), $openLog['id']]);
-                        
-                        if ($result && $updateStmt->rowCount() > 0) {
-                            $success = true;
-                            error_log("TIME OUT SUCCESS - Method 1 (Update open log) - Log ID: " . $openLog['id']);
+                    $updateStmt->execute([date("H:i:s"), $openLog['id']]);
                 } else {
-                            error_log("TIME OUT FAILED - Method 1 failed, trying Method 2 - Employee ID: $employee_id");
-                            
-                            // Method 2: Update today's log if it exists
-                            $todayStmt = $pdo->prepare("SELECT id FROM time_logs WHERE employee_id = ? AND log_date = ?");
-                            $todayStmt->execute([$employee_id, $current_date]);
-                            $todayLog = $todayStmt->fetch(PDO::FETCH_ASSOC);
-                            
-                            if ($todayLog) {
-                                $updateTodayStmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE id = ?");
-                                $result2 = $updateTodayStmt->execute([date("H:i:s"), $todayLog['id']]);
-                                
-                                if ($result2 && $updateTodayStmt->rowCount() > 0) {
-                                    $success = true;
-                                    error_log("TIME OUT SUCCESS - Method 2 (Update today's log) - Log ID: " . $todayLog['id']);
-                                } else {
-                                    error_log("TIME OUT FAILED - Method 2 failed, trying Method 3 - Employee ID: $employee_id");
-                                    
-                                    // Method 3: Insert new record with time_out only
-                                    $insertStmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_out) VALUES (?, ?, ?)");
-                                    $result3 = $insertStmt->execute([$employee_id, $current_date, date("H:i:s")]);
-                                    
-                                    if ($result3) {
-                                        $success = true;
-                                        error_log("TIME OUT SUCCESS - Method 3 (Insert new record) - Employee ID: $employee_id");
-                                    }
-                                }
-                            } else {
-                                error_log("TIME OUT FAILED - No today's log found, trying Method 3 - Employee ID: $employee_id");
-                                
-                                // Method 3: Insert new record with time_out only
-                                $insertStmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_out) VALUES (?, ?, ?)");
-                                $result3 = $insertStmt->execute([$employee_id, $current_date, date("H:i:s")]);
-                                
-                                if ($result3) {
-                                    $success = true;
-                                    error_log("TIME OUT SUCCESS - Method 3 (Insert new record) - Employee ID: $employee_id");
-                                }
-                            }
-                        }
-                    } else {
-                        error_log("TIME OUT - No open log found, trying fallback methods - Employee ID: $employee_id");
-                        
-                        // Method 2: Update today's log if it exists
-                        $todayStmt = $pdo->prepare("SELECT id FROM time_logs WHERE employee_id = ? AND log_date = ?");
-                        $todayStmt->execute([$employee_id, $current_date]);
-                        $todayLog = $todayStmt->fetch(PDO::FETCH_ASSOC);
-                        
-                        if ($todayLog) {
-                            $updateTodayStmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE id = ?");
-                            $result2 = $updateTodayStmt->execute([date("H:i:s"), $todayLog['id']]);
-                            
-                            if ($result2 && $updateTodayStmt->rowCount() > 0) {
-                                $success = true;
-                                error_log("TIME OUT SUCCESS - Method 2 (Update today's log) - Log ID: " . $todayLog['id']);
-                            } else {
-                                error_log("TIME OUT FAILED - Method 2 failed, trying Method 3 - Employee ID: $employee_id");
-                                
-                                // Method 3: Insert new record with time_out only
-                                $insertStmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_out) VALUES (?, ?, ?)");
-                                $result3 = $insertStmt->execute([$employee_id, $current_date, date("H:i:s")]);
-                                
-                                if ($result3) {
-                                    $success = true;
-                                    error_log("TIME OUT SUCCESS - Method 3 (Insert new record) - Employee ID: $employee_id");
-                                }
-                            }
-                        } else {
-                            // Method 3: Insert new record with time_out only
-                            $insertStmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_out) VALUES (?, ?, ?)");
-                            $result3 = $insertStmt->execute([$employee_id, $current_date, date("H:i:s")]);
-                            
-                            if ($result3) {
-                                $success = true;
-                                error_log("TIME OUT SUCCESS - Method 3 (Insert new record) - Employee ID: $employee_id");
-                            }
-                        }
+                    // Fallback to today's row if no open log found
+                    $fallbackStmt = $pdo->prepare("UPDATE time_logs SET time_out = ? WHERE employee_id = ? AND log_date = ?");
+                    $fallbackStmt->execute([date("H:i:s"), $employee_id, $current_date]);
                 }
 
                 $pdo->commit();
-                    
             } catch (Exception $e) {
-                    error_log("TIME OUT ATTEMPT $attempts ERROR - Employee ID: $employee_id, Error: " . $e->getMessage());
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
-                    if ($attempts < $maxAttempts) {
-                        sleep(1); // Wait 1 second before retry
-                    }
-                }
+                throw $e;
             }
-            
-            if ($success) {
-                // Regenerate CSRF token after successful operation
-                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-                $_SESSION['csrf_token_time'] = time();
-                error_log("CSRF: Token regenerated after successful time out for employee $employee_id");
-                header("Location: time_log_create.php?time_out=success");
-            } else {
-                error_log("TIME OUT FAILED - All methods failed after $maxAttempts attempts - Employee ID: $employee_id");
-                header("Location: time_log_create.php?time_out=error&reason=all_methods_failed");
-            }
+
+            header("Location: time_log_create.php");
             exit;
         }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leaveType'], $_POST['date_range'])) {
+    require '../config/db.php';
 
-        // Leave Request Handling
-        if (isset($_POST['leaveType'], $_POST['date_range'])) {
+    $employee_id = $_SESSION['employee']['id'] ?? null;
+
+    if (!$employee_id) {
+        header("Location: time_log_create.php?leave_request=unauthorized");
+        exit;
+    }
 
     $leaveTypeInput = trim($_POST['leaveType']);
     $reason = trim($_POST['reason'] ?? '');
@@ -598,8 +338,9 @@ try {
 }
 
 
-        // Schedule Change Request Check
-        if (isset($_POST['submit_schedule_change'])) {
+         /// Schedule Change Request Check
+if (isset($_POST['submit_schedule_change'])) {
+    $employee_id = $_SESSION['employee']['id'] ?? null;
     $work_schedule_id = $_POST['work_schedule_id'] ?? null;
     $reason = trim($_POST['reason'] ?? '');
     $date_range = trim($_POST['date_range'] ?? '');
@@ -695,11 +436,11 @@ try {
     exit;
 }
 
-        // Comment Handling
-        if (($_POST['type'] ?? '') === 'comment') {
-            $csrf_token = $_POST['csrf_token'] ?? '';
-            $announcement_id = intval($_POST['announcement_id'] ?? 0);
-            $comment_content = trim($_POST['comment'] ?? '');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment') {
+    $csrf_token = $_POST['csrf_token'] ?? '';
+    $announcement_id = intval($_POST['announcement_id'] ?? 0);
+    $comment_content = trim($_POST['comment'] ?? '');
+    $employee_id = $_SESSION['employee']['id'] ?? null;
 
     // Validate CSRF token
     if ($csrf_token !== ($_SESSION['csrf_token'] ?? '')) {
@@ -819,9 +560,16 @@ $todayLog = $todayLogStmt->fetch();
 if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
     $timeIn = new DateTime($todayLog['time_in']);
     $timeOut = new DateTime($todayLog['time_out']);
-    $diffInSeconds = $timeOut->getTimestamp() - $timeIn->getTimestamp();
-
-    if ($diffInSeconds >= (7 * 3600 + 58 * 60)) { // 7hrs 58mins = 28680 secs
+    
+    // Calculate total hours worked (including lunch) and include days span
+    $interval = $timeIn->diff($timeOut);
+    $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
+    
+    // Subtract 1 hour for lunch break
+    $actualWorkedHours = max(0, $totalHours - 1);
+    
+    // For regular OT, require 8.5 hours (8hrs 30mins) - consistent with helper function
+    if ($actualWorkedHours >= 8.5) {
         $overtimeEligible = true;
     }
 }
@@ -1185,10 +933,12 @@ document.addEventListener("DOMContentLoaded", function () {
         mode: "range",
         dateFormat: "Y-m-d",
         minDate: (() => {
-            // Allow dates from August 20th of current year
-            const currentYear = new Date().getFullYear();
-            return new Date(currentYear, 7, 20); // Month is 0-indexed, so 7 = August
+            // Allow backtrack for 5 days
+            const today = new Date();
+            today.setDate(today.getDate() - 5);
+            return today;
         })(),
+        // Remove any disabling/blocking of days before today
         onChange: function(selectedDates) {
             checkLeaveCredits(); // Check credits when dates change
         }
@@ -1346,32 +1096,6 @@ document.addEventListener("DOMContentLoaded", function () {
     // Show alerts based on query parameters
     const urlParams = new URLSearchParams(window.location.search);
     const alerts = {
-        time_in: {
-            success: "✅ Time in recorded successfully!",
-            already_logged: "⚠️ You have already logged time in for today.",
-            error: "❌ Error recording time in. Please try again.",
-            invalid_employee: "❌ Invalid employee ID. Please log in again.",
-            all_methods_failed: "❌ Time in failed after multiple attempts. Please contact support.",
-            critical_error: "❌ Critical error occurred. Please contact support."
-        },
-        time_out: {
-            success: "✅ Time out recorded successfully!",
-            error: "❌ Error recording time out. Please try again.",
-            invalid_employee: "❌ Invalid employee ID. Please log in again.",
-            all_methods_failed: "❌ Time out failed after multiple attempts. Please contact support."
-        },
-        error: {
-            missing_csrf_token: "❌ Security token missing. Please refresh the page and try again.",
-            session_expired: "❌ Session expired. Please log in again.",
-            invalid_csrf_token: "❌ Invalid security token. Please refresh the page and try again.",
-            csrf_expired: "❌ Security token expired. Please refresh the page and try again.",
-            rate_limit_exceeded: "❌ Too many requests. Please wait a moment and try again.",
-            invalid_session: "❌ Invalid session. Please log in again.",
-            employee_not_found: "❌ Employee account not found. Please contact support.",
-            account_inactive: "❌ Account is inactive. Please contact support.",
-            db_error: "❌ Database error. Please try again later.",
-            expired: "❌ Session expired due to inactivity. Please log in again."
-        },
         leave_request: {
             success: "Leave request submitted successfully!",
             invalid_dates: "Invalid leave date range submitted.",
@@ -1396,7 +1120,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Remove query parameters from URL after alert
-    if (['time_in', 'time_out', 'leave_request', 'schedule_change', 'overtime', 'error'].some(key => urlParams.has(key))) {
+    if (['leave_request', 'schedule_change', 'overtime'].some(key => urlParams.has(key))) {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -1482,7 +1206,13 @@ s0.parentNode.insertBefore(s1,s0);
 <!--End of Tawk.to Script-->
 
 <script>
-// Remove duplicate showSection function - using the one defined above
+function showSection(sectionId) {
+  // Hide all sections
+  document.querySelectorAll('[id$="View"]').forEach(el => el.classList.add('hidden'));
+
+  // Show the selected section
+  document.getElementById(sectionId).classList.remove('hidden');
+}
 </script>
 
 <script>
