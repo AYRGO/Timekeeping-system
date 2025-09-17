@@ -14,24 +14,55 @@ $pageTitle = $isHistoryView ? 'Leave Requests History' : 'Leave Requests';
 // Fetch leave requests with employee names and attachments 
 
 if ($isHistoryView) {
-    // Fetch all from both tables
-    $sql = "
-        SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, explanation, employee_id, fname, lname
-        FROM (
-            SELECT lr.id, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.attachment_lr,
-                   lr.created_at, '' AS explanation, lr.employee_id,
-                   e.fname, e.lname
-            FROM leave_requests lr
-            JOIN employees e ON lr.employee_id = e.id
-            UNION ALL
-            SELECT plr.id, plr.leave_type, plr.start_date, plr.end_date, plr.reason, plr.status, plr.attachment_lr,
-                   plr.created_at, plr.explanation, plr.employee_id,
-                   e.fname, e.lname
-            FROM post_leave_requests plr
-            JOIN employees e ON plr.employee_id = e.id
-        ) AS all_requests
-        ORDER BY created_at DESC
-    ";
+    // Check if processed_at column exists
+    try {
+        $checkColumn = $pdo->query("SHOW COLUMNS FROM post_leave_requests LIKE 'processed_at'");
+        $hasProcessedAt = $checkColumn->rowCount() > 0;
+    } catch (Exception $e) {
+        $hasProcessedAt = false;
+    }
+    
+    if ($hasProcessedAt) {
+        // Use processed_at column if it exists
+        $sql = "
+            SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, processed_at, explanation, employee_id, fname, lname
+            FROM (
+                SELECT lr.id, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.attachment_lr,
+                       lr.created_at, lr.created_at AS processed_at, '' AS explanation, lr.employee_id,
+                       e.fname, e.lname
+                FROM leave_requests lr
+                JOIN employees e ON lr.employee_id = e.id
+                WHERE lr.status != 'pending'
+                UNION ALL
+                SELECT plr.id, plr.leave_type, plr.start_date, plr.end_date, plr.reason, plr.status, plr.attachment_lr,
+                       plr.created_at, COALESCE(plr.processed_at, plr.created_at) AS processed_at, plr.explanation, plr.employee_id,
+                       e.fname, e.lname
+                FROM post_leave_requests plr
+                JOIN employees e ON plr.employee_id = e.id
+            ) AS all_requests
+            ORDER BY processed_at DESC
+        ";
+    } else {
+        // Fallback to created_at if processed_at doesn't exist
+        $sql = "
+            SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, created_at AS processed_at, explanation, employee_id, fname, lname
+            FROM (
+                SELECT lr.id, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.attachment_lr,
+                       lr.created_at, '' AS explanation, lr.employee_id,
+                       e.fname, e.lname
+                FROM leave_requests lr
+                JOIN employees e ON lr.employee_id = e.id
+                WHERE lr.status != 'pending'
+                UNION ALL
+                SELECT plr.id, plr.leave_type, plr.start_date, plr.end_date, plr.reason, plr.status, plr.attachment_lr,
+                       plr.created_at, plr.explanation, plr.employee_id,
+                       e.fname, e.lname
+                FROM post_leave_requests plr
+                JOIN employees e ON plr.employee_id = e.id
+            ) AS all_requests
+            ORDER BY created_at DESC
+        ";
+    }
 } else {
     // Fetch from leave_requests table (current requests) - only pending
     $sql = "
@@ -148,7 +179,23 @@ function getLeaveTypeBadge($type) {
 
                 <!-- Search and Pagination Controls -->
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-                    <input type="text" id="searchInput" placeholder="Search by employee, leave type, status..." class="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:ring focus:ring-blue-200" />
+                    <div class="flex flex-col md:flex-row gap-2 md:w-2/3">
+                        <input type="text" id="searchInput" placeholder="Search by employee, leave type, status..." class="flex-1 px-4 py-2 border rounded-lg focus:ring focus:ring-blue-200" />
+                        <select id="sortSelect" class="px-4 py-2 border rounded-lg focus:ring focus:ring-blue-200 bg-white">
+                            <?php if ($isHistoryView): ?>
+                                <option value="processed_at_desc">Processed Date (Newest)</option>
+                                <option value="processed_at_asc">Processed Date (Oldest)</option>
+                            <?php else: ?>
+                                <option value="created_at_desc">Submitted Date (Newest)</option>
+                                <option value="created_at_asc">Submitted Date (Oldest)</option>
+                            <?php endif; ?>
+                            <option value="employee_asc">Employee A-Z</option>
+                            <option value="employee_desc">Employee Z-A</option>
+                            <option value="start_date_desc">Start Date (Latest)</option>
+                            <option value="start_date_asc">Start Date (Earliest)</option>
+                            <option value="status">Status</option>
+                        </select>
+                    </div>
                     <div id="pagination" class="flex items-center space-x-2 mt-2 md:mt-0"></div>
                 </div>
 
@@ -179,26 +226,42 @@ function getLeaveTypeBadge($type) {
                 <script>
                 // Prepare leave requests data for JS
                 let leaveRequests = <?php echo json_encode($leave_requests); ?>;
-                // Sort by ID ascending
-                leaveRequests = leaveRequests.sort((a, b) => parseInt(a.id) - parseInt(b.id));
                 const isHistoryView = <?php echo json_encode($isHistoryView); ?>;
+                
+                // Sort by processed_at descending (newest first) for history view, or by ID for current view
+                if (isHistoryView) {
+                    leaveRequests = leaveRequests.sort((a, b) => {
+                        const dateA = new Date(a.processed_at || a.created_at || 0);
+                        const dateB = new Date(b.processed_at || b.created_at || 0);
+                        return dateB - dateA;
+                    });
+                } else {
+                    leaveRequests = leaveRequests.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                }
                 const rowsPerPage = 10;
                 let currentPage = 1;
                 let filteredRequests = leaveRequests;
 
                 function renderTable() {
-                    const tbody = document.getElementById('leaveTableBody');
-                    tbody.innerHTML = '';
-                    const startIdx = (currentPage - 1) * rowsPerPage;
-                    const endIdx = startIdx + rowsPerPage;
-                    const pageData = filteredRequests.slice(startIdx, endIdx);
-                    if (pageData.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-sm py-8 text-gray-500">
-                            <i class='fas fa-calendar-times text-4xl text-gray-300 mb-2'></i>
-                            <div>No leave requests found.</div>
-                        </td></tr>`;
-                        return;
-                    }
+                    try {
+                        const tbody = document.getElementById('leaveTableBody');
+                        if (!tbody) {
+                            console.error('Table body element not found');
+                            return;
+                        }
+                        
+                        tbody.innerHTML = '';
+                        const startIdx = (currentPage - 1) * rowsPerPage;
+                        const endIdx = startIdx + rowsPerPage;
+                        const pageData = filteredRequests.slice(startIdx, endIdx);
+                        
+                        if (pageData.length === 0) {
+                            tbody.innerHTML = `<tr><td colspan="10" class="text-center text-sm py-8 text-gray-500">
+                                <i class='fas fa-calendar-times text-4xl text-gray-300 mb-2'></i>
+                                <div>No leave requests found.</div>
+                            </td></tr>`;
+                            return;
+                        }
                     pageData.forEach(lr => {
                         const statusBadge = getStatusBadgeJS(lr.status);
                         const leaveTypeBadge = getLeaveTypeBadgeJS(lr.leave_type);
@@ -249,6 +312,16 @@ function getLeaveTypeBadge($type) {
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${actionCell}</td>
                         </tr>`;
                     });
+                    } catch (error) {
+                        console.error('Error rendering table:', error);
+                        const tbody = document.getElementById('leaveTableBody');
+                        if (tbody) {
+                            tbody.innerHTML = `<tr><td colspan="10" class="text-center text-sm py-8 text-red-500">
+                                <i class='fas fa-exclamation-triangle text-4xl text-red-300 mb-2'></i>
+                                <div>Error loading data. Please refresh the page.</div>
+                            </td></tr>`;
+                        }
+                    }
                 }
 
                 function escapeHtml(text) {
@@ -350,6 +423,37 @@ function getLeaveTypeBadge($type) {
                     pagDiv.appendChild(nextBtn);
                 }
 
+                function sortRequests(requests, sortBy) {
+                    return requests.sort((a, b) => {
+                        switch(sortBy) {
+                            case 'created_at_desc':
+                                return new Date(b.created_at) - new Date(a.created_at);
+                            case 'created_at_asc':
+                                return new Date(a.created_at) - new Date(b.created_at);
+                            case 'processed_at_desc':
+                                const dateB = new Date(b.processed_at || b.created_at || 0);
+                                const dateA = new Date(a.processed_at || a.created_at || 0);
+                                return dateB - dateA;
+                            case 'processed_at_asc':
+                                const dateA2 = new Date(a.processed_at || a.created_at || 0);
+                                const dateB2 = new Date(b.processed_at || b.created_at || 0);
+                                return dateA2 - dateB2;
+                            case 'employee_asc':
+                                return (a.fname + ' ' + a.lname).localeCompare(b.fname + ' ' + b.lname);
+                            case 'employee_desc':
+                                return (b.fname + ' ' + b.lname).localeCompare(a.fname + ' ' + a.lname);
+                            case 'start_date_desc':
+                                return new Date(b.start_date) - new Date(a.start_date);
+                            case 'start_date_asc':
+                                return new Date(a.start_date) - new Date(b.start_date);
+                            case 'status':
+                                return (a.status || '').localeCompare(b.status || '');
+                            default:
+                                return 0;
+                        }
+                    });
+                }
+
                 function updateTable() {
                     renderTable();
                     renderPagination();
@@ -365,11 +469,24 @@ function getLeaveTypeBadge($type) {
                             (lr.reason || '').toLowerCase().includes(val)
                         );
                     });
+                    // Apply current sorting
+                    const sortBy = document.getElementById('sortSelect').value;
+                    filteredRequests = sortRequests(filteredRequests, sortBy);
                     currentPage = 1;
                     updateTable();
                 });
 
-                // Initial render
+                document.getElementById('sortSelect').addEventListener('change', function(e) {
+                    const sortBy = e.target.value;
+                    filteredRequests = sortRequests(filteredRequests, sortBy);
+                    currentPage = 1;
+                    updateTable();
+                });
+
+                // Initial render with default sorting
+                const defaultSort = isHistoryView ? 'processed_at_desc' : 'created_at_desc';
+                document.getElementById('sortSelect').value = defaultSort;
+                filteredRequests = sortRequests(filteredRequests, defaultSort);
                 updateTable();
                 </script>
 

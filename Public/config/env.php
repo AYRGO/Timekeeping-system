@@ -13,13 +13,30 @@ if (!class_exists('EnvLoader')) {
                 return true;
             }
             
-            $envPath = __DIR__ . '/../../' . $file;
+            // Look for .env file in multiple possible locations
+            $possiblePaths = [
+                $_SERVER['DOCUMENT_ROOT'] . '/' . $file, // Document root (public_html)
+                dirname(__DIR__, 2) . '/' . $file,  // Project root (timekeeping system root)
+                __DIR__ . '/../../' . $file,        // Original path
+                getcwd() . '/' . $file,             // Current working directory
+            ];
+            
+            $envPath = null;
+            foreach ($possiblePaths as $path) {
+                if (file_exists($path)) {
+                    $envPath = $path;
+                    break;
+                }
+            }
             
             // Debug: Log the path we're trying to load
-            error_log("Trying to load environment file from: " . $envPath);
+            error_log("Trying to load environment file from: " . ($envPath ?: 'none found'));
             
-            if (!file_exists($envPath)) {
-                error_log("Environment file not found at: " . $envPath);
+            if (!$envPath) {
+                error_log("Environment file not found in any of these locations:");
+                foreach ($possiblePaths as $path) {
+                    error_log("  - " . $path);
+                }
                 // Fallback to default values or throw error
                 return false;
             }

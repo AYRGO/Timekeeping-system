@@ -67,20 +67,32 @@ if ($current_user_id) {
     $employee = $emp_stmt->fetch(PDO::FETCH_ASSOC);
 
 // --- Leave Requests (from both tables) ---
-// Pending leave requests
+// Get pending leave requests first
 $leave_stmt = $pdo->prepare("
     SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, 'pending' as source_table
     FROM leave_requests 
     WHERE employee_id = ?
-    UNION ALL
-    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, 'approved' as source_table
-    FROM post_leave_requests
-    WHERE employee_id = ?
     ORDER BY created_at DESC
     LIMIT 10
 ");
-$leave_stmt->execute([$current_user_id, $current_user_id]);
+$leave_stmt->execute([$current_user_id]);
 $leave_results = $leave_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get approved leave requests, excluding those already in pending
+$approved_leave_stmt = $pdo->prepare("
+    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, 'approved' as source_table
+    FROM post_leave_requests
+    WHERE employee_id = ? AND id NOT IN (
+        SELECT id FROM leave_requests WHERE employee_id = ?
+    )
+    ORDER BY created_at DESC
+    LIMIT 10
+");
+$approved_leave_stmt->execute([$current_user_id, $current_user_id]);
+$approved_leave_results = $approved_leave_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Combine results
+$leave_results = array_merge($leave_results, $approved_leave_results);
 
 foreach ($leave_results as $leave) {
     $raw_status = strtolower($leave['status']);
@@ -123,19 +135,32 @@ foreach ($leave_results as $leave) {
 }
 
 // --- Schedule Requests (from both tables) ---
+// Get pending schedule requests first
 $schedule_stmt = $pdo->prepare("
     SELECT id, work_schedule_id, status, start_date, end_date, created_at, notified, explanation, 'pending' as source_table
     FROM schedule_change_requests 
     WHERE employee_id = ?
-    UNION ALL
-    SELECT id, work_schedule_id, status, start_date, end_date, created_at, notified, explanation, 'approved' as source_table
-    FROM post_schedule_change_requests
-    WHERE employee_id = ?
     ORDER BY created_at DESC
     LIMIT 10
 ");
-$schedule_stmt->execute([$current_user_id, $current_user_id]);
+$schedule_stmt->execute([$current_user_id]);
 $schedule_results = $schedule_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get approved schedule requests, excluding those already in pending
+$approved_schedule_stmt = $pdo->prepare("
+    SELECT id, work_schedule_id, status, start_date, end_date, created_at, notified, explanation, 'approved' as source_table
+    FROM post_schedule_change_requests
+    WHERE employee_id = ? AND id NOT IN (
+        SELECT id FROM schedule_change_requests WHERE employee_id = ?
+    )
+    ORDER BY created_at DESC
+    LIMIT 10
+");
+$approved_schedule_stmt->execute([$current_user_id, $current_user_id]);
+$approved_schedule_results = $approved_schedule_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Combine results
+$schedule_results = array_merge($schedule_results, $approved_schedule_results);
 
 foreach ($schedule_results as $sched) {
     $status = ucfirst($sched['status']);
@@ -167,19 +192,32 @@ foreach ($schedule_results as $sched) {
 }
 
 // --- Time Adjustment Requests (from both tables) ---
+// Get pending time adjustment requests first
 $adjust_stmt = $pdo->prepare("
     SELECT id, log_date, status, reason, created_at, notified, 'pending' as source_table
     FROM time_adjustment_requests 
     WHERE employee_id = ?
-    UNION ALL
-    SELECT id, log_date, status, '' as reason, created_at, notified, 'approved' as source_table
-    FROM post_time_adjustment_requests
-    WHERE employee_id = ?
     ORDER BY created_at DESC
     LIMIT 10
 ");
-$adjust_stmt->execute([$current_user_id, $current_user_id]);
+$adjust_stmt->execute([$current_user_id]);
 $adjust_results = $adjust_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get approved time adjustment requests, excluding those already in pending
+$approved_adjust_stmt = $pdo->prepare("
+    SELECT id, log_date, status, '' as reason, created_at, notified, 'approved' as source_table
+    FROM post_time_adjustment_requests
+    WHERE employee_id = ? AND id NOT IN (
+        SELECT id FROM time_adjustment_requests WHERE employee_id = ?
+    )
+    ORDER BY created_at DESC
+    LIMIT 10
+");
+$approved_adjust_stmt->execute([$current_user_id, $current_user_id]);
+$approved_adjust_results = $approved_adjust_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Combine results
+$adjust_results = array_merge($adjust_results, $approved_adjust_results);
 
 foreach ($adjust_results as $adjustment) {
     $raw_status = strtolower($adjustment['status']);
@@ -252,6 +290,20 @@ foreach ($ot_results as $ot) {
     ];
 }
 
+
+    // Remove duplicates based on message content and date
+    $unique_notifications = [];
+    $seen_messages = [];
+    
+    foreach ($notifications as $notification) {
+        $message_key = md5($notification['message'] . $notification['created_at']);
+        if (!in_array($message_key, $seen_messages)) {
+            $seen_messages[] = $message_key;
+            $unique_notifications[] = $notification;
+        }
+    }
+    
+    $notifications = $unique_notifications;
 
     // Sort all notifications by newest first
     usort($notifications, function ($a, $b) {

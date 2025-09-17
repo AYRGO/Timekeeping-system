@@ -22,6 +22,22 @@ $log = $stmt->fetch(PDO::FETCH_ASSOC);
 $time_in = $log['time_in'] ?? null;
 $time_out = $log['time_out'] ?? null;
 
+// Check for overnight shift - only if no time_in today AND there's an open log from yesterday or earlier
+if (!$time_in) {
+    $overnightStmt = $pdo->prepare("SELECT time_in, time_out, log_date FROM time_logs 
+        WHERE employee_id = ? AND time_out IS NULL AND log_date < ?
+        ORDER BY log_date DESC, id DESC 
+        LIMIT 1");
+    $overnightStmt->execute([$employee_id, $today]);
+    $overnightLog = $overnightStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($overnightLog) {
+        $time_in = $overnightLog['time_in'];
+        $time_out = $overnightLog['time_out']; // This will be null for open logs
+        // Note: We don't update $today here to keep the display showing today's date
+    }
+}
+
 // Check for approved time adjustment for today
 $adjStmt = $pdo->prepare("SELECT requested_time_in, requested_time_out FROM post_time_adjustment_requests WHERE employee_id = ? AND log_date = ? AND status = 'approved' ORDER BY id DESC LIMIT 1");
 $adjStmt->execute([$employee_id, $today]);
@@ -52,6 +68,11 @@ if ($time_in && $time_out) {
         <h3 class="text-2xl font-semibold text-gray-800 flex items-center">
             <i class="fas fa-user-clock mr-3 text-green-500 bg-green-100 p-2 rounded-full"></i>
             Today's Time Log
+            <?php if ($time_in && !$time_out && isset($overnightLog)): ?>
+                <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    <i class="fas fa-moon mr-1"></i>Overnight Shift
+                </span>
+            <?php endif; ?>
         </h3>
         <span id="dashboardClock" class="text-sm font-mono text-gray-500 tracking-wide">--:--:-- --</span>
     </div>

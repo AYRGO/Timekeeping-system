@@ -5,16 +5,16 @@ function isOvertimeEligible($time_in, $time_out, $ot_type = null) {
     $timeIn = new DateTime($time_in);
     $timeOut = new DateTime($time_out);
     
-    // Calculate total hours worked (including lunch)
+    // Calculate total hours worked (including lunch) and include days span
     $interval = $timeIn->diff($timeOut);
-    $totalHours = $interval->h + ($interval->i / 60);
+    $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
     
     // Subtract 1 hour for lunch break
     $actualWorkedHours = max(0, $totalHours - 1);
     
-    // For Restday OT, only need 8+ hours (no 30-minute restriction)
+    // For Restday OT, allow filing for any positive worked hours (after lunch)
     if ($ot_type === 'Restday OT') {
-        return $actualWorkedHours >= 8;
+        return $actualWorkedHours > 0;
     }
     
     // For regular OT, require 8.5 hours (8hrs 30mins)
@@ -27,16 +27,16 @@ function calculateOvertimeHours($time_in, $time_out, $ot_type = null) {
     $timeIn = new DateTime($time_in);
     $timeOut = new DateTime($time_out);
     
-    // Calculate total hours worked (including lunch)
+    // Calculate total hours worked (including lunch) and include days span
     $interval = $timeIn->diff($timeOut);
-    $totalHours = $interval->h + ($interval->i / 60);
+    $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
     
     // Subtract 1 hour for lunch break
     $actualWorkedHours = max(0, $totalHours - 1);
     
-    // For Restday OT, return all worked hours (minus lunch)
+    // For Restday OT, return all worked hours (minus lunch), even if < 8 hours
     if ($ot_type === 'Restday OT') {
-        return $actualWorkedHours >= 8 ? $actualWorkedHours : 0;
+        return $actualWorkedHours;
     }
     
     // Calculate overtime (anything over 8 hours of actual work)
@@ -54,9 +54,9 @@ function calculateActualHoursWorked($time_in, $time_out) {
     $timeIn = new DateTime($time_in);
     $timeOut = new DateTime($time_out);
     
-    // Calculate total hours
+    // Calculate total hours and include days span
     $interval = $timeIn->diff($timeOut);
-    $totalHours = $interval->h + ($interval->i / 60);
+    $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
     
     // Subtract 1 hour for lunch break, but ensure no negative values
     return max(0, $totalHours - 1);

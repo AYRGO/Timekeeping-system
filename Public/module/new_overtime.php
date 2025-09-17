@@ -1958,7 +1958,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!form) {
         console.error('Overtime form not found!');
         return;
-       }
+    }
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
