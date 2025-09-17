@@ -47,6 +47,6 @@ try {
     echo json_encode(['success' => true, 'marked_count' => count($unreadAnnouncements)]);
     
 } catch (PDOException $e) {
-    echo json_encode(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Database error']);
 }
 ?>

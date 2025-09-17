@@ -160,62 +160,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leave_id'], $_POST['a
                 $leave_request['status'] = 'rejected';
             }
 
-            // Check if processed_at column exists
-            try {
-                $checkColumn = $pdo->query("SHOW COLUMNS FROM post_leave_requests LIKE 'processed_at'");
-                $hasProcessedAt = $checkColumn->rowCount() > 0;
-            } catch (Exception $e) {
-                $hasProcessedAt = false;
-            }
+            // Insert into post_leave_requests table
+            $stmt = $pdo->prepare("
+                INSERT INTO post_leave_requests 
+                (employee_id, leave_type, start_date, end_date, reason, status, 
+                 attachment_lr, explanation, created_at, notified) 
+                VALUES 
+                (:employee_id, :leave_type, :start_date, :end_date, :reason, :status, 
+                 :attachment_lr, :explanation, :created_at, :notified)
+            ");
             
-            if ($hasProcessedAt) {
-                // Insert with processed_at column
-                $stmt = $pdo->prepare("
-                    INSERT INTO post_leave_requests 
-                    (employee_id, leave_type, start_date, end_date, reason, status, 
-                     attachment_lr, explanation, created_at, processed_at, notified) 
-                    VALUES 
-                    (:employee_id, :leave_type, :start_date, :end_date, :reason, :status, 
-                     :attachment_lr, :explanation, :created_at, :processed_at, :notified)
-                ");
-                
-                $stmt->execute([
-                    'employee_id' => $leave_request['employee_id'],
-                    'leave_type' => $leave_request['leave_type'],
-                    'start_date' => $leave_request['start_date'],
-                    'end_date' => $leave_request['end_date'],
-                    'reason' => $leave_request['reason'],
-                    'status' => $leave_request['status'],
-                    'attachment_lr' => $leave_request['attachment_lr'],
-                    'explanation' => $leave_request['explanation'] ?? null,
-                    'created_at' => $leave_request['created_at'],
-                    'processed_at' => date('Y-m-d H:i:s'), // Set current timestamp as processed date
-                    'notified' => $leave_request['notified'] ?? 0
-                ]);
-            } else {
-                // Insert without processed_at column (fallback)
-                $stmt = $pdo->prepare("
-                    INSERT INTO post_leave_requests 
-                    (employee_id, leave_type, start_date, end_date, reason, status, 
-                     attachment_lr, explanation, created_at, notified) 
-                    VALUES 
-                    (:employee_id, :leave_type, :start_date, :end_date, :reason, :status, 
-                     :attachment_lr, :explanation, :created_at, :notified)
-                ");
-                
-                $stmt->execute([
-                    'employee_id' => $leave_request['employee_id'],
-                    'leave_type' => $leave_request['leave_type'],
-                    'start_date' => $leave_request['start_date'],
-                    'end_date' => $leave_request['end_date'],
-                    'reason' => $leave_request['reason'],
-                    'status' => $leave_request['status'],
-                    'attachment_lr' => $leave_request['attachment_lr'],
-                    'explanation' => $leave_request['explanation'] ?? null,
-                    'created_at' => $leave_request['created_at'],
-                    'notified' => $leave_request['notified'] ?? 0
-                ]);
-            }
+            $stmt->execute([
+                'employee_id' => $leave_request['employee_id'],
+                'leave_type' => $leave_request['leave_type'],
+                'start_date' => $leave_request['start_date'],
+                'end_date' => $leave_request['end_date'],
+                'reason' => $leave_request['reason'],
+                'status' => $leave_request['status'],
+                'attachment_lr' => $leave_request['attachment_lr'],
+                'explanation' => $leave_request['explanation'] ?? null,
+                'created_at' => $leave_request['created_at'],
+                'notified' => $leave_request['notified'] ?? 0
+            ]);
 
             // Delete from leave_requests table
             $stmt = $pdo->prepare("DELETE FROM leave_requests WHERE id = :id");

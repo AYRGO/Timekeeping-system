@@ -11,6 +11,10 @@ session_set_cookie_params([
 session_start();
 
 include('../config/db.php');
+include('../config/csrf_helper.php');
+
+// Initialize CSRF protection
+init_csrf_protection();
 
 // Check if user is already logged in - redirect them away from login page
 if (isset($_SESSION['employee']['id'])) {
@@ -43,14 +47,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    // CSRF check
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        die("Invalid CSRF token.");
-    }
-
-    if (!isset($_SESSION['login_attempts'])) {
-        $_SESSION['login_attempts'] = [];
-    }
+    // Enhanced CSRF check with centralized validation
+    $csrf_validation = validate_csrf_token(true);
+    if (!$csrf_validation['valid']) {
+        error_log("SECURITY: CSRF validation failed in employee login - " . $csrf_validation['error'] . " - IP: " . $_SERVER['REMOTE_ADDR']);
+        $error = "Security validation failed. Please refresh the page and try again.";
+    } else {
+        // Only process login if CSRF token is valid
+        if (!isset($_SESSION['login_attempts'])) {
+            $_SESSION['login_attempts'] = [];
+        }
 
     $attempt = $_SESSION['login_attempts'][$username] ?? ['count' => 0, 'time' => 0];
     if ($attempt['count'] >= $max_attempts && (time() - $attempt['time']) < $lockout_time) {
@@ -110,6 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         $error = "Invalid username or password.";
     }
+    } // Close CSRF validation else block
 }
 ?>
 
@@ -181,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- Login Form -->
     <form method="POST" class="space-y-5">
-      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+      <?= csrf_token_field() ?>>
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>

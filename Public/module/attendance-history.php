@@ -56,13 +56,14 @@ $schedule_times = [
         16 => ['in' => '08:30:00', 'out' => '16:30:00'],
         17 => ['in' => '06:00:00', 'out' => '12:00:00'],
         18 => ['in' => '06:00:00', 'out' => '14:30:00'],
-        19 => ['in' => '19:00:00', 'out' => '3:00:00'],     
+        19 => ['in' => '19:00:00', 'out' => '3:00:00'],
+        20 => ['in' => '19:00:00', 'out' => '4:30:00'],
 ];
 
-// Fetch all logs for July 1, 2025 onwards
+// Fetch all logs for July 1, 2025 onwards - Updated to include status column
 $allLogsStmt = $pdo->prepare("
     SELECT 
-        t.log_date, t.time_in, t.time_out, 
+        t.log_date, t.time_in, t.time_out, t.status,
         r.requested_time_in, r.requested_time_out, r.status AS request_status
     FROM time_logs t
     LEFT JOIN (
@@ -76,6 +77,7 @@ $allLogsStmt = $pdo->prepare("
         ) r2 ON r1.id = r2.latest_id
     ) r ON t.employee_id = r.employee_id AND t.log_date = r.log_date
     WHERE t.employee_id = ? AND t.log_date >= '2025-07-01'
+    ORDER BY t.log_date DESC
 ");
 $allLogsStmt->execute([$employee_id]);
 $logs = $allLogsStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -146,7 +148,13 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 
 <div class="bg-white rounded-lg shadow p-6 mt-6">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h3 class="text-lg font-semibold text-gray-800">My Attendance History</h3>
+        <div>
+            <h3 class="text-lg font-semibold text-gray-800">My Attendance History</h3>
+            <p class="text-sm text-gray-600 mt-1">
+                <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                Orange "Incomplete" status indicates missing time out records
+            </p>
+        </div>
         
         <!-- Search Form -->
         <form method="GET" class="flex items-center gap-2">
@@ -194,6 +202,36 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
             <div class="flex items-center gap-2">
                 <i class="fas fa-calendar text-green-500"></i>
                 <span>Showing <?= count($currentPageDates) ?> of <?= $totalItems ?> records</span>
+            </div>
+        <?php endif; ?>
+        
+        <?php
+        // Count incomplete and auto-marked incomplete logs in current page
+        $incompleteCount = 0;
+        $autoIncompleteCount = 0;
+        foreach ($currentPageDates as $dateObj) {
+            $logDate = $dateObj->format('Y-m-d');
+            $log = $logMap[$logDate] ?? null;
+            if ($log) {
+                if ($log['status'] === 'incomplete' || $log['time_out'] === 'INC') {
+                    $autoIncompleteCount++;
+                } elseif ($log['time_in'] && !$log['time_out']) {
+                    $incompleteCount++;
+                }
+            }
+        }
+        
+        if ($autoIncompleteCount > 0): ?>
+            <div class="flex items-center gap-2 mt-2">
+                <i class="fas fa-times-circle text-red-500"></i>
+                <span class="text-red-600 font-medium"><?= $autoIncompleteCount ?> auto-marked incomplete shift(s) (12+ hrs without time-out)</span>
+            </div>
+        <?php endif; ?>
+        
+        <?php if ($incompleteCount > 0): ?>
+            <div class="flex items-center gap-2 mt-2">
+                <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                <span class="text-orange-600 font-medium"><?= $incompleteCount ?> incomplete time log(s) found</span>
             </div>
         <?php endif; ?>
     </div>
@@ -258,34 +296,59 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 $schedule_out = '04:00 PM';
                             }
 
-                            // Handle times
+                            // Handle times - Updated to consider status
                             $isApproved = isset($log) && strtolower($log['request_status'] ?? '') === 'approved';
                             if ($isApproved) {
                                 $timeIn = $log['requested_time_in'] ?? $log['time_in'] ?? null;
-                                // If requested_time_out is empty, fallback to time_out
                                 $timeOut = !empty($log['requested_time_out']) ? $log['requested_time_out'] : ($log['time_out'] ?? null);
                             } else {
                                 $timeIn = $log['time_in'] ?? null;
                                 $timeOut = $log['time_out'] ?? null;
                             }
 
-                            $timeInDisplay = $timeIn ? date('h:i A', strtotime($timeIn)) : '-';
-                            $timeOutDisplay = $timeOut ? date('h:i A', strtotime($timeOut)) : '-';
+                            // Check if this is an auto-marked incomplete shift
+                            $isAutoIncomplete = $log && ($log['status'] === 'incomplete' || $log['time_out'] === 'INC');
+                            
+                            // Check for night shift
+                            $isNightShift = $timeIn && strtotime($timeIn) > strtotime('18:00:00');
 
-                            $hoursWorked = '-';
-                            if ($timeIn && $timeOut) {
-                                $start = new DateTime($timeIn);
-                                $end = new DateTime($timeOut);
-                                $diff = $start->diff($end);
-                                $hours = $diff->h + ($diff->i / 60);
-                                $hoursWorked = number_format($hours, 2);
+                            $timeInDisplay = $timeIn ? date('h:i A', strtotime($timeIn)) : '-';
+                            
+                            // Handle time out display - Updated for incomplete logic
+                            if ($isAutoIncomplete) {
+                                $timeOutDisplay = '<span class="text-red-600 font-bold">INC</span>';
+                            } elseif ($timeOut && $timeOut !== 'INC') {
+                                $timeOutDisplay = date('h:i A', strtotime($timeOut));
+                            } else {
+                                $timeOutDisplay = '-';
                             }
 
-                            // Status calculation based on actual schedule (official or approved change)
+                            // Calculate hours worked - Updated to handle incomplete shifts
+                            $hoursWorked = '-';
+                            if ($timeIn && $timeOut && $timeOut !== 'INC' && !$isAutoIncomplete) {
+                                $start = new DateTime($timeIn);
+                                $end = new DateTime($timeOut);
+                                
+                                // Handle overnight calculation
+                                if ($end < $start) {
+                                    $end->add(new DateInterval('P1D'));
+                                }
+                                
+                                $diff = $start->diff($end);
+                                $totalHours = ($diff->days * 24) + $diff->h + ($diff->i / 60);
+                                $totalHours -= 1; // Deduct 1 hour for lunch break
+                                if ($totalHours < 0) $totalHours = 0;
+                                $hoursWorked = number_format($totalHours, 2);
+                            }
+
+                            // Updated status calculation
                             $status = '-';
                             $badgeClass = 'bg-gray-100 text-gray-800';
 
-                            if ($timeIn) {
+                            if ($isAutoIncomplete) {
+                                $status = 'Auto-Incomplete';
+                                $badgeClass = 'bg-red-100 text-red-800';
+                            } elseif ($timeIn) {
                                 // Use 24-hour format for accurate comparison
                                 $actualTimeIn = date('H:i:s', strtotime($timeIn));
                                 $actualTimeOut = $timeOut ? date('H:i:s', strtotime($timeOut)) : null;
@@ -295,20 +358,63 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 $graceTimeIn = date('H:i:s', strtotime($scheduledTimeIn . ' +15 minutes'));
                                 $scheduledTimeOut = $schedule_out_24h;
 
-                                // Check if on time (within 15-minute grace period)
-                                if ($actualTimeIn <= $graceTimeIn) {
-                                    $status = 'On Time';
-                                    $badgeClass = 'bg-green-100 text-green-800';
+                                // Check if time out is missing
+                                if (!$timeOut || $timeOut === 'INC') {
+                                    // Check if it's today
+                                    $isToday = ($logDate === date('Y-m-d'));
+                                    
+                                    if ($isToday) {
+                                        // For today's shifts, check if still in progress
+                                        $currentTime = date('H:i:s');
+                                        
+                                        if ($isNightShift) {
+                                            // For night shifts, check against scheduled end time (next day)
+                                            $scheduledEndToday = date('H:i:s', strtotime($scheduledTimeOut));
+                                            if ($currentTime < $scheduledEndToday) {
+                                                $status = 'In Progress (Night)';
+                                                $badgeClass = 'bg-blue-100 text-blue-800';
+                                            } else {
+                                                // Night shift past scheduled end time
+                                                $timeSinceScheduledEnd = strtotime($currentTime) - strtotime($scheduledEndToday);
+                                                if ($timeSinceScheduledEnd > (12 * 3600)) { // 12 hours past
+                                                    $status = 'Will Auto-Mark Incomplete';
+                                                    $badgeClass = 'bg-orange-100 text-orange-800';
+                                                } else {
+                                                    $status = 'Overdue';
+                                                    $badgeClass = 'bg-yellow-100 text-yellow-800';
+                                                }
+                                            }
+                                        } else {
+                                            // Regular day shift
+                                            $status = 'In Progress';
+                                            $badgeClass = 'bg-blue-100 text-blue-800';
+                                        }
+                                    } else {
+                                        // Past dates without time out
+                                        $status = 'Incomplete';
+                                        $badgeClass = 'bg-orange-100 text-orange-800';
+                                    }
                                 } else {
-                                    $status = 'Late';
-                                    $badgeClass = 'bg-yellow-100 text-yellow-800';
-                                }
+                                    // Has both time in and time out
+                                    // Check if on time (within 15-minute grace period)
+                                    if ($actualTimeIn <= $graceTimeIn) {
+                                        $status = 'On Time';
+                                        $badgeClass = 'bg-green-100 text-green-800';
+                                    } else {
+                                        $status = 'Late';
+                                        $badgeClass = 'bg-yellow-100 text-yellow-800';
+                                    }
 
-                                // Check for early departure
-                                if ($actualTimeOut && $actualTimeOut < $scheduledTimeOut) {
-                                    $status = 'Left Early';
-                                    $badgeClass = 'bg-red-100 text-red-800';
+                                    // Check for early departure
+                                    if ($actualTimeOut && $actualTimeOut < $scheduledTimeOut) {
+                                        $status = 'Left Early';
+                                        $badgeClass = 'bg-red-100 text-red-800';
+                                    }
                                 }
+                            } else {
+                                // No time in record
+                                $status = 'No Record';
+                                $badgeClass = 'bg-gray-100 text-gray-600';
                             }
 
                         ?>
@@ -317,26 +423,86 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             <td class="px-6 py-4 text-sm text-gray-500"><?= $dayName ?></td>
                             <td class="px-6 py-4 text-sm text-gray-500">
                                 <?= $timeInDisplay ?>
+                                <?php if ($isNightShift): ?>
+                                    <div class="text-xs text-blue-600 mt-1">
+                                        <i class="fas fa-moon mr-1"></i>Night Shift
+                                    </div>
+                                <?php endif; ?>
+                                <?php if ($isAutoIncomplete): ?>
+                                    <div class="text-xs text-red-600 mt-1">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>Auto-marked
+                                    </div>
+                                <?php endif; ?>
                                 <div class="text-xs text-gray-400 mt-1">
                                     Sched: <?= $schedule_in ?>
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500">
-                                <?= $timeOutDisplay ?>
+                                <?php if ($isAutoIncomplete): ?>
+                                    <?= $timeOutDisplay ?>
+                                    <div class="text-xs text-red-600 mt-1">
+                                        <i class="fas fa-clock mr-1"></i>12+ hrs passed
+                                    </div>
+                                <?php elseif ($timeOut && $timeOut !== 'INC'): ?>
+                                    <?= $timeOutDisplay ?>
+                                <?php elseif ($timeIn): ?>
+                                    <?php 
+                                    // Updated logic for showing time out status
+                                    $isToday = ($logDate === date('Y-m-d'));
+                                    
+                                    if ($isToday) {
+                                        if ($isNightShift) {
+                                            // For night shifts today, check progress
+                                            $currentTime = date('H:i:s');
+                                            $scheduledOut = $schedule_out_24h;
+                                            
+                                            if ($currentTime < $scheduledOut) {
+                                                echo '<span class="text-blue-600 font-medium">In Progress</span>';
+                                            } else {
+                                                $timeSinceScheduled = strtotime($currentTime) - strtotime($scheduledOut);
+                                                if ($timeSinceScheduled > (12 * 3600)) { // 12 hours
+                                                    echo '<span class="text-red-600 font-medium">Will Auto-Mark</span>';
+                                                } else {
+                                                    echo '<span class="text-orange-600 font-medium">Overdue</span>';
+                                                }
+                                            }
+                                        } else {
+                                            // Regular shift today
+                                            echo '<span class="text-blue-600 font-medium">In Progress</span>';
+                                        }
+                                    } else {
+                                        // Past dates show missing
+                                        echo '<span class="text-orange-600 font-medium">Missing</span>';
+                                    }
+                                    ?>
+                                <?php else: ?>
+                                    <span class="text-gray-400">-</span>
+                                <?php endif; ?>
                                 <div class="text-xs text-gray-400 mt-1">
                                     Sched: <?= $schedule_out ?>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-500"><?= $hoursWorked ?></td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                <?php if ($isAutoIncomplete): ?>
+                                    <span class="text-red-600 font-medium">-</span>
+                                <?php else: ?>
+                                    <?= $hoursWorked ?>
+                                <?php endif; ?>
+                            </td>
                             <td class="px-6 py-4">
                                 <span class="px-3 py-1 text-xs font-semibold rounded-full <?= $badgeClass ?>">
                                     <?= $status ?>
                                 </span>
+                                <?php if ($isApproved): ?>
+                                    <div class="text-xs text-green-600 mt-1">
+                                        <i class="fas fa-check mr-1"></i>Adjusted
+                                    </div>
+                                <?php endif; ?>
                             </td>
                             <td class="px-6 py-4">
                                 <?php 
                                 $otStatus = $otStatusMap[$logDate] ?? null;
-                                if ($otStatus): 
+                                if ($otStatus && !$isAutoIncomplete): 
                                     $otBadgeClass = '';
                                     switch (strtolower($otStatus)) {
                                         case 'pending':
@@ -356,7 +522,9 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                         <?= ucfirst($otStatus) ?>
                                     </span>
                                 <?php else: ?>
-                                    <span class="text-gray-400 text-sm">-</span>
+                                    <span class="text-gray-400 text-sm">
+                                        <?= $isAutoIncomplete ? 'N/A' : '-' ?>
+                                    </span>
                                 <?php endif; ?>
                             </td>
                         </tr>

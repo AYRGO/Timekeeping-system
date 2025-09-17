@@ -55,7 +55,7 @@ try {
             <div class="flex items-center justify-between mb-4">
             <div>
                 <h1 class="text-3xl font-extrabold text-white">RSS Admin</h1>
-                <p class="text-xs text-gray-400">Management Panel</p>
+                <p class="text-xs text-gray-400">Harley Management Panel</p>
             </div>
             
             <!-- Close Button for mobile -->

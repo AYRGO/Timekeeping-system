@@ -17,7 +17,7 @@
       <!-- Horizontal Form Layout -->
       <div class="bg-white rounded-b-2xl shadow-xl border border-green-100 -mt-1">
         <form id="leaveRequestForm" action="time_log_create.php" method="POST" enctype="multipart/form-data" class="p-8">
-          <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
+          <?= csrf_token_field() ?>>
 
           <!-- Row 1: Leave Type and Date Range -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">

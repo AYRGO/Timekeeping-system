@@ -14,55 +14,25 @@ $pageTitle = $isHistoryView ? 'Leave Requests History' : 'Leave Requests';
 // Fetch leave requests with employee names and attachments 
 
 if ($isHistoryView) {
-    // Check if processed_at column exists
-    try {
-        $checkColumn = $pdo->query("SHOW COLUMNS FROM post_leave_requests LIKE 'processed_at'");
-        $hasProcessedAt = $checkColumn->rowCount() > 0;
-    } catch (Exception $e) {
-        $hasProcessedAt = false;
-    }
-    
-    if ($hasProcessedAt) {
-        // Use processed_at column if it exists
-        $sql = "
-            SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, processed_at, explanation, employee_id, fname, lname
-            FROM (
-                SELECT lr.id, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.attachment_lr,
-                       lr.created_at, lr.created_at AS processed_at, '' AS explanation, lr.employee_id,
-                       e.fname, e.lname
-                FROM leave_requests lr
-                JOIN employees e ON lr.employee_id = e.id
-                WHERE lr.status != 'pending'
-                UNION ALL
-                SELECT plr.id, plr.leave_type, plr.start_date, plr.end_date, plr.reason, plr.status, plr.attachment_lr,
-                       plr.created_at, COALESCE(plr.processed_at, plr.created_at) AS processed_at, plr.explanation, plr.employee_id,
-                       e.fname, e.lname
-                FROM post_leave_requests plr
-                JOIN employees e ON plr.employee_id = e.id
-            ) AS all_requests
-            ORDER BY processed_at DESC
-        ";
-    } else {
-        // Fallback to created_at if processed_at doesn't exist
-        $sql = "
-            SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, created_at AS processed_at, explanation, employee_id, fname, lname
-            FROM (
-                SELECT lr.id, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.attachment_lr,
-                       lr.created_at, '' AS explanation, lr.employee_id,
-                       e.fname, e.lname
-                FROM leave_requests lr
-                JOIN employees e ON lr.employee_id = e.id
-                WHERE lr.status != 'pending'
-                UNION ALL
-                SELECT plr.id, plr.leave_type, plr.start_date, plr.end_date, plr.reason, plr.status, plr.attachment_lr,
-                       plr.created_at, plr.explanation, plr.employee_id,
-                       e.fname, e.lname
-                FROM post_leave_requests plr
-                JOIN employees e ON plr.employee_id = e.id
-            ) AS all_requests
-            ORDER BY created_at DESC
-        ";
-    }
+    // Fetch all from both tables - use processed_at for sorting history
+    $sql = "
+        SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, processed_at, explanation, employee_id, fname, lname
+        FROM (
+            SELECT lr.id, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.attachment_lr,
+                   lr.created_at, lr.created_at AS processed_at, '' AS explanation, lr.employee_id,
+                   e.fname, e.lname
+            FROM leave_requests lr
+            JOIN employees e ON lr.employee_id = e.id
+            WHERE lr.status != 'pending'
+            UNION ALL
+            SELECT plr.id, plr.leave_type, plr.start_date, plr.end_date, plr.reason, plr.status, plr.attachment_lr,
+                   plr.created_at, COALESCE(plr.processed_at, plr.created_at) AS processed_at, plr.explanation, plr.employee_id,
+                   e.fname, e.lname
+            FROM post_leave_requests plr
+            JOIN employees e ON plr.employee_id = e.id
+        ) AS all_requests
+        ORDER BY processed_at DESC
+    ";
 } else {
     // Fetch from leave_requests table (current requests) - only pending
     $sql = "

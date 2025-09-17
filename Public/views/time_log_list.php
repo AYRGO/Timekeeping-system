@@ -436,7 +436,7 @@ $totalPages = ceil($totalLogs / $limit);
                                                                          <p class="text-sm text-blue-600">Total Time Logs: <?= $totalLogs ?></p>
                                 </div>
                                 <div class="text-right">
-                                    <div class="text-3xl font-bold text-blue-600"><?= count($logs) ?></div>
+                                                                         <div class="text-3xl font-bold text-blue-600"><?= $totalLogs ?></div>
                                     <div class="text-sm text-blue-500">Records</div>
                                 </div>
                             </div>

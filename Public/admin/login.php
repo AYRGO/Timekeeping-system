@@ -4,6 +4,10 @@ date_default_timezone_set('Asia/Manila');
 
 session_start();
 include('../config/db.php');
+include('../config/csrf_helper.php');
+
+// Initialize CSRF protection
+init_csrf_protection();
 
 // Redirect if already logged in
 if (isset($_SESSION['admin'])) {
@@ -19,9 +23,11 @@ if (empty($_SESSION['csrf_token'])) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // CSRF token check
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        $error = "Invalid CSRF token.";
+    // Enhanced CSRF token check with centralized validation
+    $csrf_validation = validate_csrf_token(true);
+    if (!$csrf_validation['valid']) {
+        error_log("SECURITY: CSRF validation failed in admin login - " . $csrf_validation['error'] . " - IP: " . $_SERVER['REMOTE_ADDR']);
+        $error = "Security validation failed. Please refresh the page and try again.";
     } else {
         $username = $_POST['username'] ?? '';
         $password = $_POST['password'] ?? '';
@@ -70,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <form method="POST" class="space-y-5">
 
-      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+      <?= csrf_token_field() ?>>
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>

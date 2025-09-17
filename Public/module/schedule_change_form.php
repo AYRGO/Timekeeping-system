@@ -17,7 +17,7 @@
       <!-- Horizontal Form Layout -->
       <div class="bg-white rounded-b-2xl shadow-xl border border-green-100 -mt-1">
         <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm" class="p-8">
-          <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+          <?= csrf_token_field() ?>
           <input type="hidden" name="submit_schedule_change" value="1">
 
           <!-- Row 1: Date Range and Work Hours -->
@@ -47,7 +47,7 @@
                         style="max-height: 220px; overflow-y: auto;">
                   <option value="" disabled selected>Choose your work hours</option>
                   <?php 
-                  $allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,19]; // Allowed schedule IDs
+                  $allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]; // Allowed schedule IDs
                   // Sort schedules by time_in ascending
                   $sorted_schedules = array_filter($work_schedules, function($ws) use ($allowed) {
                       return in_array($ws['id'], $allowed);
