@@ -258,7 +258,8 @@ $scheduleOptions = [
     15 => ['in' => '06:00 AM', 'out' => '04:00 PM'],
     16 => ['in' => '08:30 AM', 'out' => '04:30 PM'],
     17 => ['in' => '06:00 AM', 'out' => '12:00 PM'],
-    18 => ['in' => '06:00 AM', 'out' => '14:30 PM'],
+    18 => ['in' => '06:00 AM', 'out' => '02:30 PM'],
+    19 => ['in' => '07:00 PM', 'out' => '04:00 AM'],
 ];
 
 // Sort schedule options by 'in' time (earliest to latest)
@@ -484,8 +485,8 @@ uasort($sortedScheduleOptions, function($a, $b) {
             <div id="current-schedule" class="tab-content">
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold text-gray-800 mb-2">Current Schedule</h2>
-                    <p class="text-gray-500 mb-6">Click a schedule box below to change the employee's official work schedule.<br>
-                    <span class="text-xs text-blue-600">A confirmation will be required before applying changes.</span></p>
+                    <p class="text-gray-500 mb-6">Click a schedule box below to change the employee's official work schedule. <br>
+                  
                     <form id="scheduleForm" method="post">
                         <input type="hidden" name="update_schedule" value="1">
                         <input type="hidden" name="official_sched" id="official_sched_input" value="<?= htmlspecialchars($employee['official_sched']) ?>">
@@ -494,7 +495,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 $isCurrent = ($employee['official_sched'] == $key);
                             ?>
                             <div 
-                                class="relative cursor-pointer border-2 <?= $isCurrent ? 'border-blue-600 bg-blue-50 shadow-lg' : 'border-gray-200 bg-gray-50' ?> rounded-xl p-6 flex flex-col items-center justify-center transition-all duration-150 hover:border-blue-500 hover:shadow-lg group"
+                                class="cursor-pointer border-2 <?= $isCurrent ? 'border-blue-600 bg-blue-50 shadow-lg' : 'border-gray-200 bg-gray-50' ?> rounded-xl p-6 flex flex-col items-center justify-center transition-all duration-150 hover:border-blue-400 hover:bg-blue-100 relative group"
                                 onclick="confirmScheduleChange(<?= $key ?>, '<?= $sched['in'] ?>', '<?= $sched['out'] ?>', <?= $isCurrent ? 'true' : 'false' ?>)"
                                 style="min-height:120px;"
                             >
@@ -510,11 +511,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                     </span>
                                     <span class="mt-2 px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold shadow">Current Schedule</span>
                                 <?php else: ?>
-                                    <span class="absolute inset-0 flex flex-col items-center justify-center bg-blue-600 bg-opacity-0 group-hover:bg-opacity-10 transition pointer-events-none">
-                                        <span class="flex items-center gap-2 text-blue-700 opacity-0 group-hover:opacity-100 transition text-sm font-medium">
-                                            <i class="fa-solid fa-hand-pointer"></i> Click to select
-                                        </span>
-                                    </span>
+                                    <span class="mt-2 px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-xs font-medium group-hover:bg-blue-200 group-hover:text-blue-700 transition">Select</span>
                                 <?php endif; ?>
                             </div>
                             <?php endforeach; ?>

@@ -26,11 +26,6 @@
                     <i class="fas fa-clock text-lg"></i>
                     <span class="text-base">Overtime</span>
                 </a>
-                    <a href="../module/rdot_filing.php" 
-                       class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
-                        <i class="fas fa-calendar-day mr-3"></i>
-                        <span>RDOT Filing</span>
-                    </a>
               <div class="space-y-1">
     <button onclick="toggleLeaveMenu()" class="flex items-center justify-between w-full p-2 rounded-lg hover:bg-green-100 text-gray-700">
         <span class="flex items-center space-x-3">
