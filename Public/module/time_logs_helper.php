@@ -9,8 +9,8 @@ function isOvertimeEligible($time_in, $time_out, $ot_type = null) {
     $interval = $timeIn->diff($timeOut);
     $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
     
-    // Subtract 1 hour for lunch break
-    $actualWorkedHours = max(0, $totalHours - 1);
+    // Only subtract 1 hour for lunch break if total hours is 8 or above
+    $actualWorkedHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours;
     
     // For Restday OT, allow filing for any positive worked hours (after lunch)
     if ($ot_type === 'Restday OT') {
@@ -31,8 +31,8 @@ function calculateOvertimeHours($time_in, $time_out, $ot_type = null) {
     $interval = $timeIn->diff($timeOut);
     $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
     
-    // Subtract 1 hour for lunch break
-    $actualWorkedHours = max(0, $totalHours - 1);
+    // Only subtract 1 hour for lunch break if total hours is 8 or above
+    $actualWorkedHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours;
     
     // For Restday OT, return all worked hours (minus lunch), even if < 8 hours
     if ($ot_type === 'Restday OT') {
@@ -58,8 +58,8 @@ function calculateActualHoursWorked($time_in, $time_out) {
     $interval = $timeIn->diff($timeOut);
     $totalHours = ($interval->days * 24) + $interval->h + ($interval->i / 60);
     
-    // Subtract 1 hour for lunch break, but ensure no negative values
-    return max(0, $totalHours - 1);
+    // Only subtract 1 hour for lunch break if total hours is 8 or above, but ensure no negative values
+    return $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours;
 }
 
 function hasExistingOTRequest($time_log_id) {

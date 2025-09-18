@@ -42,10 +42,29 @@ $incompleteStmt = $pdo->prepare("
 ");
 $incompleteStmt->execute([$employee_id]);
 
+// Also check if any previously marked incomplete shifts should be reactivated (within 12 hours)
+$reactivateStmt = $pdo->prepare("
+    UPDATE time_logs 
+    SET time_out = NULL, status = 'active' 
+    WHERE employee_id = ? 
+    AND status = 'incomplete' 
+    AND time_out = 'INC'
+    AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) < 12
+");
+$reactivateStmt->execute([$employee_id]);
+
 // Log any incomplete shifts that were just marked
 if ($incompleteStmt->rowCount() > 0) {
     error_log("Marked " . $incompleteStmt->rowCount() . " incomplete shifts for employee $employee_id");
 }
+
+// Log any reactivated shifts
+if ($reactivateStmt->rowCount() > 0) {
+    error_log("Reactivated " . $reactivateStmt->rowCount() . " shifts within 12h window for employee $employee_id");
+}
+
+// Auto-reset display: Don't show incomplete shifts older than 12 hours (keep DB record but reset interface)
+// This allows overnight shifts (like 10pm-6am) to complete normally within 12 hours
 
 // Priority 1: Check for today's regular time log (exclude incomplete ones)
 $stmt = $pdo->prepare("SELECT time_in, time_out, log_date, status FROM time_logs WHERE employee_id = ? AND log_date = ? AND status != 'incomplete' ORDER BY id DESC LIMIT 1");
@@ -89,10 +108,22 @@ if ($todayLog) {
                 $incompleteLog = $incompleteStmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($incompleteLog) {
-                    $time_in = $incompleteLog['time_in'];
-                    $time_out = $incompleteLog['time_out'];
-                    $original_log_date = $incompleteLog['log_date'];
-                    $shift_status = 'incomplete';
+                    // Check if 12+ hours have passed since time-in - if so, auto-reset display (keep DB record)
+                    $timeInTimestamp = strtotime($incompleteLog['log_date'] . ' ' . $incompleteLog['time_in']);
+                    $hoursSinceTimeIn = (time() - $timeInTimestamp) / 3600;
+                    
+                    if ($hoursSinceTimeIn >= 12) {
+                        // Auto-reset: 12+ hours passed, start fresh interface (DB record preserved)
+                        error_log("Auto-reset: 12+ hours passed since time-in for employee $employee_id, starting fresh interface");
+                        // Leave all values as null for fresh start
+                    } else {
+                        // Show incomplete shift if within 12 hours (allows overnight shifts to complete)
+                        $time_in = $incompleteLog['time_in'];
+                        $time_out = $incompleteLog['time_out'];
+                        $original_log_date = $incompleteLog['log_date'];
+                        $shift_status = 'incomplete';
+                        error_log("Showing incomplete shift within 12h window: " . number_format($hoursSinceTimeIn, 1) . " hours since time-in");
+                    }
                 }
             }
         }
@@ -130,7 +161,12 @@ if ($display_time_in && $display_time_out) {
     
     $diff = $start->diff($end);
     $totalHours = ($diff->days * 24) + $diff->h + ($diff->i / 60);
-    $totalHours -= 1; // Deduct 1 hour for lunch break
+    
+    // Only deduct 1 hour for lunch break if total hours is 8 or above
+    if ($totalHours >= 8) {
+        $totalHours -= 1; // Deduct 1 hour for lunch break
+    }
+    
     if ($totalHours < 0) $totalHours = 0;
     $workingDuration = number_format($totalHours, 2) . ' hours';
 }
@@ -159,8 +195,8 @@ if ($is_reset_request && !$is_incomplete_shift) {
 }
 
 // Determine current shift status with improved logic
-$can_time_in = !$time_in || $is_incomplete_shift;
-$can_time_out = $time_in && !$time_out && !$is_incomplete_shift;
+$can_time_in = !$time_in && !$is_incomplete_shift; // Only allow time-in if no active time-in exists
+$can_time_out = $time_in && !$time_out; // Allow time-out if there's a time-in but no time-out (including incomplete)
 $shift_complete = $time_in && $time_out && !$is_incomplete_shift;
 
 // Check for manual shift completion confirmation
@@ -398,7 +434,13 @@ if ($is_overnight_shift && $time_out) {
         <?php elseif ($can_time_out): ?>
             <button type="button" onclick="showConfirmationModal('time_out')"
                 class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
-                <?= $is_overnight_shift ? 'Complete Overnight Shift' : 'Log Time Out' ?>
+                <?php if ($is_incomplete_shift): ?>
+                    Complete Shift (Time Out)
+                <?php elseif ($is_overnight_shift): ?>
+                    Complete Overnight Shift
+                <?php else: ?>
+                    Log Time Out
+                <?php endif; ?>
             </button>
         <?php else: ?>
             <button type="button" disabled
@@ -471,15 +513,6 @@ function showConfirmationModal(actionType) {
     }
 
     modal.classList.remove('hidden');
-    modal.classList.add('flex');
-}
-
-function hideConfirmationModal() {
-    const modal = document.getElementById('confirmTimeModal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-}
-</script>
     modal.classList.add('flex');
 }
 

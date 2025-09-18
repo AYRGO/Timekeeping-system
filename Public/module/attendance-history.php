@@ -336,7 +336,12 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 
                                 $diff = $start->diff($end);
                                 $totalHours = ($diff->days * 24) + $diff->h + ($diff->i / 60);
-                                $totalHours -= 1; // Deduct 1 hour for lunch break
+                                
+                                // Only deduct 1 hour for lunch break if total hours is 8 or above
+                                if ($totalHours >= 8) {
+                                    $totalHours -= 1; // Deduct 1 hour for lunch break
+                                }
+                                
                                 if ($totalHours < 0) $totalHours = 0;
                                 $hoursWorked = number_format($totalHours, 2);
                             }

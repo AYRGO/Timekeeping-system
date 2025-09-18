@@ -31,7 +31,7 @@ function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_
     $interval = $timeIn->diff($timeOut);
     $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
     $totalHours = $totalMinutes / 60;
-    $workHours = max(0, $totalHours - 1); // Minus 1hr lunch
+    $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours
     
     return $workHours >= 8; // 8+ hours for Restday OT
   }
@@ -75,7 +75,7 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
     $interval = $timeIn->diff($timeOut);
     $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
     $totalHours = $totalMinutes / 60;
-    $workHours = max(0, $totalHours - 1); // Minus 1hr lunch
+    $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours
     
     return round($workHours, 2);
   }
@@ -897,7 +897,7 @@ $default_time_out = $default_sched['time_out'];
                             $interval = $timeIn->diff($timeOut);
                             $totalMinutes = ($interval->h * 60) + $interval->i;
                             $totalHours = round($totalMinutes / 60, 2);
-                            $workHours = max(0, $totalHours - 1); // Minus 1hr lunch
+                            $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours
                           ?>
                           <div class="text-lg font-bold text-gray-900">
                             <?= number_format($workHours, 2) ?>h
@@ -1556,7 +1556,7 @@ function computeRDOTHrsFromHiddenFields() {
         let diffMs = outDate.getTime() - inDate.getTime();
         if (diffMs < 0) diffMs = Math.abs(diffMs);
         const diffHours = diffMs / (1000 * 60 * 60);
-        const workHours = Math.max(0, diffHours - 1);
+        const workHours = diffHours >= 8 ? Math.max(0, diffHours - 1) : diffHours; // Only subtract 1 hour for lunch if 8+ hours
         return Number.isFinite(workHours) ? workHours : 0;
     } catch (e) {
         console.error('computeRDOTHrsFromHiddenFields error:', e);
@@ -1662,7 +1662,7 @@ function openRDOTModal(button) {
         const timeOutDate = new Date(timeOut.replace(' ', 'T'));
         const diffMs = timeOutDate.getTime() - timeInDate.getTime();
         const diffHours = diffMs / (1000 * 60 * 60);
-        workHours = Math.max(0, diffHours - 1); // Subtract 1 hour for lunch
+        workHours = diffHours >= 8 ? Math.max(0, diffHours - 1) : diffHours; // Only subtract 1 hour for lunch if 8+ hours
         isEligible = workHours >= 8; // Restday OT needs 8+ hours
     }
     
