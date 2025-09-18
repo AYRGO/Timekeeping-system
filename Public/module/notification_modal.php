@@ -103,7 +103,8 @@ foreach ($leave_results as $leave) {
         'message' => $message,
         'created_at' => $leave['created_at'],
         'leave_status' => $status,
-        'explanation' => $leave['explanation'] ?? ''
+        'explanation' => $leave['explanation'] ?? '',
+        'leave_type' => $leave['leave_type'] ?? 'Leave Request'
     ];
 
     // Only send email notifications for pending table entries that changed status
@@ -124,13 +125,23 @@ foreach ($leave_results as $leave) {
 
 // --- Schedule Requests (from both tables) ---
 $schedule_stmt = $pdo->prepare("
-    SELECT id, work_schedule_id, status, start_date, end_date, created_at, notified, explanation, 'pending' as source_table
-    FROM schedule_change_requests 
-    WHERE employee_id = ?
+    SELECT scr.id, scr.work_schedule_id, scr.status, scr.start_date, scr.end_date, scr.created_at, scr.notified, scr.explanation, 
+           scr.current_work_schedule_id, 'pending' as source_table,
+           current_ws.time_in as current_time_in, current_ws.time_out as current_time_out,
+           new_ws.time_in as requested_time_in, new_ws.time_out as requested_time_out
+    FROM schedule_change_requests scr
+    LEFT JOIN work_schedules current_ws ON scr.current_work_schedule_id = current_ws.id
+    LEFT JOIN work_schedules new_ws ON scr.work_schedule_id = new_ws.id
+    WHERE scr.employee_id = ?
     UNION ALL
-    SELECT id, work_schedule_id, status, start_date, end_date, created_at, notified, explanation, 'approved' as source_table
-    FROM post_schedule_change_requests
-    WHERE employee_id = ?
+    SELECT pscr.id, pscr.work_schedule_id, pscr.status, pscr.start_date, pscr.end_date, pscr.created_at, pscr.notified, pscr.explanation,
+           pscr.current_work_schedule_id, 'approved' as source_table,
+           current_ws2.time_in as current_time_in, current_ws2.time_out as current_time_out,
+           new_ws2.time_in as requested_time_in, new_ws2.time_out as requested_time_out
+    FROM post_schedule_change_requests pscr
+    LEFT JOIN work_schedules current_ws2 ON pscr.current_work_schedule_id = current_ws2.id
+    LEFT JOIN work_schedules new_ws2 ON pscr.work_schedule_id = new_ws2.id
+    WHERE pscr.employee_id = ?
     ORDER BY created_at DESC
     LIMIT 10
 ");
@@ -147,11 +158,17 @@ foreach ($schedule_results as $sched) {
     }
 
     $notifications[] = [
-    'message' => $message,
-    'created_at' => $sched['created_at'],
-    'status' => $sched['status'],
-    'explanation' => $sched['explanation'] ?? ''
-];
+        'message' => $message,
+        'created_at' => $sched['created_at'],
+        'status' => $sched['status'],
+        'explanation' => $sched['explanation'] ?? '',
+        'start_date' => $sched['start_date'],
+        'end_date' => $sched['end_date'],
+        'current_time_in' => $sched['current_time_in'],
+        'current_time_out' => $sched['current_time_out'],
+        'requested_time_in' => $sched['requested_time_in'],
+        'requested_time_out' => $sched['requested_time_out']
+    ];
 
     if (in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified'] && $sched['source_table'] === 'pending') {
         $subject = "Schedule Change Request {$status}";
@@ -168,11 +185,11 @@ foreach ($schedule_results as $sched) {
 
 // --- Time Adjustment Requests (from both tables) ---
 $adjust_stmt = $pdo->prepare("
-    SELECT id, log_date, status, reason, created_at, notified, 'pending' as source_table
+    SELECT id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, status, reason, created_at, notified, 'pending' as source_table
     FROM time_adjustment_requests 
     WHERE employee_id = ?
     UNION ALL
-    SELECT id, log_date, status, '' as reason, created_at, notified, 'approved' as source_table
+    SELECT id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, status, '' as reason, created_at, notified, 'approved' as source_table
     FROM post_time_adjustment_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
@@ -202,7 +219,12 @@ foreach ($adjust_results as $adjustment) {
         'message' => $message,
         'created_at' => $adjustment['created_at'],
         'time_adjust_status' => $status,
-        'reason' => $adjustment['reason'] ?? ''
+        'reason' => $adjustment['reason'] ?? '',
+        'log_date' => $adjustment['log_date'],
+        'current_time_in' => $adjustment['current_time_in'],
+        'current_time_out' => $adjustment['current_time_out'],
+        'requested_time_in' => $adjustment['requested_time_in'],
+        'requested_time_out' => $adjustment['requested_time_out']
     ];
 
     if (in_array($raw_status, ['approved', 'declined', 'rejected']) && !$adjustment['notified'] && $adjustment['source_table'] === 'pending') {

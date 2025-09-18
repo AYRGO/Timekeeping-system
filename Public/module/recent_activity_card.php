@@ -77,6 +77,22 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                 } else {
                     $status = 'Pending';
                 }
+                
+                // Get leave type for detailed feedback - check if leave_type exists in activity data
+                $leaveType = $activity['leave_type'] ?? null;
+                
+                $leaveTypeDisplay = match($leaveType) {
+                    'sick' => 'Sick Leave',
+                    'vacation' => 'Vacation Leave',
+                    'paternity' => 'Paternity Leave',
+                    'maternity' => 'Maternity Leave',
+                    'solo_parent' => 'Solo Parent Leave',
+                    'halfday' => 'Half Day Leave',
+                    'halfday_sick' => 'Half Day Sick Leave',
+                    'lwop' => 'Leave Without Pay',
+                    'bereavement' => 'Bereavement Leave',
+                    default => 'Leave Request' // Fallback if leave_type is not found
+                };
             }
             // For Time requests, fetch status directly from post_time_adjustment_requests table
             elseif ($type === 'Time' && isset($activity['time_adjust_status'])) {
@@ -118,17 +134,86 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
             // Build sentence-style summary
             $sentence = "On $created: ";
             if ($type === 'Schedule') {
-                $sentence .= "Schedule change was $status.";
+                // Create a more descriptive message for schedule changes
+                if (!empty($activity['current_time_in']) && !empty($activity['current_time_out']) && 
+                    !empty($activity['requested_time_in']) && !empty($activity['requested_time_out'])) {
+                    
+                    $currentTimeIn = date('g:i A', strtotime($activity['current_time_in']));
+                    $currentTimeOut = date('g:i A', strtotime($activity['current_time_out']));
+                    $requestedTimeIn = date('g:i A', strtotime($activity['requested_time_in']));
+                    $requestedTimeOut = date('g:i A', strtotime($activity['requested_time_out']));
+                    
+                    $sentence .= "Schedule change from {$currentTimeIn}-{$currentTimeOut} to {$requestedTimeIn}-{$requestedTimeOut} was $status.";
+                } else {
+                    $sentence .= "Schedule change was $status.";
+                }
+                
+                // Add date range if available
+                if (!empty($activity['start_date']) && !empty($activity['end_date'])) {
+                    $startDate = date('M j, Y', strtotime($activity['start_date']));
+                    $endDate = date('M j, Y', strtotime($activity['end_date']));
+                    if ($startDate === $endDate) {
+                        $sentence .= "\nEffective Date: $startDate";
+                    } else {
+                        $sentence .= "\nEffective Period: $startDate to $endDate";
+                    }
+                }
+                
                 if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected']) && !empty($activity['explanation'])) {
                     $sentence .= "\nReason: " . htmlspecialchars($activity['explanation']);
                 }
             } elseif ($type === 'Leave') {
-                $sentence .= "Leave request was $status.";
-                if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected']) && !empty($activity['explanation'])) {
-                    $sentence .= "\nReason: " . htmlspecialchars($activity['explanation']);
+                // Use leaveTypeDisplay if available, otherwise fall back to generic
+                if (isset($leaveTypeDisplay) && $leaveTypeDisplay !== 'Leave Request') {
+                    $sentence .= "$leaveTypeDisplay was $status.";
+                } else {
+                    $sentence .= "Leave request was $status.";
+                }
+                
+                // Add leave dates if available
+                if (!empty($activity['start_date']) && !empty($activity['end_date'])) {
+                    $startDate = date('M j, Y', strtotime($activity['start_date']));
+                    $endDate = date('M j, Y', strtotime($activity['end_date']));
+                    if ($startDate === $endDate) {
+                        $sentence .= "\nDate: $startDate";
+                    } else {
+                        $sentence .= "\nDates: $startDate to $endDate";
+                    }
+                }
+                
+                // Add detailed reason for declined requests
+                if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected'])) {
+                    if (!empty($activity['explanation'])) {
+                        $sentence .= "\nReason for decline: " . htmlspecialchars($activity['explanation']);
+                    } else {
+                        $sentence .= "\nReason for decline: Not specified by administrator.";
+                    }
+                }
+                
+                // Add employee reason if available
+                if (!empty($activity['reason'])) {
+                    $sentence .= "\nEmployee reason: " . htmlspecialchars($activity['reason']);
                 }
             } elseif ($type === 'Time') {
                 $sentence .= "Time adjustment request was $status.";
+                
+                // Add time details if available
+                if (!empty($activity['log_date'])) {
+                    $logDate = date('M j, Y', strtotime($activity['log_date']));
+                    $sentence .= "\nDate: $logDate";
+                }
+                
+                // Format current times
+                $currentTimeIn = !empty($activity['current_time_in']) ? date('g:i A', strtotime($activity['current_time_in'])) : '—';
+                $currentTimeOut = !empty($activity['current_time_out']) ? date('g:i A', strtotime($activity['current_time_out'])) : '—';
+                
+                // Format requested times  
+                $requestedTimeIn = !empty($activity['requested_time_in']) ? date('g:i A', strtotime($activity['requested_time_in'])) : '—';
+                $requestedTimeOut = !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '—';
+                
+                $sentence .= "\nCurrent: $currentTimeIn - $currentTimeOut";
+                $sentence .= "\nRequested: $requestedTimeIn - $requestedTimeOut";
+                
                 if (!empty($activity['reason'])) {
                     $sentence .= "\nReason: " . htmlspecialchars($activity['reason']);
                 }
@@ -143,7 +228,19 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
         ?>
         <tr>
             <td class="px-4 py-3 text-gray-500"><?= $created ?></td>
-            <td class="px-4 py-3 font-medium text-gray-900"><?= $type ?> Request</td>
+            <td class="px-4 py-3 font-medium text-gray-900">
+                <?php if ($type === 'Leave' && isset($leaveTypeDisplay) && $leaveTypeDisplay !== 'Leave Request'): ?>
+                    <?= $leaveTypeDisplay ?>
+                <?php elseif ($type === 'Leave'): ?>
+                    Leave Request
+                <?php elseif ($type === 'Schedule'): ?>
+                    Schedule Change
+                <?php elseif ($type === 'Time'): ?>
+                    Time Adjustment
+                <?php else: ?>
+                    <?= $type ?> Request
+                <?php endif; ?>
+            </td>
             <td class="px-4 py-3">
                 <span class="inline-flex px-2 text-xs font-semibold rounded-full <?= $badgeColor ?>">
                     <?= $status ?>
