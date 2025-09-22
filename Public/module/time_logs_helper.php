@@ -64,9 +64,26 @@ function calculateActualHoursWorked($time_in, $time_out) {
 
 function hasExistingOTRequest($time_log_id) {
     global $pdo;
-    $stmt = $pdo->prepare("SELECT id FROM post_ot_requests WHERE time_log_id = ?");
+    
+    // Check active requests table first
+    $stmt = $pdo->prepare("SELECT status FROM post_ot_requests WHERE time_log_id = ?");
     $stmt->execute([$time_log_id]);
-    return $stmt->rowCount() > 0;
+    $activeRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($activeRequest) {
+        return $activeRequest['status']; // pending
+    }
+    
+    // Check archived requests table
+    $stmt = $pdo->prepare("SELECT status FROM post2_overtime_requests WHERE time_log_id = ?");
+    $stmt->execute([$time_log_id]);
+    $archivedRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($archivedRequest) {
+        return $archivedRequest['status']; // approved or declined
+    }
+    
+    return false; // No request exists
 }
 ?>
 

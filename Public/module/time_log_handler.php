@@ -70,20 +70,34 @@ try {
             error_log("Auto-marked and deleted " . $autoMarkIncompleteStmt->rowCount() . " old incomplete shifts for employee $employee_id");
         }
         
-        // Check for 8-hour restriction from previous shift completion
-        $restrictionStmt = $pdo->prepare("SELECT completed_at FROM shift_completions WHERE employee_id = ? ORDER BY completed_at DESC LIMIT 1");
-        $restrictionStmt->execute([$employee_id]);
-        $lastCompletion = $restrictionStmt->fetch(PDO::FETCH_ASSOC);
+        // Check for 8-hour restriction from previous shift completion (only if table exists)
+        $tableExistsStmt = $pdo->prepare("SHOW TABLES LIKE 'shift_completions'");
+        $tableExistsStmt->execute();
+        $tableExists = $tableExistsStmt->rowCount() > 0;
         
-        if ($lastCompletion) {
-            $completionTime = new DateTime($lastCompletion['completed_at']);
-            $now = new DateTime();
-            $hoursSinceCompletion = ($now->getTimestamp() - $completionTime->getTimestamp()) / 3600;
-            
-            if ($hoursSinceCompletion < 8) {
-                $hoursRemaining = 8 - $hoursSinceCompletion;
-                throw new Exception("You must wait " . number_format($hoursRemaining, 1) . " more hour(s) before starting a new shift.");
+        if ($tableExists) {
+            try {
+                $restrictionStmt = $pdo->prepare("SELECT completed_at FROM shift_completions WHERE employee_id = ? ORDER BY completed_at DESC LIMIT 1");
+                $restrictionStmt->execute([$employee_id]);
+                $lastCompletion = $restrictionStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($lastCompletion) {
+                    $completionTime = new DateTime($lastCompletion['completed_at']);
+                    $now = new DateTime();
+                    $hoursSinceCompletion = ($now->getTimestamp() - $completionTime->getTimestamp()) / 3600;
+                    
+                    if ($hoursSinceCompletion < 8) {
+                        $hoursRemaining = 8 - $hoursSinceCompletion;
+                        throw new Exception("You must wait " . number_format($hoursRemaining, 1) . " more hour(s) before starting a new shift.");
+                    }
+                }
+            } catch (PDOException $e) {
+                // Error querying table - skip restriction check
+                error_log("Error querying shift_completions table: " . $e->getMessage());
             }
+        } else {
+            // Table doesn't exist - skip restriction check
+            error_log("shift_completions table does not exist - skipping 8-hour restriction check");
         }
         
         // Check if there's already an active shift (AFTER cleanup) - but skip this check if we're resetting
@@ -190,43 +204,5 @@ try {
         alert('Error: " . addslashes($e->getMessage()) . "');
         history.back();
     </script>";
-}
-?>
-        $confirmStmt->execute([$employee_id, $shiftToConfirm['id'], $original_log_date]);
-        
-        $message = "Shift confirmed as complete. You can start a new shift after 8 hours.";
-        
-    } else {
-        throw new Exception("Invalid action specified.");
-    }
-    
-    $pdo->commit();
-    
-    // Regenerate CSRF token after successful operation
-    regenerate_csrf_token();
-    
-    // Success - For incomplete shift resets, force fresh page load with cache busting
-    if ($is_incomplete === '1') {
-        echo "<script>
-            alert('$message');
-            window.location.href = 'time_log_create.php?reset=" . time() . "';
-        </script>";
-    } else {
-        echo "<script>
-            alert('$message');
-            window.location.href = document.referrer || 'time_log_create.php';
-        </script>";
-    }
-    
-} catch (Exception $e) {
-    $pdo->rollBack();
-    
-    // Error - redirect back with error message
-    echo "<script>
-        alert('Error: " . addslashes($e->getMessage()) . "');
-        history.back();
-    </script>";
-}
-?>
 }
 ?>

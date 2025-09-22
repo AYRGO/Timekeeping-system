@@ -16,6 +16,74 @@ require_once 'time_logs_helper.php';
 // Include schedule tracker to get current schedule information
 include_once 'stats/schedule_tracker.php';
 
+// Function to move approved/declined overtime requests to archive table
+function moveCompletedOTRequests($pdo) {
+    try {
+        // Start transaction
+        $pdo->beginTransaction();
+        
+        // Get all approved or declined requests from post_ot_requests
+        $selectStmt = $pdo->prepare("
+            SELECT * FROM post_ot_requests 
+            WHERE status IN ('approved', 'declined')
+        ");
+        $selectStmt->execute();
+        $completedRequests = $selectStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (!empty($completedRequests)) {
+            // Insert completed requests into post2_overtime_requests
+            $insertStmt = $pdo->prepare("
+                INSERT INTO post2_overtime_requests 
+                (id, employee_id, time_log_id, time_in, time_out, ot_duration, ot_type, attachment, reason, status, created_at, approved_at, approved_by, notified)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            $movedCount = 0;
+            foreach ($completedRequests as $request) {
+                $insertStmt->execute([
+                    $request['id'],
+                    $request['employee_id'],
+                    $request['time_log_id'],
+                    $request['time_in'],
+                    $request['time_out'],
+                    $request['ot_duration'],
+                    $request['ot_type'],
+                    $request['attachment'],
+                    $request['reason'],
+                    $request['status'],
+                    $request['created_at'],
+                    $request['approved_at'],
+                    $request['approved_by'],
+                    $request['notified']
+                ]);
+                $movedCount++;
+            }
+            
+            // Delete moved requests from original table
+            $deleteStmt = $pdo->prepare("
+                DELETE FROM post_ot_requests 
+                WHERE status IN ('approved', 'declined')
+            ");
+            $deleteStmt->execute();
+            
+            $pdo->commit();
+            error_log("Successfully moved {$movedCount} completed OT requests to archive table");
+            return $movedCount;
+        }
+        
+        $pdo->commit();
+        return 0;
+        
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        error_log("Error moving completed OT requests: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Auto-move completed requests on page load
+moveCompletedOTRequests($pdo);
+
 // Updated overtime eligibility function based on active schedule
 
 // Overtime eligibility based on simple rule: 30+ minutes past scheduled end time
@@ -104,6 +172,72 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
 
   // Convert to hours and round to 2 decimals
   return round($ot_minutes / 60, 2);
+}
+
+// Function to get start OT and end OT times with exact overtime details
+function getOvertimeTimesAndHours($time_in, $time_out, $log_date, $employee_id, $pdo, $ot_type = null) {
+  if (empty($time_in) || empty($time_out)) {
+    return [
+      'start_ot' => '',
+      'end_ot' => '',
+      'max_ot_hours' => 0,
+      'exact_ot_minutes' => 0,
+      'eligible' => false
+    ];
+  }
+  
+  // For Restday OT, start OT is time in and end OT is time out
+  if ($ot_type === 'Restday OT') {
+    $actual_in_dt = new DateTime($time_in);
+    $actual_out_dt = new DateTime($time_out);
+    
+    $interval = $actual_in_dt->diff($actual_out_dt);
+    $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
+    $totalHours = $totalMinutes / 60;
+    $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours
+    
+    return [
+      'start_ot' => $actual_in_dt->format('h:i A'),
+      'end_ot' => $actual_out_dt->format('h:i A'),
+      'max_ot_hours' => round($workHours, 2),
+      'exact_ot_minutes' => round($workHours * 60),
+      'eligible' => $workHours >= 8,
+      'is_restday' => true
+    ];
+  }
+  
+  // For regular OT, get schedule information
+  $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
+  $schedule_out = $scheduleInfo['time_out'];
+  
+  // Convert to DateTime objects
+  $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  $actual_out_dt = new DateTime($time_out);
+  
+  // If actual times are on different dates, adjust schedule time accordingly
+  $actual_date = $actual_out_dt->format('Y-m-d');
+  if ($actual_date !== $log_date) {
+    $schedule_out_dt = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  }
+
+  // Calculate overtime minutes
+  $ot_minutes = 0;
+  if ($actual_out_dt > $schedule_out_dt) {
+    $past_end_interval = $schedule_out_dt->diff($actual_out_dt);
+    $ot_minutes = ($past_end_interval->days * 24 * 60) + ($past_end_interval->h * 60) + $past_end_interval->i;
+  }
+  
+  $ot_hours = round($ot_minutes / 60, 2);
+  $eligible = $ot_minutes >= 30; // Must work 30+ minutes past scheduled end
+  
+  return [
+    'start_ot' => $schedule_out_dt->format('h:i A'), // End of scheduled time = Start of OT
+    'end_ot' => $actual_out_dt->format('h:i A'),     // Actual time out = End of OT
+    'max_ot_hours' => $ot_hours,
+    'exact_ot_minutes' => $ot_minutes,
+    'eligible' => $eligible,
+    'is_restday' => false
+  ];
 }
 
 // Helper function to get detailed OT calculation breakdown - SIMPLIFIED VERSION
@@ -382,19 +516,31 @@ $stmt->bindValue(3, $offset, PDO::PARAM_INT);
 $stmt->execute();
 $time_logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get overtime request history
-$history_sql = "SELECT ot.*, tl.log_date, tl.time_in, tl.time_out,
-                       DATE_FORMAT(ot.created_at, '%M %d, %Y at %h:%i %p') as formatted_created_at,
-                       DATE_FORMAT(tl.log_date, '%M %d, %Y') as formatted_log_date,
-                       DATE_FORMAT(tl.time_in, '%h:%i %p') as formatted_time_in,
-                       DATE_FORMAT(tl.time_out, '%h:%i %p') as formatted_time_out,
-                       ot.status as request_status
-                FROM post_ot_requests ot 
-                LEFT JOIN time_logs tl ON ot.time_log_id = tl.id 
-                WHERE ot.employee_id = ? 
-                ORDER BY ot.created_at DESC LIMIT 20";
+// Get overtime request history (from both active and archived tables)
+$history_sql = "
+    (SELECT ot.*, tl.log_date, tl.time_in, tl.time_out,
+           DATE_FORMAT(ot.created_at, '%M %d, %Y at %h:%i %p') as formatted_created_at,
+           DATE_FORMAT(tl.log_date, '%M %d, %Y') as formatted_log_date,
+           DATE_FORMAT(tl.time_in, '%h:%i %p') as formatted_time_in,
+           DATE_FORMAT(tl.time_out, '%h:%i %p') as formatted_time_out,
+           ot.status as request_status, 'active' as source_table
+    FROM post_ot_requests ot 
+    LEFT JOIN time_logs tl ON ot.time_log_id = tl.id 
+    WHERE ot.employee_id = ?)
+    UNION ALL
+    (SELECT ot.*, tl.log_date, tl.time_in, tl.time_out,
+           DATE_FORMAT(ot.created_at, '%M %d, %Y at %h:%i %p') as formatted_created_at,
+           DATE_FORMAT(tl.log_date, '%M %d, %Y') as formatted_log_date,
+           DATE_FORMAT(tl.time_in, '%h:%i %p') as formatted_time_in,
+           DATE_FORMAT(tl.time_out, '%h:%i %p') as formatted_time_out,
+           ot.status as request_status, 'archived' as source_table
+    FROM post2_overtime_requests ot 
+    LEFT JOIN time_logs tl ON ot.time_log_id = tl.id 
+    WHERE ot.employee_id = ?)
+    ORDER BY created_at DESC LIMIT 20";
 $history_stmt = $pdo->prepare($history_sql);
 $history_stmt->bindValue(1, $employee_id, PDO::PARAM_INT);
+$history_stmt->bindValue(2, $employee_id, PDO::PARAM_INT);
 $history_stmt->execute();
 $overtime_history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -754,6 +900,12 @@ $default_time_out = $default_sched['time_out'];
                   </th>
                   <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
+                      <i class="fas fa-hourglass-half mr-2 text-amber-500"></i>
+                      OT Hours
+                    </div>
+                  </th>
+                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <div class="flex items-center">
                       <i class="fas fa-cog mr-2 text-gray-500"></i>
                       Action
                     </div>
@@ -770,6 +922,9 @@ $default_time_out = $default_sched['time_out'];
                     $isOTEligible = $detailedCalc['eligible'];
                     $overtimeHours = $detailedCalc['details']['net_overtime_hours'];
                     
+                    // Get Start OT and End OT times with detailed breakdown
+                    $otDetails = getOvertimeTimesAndHours($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
+                    
                     // Debug logging for button logic
                     error_log("BUTTON DEBUG for {$log['log_date']}: Eligible={$isOTEligible}, OT Hours={$overtimeHours}, Reason=" . $detailedCalc['reason']);
                     
@@ -780,7 +935,8 @@ $default_time_out = $default_sched['time_out'];
                     }
                     
                     $actualHours = calculateActualHoursWorked($log['time_in'], $log['time_out']);
-                    $hasRequest = hasExistingOTRequest($log['id']);
+                    $requestStatus = hasExistingOTRequest($log['id']); // Returns status or false
+                    $hasRequest = ($requestStatus !== false); // True if any request exists
                     $timeIn = new DateTime($log['time_in']);
                     $timeOut = new DateTime($log['time_out']);
                     $interval = $timeIn->diff($timeOut);
@@ -811,7 +967,10 @@ $default_time_out = $default_sched['time_out'];
                   data-log-id="<?= $hasLog ? $log['id'] : '' ?>"
                   data-time-in="<?= $hasLog ? $log['time_in'] : '' ?>"
                   data-time-out="<?= $hasLog ? $log['time_out'] : '' ?>"
-                  data-ot-hours="<?= $hasLog ? $overtimeHours : '0' ?>">
+                  data-ot-hours="<?= $hasLog ? $overtimeHours : '0' ?>"
+                  data-start-ot="<?= $hasLog && isset($otDetails['start_ot']) ? $otDetails['start_ot'] : '' ?>"
+                  data-end-ot="<?= $hasLog && isset($otDetails['end_ot']) ? $otDetails['end_ot'] : '' ?>"
+                  data-max-ot-hours="<?= $hasLog && isset($otDetails['max_ot_hours']) ? $otDetails['max_ot_hours'] : '0' ?>">
                   
                   <td class="px-8 py-6 whitespace-nowrap">
                     <div class="flex items-center">
@@ -905,11 +1064,6 @@ $default_time_out = $default_sched['time_out'];
                           <div class="text-xs text-gray-500">
                             (<?= number_format($totalHours, 2) ?>h total - 1h lunch)
                           </div>
-                          <?php if ($isOTEligible): ?>
-                            <div class="text-sm text-emerald-600 font-medium">
-                              +<?= number_format($overtimeHours, 2) ?>h OT
-                            </div>
-                          <?php endif; ?>
                         <?php else: ?>
                           <div class="text-lg font-bold text-gray-400">—</div>
                         <?php endif; ?>
@@ -917,6 +1071,41 @@ $default_time_out = $default_sched['time_out'];
                     </div>
                   </td>
                   
+                  <!-- OT Hours Column -->
+                  <td class="px-8 py-6 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="flex-shrink-0 mr-3">
+                        <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                          <i class="fas fa-hourglass-half text-amber-600"></i>
+                        </div>
+                      </div>
+                      <div>
+                        <?php if ($hasLog && isset($otDetails['max_ot_hours']) && $otDetails['max_ot_hours'] > 0): ?>
+                          <div class="text-lg font-bold text-emerald-600">
+                            <?= number_format($otDetails['max_ot_hours'], 2) ?>h
+                          </div>
+                          <div class="text-xs text-gray-500">
+                            (<?= $otDetails['exact_ot_minutes'] ?> minutes)
+                          </div>
+                          <?php if ($otDetails['eligible']): ?>
+                            <div class="text-sm text-emerald-600 font-medium">
+                              <i class="fas fa-check-circle mr-1"></i>Eligible
+                            </div>
+                          <?php else: ?>
+                            <div class="text-sm text-red-500 font-medium">
+                              <i class="fas fa-exclamation-triangle mr-1"></i>
+                              <?= isset($otDetails['is_restday']) && $otDetails['is_restday'] ? 'Need 8+ hrs' : 'Need 30+ min' ?>
+                            </div>
+                          <?php endif; ?>
+                        <?php else: ?>
+                          <div class="text-lg font-bold text-gray-400">0h</div>
+                          <div class="text-xs text-gray-400">No overtime</div>
+                        <?php endif; ?>
+                      </div>
+                    </div>
+                  </td>
+                  
+                  <!-- Action Column -->
                   <td class="px-8 py-6">
                     <?php if (!$hasLog): ?>
                       <div class="flex items-center justify-center w-full">
@@ -932,14 +1121,21 @@ $default_time_out = $default_sched['time_out'];
                           Request Expired (30+ days old)
                         </span>
                       </div>
-                    <?php elseif ($hasRequest): ?>
+                    <?php elseif ($requestStatus === 'approved'): ?>
                       <div class="flex items-center justify-center w-full">
                         <span class="inline-flex items-center px-4 py-3 bg-green-100 text-green-700 rounded-xl text-sm font-medium border border-green-200">
                           <i class="fas fa-check-circle mr-2"></i>
+                          Approved
+                        </span>
+                      </div>
+                    <?php elseif ($requestStatus === 'pending'): ?>
+                      <div class="flex items-center justify-center w-full">
+                        <span class="inline-flex items-center px-4 py-3 bg-yellow-100 text-yellow-700 rounded-xl text-sm font-medium border border-yellow-200">
+                          <i class="fas fa-clock mr-2"></i>
                           Request Submitted
                         </span>
                       </div>
-                    <?php else: ?>
+                    <?php elseif ($requestStatus === 'declined' || !$hasRequest): ?>
                       <button onclick="openOvertimeModal(this)"
                               class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300">
                         <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
@@ -1379,10 +1575,10 @@ $default_time_out = $default_sched['time_out'];
         <div class="fixed inset-0 transition-opacity bg-black bg-opacity-50" onclick="closeOvertimeModal()"></div>
 
         <!-- Modal content -->
-        <div class="inline-block w-full max-w-3xl px-0 pt-0 pb-0 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl shadow-xl sm:my-8 sm:align-middle border border-gray-200 animate-fade-in-up">
+        <div class="inline-block w-full max-w-4xl px-0 pt-0 pb-0 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl shadow-xl sm:my-8 sm:align-middle border border-gray-200 animate-fade-in-up">
             
             <!-- Modal Header -->
-            <div class="bg-gray-600 px-6 py-4">
+            <div class="bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
                         <div class="p-2 bg-white/20 rounded-lg mr-3">
@@ -1390,7 +1586,7 @@ $default_time_out = $default_sched['time_out'];
                         </div>
                         <div>
                             <h3 class="text-xl font-bold text-white">Submit Overtime Request</h3>
-                            <p class="text-gray-100 text-sm">Fill out the details for your overtime request</p>
+                            <p class="text-green-100 text-sm">Fill out the details for your overtime request</p>
                         </div>
                     </div>
                     <button onclick="closeOvertimeModal()" class="p-2 text-white/80 hover:text-white rounded-lg hover:bg-white/20 transition-colors focus:outline-none">
@@ -1400,58 +1596,103 @@ $default_time_out = $default_sched['time_out'];
             </div>
 
             <!-- Modal Body -->
-            <div class="p-6">
+            <div class="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
                 <form id="overtimeForm" class="space-y-6" enctype="multipart/form-data">
                     <input type="hidden" id="selected_time_log_id" name="time_log_id">
                     <input type="hidden" id="selected_time_in" name="time_in">
                     <input type="hidden" id="selected_time_out" name="time_out">
+                    <input type="hidden" id="max_ot_hours" name="max_ot_hours">
+                    <input type="hidden" id="start_ot_time" name="start_ot_time">
+                    <input type="hidden" id="end_ot_time" name="end_ot_time">
                     
                     <!-- Information Grid -->
-                    <div class="bg-gray-50 rounded-xl p-4">
-                        <h4 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <h4 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
                             <i class="fas fa-info-circle text-emerald-600 mr-2"></i>
                             Request Information
                         </h4>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                             <div class="space-y-2">
-                                <label class="block text-sm font-medium text-gray-700">Overtime Hours</label>
+                                <label class="block text-sm font-medium text-gray-700">Selectable OT Hours</label>
                                 <div class="relative">
-                                    <input type="number" id="overtime_hours" name="overtime_hours" step="0.25" min="0.25" max="12" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white font-semibold text-center text-gray-600 focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all"
+                                    <!-- Hidden input to store the selected value -->
+                                    <input type="hidden" id="overtime_hours" name="overtime_hours" value="">
+                                    
+                                    <!-- Custom Time Picker matching other input styles -->
+                                    <div class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all min-h-[50px]">
+                                        <div class="flex items-center justify-center space-x-1">
+                                            <!-- Hours -->
+                                            <div class="flex items-center">
+                                                <select id="ot_hours" class="text-center border-0 bg-transparent text-base font-semibold focus:ring-0 focus:outline-none text-gray-800 w-10">
+                                                    <!-- Options will be populated by JavaScript -->
+                                                </select>
+                                                <span class="text-xs text-gray-500 ml-1">hrs</span>
+                                            </div>
+                                            
+                                            <span class="text-base font-bold text-gray-400 px-1">:</span>
+                                            
+                                            <!-- Minutes -->
+                                            <div class="flex items-center">
+                                                <select id="ot_minutes" class="text-center border-0 bg-transparent text-base font-semibold focus:ring-0 focus:outline-none text-gray-800 w-10">
+                                                    <!-- 0-59 minutes -->
+                                                </select>
+                                                <span class="text-xs text-gray-500 ml-1">min</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <i class="fas fa-hourglass-half absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-500"></i>
+                                </div>
+                                <div id="ot-range-info" class="text-xs text-gray-500 truncate"></div>
+                                <div id="ot-validation-info" class="text-xs truncate"></div>
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">Max OT Available</label>
+                                <div class="relative">
+                                    <input type="text" id="display_max_ot_hours" 
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 font-semibold text-center text-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all min-h-[50px]"
                                            readonly>
-                                    <i class="fas fa-clock absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
+                                    <i class="fas fa-clock absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-500"></i>
                                 </div>
                             </div>
                             
                             <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">Start OT</label>
+                                <div class="relative">
+                                    <input type="text" id="display_start_ot" 
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all min-h-[50px]"
+                                           readonly>
+                                    <i class="fas fa-play absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">End OT</label>
+                                <div class="relative">
+                                    <input type="text" id="display_end_ot" 
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all min-h-[50px]"
+                                           readonly>
+                                    <i class="fas fa-stop absolute left-3 top-1/2 transform -translate-y-1/2 text-red-500"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 gap-4 mt-6">
+                            <div class="space-y-2">
                                 <label class="block text-sm font-medium text-gray-700">Date</label>
                                 <div class="relative">
                                     <input type="text" id="selected_date" name="selected_date" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all"
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all min-h-[50px]"
                                            readonly>
                                     <i class="fas fa-calendar absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500"></i>
                                 </div>
                             </div>
 
-                            <div class="space-y-2">
-                                <label class="block text-sm font-medium text-gray-700">Time In</label>
-                                <div class="relative">
-                                    <input type="text" id="display_time_in" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all"
-                                           readonly>
-                                    <i class="fas fa-sign-in-alt absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500"></i>
-                                </div>
-                            </div>
-                            
-                            <div class="space-y-2">
-                                <label class="block text-sm font-medium text-gray-700">Time Out</label>
-                                <div class="relative">
-                                    <input type="text" id="display_time_out" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all"
-                                           readonly>
-                                    <i class="fas fa-sign-out-alt absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-500"></i>
-                                </div>
+                            <!-- Hidden Time In and Time Out fields for form submission -->
+                            <div class="hidden">
+                                <input type="text" id="display_time_in" readonly>
+                                <input type="text" id="display_time_out" readonly>
                             </div>
                         </div>
                     </div>
@@ -1464,7 +1705,7 @@ $default_time_out = $default_sched['time_out'];
                             </label>
                             <div class="relative">
                                 <select name="ot_type" id="ot_type" required
-                                        class="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all appearance-none bg-white">
+                                        class="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all appearance-none bg-white min-h-[50px]">
                                     <option value="">Select OT Type</option>
                                     <option value="Regular OT">Regular OT</option>
                                     <option value="Special Holiday OT">Special Holiday OT</option>
@@ -1481,12 +1722,14 @@ $default_time_out = $default_sched['time_out'];
                             <label class="block text-sm font-medium text-gray-700">
                                 Supporting Document <span class="text-red-500">*</span>
                             </label>
-                            <input type="file" 
-                                   name="attachment" 
-                                   id="attachment" 
-                                   accept=".pdf,.jpg,.jpeg,.png"
-                                   required
-                                   class="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+                            <div class="relative">
+                                <input type="file" 
+                                       name="attachment" 
+                                       id="attachment" 
+                                       accept=".pdf,.jpg,.jpeg,.png"
+                                       required
+                                       class="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 min-h-[50px]">
+                            </div>
                             <p class="text-xs text-gray-600">Upload PDF, JPG, or PNG (Max 5MB)</p>
                         </div>
                     </div>
@@ -1502,15 +1745,17 @@ $default_time_out = $default_sched['time_out'];
                         <p class="text-xs text-gray-600">Provide a clear reason for your overtime request</p>
                     </div>
 
-                    <!-- Modal Footer -->
-                    <div class="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 pt-4 border-t border-gray-200">
+                    <!-- Submit Buttons -->
+                    <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
                         <button type="button" onclick="closeOvertimeModal()" 
-                                class="w-full sm:w-auto px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300">
-                            <i class="fas fa-times mr-2"></i>Cancel
+                                class="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all min-h-[50px] flex items-center justify-center">
+                            <i class="fas fa-times mr-2"></i>
+                            Cancel
                         </button>
                         <button type="submit" 
-                                class="w-full sm:w-auto px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500">
-                            <i class="fas fa-paper-plane mr-2"></i>Submit Request
+                                class="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-300 min-h-[50px] flex items-center justify-center">
+                            <i class="fas fa-paper-plane mr-2"></i>
+                            Submit Request
                         </button>
                     </div>
                 </form>
@@ -1563,6 +1808,117 @@ function computeRDOTHrsFromHiddenFields() {
         return 0;
     }
 }
+// Function to initialize and populate scrollable time picker (Hours and Minutes only)
+function initializeTimePicker(maxHours) {
+    const hoursSelect = document.getElementById('ot_hours');
+    const minutesSelect = document.getElementById('ot_minutes');
+    const hiddenInput = document.getElementById('overtime_hours');
+    const rangeInfo = document.getElementById('ot-range-info');
+    const validationInfo = document.getElementById('ot-validation-info');
+    
+    if (!hoursSelect || !minutesSelect) return;
+    
+    // Clear existing options
+    hoursSelect.innerHTML = '';
+    minutesSelect.innerHTML = '';
+    
+    if (maxHours <= 0) {
+        hoursSelect.innerHTML = '<option value="0">0</option>';
+        minutesSelect.innerHTML = '<option value="0">00</option>';
+        hoursSelect.disabled = true;
+        minutesSelect.disabled = true;
+        rangeInfo.textContent = 'No overtime hours available';
+        return;
+    }
+    
+    // Enable selects
+    hoursSelect.disabled = false;
+    minutesSelect.disabled = false;
+    
+    // Calculate max time components
+    const maxHoursInt = Math.floor(maxHours);
+    const maxMinutesInt = Math.floor((maxHours - maxHoursInt) * 60);
+    
+    const maxTimeFormatted = `${maxHoursInt}:${maxMinutesInt.toString().padStart(2, '0')}`;
+    rangeInfo.textContent = `Maximum available: ${maxTimeFormatted}`;
+    
+    // Populate hours (0 to max hours)
+    for (let h = 0; h <= maxHoursInt; h++) {
+        const option = document.createElement('option');
+        option.value = h;
+        option.textContent = h.toString().padStart(2, '0');
+        hoursSelect.appendChild(option);
+    }
+    
+    // Populate minutes (0-59)
+    for (let m = 0; m < 60; m++) {
+        const option = document.createElement('option');
+        option.value = m;
+        option.textContent = m.toString().padStart(2, '0');
+        minutesSelect.appendChild(option);
+    }
+    
+    // Add event listeners to update hidden input and validate
+    const updateHiddenInput = () => {
+        const hours = parseInt(hoursSelect.value) || 0;
+        const minutes = parseInt(minutesSelect.value) || 0;
+        
+        const totalHours = hours + (minutes / 60);
+        
+        // Validate against maximum
+        const isValid = totalHours <= maxHours;
+        const isAboveZero = totalHours > 0;
+        
+        if (!isAboveZero) {
+            validationInfo.textContent = 'Please select approved OT hours';
+            validationInfo.className = 'text-xs text-red-500';
+            hiddenInput.value = '';
+        } else if (!isValid) {
+            validationInfo.textContent = `Selected time exceeds maximum available (${maxTimeFormatted})`;
+            validationInfo.className = 'text-xs text-red-500';
+            hiddenInput.value = '';
+        } else {
+            const timeString = `${hours}:${minutes.toString().padStart(2, '0')}`;
+            validationInfo.textContent = `Selected: ${timeString} (${totalHours.toFixed(2)} hours)`;
+            validationInfo.className = 'text-xs text-green-600';
+            hiddenInput.value = totalHours.toFixed(2);
+        }
+        
+        // Auto-adjust if over maximum
+        if (isAboveZero && !isValid) {
+            if (hours > maxHoursInt || (hours === maxHoursInt && minutes > maxMinutesInt)) {
+                // Set to maximum available
+                hoursSelect.value = maxHoursInt;
+                minutesSelect.value = maxMinutesInt;
+                
+                // Trigger update again
+                setTimeout(updateHiddenInput, 100);
+            }
+        }
+    };
+    
+    hoursSelect.addEventListener('change', updateHiddenInput);
+    minutesSelect.addEventListener('change', updateHiddenInput);
+    
+    // Set initial values to 0
+    hoursSelect.value = 0;
+    minutesSelect.value = 0;
+    updateHiddenInput();
+}
+
+// Updated function (renamed for clarity)
+function populateOvertimeHoursDropdown(maxHours) {
+    // Now calls the new time picker function
+    initializeTimePicker(maxHours);
+}
+
+// Helper function to format minutes to HH:MM:SS format
+function formatMinutesToTime(totalMinutes) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}:${minutes.toString().padStart(2, '0')}:00`;
+}
+
 // Open overtime modal with data
 function openOvertimeModal(button) {
     const row = button.closest('tr');
@@ -1571,15 +1927,30 @@ function openOvertimeModal(button) {
     const timeOut = row.dataset.timeOut;
     const otHours = parseFloat(row.dataset.otHours);
     const date = row.dataset.date;
+    const startOT = row.dataset.startOt || '';
+    const endOT = row.dataset.endOt || '';
+    const maxOTHours = parseFloat(row.dataset.maxOtHours) || 0;
     
-    console.log('Modal Data:', { timeLogId, timeIn, timeOut, otHours, date }); // Debug log
+    console.log('Modal Data:', { timeLogId, timeIn, timeOut, otHours, date, startOT, endOT, maxOTHours }); // Debug log
     
-    // Populate form fields
+    // Populate basic form fields
     document.getElementById('selected_time_log_id').value = timeLogId || '';
     document.getElementById('selected_time_in').value = timeIn || '';
     document.getElementById('selected_time_out').value = timeOut || '';
-    document.getElementById('overtime_hours').value = (otHours || 0).toFixed(2);
     document.getElementById('selected_date').value = date || '';
+    
+    // Store max OT hours
+    document.getElementById('max_ot_hours').value = maxOTHours.toFixed(2);
+    document.getElementById('display_max_ot_hours').value = `${maxOTHours.toFixed(2)} hrs`;
+    
+    // Populate Start OT and End OT fields
+    document.getElementById('start_ot_time').value = startOT;
+    document.getElementById('end_ot_time').value = endOT;
+    document.getElementById('display_start_ot').value = startOT;
+    document.getElementById('display_end_ot').value = endOT;
+    
+    // Populate selectable overtime hours dropdown
+    populateOvertimeHoursDropdown(maxOTHours);
     
     // Format and display times - only if timeIn and timeOut exist
     if (timeIn && timeOut) {
@@ -1650,8 +2021,10 @@ function openRDOTModal(button) {
     const timeIn = row.dataset.timeIn;
     const timeOut = row.dataset.timeOut;
     const date = row.dataset.date;
+    const startOT = row.dataset.startOt || timeIn; // For RDOT, start OT is usually time in
+    const endOT = row.dataset.endOt || timeOut;    // For RDOT, end OT is time out
     
-    console.log('RDOT Modal Data:', { timeLogId, timeIn, timeOut, date });
+    console.log('RDOT Modal Data:', { timeLogId, timeIn, timeOut, date, startOT, endOT });
     
     // Calculate work hours for RDOT
     let workHours = 0;
@@ -1666,14 +2039,24 @@ function openRDOTModal(button) {
         isEligible = workHours >= 8; // Restday OT needs 8+ hours
     }
     
-    // Allow RDOT filing even if < 8 hours; no blocking warning
-    
     // Populate form fields
     document.getElementById('selected_time_log_id').value = timeLogId || '';
     document.getElementById('selected_time_in').value = timeIn || '';
     document.getElementById('selected_time_out').value = timeOut || '';
-    document.getElementById('overtime_hours').value = workHours.toFixed(2);
     document.getElementById('selected_date').value = date || '';
+    
+    // Store max OT hours for RDOT
+    document.getElementById('max_ot_hours').value = workHours.toFixed(2);
+    document.getElementById('display_max_ot_hours').value = `${workHours.toFixed(2)} hrs`;
+    
+    // Populate Start OT and End OT fields for RDOT
+    document.getElementById('start_ot_time').value = startOT;
+    document.getElementById('end_ot_time').value = endOT;
+    document.getElementById('display_start_ot').value = startOT;
+    document.getElementById('display_end_ot').value = endOT;
+    
+    // Populate selectable overtime hours dropdown
+    populateOvertimeHoursDropdown(workHours);
     
     // Format and display times
     if (timeIn && timeOut) {
@@ -1724,25 +2107,13 @@ function openRDOTModal(button) {
     document.getElementById('selected_time_in').removeAttribute('readonly');
     document.getElementById('selected_time_out').removeAttribute('readonly');
     document.getElementById('selected_date').setAttribute('readonly', 'readonly');
-    document.getElementById('overtime_hours').setAttribute('readonly', 'readonly');
+    document.getElementById('display_max_ot_hours').setAttribute('readonly', 'readonly');
+    document.getElementById('display_start_ot').setAttribute('readonly', 'readonly');
+    document.getElementById('display_end_ot').setAttribute('readonly', 'readonly');
     document.getElementById('display_time_in').setAttribute('readonly', 'readonly');
     document.getElementById('display_time_out').setAttribute('readonly', 'readonly');
     document.getElementById('reason').removeAttribute('readonly');
     document.getElementById('attachment').removeAttribute('disabled');
-
-    // Auto-compute RDOT hours immediately on modal open
-    try {
-        if (typeof computeRDOTHrsFromHiddenFields === 'function') {
-            const workHours = computeRDOTHrsFromHiddenFields();
-            const hoursInput = document.getElementById('overtime_hours');
-            if (hoursInput) {
-                hoursInput.value = workHours.toFixed(2);
-                try { hoursInput.dispatchEvent(new Event('input', { bubbles: true })); } catch(e) {}
-            }
-        }
-    } catch (e) {
-        console.error('Auto-compute RDOT hours on open failed:', e);
-    }
 }
 
 // Add missing close function for modal

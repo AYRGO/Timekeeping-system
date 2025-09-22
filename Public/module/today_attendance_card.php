@@ -32,6 +32,7 @@ $shift_status = null;
 $is_reset_request = isset($_GET['reset']);
 
 // First, check and mark incomplete shifts (time-ins older than 12 hours without time-out)
+// Only process recent shifts (within last 2 days) to prevent old data issues
 $incompleteStmt = $pdo->prepare("
     UPDATE time_logs 
     SET time_out = 'INC', status = 'incomplete' 
@@ -39,10 +40,12 @@ $incompleteStmt = $pdo->prepare("
     AND time_out IS NULL 
     AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) >= 12
     AND status != 'incomplete'
+    AND log_date >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
 ");
 $incompleteStmt->execute([$employee_id]);
 
 // Also check if any previously marked incomplete shifts should be reactivated (within 12 hours)
+// Only check recent shifts to prevent old data conflicts
 $reactivateStmt = $pdo->prepare("
     UPDATE time_logs 
     SET time_out = NULL, status = 'active' 
@@ -50,6 +53,7 @@ $reactivateStmt = $pdo->prepare("
     AND status = 'incomplete' 
     AND time_out = 'INC'
     AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) < 12
+    AND log_date >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
 ");
 $reactivateStmt->execute([$employee_id]);
 
@@ -79,12 +83,13 @@ if ($todayLog) {
     $shift_status = $todayLog['status'] ?? 'active';
     error_log("Found today's log for employee $employee_id: time_in=$time_in, time_out=$time_out, status=$shift_status");
 } else {
-    // Priority 2: Check for overnight shift from previous days (exclude incomplete ones)
+    // Priority 2: Check for overnight shift from YESTERDAY ONLY (exclude incomplete ones)
+    // Only check yesterday to prevent old incomplete shifts from showing
     $overnightStmt = $pdo->prepare("SELECT time_in, time_out, log_date, status FROM time_logs 
-        WHERE employee_id = ? AND time_out IS NULL AND log_date < ? AND status != 'incomplete'
-        ORDER BY log_date DESC, id DESC 
+        WHERE employee_id = ? AND time_out IS NULL AND log_date = ? AND status != 'incomplete'
+        ORDER BY id DESC 
         LIMIT 1");
-    $overnightStmt->execute([$employee_id, $today]);
+    $overnightStmt->execute([$employee_id, $yesterday]);
     $overnightLog = $overnightStmt->fetch(PDO::FETCH_ASSOC);
     
     if ($overnightLog) {
@@ -102,8 +107,10 @@ if ($todayLog) {
             $hasActiveShift = $activeShiftCheck->fetchColumn() > 0;
             
             if (!$hasActiveShift) {
-                // Check if there's an incomplete shift to show
-                $incompleteStmt = $pdo->prepare("SELECT time_in, time_out, log_date, status FROM time_logs WHERE employee_id = ? AND status = 'incomplete' ORDER BY log_date DESC, id DESC LIMIT 1");
+                // Check if there's a RECENT incomplete shift to show (within last 2 days only)
+                $incompleteStmt = $pdo->prepare("SELECT time_in, time_out, log_date, status FROM time_logs 
+                    WHERE employee_id = ? AND status = 'incomplete' AND log_date >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
+                    ORDER BY log_date DESC, id DESC LIMIT 1");
                 $incompleteStmt->execute([$employee_id]);
                 $incompleteLog = $incompleteStmt->fetch(PDO::FETCH_ASSOC);
                 
@@ -205,24 +212,43 @@ $manual_completion_time = null;
 $hours_until_next_shift = 0;
 
 if ($shift_complete) {
-    // Check if there's a manual completion record
-    $completionStmt = $pdo->prepare("SELECT completed_at FROM shift_completions WHERE employee_id = ? AND log_date = ? ORDER BY completed_at DESC LIMIT 1");
-    $completionStmt->execute([$employee_id, $original_log_date]);
-    $completion = $completionStmt->fetch(PDO::FETCH_ASSOC);
+    // Check if shift_completions table exists before querying
+    $tableExistsStmt = $pdo->prepare("SHOW TABLES LIKE 'shift_completions'");
+    $tableExistsStmt->execute();
+    $tableExists = $tableExistsStmt->rowCount() > 0;
     
-    if ($completion) {
-        $shift_manually_completed = true;
-        $manual_completion_time = $completion['completed_at'];
-        
-        // Calculate hours since manual completion
-        $completionTime = new DateTime($manual_completion_time);
-        $now = new DateTime();
-        $hoursSinceCompletion = ($now->getTimestamp() - $completionTime->getTimestamp()) / 3600;
-        
-        if ($hoursSinceCompletion < 8) {
-            $hours_until_next_shift = 8 - $hoursSinceCompletion;
-            $can_time_in = false; // Restrict time in for 8 hours
+    if ($tableExists) {
+        // Check if there's a manual completion record
+        try {
+            $completionStmt = $pdo->prepare("SELECT completed_at FROM shift_completions WHERE employee_id = ? AND log_date = ? ORDER BY completed_at DESC LIMIT 1");
+            $completionStmt->execute([$employee_id, $original_log_date]);
+            $completion = $completionStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($completion) {
+                $shift_manually_completed = true;
+                $manual_completion_time = $completion['completed_at'];
+                
+                // Calculate hours since manual completion
+                $completionTime = new DateTime($manual_completion_time);
+                $now = new DateTime();
+                $hoursSinceCompletion = ($now->getTimestamp() - $completionTime->getTimestamp()) / 3600;
+                
+                if ($hoursSinceCompletion < 8) {
+                    $hours_until_next_shift = 8 - $hoursSinceCompletion;
+                    $can_time_in = false; // Restrict time in for 8 hours
+                }
+            }
+        } catch (PDOException $e) {
+            // Error querying table - skip manual completion check
+            error_log("Error querying shift_completions table: " . $e->getMessage());
+            $shift_manually_completed = false;
+            $manual_completion_time = null;
         }
+    } else {
+        // Table doesn't exist - skip manual completion check
+        error_log("shift_completions table does not exist - skipping manual completion check");
+        $shift_manually_completed = false;
+        $manual_completion_time = null;
     }
 }
 
@@ -234,32 +260,55 @@ if ($is_overnight_shift && $time_out) {
     $todayRegularShift = $newShiftCheckStmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$todayRegularShift) {
-        // Check if overnight shift was manually completed
-        $overnightCompletionStmt = $pdo->prepare("SELECT completed_at FROM shift_completions WHERE employee_id = ? AND log_date = ? ORDER BY completed_at DESC LIMIT 1");
-        $overnightCompletionStmt->execute([$employee_id, $original_log_date]);
-        $overnightCompletion = $overnightCompletionStmt->fetch(PDO::FETCH_ASSOC);
+        // Check if shift_completions table exists before querying
+        $tableExistsStmt = $pdo->prepare("SHOW TABLES LIKE 'shift_completions'");
+        $tableExistsStmt->execute();
+        $tableExists = $tableExistsStmt->rowCount() > 0;
         
-        if (!$overnightCompletion) {
-            // No manual completion yet, allow new time-in
-            $can_time_in = true;
-            $can_time_out = false;
-            $shift_complete = false;
-            $show_overnight_complete_message = true;
-        } else {
-            // Check 8-hour restriction from overnight completion
-            $completionTime = new DateTime($overnightCompletion['completed_at']);
-            $now = new DateTime();
-            $hoursSinceCompletion = ($now->getTimestamp() - $completionTime->getTimestamp()) / 3600;
-            
-            if ($hoursSinceCompletion >= 8) {
+        if ($tableExists) {
+            // Check if overnight shift was manually completed
+            try {
+                $overnightCompletionStmt = $pdo->prepare("SELECT completed_at FROM shift_completions WHERE employee_id = ? AND log_date = ? ORDER BY completed_at DESC LIMIT 1");
+                $overnightCompletionStmt->execute([$employee_id, $original_log_date]);
+                $overnightCompletion = $overnightCompletionStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$overnightCompletion) {
+                    // No manual completion yet, allow new time-in
+                    $can_time_in = true;
+                    $can_time_out = false;
+                    $shift_complete = false;
+                    $show_overnight_complete_message = true;
+                } else {
+                    // Check 8-hour restriction from overnight completion
+                    $completionTime = new DateTime($overnightCompletion['completed_at']);
+                    $now = new DateTime();
+                    $hoursSinceCompletion = ($now->getTimestamp() - $completionTime->getTimestamp()) / 3600;
+                    
+                    if ($hoursSinceCompletion >= 8) {
+                        $can_time_in = true;
+                        $can_time_out = false;
+                        $shift_complete = false;
+                        $show_overnight_complete_message = true;
+                    } else {
+                        $hours_until_next_shift = 8 - $hoursSinceCompletion;
+                        $can_time_in = false;
+                    }
+                }
+            } catch (PDOException $e) {
+                // Error querying table - allow new time-in without completion check
+                error_log("Error querying shift_completions table: " . $e->getMessage());
                 $can_time_in = true;
                 $can_time_out = false;
                 $shift_complete = false;
                 $show_overnight_complete_message = true;
-            } else {
-                $hours_until_next_shift = 8 - $hoursSinceCompletion;
-                $can_time_in = false;
             }
+        } else {
+            // Table doesn't exist - allow new time-in without completion check
+            error_log("shift_completions table does not exist - allowing new time-in for overnight shift");
+            $can_time_in = true;
+            $can_time_out = false;
+            $shift_complete = false;
+            $show_overnight_complete_message = true;
         }
     }
 }

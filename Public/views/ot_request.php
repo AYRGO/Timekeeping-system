@@ -59,10 +59,10 @@ function getCurrentScheduleForEmployee($employee_id, $log_date, $pdo, $schedule_
 
 // Fetch overtime requests with employee names and time logs
 if ($isHistoryView) {
-    // Fetch from post_ot_requests table (history) with DISTINCT to avoid duplicates
-    $stmt = $pdo->query("SELECT DISTINCT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date FROM post_ot_requests por JOIN employees e ON por.employee_id = e.id LEFT JOIN time_logs tl ON por.time_log_id = tl.id ORDER BY por.created_at DESC");
+    // Fetch from post2_overtime_requests table (archived approved/declined requests)
+    $stmt = $pdo->query("SELECT DISTINCT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date FROM post2_overtime_requests por JOIN employees e ON por.employee_id = e.id LEFT JOIN time_logs tl ON por.time_log_id = tl.id ORDER BY por.created_at DESC");
 } else {
-    // Fetch from post_ot_requests table for pending requests only with DISTINCT
+    // Fetch from post_ot_requests table for pending requests only
     $stmt = $pdo->query("SELECT DISTINCT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date FROM post_ot_requests por JOIN employees e ON por.employee_id = e.id LEFT JOIN time_logs tl ON por.time_log_id = tl.id WHERE por.status = 'Pending' ORDER BY por.created_at DESC");
 }
 $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);

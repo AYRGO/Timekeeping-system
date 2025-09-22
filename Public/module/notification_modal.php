@@ -104,7 +104,13 @@ foreach ($leave_results as $leave) {
         'created_at' => $leave['created_at'],
         'leave_status' => $status,
         'explanation' => $leave['explanation'] ?? '',
-        'leave_type' => $leave['leave_type'] ?? 'Leave Request'
+        'leave_type' => $leave['leave_type'] ?? 'Leave Request',
+        'request_id' => $leave['id'],
+        'table_name' => 'leave_requests',
+        'start_date' => $leave['start_date'],
+        'end_date' => $leave['end_date'],
+        'reason' => $leave['reason'] ?? '',
+        'source_table' => $leave['source_table']
     ];
 
     // Only send email notifications for pending table entries that changed status
@@ -167,7 +173,10 @@ foreach ($schedule_results as $sched) {
         'current_time_in' => $sched['current_time_in'],
         'current_time_out' => $sched['current_time_out'],
         'requested_time_in' => $sched['requested_time_in'],
-        'requested_time_out' => $sched['requested_time_out']
+        'requested_time_out' => $sched['requested_time_out'],
+        'request_id' => $sched['id'],
+        'table_name' => 'schedule_change_requests',
+        'source_table' => $sched['source_table']
     ];
 
     if (in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified'] && $sched['source_table'] === 'pending') {
@@ -224,7 +233,10 @@ foreach ($adjust_results as $adjustment) {
         'current_time_in' => $adjustment['current_time_in'],
         'current_time_out' => $adjustment['current_time_out'],
         'requested_time_in' => $adjustment['requested_time_in'],
-        'requested_time_out' => $adjustment['requested_time_out']
+        'requested_time_out' => $adjustment['requested_time_out'],
+        'request_id' => $adjustment['id'],
+        'table_name' => 'time_adjustment_requests',
+        'source_table' => $adjustment['source_table']
     ];
 
     if (in_array($raw_status, ['approved', 'declined', 'rejected']) && !$adjustment['notified'] && $adjustment['source_table'] === 'pending') {
@@ -271,6 +283,8 @@ foreach ($ot_results as $ot) {
         'created_at' => $created_at,
         'ot_status' => $status,
         'ot_reason' => $ot['reason'],
+        'request_id' => $ot['id'],
+        'table_name' => 'post_ot_requests'
     ];
 }
 
