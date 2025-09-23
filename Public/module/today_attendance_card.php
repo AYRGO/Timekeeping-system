@@ -31,20 +31,20 @@ $shift_status = null;
 // Check if this is a reset request (cache busting parameter)
 $is_reset_request = isset($_GET['reset']);
 
-// First, check and mark incomplete shifts (time-ins older than 12 hours without time-out)
+// First, check and mark incomplete shifts (time-ins older than 14 hours without time-out)
 // Only process recent shifts (within last 2 days) to prevent old data issues
 $incompleteStmt = $pdo->prepare("
     UPDATE time_logs 
     SET time_out = 'INC', status = 'incomplete' 
     WHERE employee_id = ? 
     AND time_out IS NULL 
-    AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) >= 12
+    AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) >= 14
     AND status != 'incomplete'
     AND log_date >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
 ");
 $incompleteStmt->execute([$employee_id]);
 
-// Also check if any previously marked incomplete shifts should be reactivated (within 12 hours)
+// Also check if any previously marked incomplete shifts should be reactivated (within 14 hours)
 // Only check recent shifts to prevent old data conflicts
 $reactivateStmt = $pdo->prepare("
     UPDATE time_logs 
@@ -52,7 +52,7 @@ $reactivateStmt = $pdo->prepare("
     WHERE employee_id = ? 
     AND status = 'incomplete' 
     AND time_out = 'INC'
-    AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) < 12
+    AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) < 14
     AND log_date >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
 ");
 $reactivateStmt->execute([$employee_id]);
@@ -64,11 +64,11 @@ if ($incompleteStmt->rowCount() > 0) {
 
 // Log any reactivated shifts
 if ($reactivateStmt->rowCount() > 0) {
-    error_log("Reactivated " . $reactivateStmt->rowCount() . " shifts within 12h window for employee $employee_id");
+    error_log("Reactivated " . $reactivateStmt->rowCount() . " shifts within 14h window for employee $employee_id");
 }
 
-// Auto-reset display: Don't show incomplete shifts older than 12 hours (keep DB record but reset interface)
-// This allows overnight shifts (like 10pm-6am) to complete normally within 12 hours
+// Auto-reset display: Don't show incomplete shifts older than 14 hours (keep DB record but reset interface)
+// This allows overnight shifts (like 10pm-6am) to complete normally within 14 hours
 
 // Priority 1: Check for today's regular time log (exclude incomplete ones)
 $stmt = $pdo->prepare("SELECT time_in, time_out, log_date, status FROM time_logs WHERE employee_id = ? AND log_date = ? AND status != 'incomplete' ORDER BY id DESC LIMIT 1");
@@ -115,21 +115,21 @@ if ($todayLog) {
                 $incompleteLog = $incompleteStmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($incompleteLog) {
-                    // Check if 12+ hours have passed since time-in - if so, auto-reset display (keep DB record)
+                    // Check if 14+ hours have passed since time-in - if so, auto-reset display (keep DB record)
                     $timeInTimestamp = strtotime($incompleteLog['log_date'] . ' ' . $incompleteLog['time_in']);
                     $hoursSinceTimeIn = (time() - $timeInTimestamp) / 3600;
                     
-                    if ($hoursSinceTimeIn >= 12) {
-                        // Auto-reset: 12+ hours passed, start fresh interface (DB record preserved)
-                        error_log("Auto-reset: 12+ hours passed since time-in for employee $employee_id, starting fresh interface");
+                    if ($hoursSinceTimeIn >= 14) {
+                        // Auto-reset: 14+ hours passed, start fresh interface (DB record preserved)
+                        error_log("Auto-reset: 14+ hours passed since time-in for employee $employee_id, starting fresh interface");
                         // Leave all values as null for fresh start
                     } else {
-                        // Show incomplete shift if within 12 hours (allows overnight shifts to complete)
+                        // Show incomplete shift if within 14 hours (allows overnight shifts to complete)
                         $time_in = $incompleteLog['time_in'];
                         $time_out = $incompleteLog['time_out'];
                         $original_log_date = $incompleteLog['log_date'];
                         $shift_status = 'incomplete';
-                        error_log("Showing incomplete shift within 12h window: " . number_format($hoursSinceTimeIn, 1) . " hours since time-in");
+                        error_log("Showing incomplete shift within 14h window: " . number_format($hoursSinceTimeIn, 1) . " hours since time-in");
                     }
                 }
             }
@@ -349,7 +349,7 @@ if ($is_overnight_shift && $time_out) {
             </div>
             <div class="ml-3">
                 <p class="text-sm text-red-700">
-                    ⚠️ Your previous shift was marked as incomplete due to missing time-out (12+ hours passed). 
+                    ⚠️ Your previous shift was marked as incomplete due to missing time-out (14+ hours passed). 
                     You can now start a new shift.
                 </p>
             </div>
@@ -446,7 +446,7 @@ if ($is_overnight_shift && $time_out) {
                 <?php if ($is_overnight_shift && $display_time_out): ?>
                     <p class="text-xs text-gray-500">Today</p>
                 <?php elseif ($is_incomplete_shift): ?>
-                    <p class="text-xs text-red-500">Auto-marked after 12hrs</p>
+                    <p class="text-xs text-red-500">Auto-marked after 14hrs</p>
                 <?php endif; ?>
             </div>
         </div>

@@ -59,6 +59,37 @@ function sendEmail($to, $name, $subject, $body) {
     }
 }
 
+function getScheduleOutForDate(PDO $pdo, int $employeeId, string $date): string {
+    // First check for approved schedule changes from post_schedule_change_requests
+    $stmt = $pdo->prepare("
+        SELECT ws.time_out
+        FROM post_schedule_change_requests pscr
+        LEFT JOIN work_schedules ws ON pscr.work_schedule_id = ws.id
+        WHERE pscr.employee_id = ?
+          AND pscr.status = 'approved'
+          AND ? BETWEEN pscr.start_date AND pscr.end_date
+        ORDER BY pscr.created_at DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$employeeId, $date]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($result && $result['time_out']) {
+        return $result['time_out'];
+    }
+    
+    // Fallback to employee's official schedule
+    $stmt = $pdo->prepare("
+        SELECT ws.time_out
+        FROM employees e
+        LEFT JOIN work_schedules ws ON e.official_sched = ws.id
+        WHERE e.id = ?
+    ");
+    $stmt->execute([$employeeId]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    return $result['time_out'] ?? '17:00:00'; // Default fallback
+}
 
 if ($current_user_id) {
     // Get employee info
@@ -254,9 +285,21 @@ foreach ($adjust_results as $adjustment) {
     }
 }
 
-// --- Overtime Requests (from post_ot_requests table only) ---
+// --- Overtime Requests (from both tables) ---
+// First get pending overtime requests
+$pending_ot_stmt = $pdo->prepare("
+    SELECT id, employee_id, date, start_time, end_time, reason, duration_hours, status, created_at, 'pending' as source_table
+    FROM overtime_requests
+    WHERE employee_id = ?
+    ORDER BY created_at DESC
+    LIMIT 10
+");
+$pending_ot_stmt->execute([$current_user_id]);
+$pending_ot_results = $pending_ot_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Then get processed overtime requests
 $ot_stmt = $pdo->prepare("
-    SELECT id, time_log_id, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified
+    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified
     FROM post_ot_requests
     WHERE employee_id = ?
     ORDER BY COALESCE(approved_at, created_at) DESC
@@ -265,6 +308,38 @@ $ot_stmt = $pdo->prepare("
 $ot_stmt->execute([$current_user_id]);
 $ot_results = $ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Process pending overtime requests
+foreach ($pending_ot_results as $ot) {
+    $raw_status = strtolower($ot['status']);
+    if ($raw_status === 'approved') {
+        $status = 'Approved';
+    } elseif ($raw_status === 'declined' || $raw_status === 'rejected') {
+        $status = 'Declined';
+    } else {
+        $status = 'Pending';
+    }
+    $duration = number_format((float)$ot['duration_hours'], 2);
+    $ot_type = 'Regular OT'; // Default for pending requests
+    $created_at = $ot['created_at'];
+
+    $notifications[] = [
+        'message' => "Overtime request for <strong>{$ot_type}</strong> ({$duration} hours) was <strong>{$status}</strong>.",
+        'created_at' => $created_at,
+        'ot_status' => $status,
+        'ot_reason' => $ot['reason'],
+        'time_in' => $ot['start_time'] ?? null,
+        'time_out' => $ot['end_time'] ?? null,
+        'start_ot' => $ot['start_time'] ?? null,
+        'end_ot' => $ot['end_time'] ?? null,
+        'ot_duration' => $ot['duration_hours'],
+        'ot_type' => $ot_type,
+        'request_id' => $ot['id'],
+        'table_name' => 'overtime_requests',
+        'source_table' => 'pending'
+    ];
+}
+
+// Process post overtime requests
 foreach ($ot_results as $ot) {
     $raw_status = strtolower($ot['status']);
     if ($raw_status === 'approved') {
@@ -278,13 +353,63 @@ foreach ($ot_results as $ot) {
     $ot_type = $ot['ot_type'] ?? 'Regular OT';
     $created_at = $ot['approved_at'] ?? $ot['created_at'];
 
+    // Compute Start OT and End OT using schedule logic (similar to new_overtime)
+    $actual_time_in = $ot['time_in'] ?? null;
+    $actual_time_out = $ot['time_out'] ?? null;
+    $log_date = null;
+    $start_ot = null;
+    $end_ot = null;
+
+    // Get log_date from time_logs table if time_log_id exists
+    if (!empty($ot['time_log_id'])) {
+        $log_stmt = $pdo->prepare("SELECT log_date FROM time_logs WHERE id = ?");
+        $log_stmt->execute([$ot['time_log_id']]);
+        $log_result = $log_stmt->fetch(PDO::FETCH_ASSOC);
+        $log_date = $log_result['log_date'] ?? null;
+    }
+    
+    // Fallback: derive log_date from time_in if available
+    if (!$log_date && $actual_time_in) {
+        $log_date = date('Y-m-d', strtotime($actual_time_in));
+    }
+
+    if ($log_date) {
+        if (strtolower($ot_type) === 'restday ot') {
+            // Restday OT uses actual in/out
+            $start_ot = $actual_time_in;
+            $end_ot = $actual_time_out;
+        } else {
+            // Regular OT: start at scheduled time_out, end at actual time_out
+            $sched_out = getScheduleOutForDate($pdo, (int)$current_user_id, $log_date); // HH:MM:SS
+            $sched_out_dt = DateTime::createFromFormat('Y-m-d H:i:s', $log_date . ' ' . $sched_out);
+            $actual_out_dt = $actual_time_out ? new DateTime($actual_time_out) : null;
+            
+            if ($actual_out_dt && $sched_out_dt) {
+                $actual_out_date = $actual_out_dt->format('Y-m-d');
+                if ($actual_out_date !== $log_date) {
+                    // Cross-midnight: shift schedule to the actual out date
+                    $sched_out_dt = DateTime::createFromFormat('Y-m-d H:i:s', $actual_out_date . ' ' . $sched_out);
+                }
+            }
+            $start_ot = $sched_out_dt ? $sched_out_dt->format('Y-m-d H:i:s') : null;
+            $end_ot = $actual_time_out;
+        }
+    }
+
     $notifications[] = [
         'message' => "Overtime request for <strong>{$ot_type}</strong> ({$duration} hours) was <strong>{$status}</strong>.",
         'created_at' => $created_at,
         'ot_status' => $status,
         'ot_reason' => $ot['reason'],
+        'time_in' => $actual_time_in,
+        'time_out' => $actual_time_out,
+        'start_ot' => $start_ot,
+        'end_ot' => $end_ot,
+        'ot_duration' => $ot['ot_duration'],
+        'ot_type' => $ot_type,
         'request_id' => $ot['id'],
-        'table_name' => 'post_ot_requests'
+        'table_name' => 'post_ot_requests',
+        'source_table' => 'post'
     ];
 }
 

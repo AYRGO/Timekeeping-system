@@ -23,53 +23,47 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
 
 <!-- ✅ DO NOT TOUCH CONTAINER ABOVE THIS -->
 
-<div class="bg-white rounded-2xl shadow-lg p-4 w-full lg:w-[32rem] xl:w-[36rem] 2xl:w-[40rem] border-0 ring-1 ring-gray-200/50 hover:shadow-xl hover:ring-blue-300/30 transition-all duration-500 backdrop-blur-sm">
+<div class="bg-white rounded-xl shadow-sm p-6 w-full md:w-2/3 xl:w-1/2 2xl:w-5/12 border border-gray-200/80 transition-all duration-300 hover:shadow-lg">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
-        <h3 class="text-xl font-bold text-gray-900 flex items-center">
-            <div class="bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 p-2.5 rounded-xl mr-3 shadow-lg ring-1 ring-blue-500/20">
-                <i class="fas fa-history text-white text-sm drop-shadow-sm"></i>
-            </div>
-            <span class="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Recent Activity</span>
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+        <h3 class="text-2xl font-semibold text-gray-800">
+            Recent Activity
         </h3>
 
         <!-- Date Filter -->
-        <form method="GET" class="flex items-center gap-2 bg-gradient-to-r from-gray-50 to-gray-100/80 rounded-xl px-3 py-2 border-0 ring-1 ring-gray-200/70 hover:ring-blue-300/50 transition-all duration-300 shadow-sm hover:shadow-md">
-            <label for="activityDate" class="text-xs text-gray-700 font-medium whitespace-nowrap flex items-center">
-                <i class="fas fa-calendar-alt text-blue-500 mr-1.5 text-xs"></i>
-                <span>Filter by date:</span>
-            </label>
+        <form method="GET" class="flex items-center gap-2">
+            <label for="activityDate" class="text-sm font-medium text-gray-600">Filter:</label>
             <input type="date" id="activityDate" name="activityDate"
                    value="<?= htmlspecialchars($filterDate ?? '') ?>"
-                   class="border-0 bg-white/90 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:bg-white transition-all duration-200 shadow-sm w-32 font-medium">
-            <button type="submit" class="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 hover:from-blue-600 hover:via-blue-700 hover:to-indigo-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 ring-1 ring-blue-500/20">
-                <i class="fas fa-search text-xs mr-1"></i>Apply
+                   class="border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all duration-200 w-40">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all duration-300 shadow-sm hover:shadow-md transform active:scale-95">
+                <i class="fas fa-search text-xs"></i>
             </button>
         </form>
     </div>
 
     <!-- Activity Table -->
-    <div class="bg-gradient-to-br from-gray-50/50 to-gray-100/30 rounded-xl p-1 ring-1 ring-gray-200/50 shadow-inner">
-        <div class="bg-white/90 backdrop-blur-sm rounded-lg shadow-sm ring-1 ring-white/50">
-            <div class="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400">
-                <table class="min-w-full divide-y divide-gray-100/80">
-                    <thead class="bg-gradient-to-r from-gray-50/80 via-gray-100/50 to-gray-50/80 sticky top-0 z-10 backdrop-blur-sm">
+    <div class="overflow-x-auto">
+        <div class="border border-gray-200/80 rounded-lg">
+            <div class="max-h-60 overflow-y-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0 z-10">
                         <tr>
-                            <th class="px-4 py-2.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide w-28">
-                                <i class="fas fa-calendar text-blue-500/70 mr-1.5"></i>Date
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">
+                                Date
                             </th>
-                            <th class="px-4 py-2.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide flex-1 min-w-[160px]">
-                                <i class="fas fa-tag text-purple-500/70 mr-1.5"></i>Request Type
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                Request Details
                             </th>
-                            <th class="px-4 py-2.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide w-24">
-                                <i class="fas fa-info-circle text-green-500/70 mr-1.5"></i>Status
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-32">
+                                Status
                             </th>
-                            <th class="px-4 py-2.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide w-32">
-                                <i class="fas fa-cog text-orange-500/70 mr-1.5"></i>Actions
+                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-32">
+                                Actions
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white/50 divide-y divide-gray-100/60 backdrop-blur-sm"><?php if (!empty($recentActivities)): ?>
+                    <tbody class="divide-y divide-gray-200"><?php if (!empty($recentActivities)): ?>
     <?php foreach ($recentActivities as $activity): ?>
         <?php
             $created = date('M j, Y', strtotime($activity['created_at']));
@@ -165,11 +159,12 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                     $startDate = date('M j, Y', strtotime($activity['start_date']));
                     $endDate = date('M j, Y', strtotime($activity['end_date']));
                     if ($startDate === $endDate) {
-                        $sentence .= "\nEffective Date: $startDate";
+                            $sentence .= "\nEffective Date: $startDate"; // Keep card minimal: date ranges shown only in modal
                     } else {
                         $sentence .= "\nEffective Period: $startDate to $endDate";
                     }
                 }
+                    // Keep card minimal: date ranges shown only in modal
                 
                 if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected']) && !empty($activity['explanation'])) {
                     $sentence .= "\nReason: " . htmlspecialchars($activity['explanation']);
@@ -187,11 +182,12 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                     $startDate = date('M j, Y', strtotime($activity['start_date']));
                     $endDate = date('M j, Y', strtotime($activity['end_date']));
                     if ($startDate === $endDate) {
-                        $sentence .= "\nDate: $startDate";
+                            $sentence .= "\nDate: $startDate"; // Keep card minimal: dates shown only in modal
                     } else {
                         $sentence .= "\nDates: $startDate to $endDate";
                     }
                 }
+                    // Keep card minimal: dates shown only in modal
                 
                 // Add detailed reason for declined requests
                 if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected'])) {
@@ -238,113 +234,144 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                 $sentence .= "$type request was $status.";
             }
         ?>
-        <tr class="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/30 transition-all duration-300 group cursor-pointer backdrop-blur-sm">
-            <td class="px-4 py-2.5 text-gray-600 font-medium w-28">
-                <div class="flex items-center">
-                    <div class="w-1.5 h-1.5 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full mr-2.5 opacity-70 group-hover:opacity-100 transition-opacity duration-300 shadow-sm"></div>
-                    <span class="text-xs font-semibold text-gray-700 group-hover:text-gray-900 transition-colors duration-300 whitespace-nowrap"><?= $created ?></span>
-                </div>
+        <tr class="hover:bg-gray-50 transition-colors duration-200">
+            <td class="px-4 py-3 text-sm font-medium text-gray-700 w-36">
+                <?= $created ?>
             </td>
-            <td class="px-4 py-2.5 flex-1 min-w-[160px]">
+            <td class="px-4 py-3">
                 <div class="flex items-center">
-                    <div class="flex-shrink-0 h-6 w-6 mr-3 transform group-hover:scale-110 transition-transform duration-300">
-                        <?php if ($type === 'Leave'): ?>
-                            <div class="h-6 w-6 bg-gradient-to-br from-emerald-100 to-green-200 rounded-lg flex items-center justify-center ring-1 ring-emerald-200/50 shadow-sm">
-                                <i class="fas fa-plane text-emerald-600 text-xs"></i>
-                            </div>
-                        <?php elseif ($type === 'Schedule'): ?>
-                            <div class="h-6 w-6 bg-gradient-to-br from-purple-100 to-violet-200 rounded-lg flex items-center justify-center ring-1 ring-purple-200/50 shadow-sm">
-                                <i class="fas fa-clock text-purple-600 text-xs"></i>
-                            </div>
-                        <?php elseif ($type === 'Time'): ?>
-                            <div class="h-6 w-6 bg-gradient-to-br from-orange-100 to-amber-200 rounded-lg flex items-center justify-center ring-1 ring-orange-200/50 shadow-sm">
-                                <i class="fas fa-edit text-orange-600 text-xs"></i>
-                            </div>
-                        <?php elseif ($type === 'Overtime'): ?>
-                            <div class="h-6 w-6 bg-gradient-to-br from-indigo-100 to-blue-200 rounded-lg flex items-center justify-center ring-1 ring-indigo-200/50 shadow-sm">
-                                <i class="fas fa-business-time text-indigo-600 text-xs"></i>
-                            </div>
-                        <?php else: ?>
-                            <div class="h-6 w-6 bg-gradient-to-br from-gray-100 to-slate-200 rounded-lg flex items-center justify-center ring-1 ring-gray-200/50 shadow-sm">
-                                <i class="fas fa-file text-gray-600 text-xs"></i>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="text-sm font-bold text-gray-900 group-hover:text-gray-950 transition-colors duration-300 truncate">
+                    <div class="text-sm font-bold text-gray-900">
                             <?php if ($type === 'Leave' && isset($leaveTypeDisplay) && $leaveTypeDisplay !== 'Leave Request'): ?>
                                 <?= $leaveTypeDisplay ?>
                             <?php elseif ($type === 'Leave'): ?>
                                 Leave Request
                             <?php elseif ($type === 'Schedule'): ?>
-                                Schedule Change
+                                Schedule Change Request
                             <?php elseif ($type === 'Time'): ?>
-                                Time Adjustment
+                                Time Adjustment Request
                             <?php else: ?>
                                 <?= $type ?> Request
                             <?php endif; ?>
-                        </div>
+                    </div>
+                    <!-- Minimal card: hide dates/effective; details are shown in the modal -->
+                    
                     </div>
                 </div>
             </td>
-            <td class="px-4 py-2.5 w-24">
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold <?= $badgeColor ?> ring-1 ring-white/20 shadow-sm backdrop-blur-sm transform group-hover:scale-105 transition-all duration-300 whitespace-nowrap">
-                    <?php if (strtolower($status) === 'approved'): ?>
-                        <i class="fas fa-check-circle mr-1 text-emerald-600 drop-shadow-sm"></i>
-                    <?php elseif (in_array(strtolower($status), ['rejected', 'declined', 'cancelled'])): ?>
-                        <i class="fas fa-times-circle mr-1 text-red-600 drop-shadow-sm"></i>
-                    <?php else: ?>
-                        <i class="fas fa-clock mr-1 text-amber-600 drop-shadow-sm"></i>
-                    <?php endif; ?>
+            <td class="px-4 py-3 w-28">
+                <span class="inline-flex px-3 py-1 rounded-full text-xs font-bold <?= $badgeColor ?> whitespace-nowrap">
                     <?= $status ?>
                 </span>
             </td>
-            <td class="px-4 py-2.5 w-32">
+            <td class="px-4 py-3 w-28">
                 <div class="flex items-center gap-2">
                     <?php
                     if ($type === 'Time' && !empty($activity['reason'])) {
                         ?>
-                        <button onclick="alert('Reason: <?= htmlspecialchars_decode($activity['reason']) ?>')" 
-                                class="inline-flex items-center px-2.5 py-1 text-xs font-semibold text-blue-700 bg-gradient-to-r from-blue-100/80 to-sky-100/60 hover:from-blue-200/90 hover:to-sky-200/70 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ring-1 ring-blue-200/50 transform hover:scale-105 active:scale-95 backdrop-blur-sm whitespace-nowrap">
-                            <i class="fas fa-eye mr-1 text-blue-600"></i>View
+                        <button onclick="showActivityDetails('Time Adjustment', `<?= htmlspecialchars(json_encode([
+                            'type' => 'Time Adjustment',
+                            'status' => $status,
+                            'date' => $created,
+                            'log_date' => !empty($activity['log_date']) ? date('M j, Y', strtotime($activity['log_date'])) : '',
+                            'current_time_in' => !empty($activity['current_time_in']) ? date('g:i A', strtotime($activity['current_time_in'])) : '—',
+                            'current_time_out' => !empty($activity['current_time_out']) ? date('g:i A', strtotime($activity['current_time_out'])) : '—',
+                            'requested_time_in' => !empty($activity['requested_time_in']) ? date('g:i A', strtotime($activity['requested_time_in'])) : '—',
+                            'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '—',
+                            'reason' => $activity['reason'] ?? '',
+                            'explanation' => $activity['explanation'] ?? '',
+                            'request_id' => $activity['request_id'] ?? '',
+                            'table_name' => $activity['table_name'] ?? '',
+                            'source_table' => $activity['source_table'] ?? ''
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
+                                class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
+                            View Details
                         </button>
-                    <?php } elseif ($type === 'Overtime' && !empty($activity['ot_reason'])) { ?>
-                        <button onclick="alert('Reason: <?= htmlspecialchars_decode($activity['ot_reason']) ?>')" 
-                                class="inline-flex items-center px-2.5 py-1 text-xs font-semibold text-blue-700 bg-gradient-to-r from-blue-100/80 to-sky-100/60 hover:from-blue-200/90 hover:to-sky-200/70 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ring-1 ring-blue-200/50 transform hover:scale-105 active:scale-95 backdrop-blur-sm whitespace-nowrap">
-                            <i class="fas fa-eye mr-1 text-blue-600"></i>View
+                    <?php } elseif ($type === 'Overtime') { ?>
+                        <button onclick="showActivityDetails('Overtime Request', `<?= htmlspecialchars(json_encode([
+                            'type' => 'Overtime Request',
+                            'status' => $status,
+                            'date' => $created,
+                            'reason' => $activity['ot_reason'] ?? '',
+                            'ot_type' => $activity['ot_type'] ?? 'Overtime',
+                            'ot_duration' => isset($activity['ot_duration']) ? number_format((float)$activity['ot_duration'], 2) : '',
+                            'start_ot' => !empty($activity['start_ot']) ? date('g:i A', strtotime($activity['start_ot'])) : '',
+                            'end_ot' => !empty($activity['end_ot']) ? date('g:i A', strtotime($activity['end_ot'])) : '',
+                            'time_in' => !empty($activity['time_in']) ? date('g:i A', strtotime($activity['time_in'])) : '',
+                            'time_out' => !empty($activity['time_out']) ? date('g:i A', strtotime($activity['time_out'])) : '',
+                            'explanation' => $activity['explanation'] ?? '',
+                            'request_id' => $activity['request_id'] ?? '',
+                            'table_name' => $activity['table_name'] ?? '',
+                            'source_table' => $activity['source_table'] ?? ''
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
+                                class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
+                            View Details
+                        </button>
+                    <?php } elseif ($type === 'Leave') { ?>
+                        <button onclick="showActivityDetails('Leave Request', `<?= htmlspecialchars(json_encode([
+                            'type' => isset($leaveTypeDisplay) ? $leaveTypeDisplay : 'Leave Request',
+                            'status' => $status,
+                            'date' => $created,
+                            'start_date' => !empty($activity['start_date']) ? date('M j, Y', strtotime($activity['start_date'])) : '',
+                            'end_date' => !empty($activity['end_date']) ? date('M j, Y', strtotime($activity['end_date'])) : '',
+                            'reason' => $activity['reason'] ?? '',
+                            'explanation' => $activity['explanation'] ?? '',
+                            'request_id' => $activity['request_id'] ?? '',
+                            'table_name' => $activity['table_name'] ?? '',
+                            'source_table' => $activity['source_table'] ?? ''
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
+                                class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
+                            View Details
+                        </button>
+                    <?php } elseif ($type === 'Schedule') { ?>
+                        <button onclick="showActivityDetails('Schedule Change', `<?= htmlspecialchars(json_encode([
+                            'type' => 'Schedule Change',
+                            'status' => $status,
+                            'date' => $created,
+                            'current_time_in' => !empty($activity['current_time_in']) ? date('g:i A', strtotime($activity['current_time_in'])) : '',
+                            'current_time_out' => !empty($activity['current_time_out']) ? date('g:i A', strtotime($activity['current_time_out'])) : '',
+                            'requested_time_in' => !empty($activity['requested_time_in']) ? date('g:i A', strtotime($activity['requested_time_in'])) : '',
+                            'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
+                            'start_date' => !empty($activity['start_date']) ? date('M j, Y', strtotime($activity['start_date'])) : '',
+                            'end_date' => !empty($activity['end_date']) ? date('M j, Y', strtotime($activity['end_date'])) : '',
+                            'explanation' => $activity['explanation'] ?? '',
+                            'request_id' => $activity['request_id'] ?? '',
+                            'table_name' => $activity['table_name'] ?? '',
+                            'source_table' => $activity['source_table'] ?? ''
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
+                                class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
+                            View Details
                         </button>
                     <?php } else { ?>
-                        <button onclick="alert(`<?= htmlspecialchars_decode($sentence) ?>`)" 
-                                class="inline-flex items-center px-2.5 py-1 text-xs font-semibold text-blue-700 bg-gradient-to-r from-blue-100/80 to-sky-100/60 hover:from-blue-200/90 hover:to-sky-200/70 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ring-1 ring-blue-200/50 transform hover:scale-105 active:scale-95 backdrop-blur-sm whitespace-nowrap">
-                            <i class="fas fa-eye mr-1 text-blue-600"></i>View
+                        <?php
+                            $fallbackPayload = [
+                                'type' => $type . ' Request',
+                                'status' => $status,
+                                'date' => $created,
+                                'reason' => $activity['reason'] ?? '',
+                                'explanation' => $activity['explanation'] ?? '',
+                            ];
+                            if (!empty($activity['request_id'])) { $fallbackPayload['request_id'] = $activity['request_id']; }
+                            if (!empty($activity['table_name'])) { $fallbackPayload['table_name'] = $activity['table_name']; }
+                            if (!empty($activity['source_table'])) { $fallbackPayload['source_table'] = $activity['source_table']; }
+                        ?>
+                        <button onclick="showActivityDetails('<?= $type ?> Request', `<?= htmlspecialchars(json_encode($fallbackPayload, JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
+                                class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
+                            View Details
                         </button>
                     <?php } ?>
-                    
-                    <?php
-                    // Check if status is pending, from pending table, and we have request ID and table name for unsubmit
-                    if (strtolower($status) === 'pending' && 
-                        isset($activity['request_id']) && 
-                        isset($activity['table_name']) &&
-                        isset($activity['source_table']) &&
-                        $activity['source_table'] === 'pending'): ?>
-                        <button onclick="unsubmitRequest(<?= $activity['request_id'] ?>, '<?= $activity['table_name'] ?>')" 
-                                class="inline-flex items-center px-2.5 py-1 text-xs font-semibold text-red-700 bg-gradient-to-r from-red-100/80 to-pink-100/60 hover:from-red-200/90 hover:to-pink-200/70 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ring-1 ring-red-200/50 transform hover:scale-105 active:scale-95 backdrop-blur-sm whitespace-nowrap">
-                            <i class="fas fa-times mr-1 text-red-600"></i>Unsubmit
-                        </button>
-                    <?php endif; ?>
                 </div>
             </td>
         </tr>
     <?php endforeach; ?>
 <?php else: ?>
                         <tr>
-                            <td colspan="4" class="px-4 py-8 text-center">
+                            <td colspan="4" class="px-6 py-12 text-center">
                                 <div class="flex flex-col items-center justify-center">
-                                    <div class="w-12 h-12 bg-gradient-to-br from-gray-100 to-slate-200 rounded-full flex items-center justify-center mb-3 ring-1 ring-gray-200/50 shadow-sm">
-                                        <i class="fas fa-inbox text-gray-400 text-lg opacity-70"></i>
+                                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                        <i class="fas fa-inbox text-gray-400 text-2xl"></i>
                                     </div>
-                                    <h3 class="text-sm font-bold text-gray-900 mb-1">No Recent Activity</h3>
-                                    <p class="text-gray-500 text-xs opacity-80">Activities will appear here when you submit requests.</p>
+                                    <h3 class="text-lg font-semibold text-gray-800 mb-1">No Recent Activity</h3>
+                                    <p class="text-gray-500 text-sm">Your activities will appear here once you submit requests.</p>
                                 </div>
                             </td>
                         </tr>
@@ -356,8 +383,272 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
     </div>
 </div>
 
+<!-- Activity Details Modal -->
+<div id="activityModal" class="fixed inset-0 z-50 items-center justify-center bg-black bg-opacity-60 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 border border-gray-200/80 transform transition-all duration-300 scale-95 opacity-0" id="modalContent">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50 rounded-t-xl">
+            <div class="flex items-center">
+                <div class="bg-blue-100 p-3 rounded-xl mr-4">
+                    <i class="fas fa-info-circle text-blue-500 text-xl"></i>
+                </div>
+                <h2 class="text-xl font-bold text-gray-800" id="modalTitle">Activity Details</h2>
+            </div>
+            <button onclick="closeActivityModal()" class="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-2 hover:bg-gray-200 rounded-full">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="p-6 space-y-5" id="modalBody">
+            <!-- Dynamic content will be inserted here -->
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="flex justify-between p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl" id="modalFooter">
+            <div id="unsubmitButtonContainer"></div>
+            <button onclick="closeActivityModal()" 
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-5 py-2 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform active:scale-95">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
-function unsubmitRequest(requestId, tableName) {
+function showActivityDetails(title, dataJson) {
+    try {
+        const data = JSON.parse(dataJson);
+        const modal = document.getElementById('activityModal');
+        const modalContent = document.getElementById('modalContent');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        
+        // Set modal title
+        modalTitle.textContent = data.type || title;
+        
+        // Build modal content based on request type
+        let content = '';
+        
+        // Status badge
+        const statusClass = getStatusBadgeClass(data.status);
+        content += `
+            <div class="flex items-start justify-between pb-4 border-b border-gray-200 mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">${data.type}</h3>
+                    <p class="text-sm text-gray-500">${data.date}</p>
+                </div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${statusClass}">
+                    ${getStatusIcon(data.status)} ${data.status}
+                </span>
+            </div>
+        `;
+        
+        // Type-specific fields
+        if (data.type.includes('Time Adjustment')) {
+            if (data.log_date) {
+                content += createInfoBlock('Target Date', data.log_date, 'fa-calendar-day');
+            }
+            
+            content += `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <h4 class="text-sm font-bold text-gray-700 mb-3">Time Changes</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="bg-gray-50 p-3 rounded-md">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Current</label>
+                            <p class="text-gray-800 font-semibold">${data.current_time_in} - ${data.current_time_out}</p>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-md">
+                            <label class="block text-xs font-medium text-green-600 mb-1">Requested</label>
+                            <p class="text-green-800 font-semibold">${data.requested_time_in} - ${data.requested_time_out}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (data.type.includes('Leave')) {
+            if (data.start_date && data.end_date) {
+                content += createInfoBlock('Leave Period', `${data.start_date} to ${data.end_date}`, 'fa-calendar-week');
+            }
+        } else if (data.type.includes('Schedule')) {
+            if (data.current_time_in && data.current_time_out && data.requested_time_in && data.requested_time_out) {
+                content += `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <h4 class="text-sm font-bold text-gray-700 mb-3">Schedule Changes</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="bg-gray-50 p-3 rounded-md">
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Current</label>
+                                <p class="text-gray-800 font-semibold">${data.current_time_in} - ${data.current_time_out}</p>
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded-md">
+                                <label class="block text-xs font-medium text-blue-600 mb-1">Requested</label>
+                                <p class="text-blue-800 font-semibold">${data.requested_time_in} - ${data.requested_time_out}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (data.start_date && data.end_date) {
+                content += createInfoBlock('Effective Period', `${data.start_date} to ${data.end_date}`, 'fa-calendar-alt');
+            }
+        } else if (data.type.includes('Overtime')) {
+            // Overtime details: Start, End, Duration, Type - prefer start_ot/end_ot over time_in/time_out
+            const details = [];
+            const startTime = data.start_ot || data.time_in;
+            const endTime = data.end_ot || data.time_out;
+            
+            if (startTime || endTime) {
+                details.push(`<div class=\"grid grid-cols-1 sm:grid-cols-2 gap-4\">` +
+                    `<div class=\"bg-gray-50 p-3 rounded-md\">`+
+                    `<label class=\"block text-xs font-medium text-gray-500 mb-1\">Start OT</label>`+
+                    `<p class=\"text-gray-800 font-semibold\">${startTime || '—'}</p>`+
+                    `</div>`+
+                    `<div class=\"bg-gray-50 p-3 rounded-md\">`+
+                    `<label class=\"block text-xs font-medium text-gray-500 mb-1\">End OT</label>`+
+                    `<p class=\"text-gray-800 font-semibold\">${endTime || '—'}</p>`+
+                    `</div>`+
+                `</div>`);
+            }
+            if (data.ot_duration) {
+                details.push(`<div class=\"bg-blue-50 p-3 rounded-md\">`+
+                    `<label class=\"block text-xs font-medium text-blue-600 mb-1\">Duration</label>`+
+                    `<p class=\"text-blue-800 font-semibold\">${data.ot_duration} hours</p>`+
+                `</div>`);
+            }
+            if (data.ot_type) {
+                details.push(`<div class=\"bg-green-50 p-3 rounded-md\">`+
+                    `<label class=\"block text-xs font-medium text-green-600 mb-1\">Type</label>`+
+                    `<p class=\"text-green-800 font-semibold\">${data.ot_type}</p>`+
+                `</div>`);
+            }
+            if (details.length) {
+                content += `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <h4 class="text-sm font-bold text-gray-700 mb-3">Overtime Details</h4>
+                        <div class="space-y-3">${details.join('')}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Employee reason
+        if (data.reason) {
+            content += createInfoBlock('Employee Reason', data.reason, 'fa-comment-dots', 'text-sm leading-relaxed');
+        }
+        
+        // Admin explanation (for declined/rejected requests)
+        if (data.explanation && ['declined', 'rejected', 'cancelled'].includes(data.status.toLowerCase())) {
+            content += createInfoBlock('Administrator Response', data.explanation, 'fa-user-shield', 'text-sm leading-relaxed text-red-700', 'bg-red-50 border-red-200');
+        }
+        
+        modalBody.innerHTML = content;
+        
+        // Add unsubmit button if applicable (status is 'pending' and we have unsubmit data)
+        const unsubmitContainer = document.getElementById('unsubmitButtonContainer');
+        unsubmitContainer.innerHTML = '';
+        
+        if (data.status && data.status.toLowerCase() === 'pending' && 
+            data.request_id && data.table_name) {
+            unsubmitContainer.innerHTML = `
+                <button onclick="unsubmitFromModal(${data.request_id}, '${data.table_name}', '${data.source_table}')" 
+                        class="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform active:scale-95 flex items-center">
+                    <i class="fas fa-undo mr-2"></i>Unsubmit Request
+                </button>
+            `;
+        }
+        
+        // Show modal with animation
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        
+        // Trigger animation
+        setTimeout(() => {
+            modalContent.classList.remove('scale-95', 'opacity-0');
+            modalContent.classList.add('scale-100', 'opacity-100');
+        }, 10);
+        
+    } catch (error) {
+        console.error('Error parsing activity data:', error);
+        alert('Error displaying activity details');
+    }
+}
+
+function createInfoBlock(label, value, icon, valueClass = 'font-semibold', containerClass = 'bg-gray-50') {
+    return `
+        <div class="border border-gray-200 rounded-lg p-4 ${containerClass}">
+            <label class="block text-sm font-medium text-gray-600 mb-2 flex items-center">
+                <i class="fas ${icon} mr-2 text-gray-400"></i>
+                ${label}
+            </label>
+            <p class="text-gray-800 ${valueClass}">${value}</p>
+        </div>
+    `;
+}
+
+function unsubmitFromModal(requestId, tableName, sourceTable) {
+    if (!confirm('Are you sure you want to unsubmit this request?')) {
+        return;
+    }
+    
+    // Call the existing unsubmitRequest function with sourceTable
+    unsubmitRequest(requestId, tableName, sourceTable);
+    
+    // Close the modal after initiating unsubmit (it will only reload if successful)
+    closeActivityModal();
+}
+
+function closeActivityModal() {
+    const modal = document.getElementById('activityModal');
+    const modalContent = document.getElementById('modalContent');
+    
+    // Animate out
+    modalContent.classList.remove('scale-100', 'opacity-100');
+    modalContent.classList.add('scale-95', 'opacity-0');
+    
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 300);
+}
+
+function getStatusBadgeClass(status) {
+    switch (status.toLowerCase()) {
+        case 'approved':
+            return 'bg-green-100 text-green-800';
+        case 'rejected':
+        case 'declined':
+        case 'cancelled':
+            return 'bg-red-100 text-red-800';
+        case 'pending':
+            return 'bg-yellow-100 text-yellow-800';
+        default:
+            return 'bg-gray-100 text-gray-700';
+    }
+}
+
+function getStatusIcon(status) {
+    return '';
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('activityModal');
+    if (event.target === modal) {
+        closeActivityModal();
+    }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('activityModal');
+        if (!modal.classList.contains('hidden')) {
+            closeActivityModal();
+        }
+    }
+});
+
+function unsubmitRequest(requestId, tableName, sourceTable = null) {
     // Enhanced confirmation dialog with better styling
     const confirmed = confirm('⚠️ Are you sure you want to unsubmit this request?\n\nThis action cannot be undone and will permanently remove the request from the system.');
     
@@ -370,11 +661,33 @@ function unsubmitRequest(requestId, tableName) {
     buttons.forEach(button => {
         if (button.textContent.trim().includes('Unsubmit')) {
             button.disabled = true;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1 text-red-600"></i><span class="text-red-700">Removing...</span>';
-            button.classList.add('opacity-75', 'cursor-not-allowed', 'animate-pulse');
-            button.classList.remove('hover:scale-105', 'hover:from-red-200/90', 'hover:to-pink-200/70', 'active:scale-95');
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Removing...';
+            button.classList.add('opacity-75', 'cursor-not-allowed');
         }
     });
+    
+    // Use sourceTable if provided, otherwise use tableName
+    let tableToUse = tableName; // default to tableName
+    
+    if (sourceTable) {
+        // Map source_table to actual table names
+        if (sourceTable === 'pending') {
+            // For pending requests, use the base table name
+            tableToUse = tableName;
+        } else if (sourceTable === 'post' || sourceTable === 'approved') {
+            // For processed requests, add 'post_' prefix if not already there
+            if (tableName && !tableName.startsWith('post_')) {
+                tableToUse = 'post_' + tableName;
+            } else {
+                tableToUse = tableName;
+            }
+        } else {
+            // For other cases, use tableName as is
+            tableToUse = tableName;
+        }
+    }
+    
+    console.log(`Unsubmit mapping - Original table: ${tableName}, Source: ${sourceTable}, Final table: ${tableToUse}`);
     
     // Make AJAX request to unsubmit
     fetch('../unsubmit_request.php', {
@@ -384,48 +697,62 @@ function unsubmitRequest(requestId, tableName) {
         },
         body: JSON.stringify({
             id: requestId,
-            table: tableName
+            table: tableToUse
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        // Check if response is ok first
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
-        if (data.success) {
+        console.log('Unsubmit response:', data); // Debug logging
+        
+        if (data.success === true) {
             // Show success message with better styling
-            alert('✅ Request successfully unsubmitted!\n\nThe page will now refresh to show updated activity.');
+            alert('✅ Request successfully unsubmitted! The page will now refresh.');
             
             // Add a fade out effect before reload
             buttons.forEach(button => {
                 if (button.textContent.includes('Removing')) {
-                    button.closest('tr').style.transition = 'all 0.5s ease-out';
-                    button.closest('tr').style.opacity = '0';
-                    button.closest('tr').style.transform = 'translateX(100px)';
+                    const row = button.closest('tr');
+                    if (row) {
+                        row.style.transition = 'all 0.5s ease-out';
+                        row.style.opacity = '0';
+                        row.style.transform = 'translateX(100px)';
+                    }
                 }
             });
             
+            // Only reload on actual success
             setTimeout(() => location.reload(), 500);
         } else {
-            // Show error message and restore button
+            // Show error message and restore button - DO NOT RELOAD
+            console.error('Unsubmit failed:', data);
             alert('❌ Error: ' + (data.message || 'Failed to unsubmit request'));
+            
+            // Restore button state
             buttons.forEach(button => {
                 if (button.textContent.includes('Removing')) {
                     button.disabled = false;
-                    button.innerHTML = '<i class="fas fa-times mr-1 text-red-600"></i>Unsubmit';
-                    button.classList.remove('opacity-75', 'cursor-not-allowed', 'animate-pulse');
-                    button.classList.add('hover:scale-105', 'hover:from-red-200/90', 'hover:to-pink-200/70', 'active:scale-95');
+                    button.innerHTML = '<i class="fas fa-times mr-1.5"></i>Unsubmit';
+                    button.classList.remove('opacity-75', 'cursor-not-allowed');
                 }
             });
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('Network/Parse Error:', error);
         alert('🔥 Network error occurred. Please check your connection and try again.');
-        // Restore button
+        
+        // Restore button state
         buttons.forEach(button => {
             if (button.textContent.includes('Removing')) {
                 button.disabled = false;
-                button.innerHTML = '<i class="fas fa-times mr-1 text-red-600"></i>Unsubmit';
-                button.classList.remove('opacity-75', 'cursor-not-allowed', 'animate-pulse');
-                button.classList.add('hover:scale-105', 'hover:from-red-200/90', 'hover:to-pink-200/70', 'active:scale-95');
+                button.innerHTML = '<i class="fas fa-times mr-1.5"></i>Unsubmit';
+                button.classList.remove('opacity-75', 'cursor-not-allowed');
             }
         });
     });
@@ -433,34 +760,16 @@ function unsubmitRequest(requestId, tableName) {
 
 // Add smooth scroll animation and enhanced interactions
 document.addEventListener('DOMContentLoaded', function() {
-    const tableContainer = document.querySelector('.max-h-64');
-    if (tableContainer) {
-        tableContainer.style.scrollBehavior = 'smooth';
-    }
-    
-    // Add subtle animations on page load
-    const activityRows = document.querySelectorAll('tbody tr');
-    activityRows.forEach((row, index) => {
-        if (row.children.length > 1) { // Not the empty state row
-            row.style.opacity = '0';
-            row.style.transform = 'translateY(20px)';
-            row.style.transition = 'all 0.4s ease-out';
-            
-            setTimeout(() => {
-                row.style.opacity = '1';
-                row.style.transform = 'translateY(0)';
-            }, index * 100);
-        }
-    });
-    
     // Enhanced hover effects for the entire card
-    const card = document.querySelector('[class*="rounded-2xl shadow-lg"]');
+    const card = document.querySelector('.bg-white.rounded-xl.shadow-sm');
     if (card) {
         card.addEventListener('mouseenter', function() {
+            this.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
             this.style.transform = 'translateY(-2px)';
         });
         
         card.addEventListener('mouseleave', function() {
+            this.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)';
             this.style.transform = 'translateY(0)';
         });
     }
