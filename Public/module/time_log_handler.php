@@ -30,6 +30,7 @@ $action = $_POST['action'] ?? '';
 $original_log_date = $_POST['original_log_date'] ?? date('Y-m-d');
 $is_overnight = $_POST['is_overnight'] ?? '0';
 $is_incomplete = $_POST['is_incomplete'] ?? '0';
+$has_incomplete_previous = $_POST['has_incomplete_previous'] ?? '0';
 $current_time = date('H:i:s');
 $today = date('Y-m-d');
 
@@ -39,26 +40,31 @@ try {
     if (isset($_POST['time_in'])) {
         // Handle Time In (including reset for incomplete shifts)
         
-        // FIRST: If this is an incomplete shift reset, completely clean up ALL records for this employee
+        // FIRST: Check if user has incomplete previous shift - block time-in if so
+        if ($has_incomplete_previous === '1') {
+            throw new Exception("You cannot log in for today until you complete your previous shift. Please use the 'Complete Previous Shift' button first.");
+        }
+        
+        // SECOND: If this is an incomplete shift reset, completely clean up ALL records for this employee
         if ($is_incomplete === '1') {
             // Delete ALL incomplete records for this employee
             $cleanupAllIncompleteStmt = $pdo->prepare("DELETE FROM time_logs WHERE employee_id = ? AND status = 'incomplete'");
             $cleanupAllIncompleteStmt->execute([$employee_id]);
             
             // Also delete any records from the original incomplete date to ensure clean slate
-            $cleanupOriginalDateStmt = $pdo->prepare("DELETE FROM time_logs WHERE employee_id = ? AND log_date = ? AND time_out = 'INC'");
+            $cleanupOriginalDateStmt = $pdo->prepare("DELETE FROM time_logs WHERE employee_id = ? AND log_date = ? AND status = 'incomplete'");
             $cleanupOriginalDateStmt->execute([$employee_id, $original_log_date]);
             
             error_log("RESET: Deleted all incomplete records for employee $employee_id from date $original_log_date");
         }
         
-        // Auto-mark and clean up any OTHER shifts that should be incomplete (older than 12 hours)
+        // Auto-mark and clean up any OTHER shifts that should be incomplete (older than 14 hours)
         $autoMarkIncompleteStmt = $pdo->prepare("
             UPDATE time_logs 
-            SET time_out = 'INC', status = 'incomplete' 
+            SET time_out = NULL, status = 'incomplete' 
             WHERE employee_id = ? 
             AND time_out IS NULL 
-            AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) >= 12
+            AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) >= 14
             AND status != 'incomplete'
         ");
         $autoMarkIncompleteStmt->execute([$employee_id]);
@@ -135,7 +141,34 @@ try {
     } elseif (isset($_POST['time_out'])) {
         // Handle Time Out
         
-        if ($is_overnight === '1') {
+        if ($has_incomplete_previous === '1') {
+            // Handle completing previous incomplete shift
+            
+            // Find the open shift from the original date (yesterday)
+            $findStmt = $pdo->prepare("SELECT id, time_in, log_date FROM time_logs 
+                WHERE employee_id = ? AND time_out IS NULL AND log_date = ? AND (status IS NULL OR status = 'active')");
+            $findStmt->execute([$employee_id, $original_log_date]);
+            $openShift = $findStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$openShift) {
+                throw new Exception("No open shift found from " . date('F j, Y', strtotime($original_log_date)) . " to complete.");
+            }
+            
+            // Update the existing record with time out and log_out_date (today since completing previous shift today)
+            $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ?, log_out_date = ?, status = 'completed' WHERE id = ?");
+            $updateStmt->execute([$current_time, $today, $openShift['id']]);
+            
+            $formatted_date = date('F j, Y', strtotime($original_log_date));
+            $formatted_out_date = date('F j, Y', strtotime($today));
+            
+            // Show both dates if they're different (cross-midnight completion)
+            if ($original_log_date !== $today) {
+                $message = "Previous shift from $formatted_date completed successfully on $formatted_out_date at " . date('h:i A', strtotime($current_time));
+            } else {
+                $message = "Previous shift from $formatted_date completed successfully at " . date('h:i A', strtotime($current_time));
+            }
+            
+        } elseif ($is_overnight === '1') {
             // Handle overnight shift completion
             
             // Find the open overnight shift
@@ -148,17 +181,25 @@ try {
                 throw new Exception("No open overnight shift found to complete.");
             }
             
-            // Update the existing record with time out
-            $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ?, status = 'completed' WHERE id = ?");
-            $updateStmt->execute([$current_time, $openShift['id']]);
+            // Update the existing record with time out and log_out_date (today since completing overnight shift today)
+            $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ?, log_out_date = ?, status = 'completed' WHERE id = ?");
+            $updateStmt->execute([$current_time, $today, $openShift['id']]);
             
-            $message = "Overnight shift completed successfully at " . date('h:i A', strtotime($current_time));
+            $formatted_date = date('F j, Y', strtotime($original_log_date));
+            $formatted_out_date = date('F j, Y', strtotime($today));
+            
+            // Show both dates for overnight shift completion
+            if ($original_log_date !== $today) {
+                $message = "Overnight shift from $formatted_date completed successfully on $formatted_out_date at " . date('h:i A', strtotime($current_time));
+            } else {
+                $message = "Overnight shift completed successfully at " . date('h:i A', strtotime($current_time));
+            }
             
         } else {
             // Handle regular time out
             
             // Find today's time in record
-            $findStmt = $pdo->prepare("SELECT id, time_in FROM time_logs 
+            $findStmt = $pdo->prepare("SELECT id, time_in, log_date FROM time_logs 
                 WHERE employee_id = ? AND log_date = ? AND time_out IS NULL AND (status IS NULL OR status = 'active')");
             $findStmt->execute([$employee_id, $today]);
             $todayRecord = $findStmt->fetch(PDO::FETCH_ASSOC);
@@ -167,9 +208,23 @@ try {
                 throw new Exception("No active time in record found for today.");
             }
             
-            // Update with time out
-            $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ?, status = 'completed' WHERE id = ?");
-            $updateStmt->execute([$current_time, $todayRecord['id']]);
+            // Determine if this is a cross-midnight shift
+            $time_in_hour = (int)date('H', strtotime($todayRecord['time_in']));
+            $time_out_hour = (int)date('H', strtotime($current_time));
+            $log_out_date = $today; // Default to same day
+            
+            // Check for cross-midnight scenario (night shift that extends to next day)
+            // If time_in is in evening/night (after 6 PM) and time_out is in early morning (before 6 AM)
+            if ($time_in_hour >= 18 && $time_out_hour < 6) {
+                // This appears to be a cross-midnight shift, but employee is clocking out same day
+                // Keep log_out_date as today but this indicates a very long shift or error
+                $log_out_date = $today;
+            }
+            // For normal shifts or shifts that don't cross midnight, use same day
+            
+            // Update with time out and log_out_date
+            $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ?, log_out_date = ?, status = 'completed' WHERE id = ?");
+            $updateStmt->execute([$current_time, $log_out_date, $todayRecord['id']]);
             
             $message = "Time Out logged successfully at " . date('h:i A', strtotime($current_time));
         }

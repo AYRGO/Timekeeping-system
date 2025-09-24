@@ -27,115 +27,103 @@ $time_out = null;
 $is_overnight_shift = false;
 $original_log_date = $today;
 $shift_status = null;
+$has_incomplete_previous_shift = false;
+$incomplete_shift_date = null;
+$incomplete_shift_time_in = null;
 
 // Check if this is a reset request (cache busting parameter)
 $is_reset_request = isset($_GET['reset']);
 
-// First, check and mark incomplete shifts (time-ins older than 14 hours without time-out)
-// Only process recent shifts (within last 2 days) to prevent old data issues
-$incompleteStmt = $pdo->prepare("
-    UPDATE time_logs 
-    SET time_out = 'INC', status = 'incomplete' 
+// STEP 1: Check for incomplete shift from yesterday ONLY (1 day ago)
+// This prevents users from logging in today if they have an active shift from yesterday
+$incompleteCheckStmt = $pdo->prepare("
+    SELECT time_in, log_date 
+    FROM time_logs 
     WHERE employee_id = ? 
+    AND log_date = ? 
+    AND time_in IS NOT NULL 
     AND time_out IS NULL 
-    AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) >= 14
     AND status != 'incomplete'
-    AND log_date >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
+    LIMIT 1
 ");
-$incompleteStmt->execute([$employee_id]);
+$incompleteCheckStmt->execute([$employee_id, $yesterday]);
+$incompleteFromYesterday = $incompleteCheckStmt->fetch(PDO::FETCH_ASSOC);
 
-// Also check if any previously marked incomplete shifts should be reactivated (within 14 hours)
-// Only check recent shifts to prevent old data conflicts
-$reactivateStmt = $pdo->prepare("
-    UPDATE time_logs 
-    SET time_out = NULL, status = 'active' 
-    WHERE employee_id = ? 
-    AND status = 'incomplete' 
-    AND time_out = 'INC'
-    AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) < 14
-    AND log_date >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
-");
-$reactivateStmt->execute([$employee_id]);
-
-// Log any incomplete shifts that were just marked
-if ($incompleteStmt->rowCount() > 0) {
-    error_log("Marked " . $incompleteStmt->rowCount() . " incomplete shifts for employee $employee_id");
+if ($incompleteFromYesterday) {
+    $has_incomplete_previous_shift = true;
+    $incomplete_shift_date = $incompleteFromYesterday['log_date'];
+    $incomplete_shift_time_in = $incompleteFromYesterday['time_in'];
+    error_log("Found incomplete shift from yesterday for employee $employee_id: " . $incomplete_shift_date . " " . $incomplete_shift_time_in);
 }
 
-// Log any reactivated shifts
-if ($reactivateStmt->rowCount() > 0) {
-    error_log("Reactivated " . $reactivateStmt->rowCount() . " shifts within 14h window for employee $employee_id");
+// STEP 2: Mark shifts older than 14 hours as incomplete (system cleanup)
+// DISABLED - Do not auto-mark shifts as incomplete in database
+// Let the UI logic handle the display based on duration
+// $oldIncompleteStmt = $pdo->prepare("
+//     UPDATE time_logs 
+//     SET status = 'incomplete' 
+//     WHERE employee_id = ? 
+//     AND time_out IS NULL 
+//     AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) >= 14
+//     AND status != 'incomplete'
+// ");
+// $oldIncompleteStmt->execute([$employee_id]);
+
+$auto_marked_count = 0; // No auto-marking
+
+if ($auto_marked_count > 0) {
+    error_log("Marked " . $auto_marked_count . " old shifts as incomplete for employee $employee_id");
 }
 
-// Auto-reset display: Don't show incomplete shifts older than 14 hours (keep DB record but reset interface)
-// This allows overnight shifts (like 10pm-6am) to complete normally within 14 hours
-
-// Priority 1: Check for today's regular time log (exclude incomplete ones)
-$stmt = $pdo->prepare("SELECT time_in, time_out, log_date, status FROM time_logs WHERE employee_id = ? AND log_date = ? AND status != 'incomplete' ORDER BY id DESC LIMIT 1");
-$stmt->execute([$employee_id, $today]);
-$todayLog = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if ($todayLog) {
-    // There's a regular log for today
-    $time_in = $todayLog['time_in'];
-    $time_out = $todayLog['time_out'];
-    $original_log_date = $todayLog['log_date'];
-    $shift_status = $todayLog['status'] ?? 'active';
-    error_log("Found today's log for employee $employee_id: time_in=$time_in, time_out=$time_out, status=$shift_status");
-} else {
-    // Priority 2: Check for overnight shift from YESTERDAY ONLY (exclude incomplete ones)
-    // Only check yesterday to prevent old incomplete shifts from showing
-    $overnightStmt = $pdo->prepare("SELECT time_in, time_out, log_date, status FROM time_logs 
-        WHERE employee_id = ? AND time_out IS NULL AND log_date = ? AND status != 'incomplete'
-        ORDER BY id DESC 
-        LIMIT 1");
-    $overnightStmt->execute([$employee_id, $yesterday]);
-    $overnightLog = $overnightStmt->fetch(PDO::FETCH_ASSOC);
+// STEP 3: Determine current shift logic
+if ($has_incomplete_previous_shift) {
+    // User has incomplete shift from yesterday - determine if it's overnight or truly incomplete
+    $time_in = $incomplete_shift_time_in;
+    $time_out = null;
+    $original_log_date = $incomplete_shift_date;
     
-    if ($overnightLog) {
-        // Found an open overnight shift
-        $time_in = $overnightLog['time_in'];
-        $time_out = null; // Still open
-        $is_overnight_shift = true;
-        $original_log_date = $overnightLog['log_date'];
-        $shift_status = $overnightLog['status'] ?? 'active';
+    // Calculate hours elapsed
+    $time_in_datetime = new DateTime($incomplete_shift_date . ' ' . $incomplete_shift_time_in);
+    $now = new DateTime();
+    $hours_since_time_in = ($now->getTimestamp() - $time_in_datetime->getTimestamp()) / 3600;
+    
+    // Determine if this should be treated as an overnight shift based on time_in
+    $time_in_hour = (int)date('H', strtotime($incomplete_shift_time_in));
+    $time_in_minute = (int)date('i', strtotime($incomplete_shift_time_in));
+    $time_in_decimal = $time_in_hour + ($time_in_minute / 60);
+    $is_likely_overnight_shift = $time_in_decimal >= 16.5; // 4:30 PM or later
+    
+    if ($hours_since_time_in >= 14) {
+        // Show incomplete card for ANY shift (normal or overnight) that exceeds 14 hours
+        // But don't change database status - just the UI display
+        $is_overnight_shift = false; // Force incomplete card display (red)
+        $shift_status = 'incomplete'; // UI status, not database status
+        $shift_type = $is_likely_overnight_shift ? "overtime" : "normal";
+        error_log("Showing incomplete UI (14+ hrs, $shift_type shift) for employee $employee_id: " . $incomplete_shift_date . " " . $incomplete_shift_time_in);
     } else {
-        // Priority 3: Only show incomplete shift if no active shifts exist AND not a reset request
-        if (!$is_reset_request) {
-            $activeShiftCheck = $pdo->prepare("SELECT COUNT(*) FROM time_logs WHERE employee_id = ? AND status = 'active' AND time_out IS NULL");
-            $activeShiftCheck->execute([$employee_id]);
-            $hasActiveShift = $activeShiftCheck->fetchColumn() > 0;
-            
-            if (!$hasActiveShift) {
-                // Check if there's a RECENT incomplete shift to show (within last 2 days only)
-                $incompleteStmt = $pdo->prepare("SELECT time_in, time_out, log_date, status FROM time_logs 
-                    WHERE employee_id = ? AND status = 'incomplete' AND log_date >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
-                    ORDER BY log_date DESC, id DESC LIMIT 1");
-                $incompleteStmt->execute([$employee_id]);
-                $incompleteLog = $incompleteStmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($incompleteLog) {
-                    // Check if 14+ hours have passed since time-in - if so, auto-reset display (keep DB record)
-                    $timeInTimestamp = strtotime($incompleteLog['log_date'] . ' ' . $incompleteLog['time_in']);
-                    $hoursSinceTimeIn = (time() - $timeInTimestamp) / 3600;
-                    
-                    if ($hoursSinceTimeIn >= 14) {
-                        // Auto-reset: 14+ hours passed, start fresh interface (DB record preserved)
-                        error_log("Auto-reset: 14+ hours passed since time-in for employee $employee_id, starting fresh interface");
-                        // Leave all values as null for fresh start
-                    } else {
-                        // Show incomplete shift if within 14 hours (allows overnight shifts to complete)
-                        $time_in = $incompleteLog['time_in'];
-                        $time_out = $incompleteLog['time_out'];
-                        $original_log_date = $incompleteLog['log_date'];
-                        $shift_status = 'incomplete';
-                        error_log("Showing incomplete shift within 14h window: " . number_format($hoursSinceTimeIn, 1) . " hours since time-in");
-                    }
-                }
-            }
-        }
-        // If it's a reset request or no incomplete shifts, leave everything as null for fresh start
+        // Shift is under 14 hours - show appropriate card based on start time
+        $is_overnight_shift = $is_likely_overnight_shift;
+        $shift_status = 'active';
+        error_log("Showing " . ($is_overnight_shift ? "overnight" : "regular") . " shift from yesterday for completion: $incomplete_shift_date $incomplete_shift_time_in");
     }
+} else {
+    // No incomplete shift from yesterday - check today's logs normally
+    
+    // Priority 1: Check for today's regular time log (exclude incomplete ones)
+    $stmt = $pdo->prepare("SELECT time_in, time_out, log_date, log_out_date, status FROM time_logs WHERE employee_id = ? AND log_date = ? AND status != 'incomplete' ORDER BY id DESC LIMIT 1");
+    $stmt->execute([$employee_id, $today]);
+    $todayLog = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($todayLog) {
+        // There's a regular log for today
+        $time_in = $todayLog['time_in'];
+        $time_out = $todayLog['time_out'];
+        $original_log_date = $todayLog['log_date'];
+        $log_out_date = $todayLog['log_out_date'] ?? null;
+        $shift_status = $todayLog['status'] ?? 'active';
+        error_log("Found today's log for employee $employee_id: time_in=$time_in, time_out=$time_out, log_out_date=$log_out_date, status=$shift_status");
+    }
+    // If no logs found, all variables remain null for fresh start
 }
 
 // Check for approved time adjustment for the relevant date
@@ -149,6 +137,7 @@ if ($adj) {
     // Use adjusted time if available
     $time_in = $adj['requested_time_in'] ?? $time_in;
     $time_out = $adj['requested_time_out'] ?? $time_out;
+    // Note: log_out_date from adjustments not yet implemented in table schema
 }
 
 // Format times for display
@@ -157,15 +146,53 @@ $display_time_out = $time_out ? date('H:i:s', strtotime($time_out)) : null;
 
 // Calculate working duration
 $workingDuration = '';
+$is_cross_midnight = false;
+$cross_midnight_indicator = '';
+
 if ($display_time_in && $display_time_out) {
-    $start = new DateTime($time_in);
-    $end = new DateTime($time_out);
+    // Create DateTime objects for calculation
+    $start = new DateTime($original_log_date . ' ' . $time_in);
     
-    // Handle overnight calculation
-    if ($is_overnight_shift || ($end < $start)) {
-        $end->add(new DateInterval('P1D')); // Add one day for overnight shifts
+    // Use log_out_date if available, otherwise fall back to original logic
+    if ($log_out_date && $log_out_date !== $original_log_date) {
+        // log_out_date is different from log_date - definitely cross-midnight
+        $end = new DateTime($log_out_date . ' ' . $time_out);
+        $is_cross_midnight = true;
+    } else {
+        // Same date or no log_out_date - use original date with fallback logic
+        $end = new DateTime($original_log_date . ' ' . $time_out);
+        
+        // Detect cross-midnight scenarios using original logic as fallback
+        if ($is_overnight_shift || ($end < $start)) {
+            // Confirmed overnight shift - time out is next day
+            $end->add(new DateInterval('P1D')); // Add one day for overnight shifts
+            $is_cross_midnight = true;
+        } else {
+            // Additional check: if shift duration seems too short (< 6 hours) 
+            // and it's a reasonable work shift, likely cross-midnight
+            $normalDiff = $start->diff($end);
+            $normalHours = ($normalDiff->days * 24) + $normalDiff->h + ($normalDiff->i / 60);
+            
+            // If duration is less than 6 hours but the employee logged significant time,
+            // AND time_in is after typical shift start (like 4:30 PM or later),
+            // it's likely a night shift that crosses midnight
+            $time_in_hour = (int)date('H', strtotime($time_in));
+            $time_in_minute = (int)date('i', strtotime($time_in));
+            $time_in_decimal = $time_in_hour + ($time_in_minute / 60);
+            
+            if ($normalHours < 6 && $time_in_decimal >= 16.5) {
+                // Night shift starting 4:30 PM or later with short duration = likely cross-midnight
+                $end->add(new DateInterval('P1D'));
+                $is_cross_midnight = true;
+            } elseif ($normalHours < 4 && $time_in_decimal >= 15.0) {
+                // Afternoon shift starting 3:00 PM or later with very short duration = likely cross-midnight
+                $end->add(new DateInterval('P1D'));
+                $is_cross_midnight = true;
+            }
+        }
     }
     
+    // Calculate final duration
     $diff = $start->diff($end);
     $totalHours = ($diff->days * 24) + $diff->h + ($diff->i / 60);
     
@@ -175,7 +202,13 @@ if ($display_time_in && $display_time_out) {
     }
     
     if ($totalHours < 0) $totalHours = 0;
+    
+    // Format duration with cross-midnight indicator
     $workingDuration = number_format($totalHours, 2) . ' hours';
+    if ($is_cross_midnight) {
+        $cross_midnight_indicator = ' (next day)';
+        $workingDuration .= $cross_midnight_indicator;
+    }
 }
 
 // Check if current shift is marked as incomplete
@@ -202,9 +235,9 @@ if ($is_reset_request && !$is_incomplete_shift) {
 }
 
 // Determine current shift status with improved logic
-$can_time_in = !$time_in && !$is_incomplete_shift; // Only allow time-in if no active time-in exists
-$can_time_out = $time_in && !$time_out; // Allow time-out if there's a time-in but no time-out (including incomplete)
-$shift_complete = $time_in && $time_out && !$is_incomplete_shift;
+$can_time_in = !$time_in && !$has_incomplete_previous_shift; // Block time-in if incomplete previous shift exists
+$can_time_out = $time_in && !$time_out; // Allow time-out if there's a time-in but no time-out
+$shift_complete = $time_in && $time_out && !$has_incomplete_previous_shift;
 
 // Check for manual shift completion confirmation
 $shift_manually_completed = false;
@@ -320,14 +353,26 @@ if ($is_overnight_shift && $time_out) {
     <div class="flex items-center justify-between mb-6">
         <h3 class="text-2xl font-semibold text-gray-800 flex items-center">
             <i class="fas fa-user-clock mr-3 text-green-500 bg-green-100 p-2 rounded-full"></i>
-            <?php if ($is_overnight_shift): ?>
+            <?php if ($has_incomplete_previous_shift && $shift_status === 'incomplete'): ?>
+                Incomplete Shift
+            <?php elseif ($has_incomplete_previous_shift && $is_overnight_shift): ?>
+                Complete Overnight Shift
+            <?php elseif ($is_overnight_shift): ?>
                 Overnight Shift Status
             <?php elseif ($is_incomplete_shift): ?>
                 Incomplete Shift - Reset Available
             <?php else: ?>
                 Today's Time Log
             <?php endif; ?>
-            <?php if ($is_overnight_shift): ?>
+            <?php if ($has_incomplete_previous_shift && $is_overnight_shift): ?>
+                <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    <i class="fas fa-moon mr-1"></i>Overnight
+                </span>
+            <?php elseif ($is_cross_midnight && $display_time_out): ?>
+                <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    <i class="fas fa-moon mr-1"></i>Cross-Midnight Shift
+                </span>
+            <?php elseif ($is_overnight_shift): ?>
                 <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                     <i class="fas fa-moon mr-1"></i>Started: <?= date('M j', strtotime($original_log_date)) ?>
                 </span>
@@ -340,25 +385,12 @@ if ($is_overnight_shift && $time_out) {
         <span id="dashboardClock" class="text-sm font-mono text-gray-500 tracking-wide">--:--:-- --</span>
     </div>
 
-    <!-- Incomplete Shift Warning -->
-    <?php if ($is_incomplete_shift): ?>
-    <div class="mb-4 p-3 bg-red-50 border-l-4 border-red-400 rounded">
-        <div class="flex">
-            <div class="flex-shrink-0">
-                <i class="fas fa-exclamation-triangle text-red-400"></i>
-            </div>
-            <div class="ml-3">
-                <p class="text-sm text-red-700">
-                    ⚠️ Your previous shift was marked as incomplete due to missing time-out (14+ hours passed). 
-                    You can now start a new shift.
-                </p>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
+
+
+    <?php // Removed incomplete shift warning message ?>
 
     <!-- Overnight Shift Warning -->
-    <?php if ($is_overnight_shift): ?>
+    <?php if ($is_overnight_shift && !$has_incomplete_previous_shift): ?>
     <div class="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
         <div class="flex">
             <div class="flex-shrink-0">
@@ -412,17 +444,54 @@ if ($is_overnight_shift && $time_out) {
     <!-- Time Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
         <!-- Time In -->
-        <div class="flex items-center p-5 rounded-xl border <?= $is_incomplete_shift ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50' ?> shadow-inner hover:shadow transition">
-            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr <?= $is_incomplete_shift ? 'from-red-300 to-red-500' : 'from-green-300 to-green-500' ?> text-white mr-4">
+        <div class="flex items-center p-5 rounded-xl border <?php
+            if ($has_incomplete_previous_shift && $shift_status === 'incomplete') {
+                echo 'border-red-200 bg-red-50';
+            } elseif ($has_incomplete_previous_shift && $is_overnight_shift) {
+                echo 'border-blue-200 bg-blue-50';
+            } elseif ($is_overnight_shift) {
+                echo 'border-blue-200 bg-blue-50';
+            } elseif ($is_incomplete_shift) {
+                echo 'border-red-200 bg-red-50';
+            } else {
+                echo 'border-green-200 bg-green-50';
+            }
+        ?> shadow-inner hover:shadow transition">
+            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr <?php
+            if ($has_incomplete_previous_shift && $shift_status === 'incomplete') {
+                echo 'from-red-300 to-red-500';
+            } elseif ($has_incomplete_previous_shift && $is_overnight_shift) {
+                echo 'from-blue-300 to-blue-500';
+            } elseif ($is_overnight_shift) {
+                echo 'from-blue-300 to-blue-500';
+            } elseif ($is_incomplete_shift) {
+                echo 'from-red-300 to-red-500';
+            } else {
+                echo 'from-green-300 to-green-500';
+            }
+        ?> text-white mr-4">
                 <i class="fas fa-sign-in-alt"></i>
             </div>
             <div>
                 <p class="text-sm text-gray-600">Time In</p>
                 <p class="text-2xl font-extrabold text-gray-900">
                     <?= $display_time_in ? date("h:i A", strtotime($display_time_in)) : '—'; ?>
+                    <?php if ($is_cross_midnight && $display_time_in): ?>
+                        <div class="text-sm font-medium text-green-700 mt-1">
+                            on <?= date("M j, Y", strtotime($original_log_date)) ?>
+                        </div>
+                    <?php endif; ?>
                 </p>
-                <?php if ($is_overnight_shift && $display_time_in): ?>
-                    <p class="text-xs text-gray-500"><?= date('M j', strtotime($original_log_date)) ?></p>
+                <?php if ($has_incomplete_previous_shift && $shift_status === 'incomplete' && $display_time_in): ?>
+                    <p class="text-xs text-red-500"><?= date('M j', strtotime($original_log_date)) ?> - Incomplete</p>
+                <?php elseif (($has_incomplete_previous_shift && $is_overnight_shift) && $display_time_in): ?>
+                    <p class="text-xs text-blue-500"><?= date('M j', strtotime($original_log_date)) ?> - Overnight</p>
+                <?php elseif ($is_cross_midnight && $display_time_in): ?>
+                    <p class="text-xs text-green-600 font-medium">
+                        <i class="fas fa-calendar mr-1"></i>Start Date
+                    </p>
+                <?php elseif ($is_overnight_shift && $display_time_in): ?>
+                    <p class="text-xs text-blue-500"><?= date('M j', strtotime($original_log_date)) ?> - Overnight</p>
                 <?php elseif ($is_incomplete_shift && $display_time_in): ?>
                     <p class="text-xs text-red-500">Incomplete Shift</p>
                 <?php endif; ?>
@@ -430,21 +499,66 @@ if ($is_overnight_shift && $time_out) {
         </div>
 
         <!-- Time Out -->
-        <div class="flex items-center p-5 rounded-xl border <?= $is_incomplete_shift ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50' ?> shadow-inner hover:shadow transition">
-            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr <?= $is_incomplete_shift ? 'from-red-300 to-red-500' : 'from-yellow-300 to-yellow-500' ?> text-white mr-4">
+        <div class="flex items-center p-5 rounded-xl border <?php
+            if ($has_incomplete_previous_shift && $shift_status === 'incomplete') {
+                echo 'border-red-200 bg-red-50';
+            } elseif ($has_incomplete_previous_shift && $is_overnight_shift) {
+                echo 'border-blue-200 bg-blue-50';
+            } elseif ($is_overnight_shift) {
+                echo 'border-blue-200 bg-blue-50';
+            } elseif ($is_incomplete_shift) {
+                echo 'border-red-200 bg-red-50';
+            } else {
+                echo 'border-yellow-200 bg-yellow-50';
+            }
+        ?> shadow-inner hover:shadow transition">
+            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr <?php
+            if ($has_incomplete_previous_shift && $shift_status === 'incomplete') {
+                echo 'from-red-300 to-red-500';
+            } elseif ($has_incomplete_previous_shift && $is_overnight_shift) {
+                echo 'from-blue-300 to-blue-500';
+            } elseif ($is_overnight_shift) {
+                echo 'from-blue-300 to-blue-500';
+            } elseif ($is_incomplete_shift) {
+                echo 'from-red-300 to-red-500';
+            } else {
+                echo 'from-yellow-300 to-yellow-500';
+            }
+        ?> text-white mr-4">
                 <i class="fas fa-sign-out-alt"></i>
             </div>
             <div>
                 <p class="text-sm text-gray-600">Time Out</p>
                 <p class="text-2xl font-extrabold text-gray-900">
-                    <?php if ($is_incomplete_shift): ?>
+                    <?php if ($has_incomplete_previous_shift && $shift_status === 'incomplete'): ?>
+                        <span class="text-red-600">REQUIRED</span>
+                    <?php elseif ($has_incomplete_previous_shift && $is_overnight_shift): ?>
+                        <span class="text-blue-600">REQUIRED</span>
+                    <?php elseif ($is_overnight_shift): ?>
+                        <span class="text-blue-600">REQUIRED</span>
+                    <?php elseif ($is_incomplete_shift): ?>
                         <span class="text-red-600">INC</span>
+                    <?php elseif ($is_cross_midnight && $display_time_out): ?>
+                        <?= date("h:i A", strtotime($display_time_out)) ?>
+                        <div class="text-sm font-medium text-blue-700 mt-1">
+                            on <?= date("M j, Y", strtotime($original_log_date . ' +1 day')) ?>
+                        </div>
                     <?php else: ?>
                         <?= $display_time_out ? date("h:i A", strtotime($display_time_out)) : '—'; ?>
                     <?php endif; ?>
                 </p>
-                <?php if ($is_overnight_shift && $display_time_out): ?>
-                    <p class="text-xs text-gray-500">Today</p>
+                <?php if ($has_incomplete_previous_shift && $shift_status === 'incomplete'): ?>
+                    <p class="text-xs text-red-500">Complete previous shift</p>
+                <?php elseif ($has_incomplete_previous_shift && $is_overnight_shift): ?>
+                    <p class="text-xs text-blue-500">Complete overnight shift</p>
+                <?php elseif ($is_cross_midnight && $display_time_out): ?>
+                    <p class="text-xs text-blue-600 font-medium">
+                        <i class="fas fa-calendar mr-1"></i>Next Day Time Out
+                    </p>
+                <?php elseif ($is_overnight_shift && $display_time_out): ?>
+                    <p class="text-xs text-blue-500">Today</p>
+                <?php elseif ($is_overnight_shift): ?>
+                    <p class="text-xs text-blue-500">Complete shift when finished</p>
                 <?php elseif ($is_incomplete_shift): ?>
                     <p class="text-xs text-red-500">Auto-marked after 14hrs</p>
                 <?php endif; ?>
@@ -453,12 +567,31 @@ if ($is_overnight_shift && $time_out) {
     </div>
 
     <!-- Working Duration -->
-    <?php if ($workingDuration && !$is_incomplete_shift): ?>
-    <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+    <?php if ($workingDuration && !$is_incomplete_shift && !$has_incomplete_previous_shift): ?>
+    <div class="mb-4 p-3 <?= $is_cross_midnight ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50' ?> rounded-lg">
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-600">Working Duration:</span>
-            <span class="font-semibold text-gray-800"><?= $workingDuration ?></span>
+            <span class="text-sm <?= $is_cross_midnight ? 'text-blue-700' : 'text-gray-600' ?>">
+                Working Duration:
+                <?php if ($is_cross_midnight): ?>
+                    <span class="text-xs text-blue-600 ml-1">
+                        <i class="fas fa-moon"></i> Cross-Midnight Shift
+                    </span>
+                <?php endif; ?>
+            </span>
+            <span class="font-semibold <?= $is_cross_midnight ? 'text-blue-800' : 'text-gray-800' ?>"><?= $workingDuration ?></span>
         </div>
+        <?php if ($is_cross_midnight): ?>
+        <div class="mt-2 text-xs text-blue-600">
+            <i class="fas fa-info-circle mr-1"></i>
+            From <?= date('M j', strtotime($original_log_date)) ?> to 
+            <?php if ($log_out_date): ?>
+                <?= date('M j', strtotime($log_out_date)) ?>
+            <?php else: ?>
+                <?= date('M j', strtotime($original_log_date . ' +1 day')) ?>
+            <?php endif; ?>
+            (Time out occurred on the following day)
+        </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 
@@ -468,6 +601,7 @@ if ($is_overnight_shift && $time_out) {
         <input type="hidden" name="original_log_date" value="<?= $original_log_date ?>">
         <input type="hidden" name="is_overnight" value="<?= $is_overnight_shift ? '1' : '0' ?>">
         <input type="hidden" name="is_incomplete" value="<?= $is_incomplete_shift ? '1' : '0' ?>">
+        <input type="hidden" name="has_incomplete_previous" value="<?= $has_incomplete_previous_shift ? '1' : '0' ?>">
         
         <?php if ($can_time_in): ?>
             <button type="button" onclick="showConfirmationModal('time_in')"
@@ -483,13 +617,22 @@ if ($is_overnight_shift && $time_out) {
         <?php elseif ($can_time_out): ?>
             <button type="button" onclick="showConfirmationModal('time_out')"
                 class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
-                <?php if ($is_incomplete_shift): ?>
+                <?php if ($has_incomplete_previous_shift && $shift_status === 'incomplete'): ?>
+                    Complete Incomplete Shift
+                <?php elseif ($has_incomplete_previous_shift && $is_overnight_shift): ?>
+                    Complete Overnight Shift
+                <?php elseif ($is_incomplete_shift): ?>
                     Complete Shift (Time Out)
                 <?php elseif ($is_overnight_shift): ?>
                     Complete Overnight Shift
                 <?php else: ?>
                     Log Time Out
                 <?php endif; ?>
+            </button>
+        <?php elseif ($has_incomplete_previous_shift): ?>
+            <button type="button" disabled
+                class="w-full bg-red-400 text-white font-semibold py-3 px-4 rounded-xl cursor-not-allowed">
+                <i class="fas fa-lock mr-2"></i>Complete Previous Shift First
             </button>
         <?php else: ?>
             <button type="button" disabled
@@ -523,6 +666,7 @@ if ($is_overnight_shift && $time_out) {
             <input type="hidden" name="action" id="timeLogAction">
             <input type="hidden" name="original_log_date" value="<?= $original_log_date ?>">
             <input type="hidden" name="is_overnight" value="<?= $is_overnight_shift ? '1' : '0' ?>">
+            <input type="hidden" name="has_incomplete_previous" value="<?= $has_incomplete_previous_shift ? '1' : '0' ?>">
             <div class="flex justify-center gap-4">
                 <button type="button" onclick="hideConfirmationModal()"
                     class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium px-4 py-2 rounded">
@@ -544,6 +688,7 @@ function showConfirmationModal(actionType) {
     const actionInput = document.getElementById('timeLogAction');
     const isOvernight = <?= $is_overnight_shift ? 'true' : 'false' ?>;
     const isIncomplete = <?= $is_incomplete_shift ? 'true' : 'false' ?>;
+    const hasIncompletePrevious = <?= $has_incomplete_previous_shift ? 'true' : 'false' ?>;
 
     if (actionType === 'time_in') {
         title.textContent = 'Confirm Time In';
@@ -554,10 +699,20 @@ function showConfirmationModal(actionType) {
         }
         actionInput.name = 'time_in';
     } else if (actionType === 'time_out') {
-        title.textContent = isOvernight ? 'Complete Overnight Shift' : 'Confirm Time Out';
-        message.textContent = isOvernight ? 
-            'Are you sure you want to complete your overnight shift?' : 
-            'Are you sure you want to log your Time Out for today?';
+        if (hasIncompletePrevious) {
+            <?php if ($shift_status === 'incomplete'): ?>
+            title.textContent = 'Complete Incomplete Shift';
+            message.textContent = 'This shift has been running for 14+ hours. Are you sure you want to complete it from <?= date("F j, Y", strtotime($incomplete_shift_date ?? $original_log_date)) ?>?';
+            <?php else: ?>
+            title.textContent = 'Complete Overnight Shift';
+            message.textContent = 'Are you sure you want to complete your overnight shift from <?= date("F j, Y", strtotime($incomplete_shift_date ?? $original_log_date)) ?>?';
+            <?php endif; ?>
+        } else {
+            title.textContent = isOvernight ? 'Complete Overnight Shift' : 'Confirm Time Out';
+            message.textContent = isOvernight ? 
+                'Are you sure you want to complete your overnight shift?' : 
+                'Are you sure you want to log your Time Out for today?';
+        }
         actionInput.name = 'time_out';
     }
 

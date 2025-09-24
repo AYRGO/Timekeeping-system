@@ -164,11 +164,10 @@ function getStatusBadge($status) {
                     <table class="min-w-full divide-y divide-gray-200" id="otTable">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Date</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Schedule</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Regular Hours</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Hours</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Duration</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Type</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
@@ -199,7 +198,7 @@ function getStatusBadge($status) {
                     const endIdx = startIdx + rowsPerPage;
                     const pageData = filteredRequests.slice(startIdx, endIdx);
                     if (pageData.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="12" class="text-center text-sm py-8 text-gray-500"><i class='fas fa-clock text-4xl text-gray-300 mb-2'></i><div>No overtime requests found.</div></td></tr>`;
+                        tbody.innerHTML = `<tr><td colspan="11" class="text-center text-sm py-8 text-gray-500"><i class='fas fa-clock text-4xl text-gray-300 mb-2'></i><div>No overtime requests found.</div></td></tr>`;
                         return;
                     }
                     pageData.forEach(ot => {
@@ -208,7 +207,6 @@ function getStatusBadge($status) {
                         const actionCell = renderActionCell(ot);
                         tbody.innerHTML += `
                         <tr class="hover:bg-gray-50" id="row-${ot.id}">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${ot.id}</td>
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 <div class="flex items-center">
                                     <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
@@ -231,9 +229,9 @@ function getStatusBadge($status) {
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 <div class="flex flex-col">
-                                    <div class="flex items-center text-xs text-green-600 mb-1"><i class="fas fa-sign-in-alt mr-1"></i>In:</div>
-                                    <span class="font-medium text-green-700">${isValidTime(ot.time_in) ? formatTime(ot.time_in) : '<span class="text-gray-400 italic">None</span>'}</span>
-                                    <div class="flex items-center text-xs text-red-600 mb-1 mt-2"><i class="fas fa-sign-out-alt mr-1"></i>Out:</div>
+                                    <div class="flex items-center text-xs text-green-600 mb-1"><i class="fas fa-play mr-1"></i>Start OT:</div>
+                                    <span class="font-medium text-green-700">${ot.current_schedule.time_out !== 'N/A' ? ot.current_schedule.time_out : '<span class="text-gray-400 italic">None</span>'}</span>
+                                    <div class="flex items-center text-xs text-red-600 mb-1 mt-2"><i class="fas fa-stop mr-1"></i>End OT:</div>
                                     <span class="font-medium text-red-700">${isValidTime(ot.time_out) ? formatTime(ot.time_out) : '<span class="text-gray-400 italic">None</span>'}</span>
                                 </div>
                             </td>
