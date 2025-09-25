@@ -11,6 +11,23 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
+// Function to format duration in hours and minutes
+function formatDurationPHP($hours) {
+    $totalHours = floatval($hours ?: 0);
+    $wholeHours = floor($totalHours);
+    $minutes = round(($totalHours - $wholeHours) * 60);
+    
+    if ($wholeHours == 0 && $minutes == 0) {
+        return '0 min';
+    } else if ($wholeHours == 0) {
+        return $minutes . ' min';
+    } else if ($minutes == 0) {
+        return $wholeHours . ($wholeHours > 1 ? ' hrs' : ' hr');
+    } else {
+        return $wholeHours . ($wholeHours > 1 ? ' hrs ' : ' hr ') . $minutes . ' min';
+    }
+}
+
 // Get filter parameters
 $employee_id = $_GET['employee_id'] ?? '';
 $date_filter = $_GET['date_filter'] ?? ''; // Default to show all dates
@@ -215,7 +232,7 @@ $employees = $emp_stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 $hours_worked = $interval->h + ($interval->i / 60);
                                                 ?>
                                                 <div class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium text-center">
-                                                    <?= number_format($hours_worked, 2) ?> hrs
+                                                    <?= formatDurationPHP($hours_worked) ?>
                                                 </div>
                                                 <?php
                                             } else {

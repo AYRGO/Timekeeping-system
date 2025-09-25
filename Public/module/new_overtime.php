@@ -6,6 +6,23 @@ if (session_status() === PHP_SESSION_NONE) {
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
+// Function to format duration in hours and minutes
+function formatDurationPHP($hours) {
+    $totalHours = floatval($hours ?: 0);
+    $wholeHours = floor($totalHours);
+    $minutes = round(($totalHours - $wholeHours) * 60);
+    
+    if ($wholeHours == 0 && $minutes == 0) {
+        return '0 min';
+    } else if ($wholeHours == 0) {
+        return $minutes . ' min';
+    } else if ($minutes == 0) {
+        return $wholeHours . ($wholeHours > 1 ? ' hrs' : ' hr');
+    } else {
+        return $wholeHours . ($wholeHours > 1 ? ' hrs ' : ' hr ') . $minutes . ' min';
+    }
+}
+
 if (!isset($_SESSION['regenerated']) && !headers_sent()) {
     session_regenerate_id(true);
     $_SESSION['regenerated'] = true;
@@ -686,6 +703,141 @@ $default_time_out = $default_sched['time_out'];
 .overflow-x-auto::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(90deg, #059669, #047857);
 }
+
+/* Clean time input styling */
+#ot_time_input {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+}
+
+#ot_time_input:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
+}
+
+#ot_time_input::placeholder {
+    color: #9ca3af;
+    font-weight: 500;
+}
+
+/* Button-based Time Picker Styling */
+#hours-up, #hours-down, #minutes-up, #minutes-down {
+    transition: all 0.2s ease;
+    font-size: 10px;
+}
+
+#hours-up:hover:not(:disabled), #hours-down:hover:not(:disabled), 
+#minutes-up:hover:not(:disabled), #minutes-down:hover:not(:disabled) {
+    background-color: #059669 !important;
+    color: white !important;
+    transform: scale(1.05);
+}
+
+#hours-up:disabled, #hours-down:disabled, 
+#minutes-up:disabled, #minutes-down:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+#selected-hours, #selected-minutes {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+/* Time picker container animations */
+.time-picker-container:hover {
+    transform: translateY(-1px);
+}
+
+/* Button active states */
+#hours-up:active:not(:disabled), #hours-down:active:not(:disabled),
+#minutes-up:active:not(:disabled), #minutes-down:active:not(:disabled) {
+    transform: scale(0.95);
+    background-color: #047857 !important;
+}
+
+/* Prevent any overflow issues */
+.modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* Ensure containers are properly contained */
+#overtimeModal .relative {
+    overflow: visible;
+}
+
+/* Smooth transitions for time display */
+#selected-hours, #selected-minutes {
+    transition: all 0.2s ease;
+}
+
+/* Focus states for accessibility */
+#hours-up:focus, #hours-down:focus, #minutes-up:focus, #minutes-down:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.5);
+}
+
+/* Enhanced form input animations */
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
+    transform: translateY(-1px);
+    animation: subtle-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes subtle-glow {
+    0% { box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15); }
+    100% { box-shadow: 0 6px 25px rgba(16, 185, 129, 0.25); }
+}
+
+/* Enhanced gradient backgrounds */
+.gradient-bg {
+    background: linear-gradient(135deg, 
+        rgba(16, 185, 129, 0.05) 0%, 
+        rgba(5, 150, 105, 0.08) 50%, 
+        rgba(6, 95, 70, 0.05) 100%);
+}
+
+/* Modern glassmorphism effect */
+.glass-effect {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Micro-interactions for better feedback */
+.micro-bounce:active {
+    animation: micro-bounce 0.2s ease-in-out;
+}
+
+@keyframes micro-bounce {
+    0% { transform: scale(1); }
+    50% { transform: scale(0.98); }
+    100% { transform: scale(1); }
+}
+
+/* Enhanced button hover effects */
+button:hover {
+    filter: brightness(1.05);
+}
+
+/* Enhanced modal animations */
+.modal-enter {
+    animation: modal-slide-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modal-slide-in {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
 </style>
 
 <div id="overtimeView" class="mt-12 hidden animate-fade-in-up">
@@ -1059,10 +1211,10 @@ $default_time_out = $default_sched['time_out'];
                             $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours
                           ?>
                           <div class="text-lg font-bold text-gray-900">
-                            <?= number_format($workHours, 2) ?>h
+                            <?= formatDurationPHP($workHours) ?>
                           </div>
                           <div class="text-xs text-gray-500">
-                            (<?= number_format($totalHours, 2) ?>h total - 1h lunch)
+                            (<?= formatDurationPHP($totalHours) ?> total - 1 hr lunch)
                           </div>
                         <?php else: ?>
                           <div class="text-lg font-bold text-gray-400">—</div>
@@ -1082,7 +1234,7 @@ $default_time_out = $default_sched['time_out'];
                       <div>
                         <?php if ($hasLog && isset($otDetails['max_ot_hours']) && $otDetails['max_ot_hours'] > 0): ?>
                           <div class="text-lg font-bold text-emerald-600">
-                            <?= number_format($otDetails['max_ot_hours'], 2) ?>h
+                            <?= formatDurationPHP($otDetails['max_ot_hours']) ?>
                           </div>
                           <div class="text-xs text-gray-500">
                             (<?= $otDetails['exact_ot_minutes'] ?> minutes)
@@ -1505,7 +1657,7 @@ $default_time_out = $default_sched['time_out'];
                           </div>
                           <div class="text-sm text-gray-500 flex items-center mt-1">
                             <i class="fas fa-hourglass-half mr-1 text-purple-500"></i>
-                            <span class="font-medium"><?= number_format($request['ot_duration'], 2) ?> hours</span>
+                            <span class="font-medium"><?= formatDurationPHP($request['ot_duration']) ?></span>
                           </div>
                         </div>
                       </div>
@@ -1571,33 +1723,33 @@ $default_time_out = $default_sched['time_out'];
 <!-- Overtime Request Modal -->
 <div id="overtimeModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <!-- Background overlay -->
-        <div class="fixed inset-0 transition-opacity bg-black bg-opacity-50" onclick="closeOvertimeModal()"></div>
+  <!-- Background overlay -->
+  <div class="fixed inset-0 transition-opacity bg-black/40 backdrop-blur-sm" onclick="closeOvertimeModal()"></div>
 
-        <!-- Modal content -->
-        <div class="inline-block w-full max-w-4xl px-0 pt-0 pb-0 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl shadow-xl sm:my-8 sm:align-middle border border-gray-200 animate-fade-in-up">
+  <!-- Modal content -->
+  <div class="inline-block w-full max-w-4xl px-0 pt-0 pb-0 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl shadow-2xl ring-1 ring-black/5 sm:my-8 sm:align-middle border border-slate-200 animate-fade-in-up">
             
             <!-- Modal Header -->
-            <div class="bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-4">
+      <div class="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
-                        <div class="p-2 bg-white/20 rounded-lg mr-3">
-                            <i class="fas fa-clock text-white text-xl"></i>
+            <div class="p-3 bg-white/30 rounded-xl mr-3 ring-2 ring-white/30 backdrop-blur-sm shadow-lg">
+                            <i class="fas fa-clock text-white text-xl drop-shadow-md"></i>
                         </div>
                         <div>
-                            <h3 class="text-xl font-bold text-white">Submit Overtime Request</h3>
-                            <p class="text-green-100 text-sm">Fill out the details for your overtime request</p>
+                            <h3 class="text-xl font-black text-white drop-shadow-md">Submit Overtime Request</h3>
+                            <p class="text-green-100 text-sm font-medium drop-shadow-sm">Fill out the details for your overtime request</p>
                         </div>
                     </div>
-                    <button onclick="closeOvertimeModal()" class="p-2 text-white/80 hover:text-white rounded-lg hover:bg-white/20 transition-colors focus:outline-none">
-                        <i class="fas fa-times text-lg"></i>
+          <button onclick="closeOvertimeModal()" class="p-2.5 text-white/90 hover:text-white rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur-sm transform hover:scale-110">
+                        <i class="fas fa-times text-lg drop-shadow-md"></i>
                     </button>
                 </div>
             </div>
 
             <!-- Modal Body -->
-            <div class="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
-                <form id="overtimeForm" class="space-y-6" enctype="multipart/form-data">
+            <div class="p-4 max-h-[calc(100vh-180px)] overflow-y-auto">
+                <form id="overtimeForm" class="space-y-4" enctype="multipart/form-data">
                     <input type="hidden" id="selected_time_log_id" name="time_log_id">
                     <input type="hidden" id="selected_time_in" name="time_in">
                     <input type="hidden" id="selected_time_out" name="time_out">
@@ -1606,86 +1758,113 @@ $default_time_out = $default_sched['time_out'];
                     <input type="hidden" id="end_ot_time" name="end_ot_time">
                     
                     <!-- Information Grid -->
-                    <div class="bg-gray-50 rounded-xl p-6">
-                        <h4 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
-                            <i class="fas fa-info-circle text-emerald-600 mr-2"></i>
+          <div class="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-xl p-5 border border-slate-200/80 shadow-lg backdrop-blur-sm">
+                        <h4 class="text-base font-bold text-slate-800 mb-5 flex items-center">
+                            <div class="w-7 h-7 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center mr-2 shadow-md">
+                                <i class="fas fa-info-circle text-white text-sm"></i>
+                            </div>
                             Request Information
                         </h4>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                             <div class="space-y-2">
-                                <label class="block text-sm font-medium text-gray-700">Selectable OT Hours</label>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Selectable OT Hours</label>
                                 <div class="relative">
                                     <!-- Hidden input to store the selected value -->
                                     <input type="hidden" id="overtime_hours" name="overtime_hours" value="">
                                     
-                                    <!-- Custom Time Picker matching other input styles -->
-                                    <div class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all min-h-[50px]">
-                                        <div class="flex items-center justify-center space-x-1">
-                                            <!-- Hours -->
-                                            <div class="flex items-center">
-                                                <select id="ot_hours" class="text-center border-0 bg-transparent text-base font-semibold focus:ring-0 focus:outline-none text-gray-800 w-10">
-                                                    <!-- Options will be populated by JavaScript -->
-                                                </select>
-                                                <span class="text-xs text-gray-500 ml-1">hrs</span>
+                                    <!-- Enhanced Time Input Container -->
+                                    <div class="w-full pl-9 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus-within:ring-2 focus-within:ring-emerald-400/30 focus-within:border-emerald-400 transition-all duration-300 shadow-md hover:shadow-lg backdrop-blur-sm">
+                                        <div class="flex items-center justify-center space-x-4">
+                                            <!-- Hours Input -->
+                                            <div class="flex flex-col items-center">
+                                                <label class="text-xs font-medium text-slate-600 mb-1 uppercase tracking-wider">Hrs</label>
+                                                <input type="number" 
+                                                       id="hours-input" 
+                                                       min="0" 
+                                                       max="99"
+                                                       value="0"
+                                                       class="w-12 h-8 text-center border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-200 bg-slate-50/50 hover:bg-white shadow-sm">
                                             </div>
                                             
-                                            <span class="text-base font-bold text-gray-400 px-1">:</span>
+                                            <div class="text-lg font-black text-slate-400 mt-4 animate-pulse">:</div>
                                             
-                                            <!-- Minutes -->
-                                            <div class="flex items-center">
-                                                <select id="ot_minutes" class="text-center border-0 bg-transparent text-base font-semibold focus:ring-0 focus:outline-none text-gray-800 w-10">
-                                                    <!-- 0-59 minutes -->
-                                                </select>
-                                                <span class="text-xs text-gray-500 ml-1">min</span>
+                                            <!-- Minutes Input -->
+                                            <div class="flex flex-col items-center">
+                                                <label class="text-xs font-medium text-slate-600 mb-1 uppercase tracking-wider">Min</label>
+                                                <input type="number" 
+                                                       id="minutes-input" 
+                                                       min="0" 
+                                                       max="59"
+                                                       step="15"
+                                                       value="0"
+                                                       class="w-12 h-8 text-center border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-200 bg-slate-50/50 hover:bg-white shadow-sm">
                                             </div>
                                         </div>
                                     </div>
-                                    <i class="fas fa-hourglass-half absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-500"></i>
+                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                        <div class="w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center shadow-md">
+                                            <i class="fas fa-hourglass-half text-white text-xs"></i>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div id="ot-range-info" class="text-xs text-gray-500 truncate"></div>
-                                <div id="ot-validation-info" class="text-xs truncate"></div>
-                            </div>
-                            
-                            <div class="space-y-2">
-                                <label class="block text-sm font-medium text-gray-700">Max OT Available</label>
-                                <div class="relative">
-                                    <input type="text" id="display_max_ot_hours" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 font-semibold text-center text-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all min-h-[50px]"
-                                           readonly>
-                                    <i class="fas fa-clock absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-500"></i>
-                                </div>
-                            </div>
-                            
-                            <div class="space-y-2">
-                                <label class="block text-sm font-medium text-gray-700">Start OT</label>
-                                <div class="relative">
-                                    <input type="text" id="display_start_ot" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all min-h-[50px]"
-                                           readonly>
-                                    <i class="fas fa-play absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500"></i>
+                                <div id="ot-range-info" class="text-xs text-slate-600 truncate font-medium"></div>
+                                <div id="ot-validation-info" class="text-xs text-emerald-600 truncate font-medium"></div>
+                            </div>                            <div class="space-y-2">
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Max OT Available</label>
+                <div class="relative">
+                  <input type="text" id="display_max_ot_hours" 
+                       class="w-full pl-10 pr-4 py-3 border-2 border-emerald-200/60 rounded-xl bg-gradient-to-r from-emerald-50/80 to-green-50/60 font-bold text-center text-emerald-800 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm shadow-lg backdrop-blur-sm"
+                       readonly>
+                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                        <div class="w-6 h-6 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg flex items-center justify-center shadow-md">
+                                            <i class="fas fa-clock text-white text-xs"></i>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             
                             <div class="space-y-2">
-                                <label class="block text-sm font-medium text-gray-700">End OT</label>
-                                <div class="relative">
-                                    <input type="text" id="display_end_ot" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all min-h-[50px]"
-                                           readonly>
-                                    <i class="fas fa-stop absolute left-3 top-1/2 transform -translate-y-1/2 text-red-500"></i>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Start OT</label>
+                <div class="relative">
+                  <input type="text" id="display_start_ot" 
+                       class="w-full pl-10 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm"
+                       readonly>
+                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                        <div class="w-6 h-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md">
+                                            <i class="fas fa-play text-white text-xs"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">End OT</label>
+                <div class="relative">
+                  <input type="text" id="display_end_ot" 
+                       class="w-full pl-10 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm"
+                       readonly>
+                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                        <div class="w-6 h-6 bg-gradient-to-br from-red-500 to-rose-600 rounded-lg flex items-center justify-center shadow-md">
+                                            <i class="fas fa-stop text-white text-xs"></i>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="grid grid-cols-1 gap-4 mt-6">
+                        <div class="grid grid-cols-1 gap-4 mt-5">
                             <div class="space-y-2">
-                                <label class="block text-sm font-medium text-gray-700">Date</label>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Date</label>
                                 <div class="relative">
-                                    <input type="text" id="selected_date" name="selected_date" 
-                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all min-h-[50px]"
-                                           readonly>
-                                    <i class="fas fa-calendar absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500"></i>
+           <input type="text" id="selected_date" name="selected_date" 
+             class="w-full pl-10 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm"
+             readonly>
+                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                        <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                                            <i class="fas fa-calendar text-white text-xs"></i>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1700,61 +1879,71 @@ $default_time_out = $default_sched['time_out'];
                     <!-- OT Type and Attachment -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="space-y-2">
-                            <label class="block text-sm font-medium text-gray-700">
-                                Overtime Type <span class="text-red-500">*</span>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                                Overtime Type <span class="text-red-500 text-sm">*</span>
                             </label>
                             <div class="relative">
-                                <select name="ot_type" id="ot_type" required
-                                        class="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all appearance-none bg-white min-h-[50px]">
+                <select name="ot_type" id="ot_type" required
+                    class="w-full pl-10 pr-10 py-3 border-2 border-slate-200/60 rounded-xl focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 appearance-none bg-white/90 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm hover:shadow-xl">
                                     <option value="">Select OT Type</option>
                                     <option value="Regular OT">Regular OT</option>
                                     <option value="Special Holiday OT">Special Holiday OT</option>
                                     <option value="Regular Holiday OT">Regular Holiday OT</option>
                                     <option value="Restday OT">Restday OT</option>
                                 </select>
-                                <i class="fas fa-briefcase absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-500"></i>
-                                <i class="fas fa-chevron-down absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                    <div class="w-6 h-6 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                                        <i class="fas fa-briefcase text-white text-xs"></i>
+                                    </div>
+                                </div>
+                <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div class="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-chevron-down text-slate-500 text-xs"></i>
+                    </div>
+                </div>
                             </div>
-                            <p class="text-xs text-gray-600">Choose the appropriate overtime type</p>
                         </div>
 
                         <div class="space-y-2">
-                            <label class="block text-sm font-medium text-gray-700">
-                                Supporting Document <span class="text-red-500">*</span>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                                Supporting Document <span class="text-red-500 text-sm">*</span>
                             </label>
                             <div class="relative">
-                                <input type="file" 
+            <input type="file" 
                                        name="attachment" 
                                        id="attachment" 
                                        accept=".pdf,.jpg,.jpeg,.png"
                                        required
-                                       class="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 min-h-[50px]">
+              class="w-full px-4 py-3 border-2 border-slate-200/60 rounded-xl focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-emerald-50 file:to-green-50 file:text-emerald-700 hover:file:from-emerald-100 hover:file:to-green-100 text-sm shadow-lg backdrop-blur-sm bg-white/90">
                             </div>
-                            <p class="text-xs text-gray-600">Upload PDF, JPG, or PNG (Max 5MB)</p>
+                            <p class="text-xs text-slate-600 font-medium">PDF, JPG, PNG (Max 5MB)</p>
                         </div>
                     </div>
 
                     <!-- Reason -->
                     <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700">
-                            Reason for Overtime <span class="text-red-500">*</span>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                            Reason for Overtime <span class="text-red-500 text-sm">*</span>
                         </label>
-                        <textarea name="reason" id="reason" rows="4" required
-                                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-none"
-                                  placeholder="Please provide a detailed explanation for your overtime work(please indicate if with or without break)"></textarea>
-                        <p class="text-xs text-gray-600">Provide a clear reason for your overtime request</p>
+            <textarea name="reason" id="reason" rows="4" required
+                  class="w-full px-4 py-3 border-2 border-slate-200/60 rounded-xl focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 resize-none shadow-lg placeholder:text-slate-400 text-sm font-medium bg-white/90 backdrop-blur-sm hover:shadow-xl"
+                                  placeholder="Provide detailed explanation for OT work (indicate if with or without break)"></textarea>
                     </div>
 
                     <!-- Submit Buttons -->
-                    <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
+          <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t-2 border-slate-200/80">
                         <button type="button" onclick="closeOvertimeModal()" 
-                                class="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition-all min-h-[50px] flex items-center justify-center">
-                            <i class="fas fa-times mr-2"></i>
+                class="flex-1 px-6 py-3 border-2 border-slate-200/60 rounded-xl text-slate-700 font-bold bg-white/90 hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-slate-300/50 focus:border-slate-400 transition-all duration-300 text-sm flex items-center justify-center shadow-lg backdrop-blur-sm hover:shadow-xl transform hover:scale-[1.02]">
+                            <div class="w-5 h-5 bg-slate-200 rounded-lg flex items-center justify-center mr-2">
+                                <i class="fas fa-times text-slate-600 text-xs"></i>
+                            </div>
                             Cancel
                         </button>
                         <button type="submit" 
-                                class="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-300 min-h-[50px] flex items-center justify-center">
-                            <i class="fas fa-paper-plane mr-2"></i>
+                class="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-400/50 text-sm flex items-center justify-center shadow-lg backdrop-blur-sm">
+                            <div class="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center mr-2">
+                                <i class="fas fa-paper-plane text-white text-xs"></i>
+                            </div>
                             Submit Request
                         </button>
                     </div>
@@ -1765,6 +1954,23 @@ $default_time_out = $default_sched['time_out'];
 </div>
 
 <script>
+// Function to format duration in hours and minutes (JavaScript version)
+function formatDuration(hours) {
+    const totalHours = parseFloat(hours || 0);
+    const wholeHours = Math.floor(totalHours);
+    const minutes = Math.round((totalHours - wholeHours) * 60);
+    
+    if (wholeHours === 0 && minutes === 0) {
+        return '0 min';
+    } else if (wholeHours === 0) {
+        return minutes + ' min';
+    } else if (minutes === 0) {
+        return wholeHours + (wholeHours > 1 ? ' hrs' : ' hr');
+    } else {
+        return wholeHours + (wholeHours > 1 ? ' hrs ' : ' hr ') + minutes + ' min';
+    }
+}
+
 // Utility: compute Restday OT hours from hidden time fields
 function computeRDOTHrsFromHiddenFields() {
     const timeInStr = document.getElementById('selected_time_in')?.value || '';
@@ -1808,101 +2014,77 @@ function computeRDOTHrsFromHiddenFields() {
         return 0;
     }
 }
-// Function to initialize and populate scrollable time picker (Hours and Minutes only)
+// Function to initialize simple input-based time picker
 function initializeTimePicker(maxHours) {
-    const hoursSelect = document.getElementById('ot_hours');
-    const minutesSelect = document.getElementById('ot_minutes');
+    const hoursInput = document.getElementById('hours-input');
+    const minutesInput = document.getElementById('minutes-input');
     const hiddenInput = document.getElementById('overtime_hours');
     const rangeInfo = document.getElementById('ot-range-info');
     const validationInfo = document.getElementById('ot-validation-info');
     
-    if (!hoursSelect || !minutesSelect) return;
-    
-    // Clear existing options
-    hoursSelect.innerHTML = '';
-    minutesSelect.innerHTML = '';
+    if (!hoursInput || !minutesInput) return;
     
     if (maxHours <= 0) {
-        hoursSelect.innerHTML = '<option value="0">0</option>';
-        minutesSelect.innerHTML = '<option value="0">00</option>';
-        hoursSelect.disabled = true;
-        minutesSelect.disabled = true;
-        rangeInfo.textContent = 'No overtime hours available';
+        hoursInput.disabled = true;
+        minutesInput.disabled = true;
+        rangeInfo.textContent = 'No overtime available for this time log';
+        validationInfo.textContent = 'Please select a different time log.';
+        validationInfo.className = 'mt-0.5 text-xs text-red-500 truncate';
         return;
     }
     
-    // Enable selects
-    hoursSelect.disabled = false;
-    minutesSelect.disabled = false;
+    rangeInfo.textContent = `Maximum available: ${formatDuration(maxHours)}`;
     
-    // Calculate max time components
-    const maxHoursInt = Math.floor(maxHours);
-    const maxMinutesInt = Math.floor((maxHours - maxHoursInt) * 60);
-    
-    const maxTimeFormatted = `${maxHoursInt}:${maxMinutesInt.toString().padStart(2, '0')}`;
-    rangeInfo.textContent = `Maximum available: ${maxTimeFormatted}`;
-    
-    // Populate hours (0 to max hours)
-    for (let h = 0; h <= maxHoursInt; h++) {
-        const option = document.createElement('option');
-        option.value = h;
-        option.textContent = h.toString().padStart(2, '0');
-        hoursSelect.appendChild(option);
-    }
-    
-    // Populate minutes (0-59)
-    for (let m = 0; m < 60; m++) {
-        const option = document.createElement('option');
-        option.value = m;
-        option.textContent = m.toString().padStart(2, '0');
-        minutesSelect.appendChild(option);
-    }
-    
-    // Add event listeners to update hidden input and validate
-    const updateHiddenInput = () => {
-        const hours = parseInt(hoursSelect.value) || 0;
-        const minutes = parseInt(minutesSelect.value) || 0;
+    function updateHiddenInput() {
+        const hours = parseInt(hoursInput.value) || 0;
+        const minutes = parseInt(minutesInput.value) || 0;
         
+        // Calculate total hours as decimal
         const totalHours = hours + (minutes / 60);
         
-        // Validate against maximum
-        const isValid = totalHours <= maxHours;
-        const isAboveZero = totalHours > 0;
-        
-        if (!isAboveZero) {
-            validationInfo.textContent = 'Please select approved OT hours';
-            validationInfo.className = 'text-xs text-red-500';
+        if (totalHours === 0) {
             hiddenInput.value = '';
-        } else if (!isValid) {
-            validationInfo.textContent = `Selected time exceeds maximum available (${maxTimeFormatted})`;
-            validationInfo.className = 'text-xs text-red-500';
-            hiddenInput.value = '';
-        } else {
-            const timeString = `${hours}:${minutes.toString().padStart(2, '0')}`;
-            validationInfo.textContent = `Selected: ${timeString} (${totalHours.toFixed(2)} hours)`;
-            validationInfo.className = 'text-xs text-green-600';
+            validationInfo.textContent = 'Select approved OT hours';
+            validationInfo.className = 'mt-0.5 text-xs text-gray-500 truncate';
+        } else if (totalHours > maxHours) {
             hiddenInput.value = totalHours.toFixed(2);
+            validationInfo.textContent = 'Exceeds available OT time';
+            validationInfo.className = 'mt-0.5 text-xs text-red-500 truncate';
+        } else {
+            hiddenInput.value = totalHours.toFixed(2);
+            validationInfo.textContent = `Selected: ${formatDuration(totalHours)}`;
+            validationInfo.className = 'mt-0.5 text-xs text-emerald-600 truncate';
         }
-        
-        // Auto-adjust if over maximum
-        if (isAboveZero && !isValid) {
-            if (hours > maxHoursInt || (hours === maxHoursInt && minutes > maxMinutesInt)) {
-                // Set to maximum available
-                hoursSelect.value = maxHoursInt;
-                minutesSelect.value = maxMinutesInt;
-                
-                // Trigger update again
-                setTimeout(updateHiddenInput, 100);
-            }
-        }
-    };
+    }
     
-    hoursSelect.addEventListener('change', updateHiddenInput);
-    minutesSelect.addEventListener('change', updateHiddenInput);
+    // Round minutes to nearest 15-minute increment
+    function roundMinutes(minutes) {
+        return Math.round(minutes / 15) * 15;
+    }
     
-    // Set initial values to 0
-    hoursSelect.value = 0;
-    minutesSelect.value = 0;
+    // Input event listeners
+    hoursInput.addEventListener('input', function() {
+        let value = parseInt(this.value);
+        if (value < 0) this.value = 0;
+        if (value > 99) this.value = 99;
+        updateHiddenInput();
+    });
+    
+    minutesInput.addEventListener('input', function() {
+        let value = parseInt(this.value);
+        if (value < 0) this.value = 0;
+        if (value > 59) this.value = 59;
+        updateHiddenInput();
+    });
+    
+    // Round minutes on blur for 15-minute increments
+    minutesInput.addEventListener('blur', function() {
+        const rounded = roundMinutes(parseInt(this.value) || 0);
+        this.value = rounded;
+        updateHiddenInput();
+    });
+    
+    // Initialize
     updateHiddenInput();
 }
 
@@ -1941,7 +2123,7 @@ function openOvertimeModal(button) {
     
     // Store max OT hours
     document.getElementById('max_ot_hours').value = maxOTHours.toFixed(2);
-    document.getElementById('display_max_ot_hours').value = `${maxOTHours.toFixed(2)} hrs`;
+    document.getElementById('display_max_ot_hours').value = formatDuration(maxOTHours);
     
     // Populate Start OT and End OT fields
     document.getElementById('start_ot_time').value = startOT;
@@ -2047,7 +2229,7 @@ function openRDOTModal(button) {
     
     // Store max OT hours for RDOT
     document.getElementById('max_ot_hours').value = workHours.toFixed(2);
-    document.getElementById('display_max_ot_hours').value = `${workHours.toFixed(2)} hrs`;
+    document.getElementById('display_max_ot_hours').value = formatDuration(workHours);
     
     // Populate Start OT and End OT fields for RDOT
     document.getElementById('start_ot_time').value = startOT;

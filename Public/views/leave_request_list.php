@@ -173,7 +173,6 @@ function getLeaveTypeBadge($type) {
                     <table class="min-w-full divide-y divide-gray-200" id="leaveTable">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leave Type</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
@@ -226,7 +225,7 @@ function getLeaveTypeBadge($type) {
                         const pageData = filteredRequests.slice(startIdx, endIdx);
                         
                         if (pageData.length === 0) {
-                            tbody.innerHTML = `<tr><td colspan="10" class="text-center text-sm py-8 text-gray-500">
+                            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-sm py-8 text-gray-500">
                                 <i class='fas fa-calendar-times text-4xl text-gray-300 mb-2'></i>
                                 <div>No leave requests found.</div>
                             </td></tr>`;
@@ -238,7 +237,6 @@ function getLeaveTypeBadge($type) {
                         const actionCell = isHistoryView ? renderHistoryAction(lr) : renderCurrentAction(lr);
                         tbody.innerHTML += `
                         <tr class="hover:bg-gray-50" id="leave-row-${lr.id}">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${lr.id}</td>
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 <div class="flex items-center">
                                     <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
@@ -286,7 +284,7 @@ function getLeaveTypeBadge($type) {
                         console.error('Error rendering table:', error);
                         const tbody = document.getElementById('leaveTableBody');
                         if (tbody) {
-                            tbody.innerHTML = `<tr><td colspan="10" class="text-center text-sm py-8 text-red-500">
+                            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-sm py-8 text-red-500">
                                 <i class='fas fa-exclamation-triangle text-4xl text-red-300 mb-2'></i>
                                 <div>Error loading data. Please refresh the page.</div>
                             </td></tr>`;

@@ -11,6 +11,23 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
+// Function to format duration in hours and minutes
+function formatDurationPHP($hours) {
+    $totalHours = floatval($hours ?: 0);
+    $wholeHours = floor($totalHours);
+    $minutes = round(($totalHours - $wholeHours) * 60);
+    
+    if ($wholeHours == 0 && $minutes == 0) {
+        return '0 min';
+    } else if ($wholeHours == 0) {
+        return $minutes . ' min';
+    } else if ($minutes == 0) {
+        return $wholeHours . ($wholeHours > 1 ? ' hrs' : ' hr');
+    } else {
+        return $wholeHours . ($wholeHours > 1 ? ' hrs ' : ' hr ') . $minutes . ' min';
+    }
+}
+
 // Check which view to display (current requests or history)
 $view = isset($_GET['view']) ? $_GET['view'] : 'current';
 $isHistoryView = ($view === 'history');
@@ -487,7 +504,7 @@ function getStatusBadge($status) {
                             </div>
                             <div class="ml-3">
                                 <p class="text-sm font-medium text-gray-500">Approved Hours</p>
-                                <p class="text-lg font-semibold text-gray-900"><?= number_format($totalHours, 1) ?></p>
+                                <p class="text-lg font-semibold text-gray-900"><?= formatDurationPHP($totalHours) ?></p>
                             </div>
                         </div>
                     </div>

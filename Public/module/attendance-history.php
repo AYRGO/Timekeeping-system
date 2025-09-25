@@ -364,80 +364,51 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 // Employee is on approved leave
                                 $status = 'Leave';
                                 $badgeClass = 'bg-purple-100 text-purple-800';
-                            } elseif ($isAutoIncomplete) {
+                            } elseif ($isAutoIncomplete || !$timeOut || $timeOut === 'INC') {
+                                // Missing time out or auto-marked incomplete
                                 $status = 'Incomplete';
                                 $badgeClass = 'bg-red-100 text-red-800';
-                            } elseif ($timeIn) {
-                                // Use 24-hour format for accurate comparison
+                            } elseif ($timeIn && $timeOut && $timeOut !== 'INC') {
+                                // Both time in and time out are present
                                 $actualTimeIn = date('H:i:s', strtotime($timeIn));
-                                $actualTimeOut = $timeOut ? date('H:i:s', strtotime($timeOut)) : null;
+                                $actualTimeOut = date('H:i:s', strtotime($timeOut));
                                 
                                 // Calculate grace period (15 minutes after scheduled time in)
                                 $scheduledTimeIn = $schedule_in_24h;
                                 $graceTimeIn = date('H:i:s', strtotime($scheduledTimeIn . ' +15 minutes'));
                                 $scheduledTimeOut = $schedule_out_24h;
-
-                                // Check if time out is missing
-                                if (!$timeOut || $timeOut === 'INC') {
-                                    // Check if it's today
-                                    $isToday = ($logDate === date('Y-m-d'));
-                                    
-                                    if ($isToday) {
-                                        // For today's shifts, check if still in progress
-                                        $currentTime = date('H:i:s');
-                                        
-                                        if ($isNightShift) {
-                                            // For night shifts, check against scheduled end time (next day)
-                                            $scheduledEndToday = date('H:i:s', strtotime($scheduledTimeOut));
-                                            if ($currentTime < $scheduledEndToday) {
-                                                $status = 'In Progress';
-                                                $badgeClass = 'bg-blue-100 text-blue-800';
-                                            } else {
-                                                // Night shift past scheduled end time
-                                                $timeSinceScheduledEnd = strtotime($currentTime) - strtotime($scheduledEndToday);
-                                                if ($timeSinceScheduledEnd > (12 * 3600)) { // 12 hours past
-                                                    $status = 'Incomplete';
-                                                    $badgeClass = 'bg-red-100 text-red-800';
-                                                } else {
-                                                    $status = 'Incomplete';
-                                                    $badgeClass = 'bg-orange-100 text-orange-800';
-                                                }
-                                            }
-                                        } else {
-                                            // Regular day shift
-                                            $status = 'In Progress';
-                                            $badgeClass = 'bg-blue-100 text-blue-800';
-                                        }
-                                    } else {
-                                        // Past dates without time out
-                                        $status = 'Incomplete';
-                                        $badgeClass = 'bg-red-100 text-red-800';
-                                    }
+                                
+                                // Check if late (arrived after grace period)
+                                $isLate = $actualTimeIn > $graceTimeIn;
+                                
+                                // Check if undertime (left early - more than 15 minutes before scheduled out)
+                                $earliestAllowedOut = date('H:i:s', strtotime($scheduledTimeOut . ' -15 minutes'));
+                                $isUndertime = false;
+                                
+                                if ($isCrossMidnight) {
+                                    // For cross-midnight shifts, we need to handle the time comparison differently
+                                    // The scheduled out time might be on the next day
+                                    $isUndertime = false; // For cross-midnight, consider complete unless obviously early
                                 } else {
-                                    // Has both time in and time out - determine if complete, late, or undertime
-                                    $isLate = $actualTimeIn > $graceTimeIn;
-                                    $leftEarly = $actualTimeOut && $actualTimeOut < $scheduledTimeOut;
-                                    
-                                    if ($isLate && $leftEarly) {
-                                        $status = 'Late & Undertime';
-                                        $badgeClass = 'bg-red-100 text-red-800';
-                                    } elseif ($isLate) {
-                                        $status = 'Late';
-                                        $badgeClass = 'bg-yellow-100 text-yellow-800';
-                                    } elseif ($leftEarly) {
-                                        $status = 'Undertime';
-                                        $badgeClass = 'bg-orange-100 text-orange-800';
-                                    } else {
-                                        $status = 'Complete';
-                                        $badgeClass = 'bg-green-100 text-green-800';
-                                    }
+                                    // Regular shift - check if left significantly early
+                                    $isUndertime = $actualTimeOut < $earliestAllowedOut;
+                                }
+                                
+                                // Determine final status - prioritize Late over Undertime
+                                if ($isLate) {
+                                    $status = 'Late';
+                                    $badgeClass = 'bg-orange-100 text-orange-800';
+                                } elseif ($isUndertime) {
+                                    $status = 'Undertime';
+                                    $badgeClass = 'bg-yellow-100 text-yellow-800';
+                                } else {
+                                    $status = 'Complete';
+                                    $badgeClass = 'bg-green-100 text-green-800';
                                 }
                             } else {
-                                // No time in record - could be leave or absent
-                                if (!$leaveType) {
-                                    $status = 'No Record';
-                                    $badgeClass = 'bg-gray-100 text-gray-600';
-                                }
+                                // No time in record and not on leave
+                                $status = 'Incomplete';
+                                $badgeClass = 'bg-red-100 text-red-800';
                             }
 
                         ?>
@@ -457,11 +428,6 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                         <i class="fas fa-moon mr-1"></i>Night Shift
                                     </div>
                                 <?php endif; ?>
-                                <?php if ($isAutoIncomplete): ?>
-                                    <div class="text-xs text-red-600 mt-1">
-                                        <i class="fas fa-exclamation-triangle mr-1"></i>Auto-marked
-                                    </div>
-                                <?php endif; ?>
                                 <div class="text-xs text-gray-400 mt-1">
                                     Sched: <?= $schedule_in ?>
                                 </div>
@@ -469,9 +435,6 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             <td class="px-6 py-4 text-sm text-gray-500">
                                 <?php if ($isAutoIncomplete): ?>
                                     <?= $timeOutDisplay ?>
-                                    <div class="text-xs text-red-600 mt-1">
-                                        <i class="fas fa-clock mr-1"></i>12+ hrs passed
-                                    </div>
                                 <?php elseif ($timeOut && $timeOut !== 'INC'): ?>
                                     <?= $timeOutDisplay ?>
                                 <?php elseif ($timeIn): ?>

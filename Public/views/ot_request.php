@@ -76,6 +76,23 @@ foreach ($overtime_requests as &$ot) {
     }
 }
 
+// Function to format duration in hours and minutes
+function formatDurationPHP($hours) {
+    $totalHours = floatval($hours ?: 0);
+    $wholeHours = floor($totalHours);
+    $minutes = round(($totalHours - $wholeHours) * 60);
+    
+    if ($wholeHours == 0 && $minutes == 0) {
+        return '0 min';
+    } else if ($wholeHours == 0) {
+        return $minutes . ' min';
+    } else if ($minutes == 0) {
+        return $wholeHours . ($wholeHours > 1 ? ' hrs' : ' hr');
+    } else {
+        return $wholeHours . ($wholeHours > 1 ? ' hrs ' : ' hr ') . $minutes . ' min';
+    }
+}
+
 // Function to get status badge
 function getStatusBadge($status) {
     $status = strtolower($status ?? 'pending');
@@ -166,7 +183,7 @@ function getStatusBadge($status) {
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Schedule</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hrs Rendered</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Hours</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Duration</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OT Type</th>
@@ -222,20 +239,34 @@ function getStatusBadge($status) {
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900">
-                                <div class="flex flex-col">
-                                    <div class="flex items-center text-xs text-green-600 mb-1"><i class="fas fa-sign-in-alt mr-1"></i>In: <span class="font-medium ml-1">${escapeHtml(ot.current_schedule.time_in)}</span></div>
-                                    <div class="flex items-center text-xs text-red-600"><i class="fas fa-sign-out-alt mr-1"></i>Out: <span class="font-medium ml-1">${escapeHtml(ot.current_schedule.time_out)}</span></div>
+                                <div class="flex flex-col space-y-1">
+                                    <div class="flex items-center text-xs">
+                                        <i class="fas fa-sign-in-alt text-green-600 mr-1"></i>
+                                        <span class="text-gray-600">In:</span>
+                                        <span class="font-medium ml-1 ${isValidTime(ot.time_in) ? 'text-green-700' : 'text-gray-400 italic'}">${isValidTime(ot.time_in) ? formatTime(ot.time_in) : 'None'}</span>
+                                    </div>
+                                    <div class="flex items-center text-xs">
+                                        <i class="fas fa-sign-out-alt text-red-600 mr-1"></i>
+                                        <span class="text-gray-600">Out:</span>
+                                        <span class="font-medium ml-1 ${isValidTime(ot.time_out) ? 'text-red-700' : 'text-gray-400 italic'}">${isValidTime(ot.time_out) ? formatTime(ot.time_out) : 'None'}</span>
+                                    </div>
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900">
-                                <div class="flex flex-col">
-                                    <div class="flex items-center text-xs text-green-600 mb-1"><i class="fas fa-play mr-1"></i>Start OT:</div>
-                                    <span class="font-medium text-green-700">${ot.current_schedule.time_out !== 'N/A' ? ot.current_schedule.time_out : '<span class="text-gray-400 italic">None</span>'}</span>
-                                    <div class="flex items-center text-xs text-red-600 mb-1 mt-2"><i class="fas fa-stop mr-1"></i>End OT:</div>
-                                    <span class="font-medium text-red-700">${isValidTime(ot.time_out) ? formatTime(ot.time_out) : '<span class="text-gray-400 italic">None</span>'}</span>
+                                <div class="flex flex-col space-y-1">
+                                    <div class="flex items-center text-xs">
+                                        <i class="fas fa-play text-green-600 mr-1"></i>
+                                        <span class="text-gray-600">Start:</span>
+                                        <span class="font-medium ml-1 ${ot.current_schedule.time_out !== 'N/A' ? 'text-green-700' : 'text-gray-400 italic'}">${ot.current_schedule.time_out !== 'N/A' ? ot.current_schedule.time_out : 'None'}</span>
+                                    </div>
+                                    <div class="flex items-center text-xs">
+                                        <i class="fas fa-stop text-red-600 mr-1"></i>
+                                        <span class="text-gray-600">End:</span>
+                                        <span class="font-medium ml-1 ${isValidTime(ot.time_out) ? 'text-red-700' : 'text-gray-400 italic'}">${isValidTime(ot.time_out) ? formatTime(ot.time_out) : 'None'}</span>
+                                    </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><div class="flex flex-col items-center"><div class="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium"><i class="fas fa-clock mr-1"></i>${parseFloat(ot.ot_duration).toFixed(2)} hrs</div></div></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><div class="flex flex-col items-center"><div class="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium"><i class="fas fa-clock mr-1"></i>${formatDuration(ot.ot_duration)}</div></div></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${otTypeBadge}</td>
                             <td class="px-6 py-4 max-w-xs text-sm text-gray-900 break-words overflow-hidden"><div class="truncate hover:whitespace-normal" title="${escapeHtml(ot.reason)}">${escapeHtml(ot.reason)}</div></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">${ot.attachment ? `<a href="../uploads/overtime_attachments/${escapeHtml(ot.attachment)}" target="_blank" class="inline-flex items-center text-blue-600 hover:text-blue-800"><i class="fas fa-paperclip mr-1"></i>View</a>` : `<span class="text-gray-400 italic">None</span>`}</td>
@@ -275,6 +306,21 @@ function getStatusBadge($status) {
                     if (/^\d{2}:\d{2}:\d{2}$/.test(dateStr)) return true;
                     const d = new Date(dateStr);
                     return !isNaN(d.getTime());
+                }
+                function formatDuration(hours) {
+                    const totalHours = parseFloat(hours || 0);
+                    const wholeHours = Math.floor(totalHours);
+                    const minutes = Math.round((totalHours - wholeHours) * 60);
+                    
+                    if (wholeHours === 0 && minutes === 0) {
+                        return '0 min';
+                    } else if (wholeHours === 0) {
+                        return `${minutes} min`;
+                    } else if (minutes === 0) {
+                        return `${wholeHours} hr${wholeHours > 1 ? 's' : ''}`;
+                    } else {
+                        return `${wholeHours} hr${wholeHours > 1 ? 's' : ''} ${minutes} min`;
+                    }
                 }
                 function getStatusBadgeJS(status) {
                     status = (status || 'pending').toLowerCase();
@@ -404,7 +450,7 @@ function getStatusBadge($status) {
                             </div>
                             <div class="ml-3">
                                 <p class="text-sm font-medium text-gray-500">Approved Hours</p>
-                                <p class="text-lg font-semibold text-gray-900"><?= number_format($totalHours, 1) ?></p>
+                                <p class="text-lg font-semibold text-gray-900"><?= formatDurationPHP($totalHours) ?></p>
                             </div>
                         </div>
                     </div>

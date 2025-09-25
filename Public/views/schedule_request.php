@@ -176,7 +176,6 @@ function getCurrentScheduleForEmployee($employee_id, $pdo) {
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Schedule</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requested Schedule</th>
@@ -209,7 +208,6 @@ function getCurrentScheduleForEmployee($employee_id, $pdo) {
                                     $days = $start->diff($end)->days + 1;
                                     ?>
                                     <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 text-sm font-medium text-gray-900">#<?= htmlspecialchars($sr['id']) ?></td>
                                         <td class="px-6 py-4 text-sm text-gray-900">
                                             <div class="flex items-center">
                                                 <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
