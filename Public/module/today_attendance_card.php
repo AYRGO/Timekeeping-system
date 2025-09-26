@@ -24,6 +24,7 @@ include_once('../config/db.php');
 // Initialize variables
 $time_in = null;
 $time_out = null;
+$log_out_date = null;
 $is_overnight_shift = false;
 $original_log_date = $today;
 $shift_status = null;
@@ -93,15 +94,14 @@ if ($has_incomplete_previous_shift) {
     $time_in_decimal = $time_in_hour + ($time_in_minute / 60);
     $is_likely_overnight_shift = $time_in_decimal >= 16.5; // 4:30 PM or later
     
-    if ($hours_since_time_in >= 14) {
-        // Show incomplete card for ANY shift (normal or overnight) that exceeds 14 hours
-        // But don't change database status - just the UI display
+    if ($hours_since_time_in >= 14 && !$is_likely_overnight_shift) {
+        // Show incomplete card ONLY for regular shifts (not overnight) that exceed 14 hours
+        // Overnight shifts (4:30 PM+) can run longer without being marked incomplete
         $is_overnight_shift = false; // Force incomplete card display (red)
         $shift_status = 'incomplete'; // UI status, not database status
-        $shift_type = $is_likely_overnight_shift ? "overtime" : "normal";
-        error_log("Showing incomplete UI (14+ hrs, $shift_type shift) for employee $employee_id: " . $incomplete_shift_date . " " . $incomplete_shift_time_in);
+        error_log("Showing incomplete UI (14+ hrs, regular shift) for employee $employee_id: " . $incomplete_shift_date . " " . $incomplete_shift_time_in);
     } else {
-        // Shift is under 14 hours - show appropriate card based on start time
+        // Either under 14 hours OR it's an overnight shift - show appropriate card based on start time
         $is_overnight_shift = $is_likely_overnight_shift;
         $shift_status = 'active';
         error_log("Showing " . ($is_overnight_shift ? "overnight" : "regular") . " shift from yesterday for completion: $incomplete_shift_date $incomplete_shift_time_in");
@@ -630,9 +630,14 @@ if ($is_overnight_shift && $time_out) {
                 <?php endif; ?>
             </button>
         <?php elseif ($has_incomplete_previous_shift): ?>
-            <button type="button" disabled
-                class="w-full bg-red-400 text-white font-semibold py-3 px-4 rounded-xl cursor-not-allowed">
-                <i class="fas fa-lock mr-2"></i>Complete Previous Shift First
+            <button type="button" onclick="showConfirmationModal('time_out')"
+                class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200">
+                <i class="fas fa-clock mr-2"></i>
+                <?php if ($shift_status === 'incomplete'): ?>
+                    Complete Incomplete Shift
+                <?php else: ?>
+                    Complete Previous Shift
+                <?php endif; ?>
             </button>
         <?php else: ?>
             <button type="button" disabled

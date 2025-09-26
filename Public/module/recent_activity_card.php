@@ -100,7 +100,9 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                     default => 'Leave Request' // Fallback if leave_type is not found
                 };
             }
-            // For Time requests, fetch status directly from post_time_adjustment_requests table
+            // For Time requests, fetch status and data directly from post_time_adjustment_requests table
+            // IMPORTANT: For approved requests, all data (log_date, current_time_in, current_time_out, 
+            // requested_time_in, requested_time_out, reason, etc.) should come from post_time_adjustment_requests table
             elseif ($type === 'Time' && isset($activity['time_adjust_status'])) {
                 $status = strtolower($activity['time_adjust_status']);
                 if ($status === 'approved') {
@@ -203,24 +205,26 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                     $sentence .= "\nEmployee reason: " . htmlspecialchars($activity['reason']);
                 }
             } elseif ($type === 'Time') {
+                // NOTE: For approved time adjustments, this data should come from post_time_adjustment_requests table
+                // including log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, reason
                 $sentence .= "Time adjustment request was $status.";
                 
-                // Add time details if available
+                // Add time details if available (from post_time_adjustment_requests table)
                 if (!empty($activity['log_date'])) {
                     $logDate = date('M j, Y', strtotime($activity['log_date']));
-                    $sentence .= "\nDate: $logDate";
+                    $sentence .= "\nTarget Date: $logDate";
                 }
                 
-                // Format current times
+                // Format original times (from post_time_adjustment_requests.current_time_in/out)
                 $currentTimeIn = !empty($activity['current_time_in']) ? date('g:i A', strtotime($activity['current_time_in'])) : '—';
                 $currentTimeOut = !empty($activity['current_time_out']) ? date('g:i A', strtotime($activity['current_time_out'])) : '—';
                 
-                // Format requested times  
+                // Format adjusted times (from post_time_adjustment_requests.requested_time_in/out)
                 $requestedTimeIn = !empty($activity['requested_time_in']) ? date('g:i A', strtotime($activity['requested_time_in'])) : '—';
                 $requestedTimeOut = !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '—';
                 
-                $sentence .= "\nCurrent: $currentTimeIn - $currentTimeOut";
-                $sentence .= "\nRequested: $requestedTimeIn - $requestedTimeOut";
+                $sentence .= "\nOriginal: $currentTimeIn - $currentTimeOut";
+                $sentence .= "\nAdjusted: $requestedTimeIn - $requestedTimeOut";
                 
                 if (!empty($activity['reason'])) {
                     $sentence .= "\nReason: " . htmlspecialchars($activity['reason']);
@@ -266,17 +270,17 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
             <td class="px-4 py-3 w-28">
                 <div class="flex items-center gap-2">
                     <?php
-                    if ($type === 'Time' && !empty($activity['reason'])) {
+                    if ($type === 'Time') {
                         ?>
                         <button onclick="showActivityDetails('Time Adjustment', `<?= htmlspecialchars(json_encode([
                             'type' => 'Time Adjustment',
                             'status' => $status,
                             'date' => $created,
                             'log_date' => !empty($activity['log_date']) ? date('M j, Y', strtotime($activity['log_date'])) : '',
-                            'current_time_in' => !empty($activity['current_time_in']) ? date('g:i A', strtotime($activity['current_time_in'])) : '—',
-                            'current_time_out' => !empty($activity['current_time_out']) ? date('g:i A', strtotime($activity['current_time_out'])) : '—',
-                            'requested_time_in' => !empty($activity['requested_time_in']) ? date('g:i A', strtotime($activity['requested_time_in'])) : '—',
-                            'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '—',
+                            'current_time_in' => !empty($activity['current_time_in']) ? date('g:i A', strtotime($activity['current_time_in'])) : '',
+                            'current_time_out' => !empty($activity['current_time_out']) ? date('g:i A', strtotime($activity['current_time_out'])) : '',
+                            'requested_time_in' => !empty($activity['requested_time_in']) ? date('g:i A', strtotime($activity['requested_time_in'])) : '',
+                            'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
                             'reason' => $activity['reason'] ?? '',
                             'explanation' => $activity['explanation'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
@@ -418,7 +422,10 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
 <script>
 function showActivityDetails(title, dataJson) {
     try {
+        console.log('Raw JSON string:', dataJson); // Debug: show raw JSON string
         const data = JSON.parse(dataJson);
+        console.log('Parsed Data:', data); // Debug: show parsed data
+        
         const modal = document.getElementById('activityModal');
         const modalContent = document.getElementById('modalContent');
         const modalTitle = document.getElementById('modalTitle');
@@ -450,21 +457,50 @@ function showActivityDetails(title, dataJson) {
                 content += createInfoBlock('Target Date', data.log_date, 'fa-calendar-day');
             }
             
-            content += `
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <h4 class="text-sm font-bold text-gray-700 mb-3">Time Changes</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="bg-gray-50 p-3 rounded-md">
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Current</label>
-                            <p class="text-gray-800 font-semibold">${data.current_time_in} - ${data.current_time_out}</p>
-                        </div>
-                        <div class="bg-green-50 p-3 rounded-md">
-                            <label class="block text-xs font-medium text-green-600 mb-1">Requested</label>
-                            <p class="text-green-800 font-semibold">${data.requested_time_in} - ${data.requested_time_out}</p>
+            // Debug: Show all available data if time fields are missing
+            console.log('Time Adjustment Data:', data);
+            
+            // Check if we have time data, if not show debugging info
+            if (data.current_time_in || data.current_time_out || data.requested_time_in || data.requested_time_out) {
+                content += `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <h4 class="text-sm font-bold text-gray-700 mb-3">Time Changes</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="bg-gray-50 p-3 rounded-md">
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Original Time</label>
+                                <p class="text-gray-800 font-semibold">${data.current_time_in || 'Not Available'} - ${data.current_time_out || 'Not Available'}</p>
+                            </div>
+                            <div class="bg-green-50 p-3 rounded-md">
+                                <label class="block text-xs font-medium text-green-600 mb-1">Adjusted Time</label>
+                                <p class="text-green-800 font-semibold">${data.requested_time_in || 'Not Available'} - ${data.requested_time_out || 'Not Available'}</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // Show debugging information when time data is missing
+                content += `
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <h4 class="text-sm font-bold text-red-700 mb-3">⚠️ Missing Time Data</h4>
+                        <p class="text-sm text-red-600 mb-2">Expected data from post_time_adjustment_requests table:</p>
+                        <ul class="text-xs text-red-600 list-disc list-inside space-y-1">
+                            <li>log_date: ${data.log_date || 'Missing'}</li>
+                            <li>current_time_in: ${data.current_time_in || 'Missing'}</li>
+                            <li>current_time_out: ${data.current_time_out || 'Missing'}</li>
+                            <li>requested_time_in: ${data.requested_time_in || 'Missing'}</li>
+                            <li>requested_time_out: ${data.requested_time_out || 'Missing'}</li>
+                            <li>reason: ${data.reason || 'Missing'}</li>
+                        </ul>
+                        <p class="text-xs text-red-600 mt-2 italic">Check if notification data is being fetched from the correct table.</p>
+                        ${data.raw_data ? `<details class="mt-3"><summary class="text-xs cursor-pointer">Show Raw Data</summary><pre class="text-xs mt-2 bg-gray-100 p-2 rounded overflow-auto">${data.raw_data}</pre></details>` : ''}
+                    </div>
+                `;
+            }
+            
+            // Show processing information for approved requests
+            if (data.status.toLowerCase() === 'approved' && data.processed_at) {
+                content += createInfoBlock('Processed Date', new Date(data.processed_at).toLocaleString(), 'fa-check-circle', 'text-sm text-green-700', 'bg-green-50 border-green-200');
+            }
         } else if (data.type.includes('Leave')) {
             if (data.start_date && data.end_date) {
                 content += createInfoBlock('Leave Period', `${data.start_date} to ${data.end_date}`, 'fa-calendar-week');
@@ -569,7 +605,40 @@ function showActivityDetails(title, dataJson) {
         
     } catch (error) {
         console.error('Error parsing activity data:', error);
-        alert('Error displaying activity details');
+        console.error('Raw JSON that failed to parse:', dataJson);
+        console.error('Error details:', error.message);
+        
+        // Show more detailed error message
+        alert(`Error displaying activity details:\n\nError: ${error.message}\n\nCheck browser console for more details.`);
+        
+        // Try to show modal with error info
+        const modal = document.getElementById('activityModal');
+        const modalContent = document.getElementById('modalContent');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        
+        if (modal && modalContent && modalTitle && modalBody) {
+            modalTitle.textContent = 'Error Loading Details';
+            modalBody.innerHTML = `
+                <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                    <h4 class="text-sm font-bold text-red-700 mb-3">⚠️ JSON Parse Error</h4>
+                    <p class="text-sm text-red-600 mb-2">Failed to parse activity data:</p>
+                    <pre class="text-xs text-red-600 bg-red-100 p-2 rounded overflow-auto max-h-32">${error.message}</pre>
+                    <details class="mt-3">
+                        <summary class="text-xs cursor-pointer text-red-700 font-bold">Show Raw Data</summary>
+                        <pre class="text-xs mt-2 bg-gray-100 p-2 rounded overflow-auto max-h-40">${dataJson}</pre>
+                    </details>
+                </div>
+            `;
+            
+            // Show modal anyway
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
     }
 }
 
