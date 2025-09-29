@@ -94,12 +94,12 @@ if ($has_incomplete_previous_shift) {
     $time_in_decimal = $time_in_hour + ($time_in_minute / 60);
     $is_likely_overnight_shift = $time_in_decimal >= 16.5; // 4:30 PM or later
     
-    if ($hours_since_time_in >= 14 && !$is_likely_overnight_shift) {
-        // Show incomplete card ONLY for regular shifts (not overnight) that exceed 14 hours
+    if ($hours_since_time_in >= 20 && !$is_likely_overnight_shift) {
+        // Show incomplete card ONLY for regular shifts (not overnight) that exceed 20 hours
         // Overnight shifts (4:30 PM+) can run longer without being marked incomplete
         $is_overnight_shift = false; // Force incomplete card display (red)
         $shift_status = 'incomplete'; // UI status, not database status
-        error_log("Showing incomplete UI (14+ hrs, regular shift) for employee $employee_id: " . $incomplete_shift_date . " " . $incomplete_shift_time_in);
+        error_log("Showing incomplete UI (20+ hrs, regular shift) for employee $employee_id: " . $incomplete_shift_date . " " . $incomplete_shift_time_in);
     } else {
         // Either under 14 hours OR it's an overnight shift - show appropriate card based on start time
         $is_overnight_shift = $is_likely_overnight_shift;

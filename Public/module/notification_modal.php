@@ -297,12 +297,13 @@ $pending_ot_stmt = $pdo->prepare("
 $pending_ot_stmt->execute([$current_user_id]);
 $pending_ot_results = $pending_ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Then get processed overtime requests
+// Then get processed overtime requests with log_date
 $ot_stmt = $pdo->prepare("
-    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified
-    FROM post_ot_requests
-    WHERE employee_id = ?
-    ORDER BY COALESCE(approved_at, created_at) DESC
+    SELECT por.id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.created_at, por.approved_at, por.approved_by, por.notified, tl.log_date
+    FROM post_ot_requests por
+    LEFT JOIN time_logs tl ON por.time_log_id = tl.id
+    WHERE por.employee_id = ?
+    ORDER BY COALESCE(por.approved_at, por.created_at) DESC
     LIMIT 10
 ");
 $ot_stmt->execute([$current_user_id]);
@@ -333,6 +334,8 @@ foreach ($pending_ot_results as $ot) {
         'end_ot' => $ot['end_time'] ?? null,
         'ot_duration' => $ot['duration_hours'],
         'ot_type' => $ot_type,
+        'ot_date' => $ot['date'] ?? null,  // Add OT date from overtime_requests table
+        'log_date' => $ot['date'] ?? null, // Fallback field
         'request_id' => $ot['id'],
         'table_name' => 'overtime_requests',
         'source_table' => 'pending'
@@ -356,18 +359,10 @@ foreach ($ot_results as $ot) {
     // Compute Start OT and End OT using schedule logic (similar to new_overtime)
     $actual_time_in = $ot['time_in'] ?? null;
     $actual_time_out = $ot['time_out'] ?? null;
-    $log_date = null;
+    $log_date = $ot['log_date'] ?? null; // Get log_date directly from JOIN query
     $start_ot = null;
     $end_ot = null;
 
-    // Get log_date from time_logs table if time_log_id exists
-    if (!empty($ot['time_log_id'])) {
-        $log_stmt = $pdo->prepare("SELECT log_date FROM time_logs WHERE id = ?");
-        $log_stmt->execute([$ot['time_log_id']]);
-        $log_result = $log_stmt->fetch(PDO::FETCH_ASSOC);
-        $log_date = $log_result['log_date'] ?? null;
-    }
-    
     // Fallback: derive log_date from time_in if available
     if (!$log_date && $actual_time_in) {
         $log_date = date('Y-m-d', strtotime($actual_time_in));
@@ -407,6 +402,8 @@ foreach ($ot_results as $ot) {
         'end_ot' => $end_ot,
         'ot_duration' => $ot['ot_duration'],
         'ot_type' => $ot_type,
+        'ot_date' => $log_date,  // Add OT date from time_logs table
+        'log_date' => $log_date, // Same field for consistency
         'request_id' => $ot['id'],
         'table_name' => 'post_ot_requests',
         'source_table' => 'post'

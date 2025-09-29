@@ -231,6 +231,16 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                 }
             } elseif ($type === 'Overtime') {
                 $sentence .= "Overtime request was $status.";
+                
+                // Add OT date if available
+                if (!empty($activity['ot_date'])) {
+                    $otDate = date('M j, Y', strtotime($activity['ot_date']));
+                    $sentence .= "\nOT Date: $otDate";
+                } elseif (!empty($activity['log_date'])) {
+                    $otDate = date('M j, Y', strtotime($activity['log_date']));
+                    $sentence .= "\nOT Date: $otDate";
+                }
+                
                 if (!empty($activity['ot_reason'])) {
                     $sentence .= "\nReason: " . htmlspecialchars($activity['ot_reason']);
                 }
@@ -295,9 +305,11 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                             'type' => 'Overtime Request',
                             'status' => $status,
                             'date' => $created,
+                            'ot_date' => !empty($activity['ot_date']) ? date('M j, Y', strtotime($activity['ot_date'])) : (!empty($activity['log_date']) ? date('M j, Y', strtotime($activity['log_date'])) : ''),
                             'reason' => $activity['ot_reason'] ?? '',
                             'ot_type' => $activity['ot_type'] ?? 'Overtime',
                             'ot_duration' => isset($activity['ot_duration']) ? number_format((float)$activity['ot_duration'], 2) : '',
+                            'max_ot_hours' => isset($activity['max_ot_hours']) ? number_format((float)$activity['max_ot_hours'], 2) : '',
                             'start_ot' => !empty($activity['start_ot']) ? date('g:i A', strtotime($activity['start_ot'])) : '',
                             'end_ot' => !empty($activity['end_ot']) ? date('g:i A', strtotime($activity['end_ot'])) : '',
                             'time_in' => !empty($activity['time_in']) ? date('g:i A', strtotime($activity['time_in'])) : '',
@@ -528,6 +540,11 @@ function showActivityDetails(title, dataJson) {
                 content += createInfoBlock('Effective Period', `${data.start_date} to ${data.end_date}`, 'fa-calendar-alt');
             }
         } else if (data.type.includes('Overtime')) {
+            // Add OT Date if available
+            if (data.ot_date) {
+                content += createInfoBlock('Overtime Date', data.ot_date, 'fa-calendar-day');
+            }
+            
             // Overtime details: Start, End, Duration, Type - prefer start_ot/end_ot over time_in/time_out
             const details = [];
             const startTime = data.start_ot || data.time_in;
@@ -546,10 +563,40 @@ function showActivityDetails(title, dataJson) {
                 `</div>`);
             }
             if (data.ot_duration) {
-                details.push(`<div class=\"bg-blue-50 p-3 rounded-md\">`+
-                    `<label class=\"block text-xs font-medium text-blue-600 mb-1\">Duration</label>`+
-                    `<p class=\"text-blue-800 font-semibold\">${data.ot_duration} hours</p>`+
-                `</div>`);
+                // Check if request is pending and can be edited
+                if (data.status && data.status.toLowerCase() === 'pending' && data.request_id) {
+                    // Editable duration for pending requests
+                    const durationHours = parseFloat(data.ot_duration) || 0;
+                    const wholeHours = Math.floor(durationHours);
+                    const minutes = Math.round((durationHours - wholeHours) * 60);
+                    
+                    details.push(`<div class=\"bg-blue-50 p-3 rounded-md\">`+
+                        `<label class=\"block text-xs font-medium text-blue-600 mb-2\">Duration (Editable)</label>`+
+                        `<div class=\"flex items-center space-x-2 mb-2\">`+
+                            `<div class=\"flex flex-col items-center\">`+
+                                `<label class=\"text-xs font-medium text-blue-600 mb-1\">Hrs</label>`+
+                                `<input type=\"number\" id=\"edit-hours-${data.request_id}\" min=\"0\" max=\"24\" value=\"${wholeHours}\" `+
+                                `class=\"w-12 h-8 text-center border border-blue-300 rounded text-sm font-bold focus:ring-1 focus:ring-blue-400 focus:border-blue-400\">`+
+                            `</div>`+
+                            `<div class=\"text-blue-400 font-bold mt-4\">:</div>`+
+                            `<div class=\"flex flex-col items-center\">`+
+                                `<label class=\"text-xs font-medium text-blue-600 mb-1\">Min</label>`+
+                                `<input type=\"number\" id=\"edit-minutes-${data.request_id}\" min=\"0\" max=\"59\" step=\"15\" value=\"${minutes}\" `+
+                                `class=\"w-12 h-8 text-center border border-blue-300 rounded text-sm font-bold focus:ring-1 focus:ring-blue-400 focus:border-blue-400\">`+
+                            `</div>`+
+                        `</div>`+
+                        `<div class=\"text-xs text-blue-600 mb-2\" id=\"duration-display-${data.request_id}\">Current: ${data.ot_duration} hours</div>`+
+                        `<div class=\"text-xs text-gray-500\" id=\"duration-validation-${data.request_id}\">Max available: ${data.max_ot_hours || 'N/A'}</div>`+
+                        `<button type=\"button\" onclick=\"updateOvertimeDuration('${data.request_id}', '${data.table_name}')\" `+
+                        `class=\"mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors\">Update Duration</button>`+
+                    `</div>`);
+                } else {
+                    // Static duration display for non-pending requests
+                    details.push(`<div class=\"bg-blue-50 p-3 rounded-md\">`+
+                        `<label class=\"block text-xs font-medium text-blue-600 mb-1\">Duration</label>`+
+                        `<p class=\"text-blue-800 font-semibold\">${data.ot_duration} hours</p>`+
+                    `</div>`);
+                }
             }
             if (data.ot_type) {
                 details.push(`<div class=\"bg-green-50 p-3 rounded-md\">`+
@@ -579,17 +626,23 @@ function showActivityDetails(title, dataJson) {
         
         modalBody.innerHTML = content;
         
-        // Add unsubmit button if applicable (status is 'pending' and we have unsubmit data)
+        // Add Edit and Cancel buttons if applicable (status is 'pending' and we have request data)
         const unsubmitContainer = document.getElementById('unsubmitButtonContainer');
         unsubmitContainer.innerHTML = '';
         
         if (data.status && data.status.toLowerCase() === 'pending' && 
             data.request_id && data.table_name) {
             unsubmitContainer.innerHTML = `
-                <button onclick="unsubmitFromModal(${data.request_id}, '${data.table_name}', '${data.source_table}')" 
-                        class="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform active:scale-95 flex items-center">
-                    <i class="fas fa-undo mr-2"></i>Unsubmit Request
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="editRequestFromModal('${data.type}', ${data.request_id}, '${data.table_name}', '${data.source_table}')" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform active:scale-95 flex items-center">
+                        <i class="fas fa-edit mr-2"></i>Edit
+                    </button>
+                    <button onclick="cancelRequestFromModal(${data.request_id}, '${data.table_name}', '${data.source_table}')" 
+                            class="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform active:scale-95 flex items-center">
+                        <i class="fas fa-times mr-2"></i>Cancel
+                    </button>
+                </div>
             `;
         }
         
@@ -654,15 +707,37 @@ function createInfoBlock(label, value, icon, valueClass = 'font-semibold', conta
     `;
 }
 
-function unsubmitFromModal(requestId, tableName, sourceTable) {
-    if (!confirm('Are you sure you want to unsubmit this request?')) {
+function editRequestFromModal(requestType, requestId, tableName, sourceTable) {
+    // Determine the edit page based on request type
+    let editUrl = '';
+    
+    if (requestType.includes('Time Adjustment')) {
+        editUrl = `test.php?edit=${requestId}`;
+    } else if (requestType.includes('Leave')) {
+        editUrl = `employee_leave.php?edit=${requestId}`;
+    } else if (requestType.includes('Schedule')) {
+        editUrl = `schedule_change.php?edit=${requestId}`;
+    } else if (requestType.includes('Overtime')) {
+        editUrl = `overtime.php?edit=${requestId}`;
+    } else {
+        alert('Edit functionality not available for this request type.');
+        return;
+    }
+    
+    // Close modal and redirect to edit page
+    closeActivityModal();
+    window.location.href = editUrl;
+}
+
+function cancelRequestFromModal(requestId, tableName, sourceTable) {
+    if (!confirm('Are you sure you want to cancel this request?\n\nThis action cannot be undone and will permanently remove the request from the system.')) {
         return;
     }
     
     // Call the existing unsubmitRequest function with sourceTable
     unsubmitRequest(requestId, tableName, sourceTable);
     
-    // Close the modal after initiating unsubmit (it will only reload if successful)
+    // Close the modal after initiating cancel (it will only reload if successful)
     closeActivityModal();
 }
 
@@ -719,7 +794,7 @@ document.addEventListener('keydown', function(event) {
 
 function unsubmitRequest(requestId, tableName, sourceTable = null) {
     // Enhanced confirmation dialog with better styling
-    const confirmed = confirm('⚠️ Are you sure you want to unsubmit this request?\n\nThis action cannot be undone and will permanently remove the request from the system.');
+    const confirmed = confirm('⚠️ Are you sure you want to cancel this request?\n\nThis action cannot be undone and will permanently remove the request from the system.');
     
     if (!confirmed) {
         return;
@@ -728,9 +803,9 @@ function unsubmitRequest(requestId, tableName, sourceTable = null) {
     // Show loading state with better visual feedback
     const buttons = document.querySelectorAll(`button[onclick*="${requestId}"][onclick*="${tableName}"]`);
     buttons.forEach(button => {
-        if (button.textContent.trim().includes('Unsubmit')) {
+        if (button.textContent.trim().includes('Cancel') || button.textContent.trim().includes('Unsubmit')) {
             button.disabled = true;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Removing...';
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Cancelling...';
             button.classList.add('opacity-75', 'cursor-not-allowed');
         }
     });
@@ -781,11 +856,11 @@ function unsubmitRequest(requestId, tableName, sourceTable = null) {
         
         if (data.success === true) {
             // Show success message with better styling
-            alert('✅ Request successfully unsubmitted! The page will now refresh.');
+            alert('✅ Request successfully cancelled! The page will now refresh.');
             
             // Add a fade out effect before reload
             buttons.forEach(button => {
-                if (button.textContent.includes('Removing')) {
+                if (button.textContent.includes('Cancelling')) {
                     const row = button.closest('tr');
                     if (row) {
                         row.style.transition = 'all 0.5s ease-out';
@@ -795,18 +870,20 @@ function unsubmitRequest(requestId, tableName, sourceTable = null) {
                 }
             });
             
-            // Only reload on actual success
-            setTimeout(() => location.reload(), 500);
+            // Force page reload to reflect database changes
+            setTimeout(() => {
+                window.location.reload(true); // Force reload from server
+            }, 500);
         } else {
             // Show error message and restore button - DO NOT RELOAD
-            console.error('Unsubmit failed:', data);
-            alert('❌ Error: ' + (data.message || 'Failed to unsubmit request'));
+            console.error('Cancel failed:', data);
+            alert('❌ Error: ' + (data.message || 'Failed to cancel request'));
             
             // Restore button state
             buttons.forEach(button => {
-                if (button.textContent.includes('Removing')) {
+                if (button.textContent.includes('Cancelling')) {
                     button.disabled = false;
-                    button.innerHTML = '<i class="fas fa-times mr-1.5"></i>Unsubmit';
+                    button.innerHTML = '<i class="fas fa-times mr-1.5"></i>Cancel';
                     button.classList.remove('opacity-75', 'cursor-not-allowed');
                 }
             });
@@ -818,13 +895,186 @@ function unsubmitRequest(requestId, tableName, sourceTable = null) {
         
         // Restore button state
         buttons.forEach(button => {
-            if (button.textContent.includes('Removing')) {
+            if (button.textContent.includes('Cancelling')) {
                 button.disabled = false;
-                button.innerHTML = '<i class="fas fa-times mr-1.5"></i>Unsubmit';
+                button.innerHTML = '<i class="fas fa-times mr-1.5"></i>Cancel';
                 button.classList.remove('opacity-75', 'cursor-not-allowed');
             }
         });
     });
+}
+
+// Function to update overtime duration
+function updateOvertimeDuration(requestId, tableName) {
+    const hoursInput = document.getElementById(`edit-hours-${requestId}`);
+    const minutesInput = document.getElementById(`edit-minutes-${requestId}`);
+    const validationDiv = document.getElementById(`duration-validation-${requestId}`);
+    const displayDiv = document.getElementById(`duration-display-${requestId}`);
+    
+    if (!hoursInput || !minutesInput) {
+        alert('Error: Duration inputs not found');
+        return;
+    }
+    
+    const hours = parseInt(hoursInput.value) || 0;
+    const minutes = parseInt(minutesInput.value) || 0;
+    const maxAllowedHours = parseFloat(hoursInput.getAttribute('data-max-hours')) || 24;
+    
+    // Round minutes to nearest 15-minute increment
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    if (roundedMinutes !== minutes) {
+        minutesInput.value = roundedMinutes > 59 ? 0 : roundedMinutes;
+        if (roundedMinutes > 59) {
+            hoursInput.value = hours + 1;
+        }
+    }
+    
+    // Calculate total hours as decimal
+    const totalHours = hours + (parseInt(minutesInput.value) / 60);
+    
+    if (totalHours === 0) {
+        alert('Please select a valid duration (minimum 15 minutes)');
+        return;
+    }
+    
+    // Validate against maximum allowed hours (based on OT window)
+    if (totalHours > maxAllowedHours) {
+        alert(`Duration cannot exceed ${formatOvertimeDuration(maxAllowedHours)} (based on Start OT to End OT window)`);
+        // Reset to maximum allowed
+        const maxWholeHours = Math.floor(maxAllowedHours);
+        const maxMinutes = Math.round((maxAllowedHours - maxWholeHours) * 60);
+        hoursInput.value = maxWholeHours;
+        minutesInput.value = maxMinutes;
+        return;
+    }
+    
+    // Show confirmation
+    const durationText = formatOvertimeDuration(totalHours);
+    if (!confirm(`Update overtime duration to ${durationText}?`)) {
+        return;
+    }
+    
+    // Show loading state
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Updating...';
+    
+    // Debug: Log the data being sent
+    const updateData = {
+        request_id: requestId,
+        table_name: tableName,
+        ot_duration: totalHours.toFixed(2)
+    };
+    console.log('Sending update data:', updateData);
+    
+    // Make AJAX request to update duration (using debug version)
+    fetch('../controller/update_overtime_duration_debug.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Response data:', data);
+        
+        if (data.success) {
+            alert('✅ Overtime duration updated successfully!');
+            displayDiv.innerHTML = `Current: ${totalHours.toFixed(2)} hours`;
+            
+            // Refresh the page to reflect changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            console.error('Update failed:', data);
+            alert('❌ Error: ' + (data.message || 'Failed to update duration') + 
+                  '\n\nDebug info: ' + JSON.stringify(data, null, 2));
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Network/Parse Error:', error);
+        alert('🔥 Network error occurred: ' + error.message + 
+              '\n\nPlease check browser console for details and try again.');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+// Function to convert 12-hour time format to 24-hour format
+function convertTo24Hour(time12h) {
+    if (!time12h) return '';
+    
+    const [time, modifier] = time12h.split(/\s/);
+    let [hours, minutes] = time.split(':');
+    
+    if (hours === '12') {
+        hours = '00';
+    }
+    
+    if (modifier && modifier.toUpperCase() === 'PM') {
+        hours = parseInt(hours, 10) + 12;
+    }
+    
+    return `${hours}:${minutes}:00`;
+}
+
+// Function to validate OT duration in real-time
+function validateOTDuration(requestId) {
+    const hoursInput = document.getElementById(`edit-hours-${requestId}`);
+    const minutesInput = document.getElementById(`edit-minutes-${requestId}`);
+    const validationDiv = document.getElementById(`duration-validation-${requestId}`);
+    
+    if (!hoursInput || !minutesInput || !validationDiv) return;
+    
+    const hours = parseInt(hoursInput.value) || 0;
+    const minutes = parseInt(minutesInput.value) || 0;
+    const maxAllowedHours = parseFloat(hoursInput.getAttribute('data-max-hours')) || 24;
+    
+    // Calculate total hours as decimal
+    const totalHours = hours + (minutes / 60);
+    
+    if (totalHours > maxAllowedHours) {
+        validationDiv.innerHTML = `<span class="text-red-500">⚠️ Exceeds OT window limit: ${formatOvertimeDuration(maxAllowedHours)}</span>`;
+        hoursInput.classList.add('border-red-300');
+        minutesInput.classList.add('border-red-300');
+    } else if (totalHours > 0) {
+        validationDiv.innerHTML = `<span class="text-green-600">✓ Valid duration: ${formatOvertimeDuration(totalHours)}</span>`;
+        hoursInput.classList.remove('border-red-300');
+        minutesInput.classList.remove('border-red-300');
+        hoursInput.classList.add('border-green-300');
+        minutesInput.classList.add('border-green-300');
+    } else {
+        validationDiv.innerHTML = `Max allowed: ${formatOvertimeDuration(maxAllowedHours)} hrs (based on OT window)`;
+        hoursInput.classList.remove('border-red-300', 'border-green-300');
+        minutesInput.classList.remove('border-red-300', 'border-green-300');
+    }
+}
+
+// Function to format overtime duration for display
+function formatOvertimeDuration(hours) {
+    const totalHours = parseFloat(hours || 0);
+    const wholeHours = Math.floor(totalHours);
+    const minutes = Math.round((totalHours - wholeHours) * 60);
+    
+    if (wholeHours === 0 && minutes === 0) {
+        return '0 min';
+    } else if (wholeHours === 0) {
+        return minutes + ' min';
+    } else if (minutes === 0) {
+        return wholeHours + (wholeHours > 1 ? ' hrs' : ' hr');
+    } else {
+        return wholeHours + (wholeHours > 1 ? ' hrs' : ' hr') + ' ' + minutes + ' min';
+    }
 }
 
 // Add smooth scroll animation and enhanced interactions

@@ -1855,17 +1855,20 @@ button:hover {
                         
                         <div class="grid grid-cols-1 gap-4 mt-5">
                             <div class="space-y-2">
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Date</label>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                                    OT Date <span class="text-red-500 text-sm">*</span>
+                                </label>
                                 <div class="relative">
-           <input type="text" id="selected_date" name="selected_date" 
+           <input type="date" id="selected_date" name="selected_date" 
              class="w-full pl-10 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm"
-             readonly>
+             required>
                                     <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
                                         <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
                                             <i class="fas fa-calendar text-white text-xs"></i>
                                         </div>
                                     </div>
                                 </div>
+                                <p class="text-xs text-slate-600 font-medium">Select the date when overtime was performed</p>
                             </div>
 
                             <!-- Hidden Time In and Time Out fields for form submission -->

@@ -356,6 +356,34 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             // Check if this date is on approved leave first
                             $leaveType = isOnApprovedLeave($logDate, $approvedLeaves);
                             
+                            // Calculate late and undertime minutes
+                            $lateMinutes = 0;
+                            $undertimeMinutes = 0;
+                            
+                            if ($timeIn && !$leaveType) {
+                                $actualTimeIn = date('H:i:s', strtotime($timeIn));
+                                $scheduledTimeIn = $schedule_in_24h;
+                                $graceTimeIn = date('H:i:s', strtotime($scheduledTimeIn . ' +15 minutes'));
+                                
+                                // Calculate late minutes (if arrived after grace period)
+                                if ($actualTimeIn > $graceTimeIn) {
+                                    $lateSeconds = strtotime($actualTimeIn) - strtotime($graceTimeIn);
+                                    $lateMinutes = round($lateSeconds / 60);
+                                }
+                            }
+                            
+                            if ($timeOut && $timeOut !== 'INC' && !$leaveType && !$isAutoIncomplete) {
+                                $actualTimeOut = date('H:i:s', strtotime($timeOut));
+                                $scheduledTimeOut = $schedule_out_24h;
+                                $earliestAllowedOut = date('H:i:s', strtotime($scheduledTimeOut . ' -15 minutes'));
+                                
+                                // Calculate undertime minutes (if left before earliest allowed time)
+                                if (!$isCrossMidnight && $actualTimeOut < $earliestAllowedOut) {
+                                    $undertimeSeconds = strtotime($earliestAllowedOut) - strtotime($actualTimeOut);
+                                    $undertimeMinutes = round($undertimeSeconds / 60);
+                                }
+                            }
+                            
                             // Updated status calculation
                             $status = '-';
                             $badgeClass = 'bg-gray-100 text-gray-800';
@@ -396,10 +424,10 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 
                                 // Determine final status - prioritize Late over Undertime
                                 if ($isLate) {
-                                    $status = 'Late';
+                                    $status = $lateMinutes > 0 ? "Late ({$lateMinutes}mins)" : 'Late';
                                     $badgeClass = 'bg-orange-100 text-orange-800';
                                 } elseif ($isUndertime) {
-                                    $status = 'Undertime';
+                                    $status = $undertimeMinutes > 0 ? "Undertime ({$undertimeMinutes}mins)" : 'Undertime';
                                     $badgeClass = 'bg-yellow-100 text-yellow-800';
                                 } else {
                                     $status = 'Complete';
