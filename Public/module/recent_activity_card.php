@@ -305,7 +305,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                             'type' => 'Overtime Request',
                             'status' => $status,
                             'date' => $created,
-                            'ot_date' => !empty($activity['ot_date']) ? date('M j, Y', strtotime($activity['ot_date'])) : (!empty($activity['log_date']) ? date('M j, Y', strtotime($activity['log_date'])) : ''),
+                            'ot_date' => !empty($activity['ot_date']) ? date('M j, Y', strtotime($activity['ot_date'])) : (!empty($activity['log_date']) ? date('M j, Y', strtotime($activity['log_date'])) : (!empty($activity['created_at']) ? date('M j, Y', strtotime($activity['created_at'])) : 'Not specified')),
                             'reason' => $activity['ot_reason'] ?? '',
                             'ot_type' => $activity['ot_type'] ?? 'Overtime',
                             'ot_duration' => isset($activity['ot_duration']) ? number_format((float)$activity['ot_duration'], 2) : '',
@@ -349,6 +349,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                             'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
                             'start_date' => !empty($activity['start_date']) ? date('M j, Y', strtotime($activity['start_date'])) : '',
                             'end_date' => !empty($activity['end_date']) ? date('M j, Y', strtotime($activity['end_date'])) : '',
+                            'reason' => $activity['reason'] ?? '',
                             'explanation' => $activity['explanation'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
@@ -401,7 +402,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
 
 <!-- Activity Details Modal -->
 <div id="activityModal" class="fixed inset-0 z-50 items-center justify-center bg-black bg-opacity-60 hidden backdrop-blur-sm">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 border border-gray-200/80 transform transition-all duration-300 scale-95 opacity-0" id="modalContent">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 border border-gray-200/80 transform transition-all duration-300 scale-95 opacity-0" id="modalContent">
         <!-- Modal Header -->
         <div class="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50 rounded-t-xl">
             <div class="flex items-center">
@@ -466,29 +467,126 @@ function showActivityDetails(title, dataJson) {
         // Type-specific fields
         if (data.type.includes('Time Adjustment')) {
             if (data.log_date) {
-                content += createInfoBlock('Target Date', data.log_date, 'fa-calendar-day');
+                content += createInfoBlock('Adjustment Date', data.log_date, 'fa-calendar-day');
             }
             
             // Debug: Show all available data if time fields are missing
             console.log('Time Adjustment Data:', data);
+            console.log('Requested Time In:', data.requested_time_in);
+            console.log('Requested Time Out:', data.requested_time_out);
+            console.log('Current Time In:', data.current_time_in);
+            console.log('Current Time Out:', data.current_time_out);
             
             // Check if we have time data, if not show debugging info
             if (data.current_time_in || data.current_time_out || data.requested_time_in || data.requested_time_out) {
-                content += `
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <h4 class="text-sm font-bold text-gray-700 mb-3">Time Changes</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div class="bg-gray-50 p-3 rounded-md">
-                                <label class="block text-xs font-medium text-gray-500 mb-1">Original Time</label>
-                                <p class="text-gray-800 font-semibold">${data.current_time_in || 'Not Available'} - ${data.current_time_out || 'Not Available'}</p>
-                            </div>
-                            <div class="bg-green-50 p-3 rounded-md">
-                                <label class="block text-xs font-medium text-green-600 mb-1">Adjusted Time</label>
-                                <p class="text-green-800 font-semibold">${data.requested_time_in || 'Not Available'} - ${data.requested_time_out || 'Not Available'}</p>
+                // Check if request is pending and can be edited
+                const isEditable = data.status && data.status.toLowerCase() === 'pending' && data.request_id;
+                
+                if (isEditable) {
+                    // Compact editable time adjustment
+                    content += `
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" id="time-adjustment-block-${data.request_id}">
+                            <h4 class="text-sm font-bold text-gray-700 mb-4 flex items-center">
+                                <i class="fas fa-clock mr-2 text-gray-500"></i>
+                                Time Changes
+                            </h4>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Time In -->
+                                <div class="bg-white p-3 rounded-lg border">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="text-xs font-medium text-blue-600">Time In</label>
+                                        <span class="text-xs text-gray-500">Was: ${data.current_time_in || 'N/A'}</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <select id="edit-time-in-hour-${data.request_id}" 
+                                                class="w-12 h-8 text-center border border-gray-300 bg-gray-100 rounded text-xs font-bold focus:ring-1 focus:ring-blue-400 focus:border-blue-400" 
+                                                disabled data-original="${extractHour(data.requested_time_in || data.current_time_in)}" 
+                                                onchange="updateTimeDisplay(${data.request_id}, 'in'); checkForChanges(${data.request_id})">
+                                            ${(() => {
+                                                const timeValue = data.requested_time_in || data.current_time_in;
+                                                console.log('Time In value being used for hour options:', timeValue);
+                                                return generateHourOptions(timeValue);
+                                            })()}
+                                        </select>
+                                        <span class="text-gray-400">:</span>
+                                        <select id="edit-time-in-minute-${data.request_id}" 
+                                                class="w-12 h-8 text-center border border-gray-300 bg-gray-100 rounded text-xs font-bold focus:ring-1 focus:ring-blue-400 focus:border-blue-400" 
+                                                disabled data-original="${extractMinute(data.requested_time_in || data.current_time_in)}" 
+                                                onchange="updateTimeDisplay(${data.request_id}, 'in'); checkForChanges(${data.request_id})">
+                                            ${(() => {
+                                                const timeValue = data.requested_time_in || data.current_time_in;
+                                                console.log('Time In value being used for minute options:', timeValue);
+                                                return generateMinuteOptions(timeValue);
+                                            })()}
+                                        </select>
+                                        <select id="edit-time-in-ampm-${data.request_id}" 
+                                                class="w-14 h-8 text-center border border-gray-300 bg-gray-100 rounded text-xs font-bold focus:ring-1 focus:ring-blue-400 focus:border-blue-400" 
+                                                disabled data-original="${extractAMPM(data.requested_time_in || data.current_time_in)}" 
+                                                onchange="updateTimeDisplay(${data.request_id}, 'in'); checkForChanges(${data.request_id})">
+                                            ${(() => {
+                                                const timeValue = data.requested_time_in || data.current_time_in;
+                                                console.log('Time In value being used for AM/PM options:', timeValue);
+                                                return generateAMPMOptions(timeValue);
+                                            })()}
+                                        </select>
+                                    </div>
+                                    <input type="hidden" id="edit-time-in-${data.request_id}" value="${data.requested_time_in || data.current_time_in || ''}" data-original="${data.requested_time_in || data.current_time_in || ''}">
+                                </div>
+                                
+                                <!-- Time Out -->
+                                <div class="bg-white p-3 rounded-lg border">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="text-xs font-medium text-green-600">Time Out</label>
+                                        <span class="text-xs text-gray-500">Was: ${data.current_time_out || 'N/A'}</span>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <select id="edit-time-out-hour-${data.request_id}" 
+                                                class="w-12 h-8 text-center border border-gray-300 bg-gray-100 rounded text-xs font-bold focus:ring-1 focus:ring-green-400 focus:border-green-400" 
+                                                disabled data-original="${extractHour(data.requested_time_out || data.current_time_out)}" 
+                                                onchange="updateTimeDisplay(${data.request_id}, 'out'); checkForChanges(${data.request_id})">
+                                            ${generateHourOptions(data.requested_time_out || data.current_time_out)}
+                                        </select>
+                                        <span class="text-gray-400">:</span>
+                                        <select id="edit-time-out-minute-${data.request_id}" 
+                                                class="w-12 h-8 text-center border border-gray-300 bg-gray-100 rounded text-xs font-bold focus:ring-1 focus:ring-green-400 focus:border-green-400" 
+                                                disabled data-original="${extractMinute(data.requested_time_out || data.current_time_out)}" 
+                                                onchange="updateTimeDisplay(${data.request_id}, 'out'); checkForChanges(${data.request_id})">
+                                            ${generateMinuteOptions(data.requested_time_out || data.current_time_out)}
+                                        </select>
+                                        <select id="edit-time-out-ampm-${data.request_id}" 
+                                                class="w-14 h-8 text-center border border-gray-300 bg-gray-100 rounded text-xs font-bold focus:ring-1 focus:ring-green-400 focus:border-green-400" 
+                                                disabled data-original="${extractAMPM(data.requested_time_out || data.current_time_out)}" 
+                                                onchange="updateTimeDisplay(${data.request_id}, 'out'); checkForChanges(${data.request_id})">
+                                            ${generateAMPMOptions(data.requested_time_out || data.current_time_out)}
+                                        </select>
+                                    </div>
+                                    <input type="hidden" id="edit-time-out-${data.request_id}" value="${data.requested_time_out || data.current_time_out || ''}" data-original="${data.requested_time_out || data.current_time_out || ''}">
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    // Compact static version for non-pending requests
+                    content += `
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <h4 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                                <i class="fas fa-clock mr-2 text-gray-500"></i>
+                                Time Changes
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="bg-white p-3 rounded-lg border">
+                                    <label class="text-xs font-medium text-gray-500 block mb-1">Original Time</label>
+                                    <p class="text-sm font-semibold text-gray-800">${data.current_time_in || 'N/A'} - ${data.current_time_out || 'N/A'}</p>
+                                </div>
+                                <div class="bg-white p-3 rounded-lg border">
+                                    <label class="text-xs font-medium text-green-600 block mb-1">Adjusted Time</label>
+                                    <p class="text-sm font-semibold text-green-800">${data.requested_time_in || 'N/A'} - ${data.requested_time_out || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
             } else {
                 // Show debugging information when time data is missing
                 content += `
@@ -519,31 +617,98 @@ function showActivityDetails(title, dataJson) {
             }
         } else if (data.type.includes('Schedule')) {
             if (data.current_time_in && data.current_time_out && data.requested_time_in && data.requested_time_out) {
-                content += `
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <h4 class="text-sm font-bold text-gray-700 mb-3">Schedule Changes</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div class="bg-gray-50 p-3 rounded-md">
-                                <label class="block text-xs font-medium text-gray-500 mb-1">Current</label>
-                                <p class="text-gray-800 font-semibold">${data.current_time_in} - ${data.current_time_out}</p>
+                // Check if request is pending and can be edited
+                const isEditable = data.status && data.status.toLowerCase() === 'pending' && data.request_id;
+                
+                if (isEditable) {
+                    content += `
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" id="schedule-change-block-${data.request_id}">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-lg font-semibold text-gray-800 flex items-center">
+                                    <i class="fas fa-calendar-alt text-blue-600 mr-2"></i>
+                                    Schedule Change Details
+                                </h4>
                             </div>
-                            <div class="bg-blue-50 p-3 rounded-md">
-                                <label class="block text-xs font-medium text-blue-600 mb-1">Requested</label>
-                                <p class="text-blue-800 font-semibold">${data.requested_time_in} - ${data.requested_time_out}</p>
+                            
+                            <!-- Current Schedule -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <h5 class="font-semibold text-blue-800 mb-2 flex items-center">
+                                        <i class="fas fa-clock text-blue-600 mr-2"></i>
+                                        Current Schedule
+                                    </h5>
+                                    <p class="text-lg font-bold text-blue-900">
+                                        ${data.current_time_in} - ${data.current_time_out}
+                                    </p>
+                                </div>
+                                
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <h5 class="font-semibold text-green-800 mb-2 flex items-center">
+                                        <i class="fas fa-arrow-right text-green-600 mr-2"></i>
+                                        Requested Schedule
+                                    </h5>
+                                    <div class="space-y-3">
+                                        <select id="edit-schedule-${data.request_id}" 
+                                                class="w-full p-3 border-2 border-gray-300 bg-gray-100 rounded-lg text-lg font-bold text-green-900 focus:ring-2 focus:ring-green-400 disabled:cursor-not-allowed" 
+                                                disabled 
+                                                onchange="updateScheduleDisplay('${data.request_id}')">
+                                            ${generateScheduleOptions(data.requested_time_in, data.requested_time_out)}
+                                        </select>
+                                        <input type="hidden" id="edit-schedule-hidden-${data.request_id}" 
+                                               value="${data.requested_time_in} - ${data.requested_time_out}" 
+                                               data-original="${data.requested_time_in} - ${data.requested_time_out}">
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    // Non-editable version for approved/declined requests
+                    content += `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <h5 class="font-semibold text-blue-800 mb-2 flex items-center">
+                                    <i class="fas fa-clock text-blue-600 mr-2"></i>
+                                    Current Schedule
+                                </h5>
+                                <p class="text-lg font-bold text-blue-900">
+                                    ${data.current_time_in} - ${data.current_time_out}
+                                </p>
+                            </div>
+                            
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <h5 class="font-semibold text-green-800 mb-2 flex items-center">
+                                    <i class="fas fa-arrow-right text-green-600 mr-2"></i>
+                                    Requested Schedule
+                                </h5>
+                                <p class="text-lg font-bold text-green-900">
+                                    ${data.requested_time_in} - ${data.requested_time_out}
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                }
             }
             
+            // Effective Period (editable for pending requests)
             if (data.start_date && data.end_date) {
-                content += createInfoBlock('Effective Period', `${data.start_date} to ${data.end_date}`, 'fa-calendar-alt');
+                const isEditable = data.status && data.status.toLowerCase() === 'pending' && data.request_id;
+                const dateRange = `${data.start_date} to ${data.end_date}`;
+                content += createInfoBlock('Effective Period', dateRange, 'fa-calendar-alt', 'font-semibold', 'bg-gray-50', isEditable, data.request_id, 'date_range');
             }
         } else if (data.type.includes('Overtime')) {
-            // Add OT Date if available
-            if (data.ot_date) {
-                content += createInfoBlock('Overtime Date', data.ot_date, 'fa-calendar-day');
+            // Always show OT Date section 
+            console.log('OT Date Debug - Raw data:', data.ot_date); // Debug log
+            let otDateDisplay = data.ot_date;
+            
+            // If no OT date, try to use the request date as fallback
+            if (!otDateDisplay || otDateDisplay === '') {
+                otDateDisplay = data.date || 'Not specified';
+                console.log('Using fallback OT date:', otDateDisplay);
             }
+            
+            // Create prominent OT date display
+            content += createInfoBlock('Overtime Date', otDateDisplay, 'fa-calendar-day', 'font-bold text-blue-800', 'bg-blue-50 border-blue-200');
             
             // Overtime details: Start, End, Duration, Type - prefer start_ot/end_ot over time_in/time_out
             const details = [];
@@ -551,44 +716,73 @@ function showActivityDetails(title, dataJson) {
             const endTime = data.end_ot || data.time_out;
             
             if (startTime || endTime) {
-                details.push(`<div class=\"grid grid-cols-1 sm:grid-cols-2 gap-4\">` +
-                    `<div class=\"bg-gray-50 p-3 rounded-md\">`+
-                    `<label class=\"block text-xs font-medium text-gray-500 mb-1\">Start OT</label>`+
-                    `<p class=\"text-gray-800 font-semibold\">${startTime || '—'}</p>`+
-                    `</div>`+
-                    `<div class=\"bg-gray-50 p-3 rounded-md\">`+
-                    `<label class=\"block text-xs font-medium text-gray-500 mb-1\">End OT</label>`+
-                    `<p class=\"text-gray-800 font-semibold\">${endTime || '—'}</p>`+
+                details.push(`<div class=\"bg-gray-50 p-3 rounded-md\">` +
+                    `<label class=\"block text-xs font-medium text-gray-500 mb-1\">OT Schedule</label>`+
+                    `<div class=\"flex items-center justify-center space-x-3\">`+
+                        `<span class=\"text-gray-800 font-semibold\">${startTime || '—'}</span>`+
+                        `<i class=\"fas fa-arrow-right text-gray-400 text-xs\"></i>`+
+                        `<span class=\"text-gray-800 font-semibold\">${endTime || '—'}</span>`+
                     `</div>`+
                 `</div>`);
             }
             if (data.ot_duration) {
                 // Check if request is pending and can be edited
                 if (data.status && data.status.toLowerCase() === 'pending' && data.request_id) {
+                    // Calculate maximum OT hours from Start OT and End OT
+                    let maxOTHours = 'N/A';
+                    if (startTime && endTime) {
+                        // Convert times to 24-hour format for calculation
+                        const startTime24 = convertTo24Hour(startTime);
+                        const endTime24 = convertTo24Hour(endTime);
+                        
+                        if (startTime24 && endTime24) {
+                            const [startHours, startMinutes] = startTime24.split(':').map(Number);
+                            const [endHours, endMinutes] = endTime24.split(':').map(Number);
+                            
+                            const startTotalMinutes = startHours * 60 + startMinutes;
+                            let endTotalMinutes = endHours * 60 + endMinutes;
+                            
+                            // Handle overnight shift (end time is next day)
+                            if (endTotalMinutes <= startTotalMinutes) {
+                                endTotalMinutes += 24 * 60; // Add 24 hours
+                            }
+                            
+                            const totalMinutes = endTotalMinutes - startTotalMinutes;
+                            maxOTHours = (totalMinutes / 60).toFixed(2);
+                        }
+                    }
+                    
                     // Editable duration for pending requests
                     const durationHours = parseFloat(data.ot_duration) || 0;
                     const wholeHours = Math.floor(durationHours);
                     const minutes = Math.round((durationHours - wholeHours) * 60);
                     
                     details.push(`<div class=\"bg-blue-50 p-3 rounded-md\">`+
-                        `<label class=\"block text-xs font-medium text-blue-600 mb-2\">Duration (Editable)</label>`+
-                        `<div class=\"flex items-center space-x-2 mb-2\">`+
-                            `<div class=\"flex flex-col items-center\">`+
-                                `<label class=\"text-xs font-medium text-blue-600 mb-1\">Hrs</label>`+
-                                `<input type=\"number\" id=\"edit-hours-${data.request_id}\" min=\"0\" max=\"24\" value=\"${wholeHours}\" `+
-                                `class=\"w-12 h-8 text-center border border-blue-300 rounded text-sm font-bold focus:ring-1 focus:ring-blue-400 focus:border-blue-400\">`+
-                            `</div>`+
-                            `<div class=\"text-blue-400 font-bold mt-4\">:</div>`+
-                            `<div class=\"flex flex-col items-center\">`+
-                                `<label class=\"text-xs font-medium text-blue-600 mb-1\">Min</label>`+
-                                `<input type=\"number\" id=\"edit-minutes-${data.request_id}\" min=\"0\" max=\"59\" step=\"15\" value=\"${minutes}\" `+
-                                `class=\"w-12 h-8 text-center border border-blue-300 rounded text-sm font-bold focus:ring-1 focus:ring-blue-400 focus:border-blue-400\">`+
+                        `<div class=\"flex items-center justify-between mb-3\">`+
+                            `<label class=\"text-xs font-medium text-blue-600\">Duration (Editable)</label>`+
+                            `<div class=\"text-right\">`+
+                                `<div class=\"text-xs text-gray-500\">Max OT: ${maxOTHours !== 'N/A' ? formatOvertimeDuration(parseFloat(maxOTHours)) : 'N/A'}</div>`+
+                                `<div class=\"text-xs text-blue-600\">Current: ${formatOvertimeDuration(durationHours)}</div>`+
                             `</div>`+
                         `</div>`+
-                        `<div class=\"text-xs text-blue-600 mb-2\" id=\"duration-display-${data.request_id}\">Current: ${data.ot_duration} hours</div>`+
-                        `<div class=\"text-xs text-gray-500\" id=\"duration-validation-${data.request_id}\">Max available: ${data.max_ot_hours || 'N/A'}</div>`+
-                        `<button type=\"button\" onclick=\"updateOvertimeDuration('${data.request_id}', '${data.table_name}')\" `+
-                        `class=\"mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors\">Update Duration</button>`+
+                        `<div class=\"flex items-center space-x-3\">`+
+                            `<div class=\"flex items-center space-x-1\">`+
+                                `<input type=\"number\" id=\"edit-hours-${data.request_id}\" min=\"0\" max=\"24\" value=\"${wholeHours}\" `+
+                                `data-max-hours=\"${maxOTHours}\" data-original=\"${wholeHours}\" disabled `+
+                                `oninput=\"validateOTDuration('${data.request_id}'); checkForChanges('${data.request_id}')\" `+
+                                `class=\"w-14 h-8 text-center border border-gray-300 bg-gray-100 rounded text-sm font-bold focus:ring-1 focus:ring-blue-400 focus:border-blue-400\">`+
+                                `<span class=\"text-xs text-gray-500 font-medium\">hrs</span>`+
+                            `</div>`+
+                            `<span class=\"text-gray-400 font-bold\">:</span>`+
+                            `<div class=\"flex items-center space-x-1\">`+
+                                `<input type=\"number\" id=\"edit-minutes-${data.request_id}\" min=\"0\" max=\"59\" step=\"15\" value=\"${minutes}\" `+
+                                `data-original=\"${minutes}\" disabled `+
+                                `oninput=\"validateOTDuration('${data.request_id}'); checkForChanges('${data.request_id}')\" `+
+                                `class=\"w-14 h-8 text-center border border-gray-300 bg-gray-100 rounded text-sm font-bold focus:ring-1 focus:ring-blue-400 focus:border-blue-400\">`+
+                                `<span class=\"text-xs text-gray-500 font-medium\">min</span>`+
+                            `</div>`+
+                        `</div>`+
+                        `<div class=\"text-xs mt-2\" id=\"duration-validation-${data.request_id}\" style=\"min-height: 16px;\"></div>`+
                     `</div>`);
                 } else {
                     // Static duration display for non-pending requests
@@ -598,25 +792,30 @@ function showActivityDetails(title, dataJson) {
                     `</div>`);
                 }
             }
-            if (data.ot_type) {
-                details.push(`<div class=\"bg-green-50 p-3 rounded-md\">`+
-                    `<label class=\"block text-xs font-medium text-green-600 mb-1\">Type</label>`+
-                    `<p class=\"text-green-800 font-semibold\">${data.ot_type}</p>`+
-                `</div>`);
-            }
             if (details.length) {
+                // Add OT type as a badge in the header if available
+                let otTypeBadge = '';
+                if (data.ot_type) {
+                    otTypeBadge = `<span class=\"inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2\">${data.ot_type}</span>`;
+                }
+                
                 content += `
                     <div class="border border-gray-200 rounded-lg p-4">
-                        <h4 class="text-sm font-bold text-gray-700 mb-3">Overtime Details</h4>
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-gray-700">Overtime Details</h4>
+                            ${otTypeBadge}
+                        </div>
                         <div class="space-y-3">${details.join('')}</div>
                     </div>
                 `;
             }
         }
         
-        // Employee reason
-        if (data.reason) {
-            content += createInfoBlock('Employee Reason', data.reason, 'fa-comment-dots', 'text-sm leading-relaxed');
+        // Employee reason (editable for pending requests)
+        if (data.reason || (data.status && data.status.toLowerCase() === 'pending')) {
+            const reasonText = data.reason || 'No reason provided';
+            const isEditable = data.status && data.status.toLowerCase() === 'pending' && data.request_id;
+            content += createInfoBlock('Employee Reason', reasonText, 'fa-comment-dots', 'text-sm leading-relaxed', 'bg-gray-50', isEditable, data.request_id, 'reason');
         }
         
         // Admin explanation (for declined/rejected requests)
@@ -626,6 +825,13 @@ function showActivityDetails(title, dataJson) {
         
         modalBody.innerHTML = content;
         
+        // Initialize time displays if this is a time adjustment
+        if (data.type && data.type.includes('Time Adjustment') && data.request_id) {
+            setTimeout(() => {
+                initializeTimeDisplay(data.request_id);
+            }, 100);
+        }
+        
         // Add Edit and Cancel buttons if applicable (status is 'pending' and we have request data)
         const unsubmitContainer = document.getElementById('unsubmitButtonContainer');
         unsubmitContainer.innerHTML = '';
@@ -634,9 +840,10 @@ function showActivityDetails(title, dataJson) {
             data.request_id && data.table_name) {
             unsubmitContainer.innerHTML = `
                 <div class="flex gap-2">
-                    <button onclick="editRequestFromModal('${data.type}', ${data.request_id}, '${data.table_name}', '${data.source_table}')" 
-                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform active:scale-95 flex items-center">
-                        <i class="fas fa-edit mr-2"></i>Edit
+                    <button id="edit-save-btn-${data.request_id}" onclick="toggleEditMode('${data.type}', ${data.request_id}, '${data.table_name}', '${data.source_table}')" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform active:scale-95 flex items-center" 
+                            data-mode="view">
+                        <i class="fas fa-edit mr-2"></i>Edit Form
                     </button>
                     <button onclick="cancelRequestFromModal(${data.request_id}, '${data.table_name}', '${data.source_table}')" 
                             class="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform active:scale-95 flex items-center">
@@ -695,14 +902,65 @@ function showActivityDetails(title, dataJson) {
     }
 }
 
-function createInfoBlock(label, value, icon, valueClass = 'font-semibold', containerClass = 'bg-gray-50') {
+function createInfoBlock(label, value, icon, valueClass = 'font-semibold', containerClass = 'bg-gray-50', isEditable = false, requestId = null, fieldType = '') {
+    if (isEditable && requestId) {
+        // Create editable version for reason fields
+        if (fieldType === 'reason') {
+            return `
+                <div class="border border-gray-200 rounded-lg p-4 ${containerClass}" id="reason-block-${requestId}">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                        <label class="text-sm font-medium text-gray-600 flex items-center md:justify-end">
+                            <i class="fas ${icon} mr-2 text-gray-400"></i>
+                            ${label}
+                        </label>
+                        <div class="md:col-span-2">
+                            <textarea id="edit-reason-${requestId}" 
+                                      class="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg text-sm resize-none disabled:cursor-not-allowed" 
+                                      rows="3" 
+                                      disabled 
+                                      data-original="${value.replace(/"/g, '&quot;')}" 
+                                      oninput="checkForChanges(${requestId})">${value}</textarea>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        // Create editable version for date range fields
+        else if (fieldType === 'date_range') {
+            return `
+                <div class="border border-gray-200 rounded-lg p-4 ${containerClass}" id="date-range-block-${requestId}">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                        <label class="text-sm font-medium text-gray-600 flex items-center md:justify-end">
+                            <i class="fas ${icon} mr-2 text-gray-400"></i>
+                            ${label}
+                        </label>
+                        <div class="md:col-span-2">
+                            <input type="text" id="edit-date-range-${requestId}" 
+                                   class="w-full px-3 py-2 border border-gray-300 bg-gray-100 rounded-lg text-sm font-semibold disabled:cursor-not-allowed" 
+                                   disabled 
+                                   value="${value}" 
+                                   data-original="${value}" 
+                                   placeholder="Select date range"
+                                   oninput="checkForChanges(${requestId})">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    // Standard horizontal layout for non-editable fields
     return `
         <div class="border border-gray-200 rounded-lg p-4 ${containerClass}">
-            <label class="block text-sm font-medium text-gray-600 mb-2 flex items-center">
-                <i class="fas ${icon} mr-2 text-gray-400"></i>
-                ${label}
-            </label>
-            <p class="text-gray-800 ${valueClass}">${value}</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                <label class="text-sm font-medium text-gray-600 flex items-center md:justify-end">
+                    <i class="fas ${icon} mr-2 text-gray-400"></i>
+                    ${label}
+                </label>
+                <div class="md:col-span-2">
+                    <p class="text-gray-800 ${valueClass}">${value}</p>
+                </div>
+            </div>
         </div>
     `;
 }
@@ -904,12 +1162,264 @@ function unsubmitRequest(requestId, tableName, sourceTable = null) {
     });
 }
 
+// Function to update time adjustment
+function updateTimeAdjustment(requestId, tableName, timeInValue, timeOutValue) {
+    if (!confirm(`Update time adjustment:\nTime In: ${timeInValue}\nTime Out: ${timeOutValue}?`)) {
+        return;
+    }
+    
+    // Show loading state
+    const editSaveBtn = document.getElementById(`edit-save-btn-${requestId}`);
+    const originalText = editSaveBtn ? editSaveBtn.innerHTML : '';
+    if (editSaveBtn) {
+        editSaveBtn.disabled = true;
+        editSaveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+    }
+    
+    const updateData = {
+        request_id: requestId,
+        table_name: tableName,
+        requested_time_in: timeInValue,
+        requested_time_out: timeOutValue
+    };
+    
+    console.log('Updating time adjustment:', updateData);
+    
+    // Make AJAX request to update time adjustment
+    fetch('../controller/update_time_adjustment.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Time adjustment update response:', data);
+        
+        if (data.success) {
+            alert('✅ Time adjustment updated successfully!');
+            
+            // Update original values to reflect the new saved state
+            const timeInHidden = document.getElementById(`edit-time-in-${requestId}`);
+            const timeOutHidden = document.getElementById(`edit-time-out-${requestId}`);
+            
+            if (timeInHidden) {
+                timeInHidden.setAttribute('data-original', timeInValue);
+            }
+            if (timeOutHidden) {
+                timeOutHidden.setAttribute('data-original', timeOutValue);
+            }
+            
+            // Reset to view mode
+            resetToViewMode(requestId);
+            
+            // Refresh the page to reflect changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            console.error('Time adjustment update failed:', data);
+            alert('❌ Error: ' + (data.message || 'Failed to update time adjustment'));
+            
+            // Restore button state
+            if (editSaveBtn) {
+                editSaveBtn.disabled = false;
+                editSaveBtn.innerHTML = originalText;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Network/Parse Error:', error);
+        alert('🔥 Network error occurred: ' + error.message);
+        
+        // Restore button state
+        if (editSaveBtn) {
+            editSaveBtn.disabled = false;
+            editSaveBtn.innerHTML = originalText;
+        }
+    });
+}
+
+// Function to update schedule change request
+function updateScheduleChange(requestId, tableName, newSchedule, newDateRange = null) {
+    if (!confirm(`Update schedule change to: "${newSchedule}"${newDateRange ? ` for period: ${newDateRange}` : ''}?`)) {
+        return;
+    }
+    
+    // Show loading state
+    const editSaveBtn = document.getElementById(`edit-save-btn-${requestId}`);
+    const originalText = editSaveBtn ? editSaveBtn.innerHTML : '';
+    if (editSaveBtn) {
+        editSaveBtn.disabled = true;
+        editSaveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+    }
+    
+    const updateData = {
+        request_id: requestId,
+        table_name: tableName,
+        new_schedule: newSchedule,
+        new_date_range: newDateRange
+    };
+    
+    console.log('Updating schedule change:', updateData);
+    
+    // Make AJAX request to update schedule change
+    fetch('../controller/update_schedule_change.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Schedule change update response:', data);
+        
+        if (data.success) {
+            alert('✅ Schedule change updated successfully!');
+            
+            // Update original values to reflect the new saved state
+            const scheduleHidden = document.getElementById(`edit-schedule-hidden-${requestId}`);
+            if (scheduleHidden) {
+                scheduleHidden.setAttribute('data-original', newSchedule);
+            }
+            
+            const dateRangeInput = document.getElementById(`edit-date-range-${requestId}`);
+            if (dateRangeInput && newDateRange) {
+                dateRangeInput.setAttribute('data-original', newDateRange);
+            }
+            
+            // Reset to view mode
+            resetToViewMode(requestId);
+            
+            // Refresh the page to reflect changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            console.error('Schedule change update failed:', data);
+            alert('❌ Error: ' + (data.message || 'Failed to update schedule change'));
+            
+            // Restore button state
+            if (editSaveBtn) {
+                editSaveBtn.disabled = false;
+                editSaveBtn.innerHTML = originalText;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Network/Parse Error:', error);
+        alert('🔥 Network error occurred: ' + error.message);
+        
+        // Restore button state
+        if (editSaveBtn) {
+            editSaveBtn.disabled = false;
+            editSaveBtn.innerHTML = originalText;
+        }
+    });
+}
+
+// Function to update request reason
+function updateRequestReason(requestId, tableName, newReason) {
+    if (!confirm(`Update reason to: "${newReason}"?`)) {
+        return;
+    }
+    
+    // Show loading state
+    const editSaveBtn = document.getElementById(`edit-save-btn-${requestId}`);
+    const originalText = editSaveBtn ? editSaveBtn.innerHTML : '';
+    if (editSaveBtn) {
+        editSaveBtn.disabled = true;
+        editSaveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+    }
+    
+    // Determine the reason field name based on request type
+    let reasonField = 'reason';
+    if (tableName && tableName.includes('ot_requests')) {
+        reasonField = 'ot_reason';
+    }
+    
+    const updateData = {
+        request_id: requestId,
+        table_name: tableName,
+        field_name: reasonField,
+        new_value: newReason
+    };
+    
+    console.log('Updating reason:', updateData);
+    
+    // Make AJAX request to update reason
+    fetch('../controller/update_request_field.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Reason update response:', data);
+        
+        if (data.success) {
+            alert('✅ Reason updated successfully!');
+            
+            // Update original value to reflect the new saved state
+            const reasonTextarea = document.getElementById(`edit-reason-${requestId}`);
+            if (reasonTextarea) {
+                reasonTextarea.setAttribute('data-original', newReason);
+            }
+            
+            // Reset to view mode
+            resetToViewMode(requestId);
+            
+            // Refresh the page to reflect changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            console.error('Reason update failed:', data);
+            alert('❌ Error: ' + (data.message || 'Failed to update reason'));
+            
+            // Restore button state
+            if (editSaveBtn) {
+                editSaveBtn.disabled = false;
+                editSaveBtn.innerHTML = originalText;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Network/Parse Error:', error);
+        alert('🔥 Network error occurred: ' + error.message);
+        
+        // Restore button state
+        if (editSaveBtn) {
+            editSaveBtn.disabled = false;
+            editSaveBtn.innerHTML = originalText;
+        }
+    });
+}
+
 // Function to update overtime duration
-function updateOvertimeDuration(requestId, tableName) {
+function updateOvertimeDuration(requestId, tableName, callback = null) {
     const hoursInput = document.getElementById(`edit-hours-${requestId}`);
     const minutesInput = document.getElementById(`edit-minutes-${requestId}`);
     const validationDiv = document.getElementById(`duration-validation-${requestId}`);
-    const displayDiv = document.getElementById(`duration-display-${requestId}`);
     
     if (!hoursInput || !minutesInput) {
         alert('Error: Duration inputs not found');
@@ -920,20 +1430,18 @@ function updateOvertimeDuration(requestId, tableName) {
     const minutes = parseInt(minutesInput.value) || 0;
     const maxAllowedHours = parseFloat(hoursInput.getAttribute('data-max-hours')) || 24;
     
-    // Round minutes to nearest 15-minute increment
-    const roundedMinutes = Math.round(minutes / 15) * 15;
-    if (roundedMinutes !== minutes) {
-        minutesInput.value = roundedMinutes > 59 ? 0 : roundedMinutes;
-        if (roundedMinutes > 59) {
-            hoursInput.value = hours + 1;
-        }
+    // Allow exact minute values without rounding
+    // Ensure minutes stay within valid range (0-59)
+    if (minutes > 59) {
+        minutesInput.value = minutes - 60;
+        hoursInput.value = hours + 1;
     }
     
     // Calculate total hours as decimal
     const totalHours = hours + (parseInt(minutesInput.value) / 60);
     
     if (totalHours === 0) {
-        alert('Please select a valid duration (minimum 15 minutes)');
+        alert('Please select a valid duration (minimum 1 minute)');
         return;
     }
     
@@ -954,11 +1462,13 @@ function updateOvertimeDuration(requestId, tableName) {
         return;
     }
     
-    // Show loading state
-    const button = event.target;
-    const originalText = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Updating...';
+    // Show loading state on the main edit/save button
+    const editSaveBtn = document.getElementById(`edit-save-btn-${requestId}`);
+    const originalText = editSaveBtn ? editSaveBtn.innerHTML : '';
+    if (editSaveBtn) {
+        editSaveBtn.disabled = true;
+        editSaveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+    }
     
     // Debug: Log the data being sent
     const updateData = {
@@ -987,26 +1497,50 @@ function updateOvertimeDuration(requestId, tableName) {
         
         if (data.success) {
             alert('✅ Overtime duration updated successfully!');
-            displayDiv.innerHTML = `Current: ${totalHours.toFixed(2)} hours`;
             
-            // Refresh the page to reflect changes
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            // Update original values to reflect the new saved state
+            hoursInput.setAttribute('data-original', Math.floor(totalHours));
+            minutesInput.setAttribute('data-original', Math.round((totalHours - Math.floor(totalHours)) * 60));
+            
+            // Update the validation message to show success
+            if (validationDiv) {
+                validationDiv.innerHTML = `<span class="text-green-600 text-xs">✅ Updated to ${formatOvertimeDuration(totalHours)}</span>`;
+            }
+            
+            // If there's a callback, execute it instead of resetting to view mode
+            if (callback && typeof callback === 'function') {
+                callback();
+            } else {
+                // Reset to view mode
+                resetToViewMode(requestId);
+                
+                // Refresh the page to reflect changes
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
         } else {
             console.error('Update failed:', data);
             alert('❌ Error: ' + (data.message || 'Failed to update duration') + 
                   '\n\nDebug info: ' + JSON.stringify(data, null, 2));
-            button.disabled = false;
-            button.innerHTML = originalText;
+            
+            // Restore button state
+            if (editSaveBtn) {
+                editSaveBtn.disabled = false;
+                editSaveBtn.innerHTML = originalText;
+            }
         }
     })
     .catch(error => {
         console.error('Network/Parse Error:', error);
         alert('🔥 Network error occurred: ' + error.message + 
               '\n\nPlease check browser console for details and try again.');
-        button.disabled = false;
-        button.innerHTML = originalText;
+        
+        // Restore button state
+        if (editSaveBtn) {
+            editSaveBtn.disabled = false;
+            editSaveBtn.innerHTML = originalText;
+        }
     });
 }
 
@@ -1028,6 +1562,211 @@ function convertTo24Hour(time12h) {
     return `${hours}:${minutes}:00`;
 }
 
+// Helper functions for clock UI
+function extractHour(time12h) {
+    console.log('extractHour called with:', time12h);
+    if (!time12h || time12h === '') {
+        console.log('No time provided, defaulting to 08');
+        return '08';
+    }
+    const [time] = time12h.split(/\s/);
+    if (!time) {
+        console.log('No time part found, defaulting to 08');
+        return '08';
+    }
+    const [hours] = time.split(':');
+    const result = hours || '08';
+    console.log('Extracted hour:', result);
+    return result;
+}
+
+function extractMinute(time12h) {
+    console.log('extractMinute called with:', time12h);
+    if (!time12h || time12h === '') return '00';
+    const [time] = time12h.split(/\s/);
+    if (!time) return '00';
+    const [, minutes] = time.split(':');
+    const result = minutes || '00';
+    console.log('Extracted minute:', result);
+    return result;
+}
+
+function extractAMPM(time12h) {
+    console.log('extractAMPM called with:', time12h);
+    if (!time12h || time12h === '') return 'AM';
+    const parts = time12h.split(/\s/);
+    const result = parts[1] ? parts[1].toUpperCase() : 'AM';
+    console.log('Extracted AM/PM:', result);
+    return result;
+}
+
+function generateHourOptions(selectedTime) {
+    console.log('generateHourOptions called with selectedTime:', selectedTime);
+    const currentHour = extractHour(selectedTime);
+    console.log('generateHourOptions - extracted currentHour:', currentHour);
+    let options = '';
+    for (let i = 1; i <= 12; i++) {
+        const hour = i.toString().padStart(2, '0');
+        // Normalize both values for comparison - remove leading zeros
+        const normalizedHour = parseInt(hour, 10).toString();
+        const normalizedCurrentHour = parseInt(currentHour, 10).toString();
+        const selected = normalizedHour === normalizedCurrentHour ? 'selected' : '';
+        if (selected) {
+            console.log('Hour', hour, 'is selected because', normalizedHour, 'matches', normalizedCurrentHour);
+        }
+        options += `<option value="${hour}" ${selected}>${hour}</option>`;
+    }
+    console.log('Generated hour options:', options);
+    return options;
+}
+
+function generateMinuteOptions(selectedTime) {
+    const currentMinute = extractMinute(selectedTime);
+    console.log('generateMinuteOptions - extracted currentMinute:', currentMinute);
+    let options = '';
+    
+    // Generate all minute options (00-59) to allow exact time selection
+    for (let i = 0; i < 60; i++) {
+        const minute = i.toString().padStart(2, '0');
+        const selected = minute === currentMinute ? 'selected' : '';
+        if (selected) {
+            console.log('Minute', minute, 'is selected (exact match for', currentMinute, ')');
+        }
+        options += `<option value="${minute}" ${selected}>${minute}</option>`;
+    }
+    return options;
+}
+
+function generateAMPMOptions(selectedTime) {
+    const currentAMPM = extractAMPM(selectedTime);
+    return `
+        <option value="AM" ${currentAMPM === 'AM' ? 'selected' : ''}>AM</option>
+        <option value="PM" ${currentAMPM === 'PM' ? 'selected' : ''}>PM</option>
+    `;
+}
+
+// Generate schedule options for schedule change requests
+function generateScheduleOptions(requestedTimeIn, requestedTimeOut) {
+    console.log('generateScheduleOptions called with:', requestedTimeIn, requestedTimeOut);
+    
+    // Common work schedules (matching the schedule_change_form.php)
+    const schedules = [
+        { id: 1, time_in: '06:00:00', time_out: '14:00:00' },   // 6 AM - 2 PM
+        { id: 2, time_in: '07:00:00', time_out: '15:00:00' },   // 7 AM - 3 PM
+        { id: 3, time_in: '08:00:00', time_out: '16:00:00' },   // 8 AM - 4 PM
+        { id: 4, time_in: '09:00:00', time_out: '17:00:00' },   // 9 AM - 5 PM
+        { id: 5, time_in: '10:00:00', time_out: '18:00:00' },   // 10 AM - 6 PM
+        { id: 6, time_in: '11:00:00', time_out: '19:00:00' },   // 11 AM - 7 PM
+        { id: 7, time_in: '12:00:00', time_out: '20:00:00' },   // 12 PM - 8 PM
+        { id: 8, time_in: '13:00:00', time_out: '21:00:00' },   // 1 PM - 9 PM
+        { id: 9, time_in: '14:00:00', time_out: '22:00:00' },   // 2 PM - 10 PM
+        { id: 10, time_in: '15:00:00', time_out: '23:00:00' },  // 3 PM - 11 PM
+        { id: 11, time_in: '16:00:00', time_out: '00:00:00' },  // 4 PM - 12 AM
+        { id: 12, time_in: '17:00:00', time_out: '01:00:00' },  // 5 PM - 1 AM
+        { id: 13, time_in: '18:00:00', time_out: '02:00:00' },  // 6 PM - 2 AM
+        { id: 14, time_in: '19:00:00', time_out: '03:00:00' },  // 7 PM - 3 AM
+        { id: 15, time_in: '20:00:00', time_out: '04:00:00' },  // 8 PM - 4 AM
+        { id: 16, time_in: '21:00:00', time_out: '05:00:00' },  // 9 PM - 5 AM
+        { id: 17, time_in: '22:00:00', time_out: '06:00:00' },  // 10 PM - 6 AM
+        { id: 18, time_in: '23:00:00', time_out: '07:00:00' },  // 11 PM - 7 AM
+        { id: 19, time_in: '00:00:00', time_out: '08:00:00' },  // 12 AM - 8 AM
+        { id: 20, time_in: '01:00:00', time_out: '09:00:00' }   // 1 AM - 9 AM
+    ];
+    
+    // Convert requested times to compare format
+    const requestedSchedule = `${requestedTimeIn} - ${requestedTimeOut}`;
+    console.log('Looking for schedule match:', requestedSchedule);
+    
+    let options = '<option value="" disabled>Choose work hours</option>';
+    
+    schedules.forEach(schedule => {
+        // Convert 24-hour to 12-hour format for display
+        const timeInDisplay = formatTime12Hour(schedule.time_in);
+        const timeOutDisplay = formatTime12Hour(schedule.time_out);
+        const scheduleDisplay = `${timeInDisplay} - ${timeOutDisplay}`;
+        
+        // Check if this matches the requested schedule
+        const isSelected = scheduleDisplay === requestedSchedule ? 'selected' : '';
+        
+        if (isSelected) {
+            console.log('Schedule option selected:', scheduleDisplay);
+        }
+        
+        options += `<option value="${schedule.id}" data-schedule="${scheduleDisplay}" ${isSelected}>${scheduleDisplay}</option>`;
+    });
+    
+    return options;
+}
+
+// Helper function to convert 24-hour time to 12-hour format
+function formatTime12Hour(time24) {
+    const [hours, minutes] = time24.split(':');
+    const hour12 = parseInt(hours);
+    const ampm = hour12 >= 12 ? 'PM' : 'AM';
+    const displayHour = hour12 === 0 ? 12 : (hour12 > 12 ? hour12 - 12 : hour12);
+    return `${displayHour}:${minutes} ${ampm}`;
+}
+
+function updateTimeDisplay(requestId, timeType) {
+    const hourSelect = document.getElementById(`edit-time-${timeType}-hour-${requestId}`);
+    const minuteSelect = document.getElementById(`edit-time-${timeType}-minute-${requestId}`);
+    const ampmSelect = document.getElementById(`edit-time-${timeType}-ampm-${requestId}`);
+    const hiddenInput = document.getElementById(`edit-time-${timeType}-${requestId}`);
+    
+    if (hourSelect && minuteSelect && ampmSelect && hiddenInput) {
+        const hour = hourSelect.value;
+        const minute = minuteSelect.value;
+        const ampm = ampmSelect.value;
+        
+        const timeString = `${hour}:${minute} ${ampm}`;
+        hiddenInput.value = timeString;
+        
+        console.log(`Updated ${timeType} time for request ${requestId}: ${timeString}`);
+    }
+}
+
+// Initialize time display after modal opens
+function initializeTimeDisplay(requestId) {
+    updateTimeDisplay(requestId, 'in');
+    updateTimeDisplay(requestId, 'out');
+}
+
+// Function to update schedule display when dropdown changes
+function updateScheduleDisplay(requestId) {
+    const scheduleSelect = document.getElementById(`edit-schedule-${requestId}`);
+    const hiddenInput = document.getElementById(`edit-schedule-hidden-${requestId}`);
+    
+    if (scheduleSelect && hiddenInput) {
+        const selectedOption = scheduleSelect.options[scheduleSelect.selectedIndex];
+        const scheduleValue = selectedOption.getAttribute('data-schedule') || selectedOption.textContent;
+        
+        hiddenInput.value = scheduleValue;
+        
+        console.log(`Updated schedule for request ${requestId}: ${scheduleValue}`);
+        
+        // Check for changes to enable save button
+        checkForChanges(requestId);
+    }
+}
+
+// Function to update schedule display when dropdown changes
+function updateScheduleDisplay(requestId) {
+    const scheduleSelect = document.getElementById(`edit-schedule-${requestId}`);
+    const hiddenInput = document.getElementById(`edit-schedule-hidden-${requestId}`);
+    
+    if (scheduleSelect && hiddenInput) {
+        const selectedOption = scheduleSelect.options[scheduleSelect.selectedIndex];
+        const scheduleValue = selectedOption.getAttribute('data-schedule') || selectedOption.textContent;
+        
+        hiddenInput.value = scheduleValue;
+        
+        console.log(`Updated schedule for request ${requestId}: ${scheduleValue}`);
+        
+        // Check for changes to enable save button
+        checkForChanges(requestId);
+    }
+}
+
 // Function to validate OT duration in real-time
 function validateOTDuration(requestId) {
     const hoursInput = document.getElementById(`edit-hours-${requestId}`);
@@ -1044,19 +1783,21 @@ function validateOTDuration(requestId) {
     const totalHours = hours + (minutes / 60);
     
     if (totalHours > maxAllowedHours) {
-        validationDiv.innerHTML = `<span class="text-red-500">⚠️ Exceeds OT window limit: ${formatOvertimeDuration(maxAllowedHours)}</span>`;
-        hoursInput.classList.add('border-red-300');
-        minutesInput.classList.add('border-red-300');
+        validationDiv.innerHTML = `<span class="text-red-500 text-xs">⚠️ Exceeds limit by ${formatOvertimeDuration(totalHours - maxAllowedHours)}</span>`;
+        hoursInput.classList.add('border-red-300', 'bg-red-50');
+        minutesInput.classList.add('border-red-300', 'bg-red-50');
+        hoursInput.classList.remove('border-green-300', 'bg-green-50');
+        minutesInput.classList.remove('border-green-300', 'bg-green-50');
     } else if (totalHours > 0) {
-        validationDiv.innerHTML = `<span class="text-green-600">✓ Valid duration: ${formatOvertimeDuration(totalHours)}</span>`;
-        hoursInput.classList.remove('border-red-300');
-        minutesInput.classList.remove('border-red-300');
-        hoursInput.classList.add('border-green-300');
-        minutesInput.classList.add('border-green-300');
+        validationDiv.innerHTML = `<span class="text-green-600 text-xs">✓ ${formatOvertimeDuration(totalHours)} (${formatOvertimeDuration(maxAllowedHours - totalHours)} remaining)</span>`;
+        hoursInput.classList.remove('border-red-300', 'bg-red-50');
+        minutesInput.classList.remove('border-red-300', 'bg-red-50');
+        hoursInput.classList.add('border-green-300', 'bg-green-50');
+        minutesInput.classList.add('border-green-300', 'bg-green-50');
     } else {
-        validationDiv.innerHTML = `Max allowed: ${formatOvertimeDuration(maxAllowedHours)} hrs (based on OT window)`;
-        hoursInput.classList.remove('border-red-300', 'border-green-300');
-        minutesInput.classList.remove('border-red-300', 'border-green-300');
+        validationDiv.innerHTML = `<span class="text-gray-500 text-xs">Enter duration (exact minutes)</span>`;
+        hoursInput.classList.remove('border-red-300', 'border-green-300', 'bg-red-50', 'bg-green-50');
+        minutesInput.classList.remove('border-red-300', 'border-green-300', 'bg-red-50', 'bg-green-50');
     }
 }
 
@@ -1074,6 +1815,481 @@ function formatOvertimeDuration(hours) {
         return wholeHours + (wholeHours > 1 ? ' hrs' : ' hr');
     } else {
         return wholeHours + (wholeHours > 1 ? ' hrs' : ' hr') + ' ' + minutes + ' min';
+    }
+}
+
+// Function to toggle between edit and save mode
+function toggleEditMode(requestType, requestId, tableName, sourceTable) {
+    const editSaveBtn = document.getElementById(`edit-save-btn-${requestId}`);
+    const currentMode = editSaveBtn.getAttribute('data-mode');
+    
+    if (currentMode === 'view') {
+        // Enable edit mode
+        enableEditMode(requestId);
+        editSaveBtn.setAttribute('data-mode', 'edit');
+        editSaveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Save Changes';
+        editSaveBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+        editSaveBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+    } else {
+        // Save changes and return to view mode
+        saveAllChanges(requestType, requestId, tableName, sourceTable);
+    }
+}
+
+// Function to enable edit mode for all editable fields
+function enableEditMode(requestId) {
+    // Enable overtime duration inputs if they exist
+    const hoursInput = document.getElementById(`edit-hours-${requestId}`);
+    const minutesInput = document.getElementById(`edit-minutes-${requestId}`);
+    
+    if (hoursInput && minutesInput) {
+        // Enable inputs
+        hoursInput.disabled = false;
+        minutesInput.disabled = false;
+        
+        // Update styling to show inputs are editable
+        hoursInput.classList.remove('border-gray-300', 'bg-gray-100');
+        hoursInput.classList.add('border-blue-300', 'bg-white');
+        minutesInput.classList.remove('border-gray-300', 'bg-gray-100');
+        minutesInput.classList.add('border-blue-300', 'bg-white');
+        
+        // Update label colors
+        const nextElements = hoursInput.parentElement.querySelectorAll('span');
+        nextElements.forEach(span => {
+            if (span.textContent === 'hrs' || span.textContent === 'min') {
+                span.classList.remove('text-gray-500');
+                span.classList.add('text-blue-600');
+            }
+        });
+        
+        // Update the separator colon
+        const colonElement = hoursInput.parentElement.parentElement.querySelector('span');
+        if (colonElement && colonElement.textContent === ':') {
+            colonElement.classList.remove('text-gray-400');
+            colonElement.classList.add('text-blue-400');
+        }
+        
+        // Initialize validation
+        validateOTDuration(requestId);
+    }
+    
+    // Enable reason textarea if it exists
+    const reasonTextarea = document.getElementById(`edit-reason-${requestId}`);
+    if (reasonTextarea) {
+        reasonTextarea.disabled = false;
+        reasonTextarea.classList.remove('border-gray-300', 'bg-gray-100');
+        reasonTextarea.classList.add('border-blue-300', 'bg-white', 'focus:ring-2', 'focus:ring-blue-400');
+        
+        // Update the container styling to show it's editable
+        const reasonBlock = document.getElementById(`reason-block-${requestId}`);
+        if (reasonBlock) {
+            reasonBlock.classList.remove('bg-gray-50');
+            reasonBlock.classList.add('bg-blue-50', 'border-blue-200');
+        }
+    }
+    
+    // Enable time adjustment clock UI if it exists
+    const timeAdjustmentBlock = document.getElementById(`time-adjustment-block-${requestId}`);
+    if (timeAdjustmentBlock) {
+        // Enable time in selects
+        const timeInHour = document.getElementById(`edit-time-in-hour-${requestId}`);
+        const timeInMinute = document.getElementById(`edit-time-in-minute-${requestId}`);
+        const timeInAMPM = document.getElementById(`edit-time-in-ampm-${requestId}`);
+        
+        if (timeInHour && timeInMinute && timeInAMPM) {
+            timeInHour.disabled = false;
+            timeInMinute.disabled = false;
+            timeInAMPM.disabled = false;
+            
+            // Update styling to show they're editable
+            timeInHour.classList.remove('border-gray-300', 'bg-gray-100');
+            timeInHour.classList.add('border-blue-300', 'bg-white');
+            timeInMinute.classList.remove('border-gray-300', 'bg-gray-100');
+            timeInMinute.classList.add('border-blue-300', 'bg-white');
+            timeInAMPM.classList.remove('border-gray-300', 'bg-gray-100');
+            timeInAMPM.classList.add('border-blue-300', 'bg-white');
+        }
+        
+        // Enable time out selects
+        const timeOutHour = document.getElementById(`edit-time-out-hour-${requestId}`);
+        const timeOutMinute = document.getElementById(`edit-time-out-minute-${requestId}`);
+        const timeOutAMPM = document.getElementById(`edit-time-out-ampm-${requestId}`);
+        
+        if (timeOutHour && timeOutMinute && timeOutAMPM) {
+            timeOutHour.disabled = false;
+            timeOutMinute.disabled = false;
+            timeOutAMPM.disabled = false;
+            
+            // Update styling to show they're editable
+            timeOutHour.classList.remove('border-gray-300', 'bg-gray-100');
+            timeOutHour.classList.add('border-green-300', 'bg-white');
+            timeOutMinute.classList.remove('border-gray-300', 'bg-gray-100');
+            timeOutMinute.classList.add('border-green-300', 'bg-white');
+            timeOutAMPM.classList.remove('border-gray-300', 'bg-gray-100');
+            timeOutAMPM.classList.add('border-green-300', 'bg-white');
+        }
+        
+        // Update container styling
+        timeAdjustmentBlock.classList.add('border-blue-200');
+    }
+    
+    // Enable schedule change UI if it exists
+    const scheduleChangeBlock = document.getElementById(`schedule-change-block-${requestId}`);
+    if (scheduleChangeBlock) {
+        const scheduleSelect = document.getElementById(`edit-schedule-${requestId}`);
+        
+        if (scheduleSelect) {
+            scheduleSelect.disabled = false;
+            
+            // Update styling to show it's editable
+            scheduleSelect.classList.remove('border-gray-300', 'bg-gray-100');
+            scheduleSelect.classList.add('border-green-300', 'bg-white');
+        }
+        
+        // Update container styling
+        scheduleChangeBlock.classList.add('border-blue-200');
+    }
+    
+    // Enable date range input if it exists
+    const dateRangeInput = document.getElementById(`edit-date-range-${requestId}`);
+    if (dateRangeInput) {
+        dateRangeInput.disabled = false;
+        dateRangeInput.classList.remove('border-gray-300', 'bg-gray-100');
+        dateRangeInput.classList.add('border-blue-300', 'bg-white', 'focus:ring-2', 'focus:ring-blue-400');
+        
+        // Update the container styling to show it's editable
+        const dateRangeBlock = document.getElementById(`date-range-block-${requestId}`);
+        if (dateRangeBlock) {
+            dateRangeBlock.classList.remove('bg-gray-50');
+            dateRangeBlock.classList.add('bg-blue-50', 'border-blue-200');
+        }
+    }
+    
+    // Add any other field types here (e.g., leave dates, etc.)
+    // This is where you'd enable editing for other request types
+}
+
+// Function to save all changes made in edit mode
+function saveAllChanges(requestType, requestId, tableName, sourceTable) {
+    const hoursInput = document.getElementById(`edit-hours-${requestId}`);
+    const minutesInput = document.getElementById(`edit-minutes-${requestId}`);
+    const reasonTextarea = document.getElementById(`edit-reason-${requestId}`);
+    const timeInHidden = document.getElementById(`edit-time-in-${requestId}`);
+    const timeOutHidden = document.getElementById(`edit-time-out-${requestId}`);
+    
+    let hasOvertimeChanges = false;
+    let hasReasonChanges = false;
+    let hasTimeAdjustmentChanges = false;
+    let hasScheduleChanges = false;
+    
+    // Check overtime duration changes
+    if (hoursInput && minutesInput && (!hoursInput.disabled)) {
+        const originalHours = parseInt(hoursInput.getAttribute('data-original')) || 0;
+        const originalMinutes = parseInt(minutesInput.getAttribute('data-original')) || 0;
+        const currentHours = parseInt(hoursInput.value) || 0;
+        const currentMinutes = parseInt(minutesInput.value) || 0;
+        
+        hasOvertimeChanges = (originalHours !== currentHours || originalMinutes !== currentMinutes);
+    }
+    
+    // Check reason changes
+    if (reasonTextarea && (!reasonTextarea.disabled)) {
+        const originalReason = reasonTextarea.getAttribute('data-original') || '';
+        const currentReason = reasonTextarea.value.trim() || '';
+        
+        hasReasonChanges = (originalReason !== currentReason);
+    }
+    
+    // Check time adjustment changes
+    if (timeInHidden && timeOutHidden) {
+        const originalTimeIn = timeInHidden.getAttribute('data-original') || '';
+        const originalTimeOut = timeOutHidden.getAttribute('data-original') || '';
+        const currentTimeIn = timeInHidden.value || '';
+        const currentTimeOut = timeOutHidden.value || '';
+        
+        hasTimeAdjustmentChanges = (originalTimeIn !== currentTimeIn) || (originalTimeOut !== currentTimeOut);
+    }
+    
+    // Check schedule changes
+    const scheduleHidden = document.getElementById(`edit-schedule-hidden-${requestId}`);
+    const dateRangeInput = document.getElementById(`edit-date-range-${requestId}`);
+    if (scheduleHidden || dateRangeInput) {
+        let scheduleChanged = false;
+        let dateRangeChanged = false;
+        
+        if (scheduleHidden) {
+            const originalSchedule = scheduleHidden.getAttribute('data-original') || '';
+            const currentSchedule = scheduleHidden.value || '';
+            scheduleChanged = (originalSchedule !== currentSchedule);
+        }
+        
+        if (dateRangeInput) {
+            const originalDateRange = dateRangeInput.getAttribute('data-original') || '';
+            const currentDateRange = dateRangeInput.value || '';
+            dateRangeChanged = (originalDateRange !== currentDateRange);
+        }
+        
+        hasScheduleChanges = scheduleChanged || dateRangeChanged;
+    }
+    
+    // Handle multiple changes sequentially
+    if (hasOvertimeChanges && hasReasonChanges) {
+        // Save overtime duration first, then reason
+        updateOvertimeDuration(requestId, tableName, () => {
+            updateRequestReason(requestId, tableName, reasonTextarea.value.trim());
+        });
+        return;
+    }
+    
+    if (hasTimeAdjustmentChanges && hasReasonChanges) {
+        // Save time adjustment first, then reason
+        updateTimeAdjustment(requestId, tableName, timeInHidden.value, timeOutHidden.value);
+        // Note: Reason update will need to be handled after time adjustment completes
+        return;
+    }
+    
+    // Handle single field changes
+    if (hasOvertimeChanges) {
+        updateOvertimeDuration(requestId, tableName);
+        return;
+    }
+    
+    if (hasTimeAdjustmentChanges) {
+        updateTimeAdjustment(requestId, tableName, timeInHidden.value, timeOutHidden.value);
+        return;
+    }
+    
+    if (hasReasonChanges) {
+        updateRequestReason(requestId, tableName, reasonTextarea.value.trim());
+        return;
+    }
+    
+    if (hasScheduleChanges) {
+        const newSchedule = scheduleHidden ? scheduleHidden.value : null;
+        const newDateRange = dateRangeInput ? dateRangeInput.value : null;
+        updateScheduleChange(requestId, tableName, newSchedule, newDateRange);
+        return;
+    }
+    
+    // If no changes were made, just return to view mode
+    resetToViewMode(requestId);
+}
+
+// Function to reset back to view mode
+function resetToViewMode(requestId) {
+    const editSaveBtn = document.getElementById(`edit-save-btn-${requestId}`);
+    const hoursInput = document.getElementById(`edit-hours-${requestId}`);
+    const minutesInput = document.getElementById(`edit-minutes-${requestId}`);
+    const reasonTextarea = document.getElementById(`edit-reason-${requestId}`);
+    
+    if (editSaveBtn) {
+        editSaveBtn.setAttribute('data-mode', 'view');
+        editSaveBtn.innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Form';
+        editSaveBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+        editSaveBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+    }
+    
+    if (hoursInput && minutesInput) {
+        // Disable inputs
+        hoursInput.disabled = true;
+        minutesInput.disabled = true;
+        
+        // Reset styling to disabled state
+        hoursInput.classList.remove('border-blue-300', 'bg-white', 'border-red-300', 'bg-red-50', 'border-green-300', 'bg-green-50');
+        hoursInput.classList.add('border-gray-300', 'bg-gray-100');
+        minutesInput.classList.remove('border-blue-300', 'bg-white', 'border-red-300', 'bg-red-50', 'border-green-300', 'bg-green-50');
+        minutesInput.classList.add('border-gray-300', 'bg-gray-100');
+        
+        // Reset label colors
+        const nextElements = hoursInput.parentElement.querySelectorAll('span');
+        nextElements.forEach(span => {
+            if (span.textContent === 'hrs' || span.textContent === 'min') {
+                span.classList.remove('text-blue-600');
+                span.classList.add('text-gray-500');
+            }
+        });
+        
+        // Reset the separator colon
+        const colonElement = hoursInput.parentElement.parentElement.querySelector('span');
+        if (colonElement && colonElement.textContent === ':') {
+            colonElement.classList.remove('text-blue-400');
+            colonElement.classList.add('text-gray-400');
+        }
+        
+        // Clear validation message
+        const validationDiv = document.getElementById(`duration-validation-${requestId}`);
+        if (validationDiv) {
+            validationDiv.innerHTML = '';
+        }
+    }
+    
+    // Reset reason textarea
+    if (reasonTextarea) {
+        reasonTextarea.disabled = true;
+        reasonTextarea.classList.remove('border-blue-300', 'bg-white', 'focus:ring-2', 'focus:ring-blue-400');
+        reasonTextarea.classList.add('border-gray-300', 'bg-gray-100');
+        
+        // Reset the container styling
+        const reasonBlock = document.getElementById(`reason-block-${requestId}`);
+        if (reasonBlock) {
+            reasonBlock.classList.remove('bg-blue-50', 'border-blue-200');
+            reasonBlock.classList.add('bg-gray-50');
+        }
+    }
+    
+    // Reset time adjustment clock UI
+    const timeAdjustmentBlock = document.getElementById(`time-adjustment-block-${requestId}`);
+    if (timeAdjustmentBlock) {
+        // Reset time in selects
+        const timeInHour = document.getElementById(`edit-time-in-hour-${requestId}`);
+        const timeInMinute = document.getElementById(`edit-time-in-minute-${requestId}`);
+        const timeInAMPM = document.getElementById(`edit-time-in-ampm-${requestId}`);
+        
+        if (timeInHour && timeInMinute && timeInAMPM) {
+            timeInHour.disabled = true;
+            timeInMinute.disabled = true;
+            timeInAMPM.disabled = true;
+            
+            // Reset styling to disabled state
+            timeInHour.classList.remove('border-blue-300', 'bg-white');
+            timeInHour.classList.add('border-gray-300', 'bg-gray-100');
+            timeInMinute.classList.remove('border-blue-300', 'bg-white');
+            timeInMinute.classList.add('border-gray-300', 'bg-gray-100');
+            timeInAMPM.classList.remove('border-blue-300', 'bg-white');
+            timeInAMPM.classList.add('border-gray-300', 'bg-gray-100');
+        }
+        
+        // Reset time out selects
+        const timeOutHour = document.getElementById(`edit-time-out-hour-${requestId}`);
+        const timeOutMinute = document.getElementById(`edit-time-out-minute-${requestId}`);
+        const timeOutAMPM = document.getElementById(`edit-time-out-ampm-${requestId}`);
+        
+        if (timeOutHour && timeOutMinute && timeOutAMPM) {
+            timeOutHour.disabled = true;
+            timeOutMinute.disabled = true;
+            timeOutAMPM.disabled = true;
+            
+            // Reset styling to disabled state
+            timeOutHour.classList.remove('border-green-300', 'bg-white');
+            timeOutHour.classList.add('border-gray-300', 'bg-gray-100');
+            timeOutMinute.classList.remove('border-green-300', 'bg-white');
+            timeOutMinute.classList.add('border-gray-300', 'bg-gray-100');
+            timeOutAMPM.classList.remove('border-green-300', 'bg-white');
+            timeOutAMPM.classList.add('border-gray-300', 'bg-gray-100');
+        }
+        
+        // Reset container styling
+        timeAdjustmentBlock.classList.remove('border-blue-200');
+    }
+    
+    // Reset schedule change UI
+    const scheduleChangeBlock = document.getElementById(`schedule-change-block-${requestId}`);
+    if (scheduleChangeBlock) {
+        const scheduleSelect = document.getElementById(`edit-schedule-${requestId}`);
+        
+        if (scheduleSelect) {
+            scheduleSelect.disabled = true;
+            
+            // Reset styling to disabled state
+            scheduleSelect.classList.remove('border-green-300', 'bg-white');
+            scheduleSelect.classList.add('border-gray-300', 'bg-gray-100');
+        }
+        
+        // Reset container styling
+        scheduleChangeBlock.classList.remove('border-blue-200');
+    }
+    
+    // Reset date range input
+    const dateRangeInput = document.getElementById(`edit-date-range-${requestId}`);
+    if (dateRangeInput) {
+        dateRangeInput.disabled = true;
+        dateRangeInput.classList.remove('border-blue-300', 'bg-white', 'focus:ring-2', 'focus:ring-blue-400');
+        dateRangeInput.classList.add('border-gray-300', 'bg-gray-100');
+        
+        // Reset the container styling
+        const dateRangeBlock = document.getElementById(`date-range-block-${requestId}`);
+        if (dateRangeBlock) {
+            dateRangeBlock.classList.remove('bg-blue-50', 'border-blue-200');
+            dateRangeBlock.classList.add('bg-gray-50');
+        }
+    }
+}
+
+// Function to check if values have changed and enable/disable save button
+function checkForChanges(requestId) {
+    const hoursInput = document.getElementById(`edit-hours-${requestId}`);
+    const minutesInput = document.getElementById(`edit-minutes-${requestId}`);
+    const reasonTextarea = document.getElementById(`edit-reason-${requestId}`);
+    const editSaveBtn = document.getElementById(`edit-save-btn-${requestId}`);
+    
+    if (!editSaveBtn) return;
+    
+    let hasChanged = false;
+    
+    // Check overtime duration changes
+    if (hoursInput && minutesInput) {
+        const originalHours = parseInt(hoursInput.getAttribute('data-original')) || 0;
+        const originalMinutes = parseInt(minutesInput.getAttribute('data-original')) || 0;
+        const currentHours = parseInt(hoursInput.value) || 0;
+        const currentMinutes = parseInt(minutesInput.value) || 0;
+        
+        hasChanged = hasChanged || (originalHours !== currentHours) || (originalMinutes !== currentMinutes);
+    }
+    
+    // Check reason changes
+    if (reasonTextarea) {
+        const originalReason = reasonTextarea.getAttribute('data-original') || '';
+        const currentReason = reasonTextarea.value.trim() || '';
+        
+        hasChanged = hasChanged || (originalReason !== currentReason);
+    }
+    
+    // Check time adjustment changes
+    const timeInHidden = document.getElementById(`edit-time-in-${requestId}`);
+    const timeOutHidden = document.getElementById(`edit-time-out-${requestId}`);
+    
+    if (timeInHidden) {
+        const originalTimeIn = timeInHidden.getAttribute('data-original') || '';
+        const currentTimeIn = timeInHidden.value || '';
+        
+        hasChanged = hasChanged || (originalTimeIn !== currentTimeIn);
+    }
+    
+    if (timeOutHidden) {
+        const originalTimeOut = timeOutHidden.getAttribute('data-original') || '';
+        const currentTimeOut = timeOutHidden.value || '';
+        
+        hasChanged = hasChanged || (originalTimeOut !== currentTimeOut);
+    }
+    
+    // Check schedule change
+    const scheduleHidden = document.getElementById(`edit-schedule-hidden-${requestId}`);
+    if (scheduleHidden) {
+        const originalSchedule = scheduleHidden.getAttribute('data-original') || '';
+        const currentSchedule = scheduleHidden.value || '';
+        
+        hasChanged = hasChanged || (originalSchedule !== currentSchedule);
+    }
+    
+    // Check date range changes
+    const dateRangeInput = document.getElementById(`edit-date-range-${requestId}`);
+    if (dateRangeInput) {
+        const originalDateRange = dateRangeInput.getAttribute('data-original') || '';
+        const currentDateRange = dateRangeInput.value || '';
+        
+        hasChanged = hasChanged || (originalDateRange !== currentDateRange);
+    }
+    
+    if (hasChanged) {
+        // Show save button as ready to save changes
+        editSaveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Save Changes';
+        editSaveBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+        editSaveBtn.classList.add('bg-orange-600', 'hover:bg-orange-700');
+    } else {
+        // Show save button in normal edit state
+        editSaveBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Save Changes';
+        editSaveBtn.classList.remove('bg-orange-600', 'hover:bg-orange-700');
+        editSaveBtn.classList.add('bg-green-600', 'hover:bg-green-700');
     }
 }
 

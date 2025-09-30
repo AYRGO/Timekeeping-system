@@ -100,11 +100,11 @@ if ($current_user_id) {
 // --- Leave Requests (from both tables) ---
 // Pending leave requests
 $leave_stmt = $pdo->prepare("
-    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, 'pending' as source_table
+    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, reason, 'pending' as source_table
     FROM leave_requests 
     WHERE employee_id = ?
     UNION ALL
-    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, 'approved' as source_table
+    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, reason, 'approved' as source_table
     FROM post_leave_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
@@ -162,7 +162,7 @@ foreach ($leave_results as $leave) {
 
 // --- Schedule Requests (from both tables) ---
 $schedule_stmt = $pdo->prepare("
-    SELECT scr.id, scr.work_schedule_id, scr.status, scr.start_date, scr.end_date, scr.created_at, scr.notified, scr.explanation, 
+    SELECT scr.id, scr.work_schedule_id, scr.status, scr.start_date, scr.end_date, scr.created_at, scr.notified, scr.explanation, scr.reason,
            scr.current_work_schedule_id, 'pending' as source_table,
            current_ws.time_in as current_time_in, current_ws.time_out as current_time_out,
            new_ws.time_in as requested_time_in, new_ws.time_out as requested_time_out
@@ -171,7 +171,7 @@ $schedule_stmt = $pdo->prepare("
     LEFT JOIN work_schedules new_ws ON scr.work_schedule_id = new_ws.id
     WHERE scr.employee_id = ?
     UNION ALL
-    SELECT pscr.id, pscr.work_schedule_id, pscr.status, pscr.start_date, pscr.end_date, pscr.created_at, pscr.notified, pscr.explanation,
+    SELECT pscr.id, pscr.work_schedule_id, pscr.status, pscr.start_date, pscr.end_date, pscr.created_at, pscr.notified, pscr.explanation, pscr.reason,
            pscr.current_work_schedule_id, 'approved' as source_table,
            current_ws2.time_in as current_time_in, current_ws2.time_out as current_time_out,
            new_ws2.time_in as requested_time_in, new_ws2.time_out as requested_time_out
@@ -199,6 +199,7 @@ foreach ($schedule_results as $sched) {
         'created_at' => $sched['created_at'],
         'status' => $sched['status'],
         'explanation' => $sched['explanation'] ?? '',
+        'reason' => $sched['reason'] ?? '',
         'start_date' => $sched['start_date'],
         'end_date' => $sched['end_date'],
         'current_time_in' => $sched['current_time_in'],
@@ -229,7 +230,7 @@ $adjust_stmt = $pdo->prepare("
     FROM time_adjustment_requests 
     WHERE employee_id = ?
     UNION ALL
-    SELECT id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, status, '' as reason, created_at, notified, 'approved' as source_table
+    SELECT id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, status, reason, created_at, notified, 'approved' as source_table
     FROM post_time_adjustment_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
@@ -297,13 +298,12 @@ $pending_ot_stmt = $pdo->prepare("
 $pending_ot_stmt->execute([$current_user_id]);
 $pending_ot_results = $pending_ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Then get processed overtime requests with log_date
+// Then get processed overtime requests
 $ot_stmt = $pdo->prepare("
-    SELECT por.id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.created_at, por.approved_at, por.approved_by, por.notified, tl.log_date
-    FROM post_ot_requests por
-    LEFT JOIN time_logs tl ON por.time_log_id = tl.id
-    WHERE por.employee_id = ?
-    ORDER BY COALESCE(por.approved_at, por.created_at) DESC
+    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified
+    FROM post_ot_requests
+    WHERE employee_id = ?
+    ORDER BY COALESCE(approved_at, created_at) DESC
     LIMIT 10
 ");
 $ot_stmt->execute([$current_user_id]);
@@ -334,8 +334,6 @@ foreach ($pending_ot_results as $ot) {
         'end_ot' => $ot['end_time'] ?? null,
         'ot_duration' => $ot['duration_hours'],
         'ot_type' => $ot_type,
-        'ot_date' => $ot['date'] ?? null,  // Add OT date from overtime_requests table
-        'log_date' => $ot['date'] ?? null, // Fallback field
         'request_id' => $ot['id'],
         'table_name' => 'overtime_requests',
         'source_table' => 'pending'
@@ -359,10 +357,18 @@ foreach ($ot_results as $ot) {
     // Compute Start OT and End OT using schedule logic (similar to new_overtime)
     $actual_time_in = $ot['time_in'] ?? null;
     $actual_time_out = $ot['time_out'] ?? null;
-    $log_date = $ot['log_date'] ?? null; // Get log_date directly from JOIN query
+    $log_date = null;
     $start_ot = null;
     $end_ot = null;
 
+    // Get log_date from time_logs table if time_log_id exists
+    if (!empty($ot['time_log_id'])) {
+        $log_stmt = $pdo->prepare("SELECT log_date FROM time_logs WHERE id = ?");
+        $log_stmt->execute([$ot['time_log_id']]);
+        $log_result = $log_stmt->fetch(PDO::FETCH_ASSOC);
+        $log_date = $log_result['log_date'] ?? null;
+    }
+    
     // Fallback: derive log_date from time_in if available
     if (!$log_date && $actual_time_in) {
         $log_date = date('Y-m-d', strtotime($actual_time_in));
@@ -402,8 +408,6 @@ foreach ($ot_results as $ot) {
         'end_ot' => $end_ot,
         'ot_duration' => $ot['ot_duration'],
         'ot_type' => $ot_type,
-        'ot_date' => $log_date,  // Add OT date from time_logs table
-        'log_date' => $log_date, // Same field for consistency
         'request_id' => $ot['id'],
         'table_name' => 'post_ot_requests',
         'source_table' => 'post'
