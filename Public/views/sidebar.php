@@ -149,6 +149,69 @@ try {
                 </a>
             </div>
 
+            <!-- Reports Section -->
+            <div class="space-y-2" x-data="{ reportsOpen: false }">
+                <h3 class="text-xs uppercase text-gray-400 tracking-wider font-semibold px-3 mb-3">Reports</h3>
+
+                <!-- Reports Parent Menu -->
+                <div class="relative">
+                    <button @click="reportsOpen = !reportsOpen" 
+                           class="group flex items-center justify-between w-full px-3 py-3 rounded-xl transition-all duration-200 hover:bg-gray-800 hover:shadow-md">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 rounded-lg bg-green-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
+                                <i class="fas fa-chart-bar text-green-400 text-sm"></i>
+                            </div>
+                            <span class="font-medium">Generate Reports</span>
+                        </div>
+                        <i class="fas fa-chevron-down text-xs text-gray-400 transition-transform duration-200" 
+                           :class="{ 'rotate-180': reportsOpen }"></i>
+                    </button>
+
+                    <!-- Reports Submenu -->
+                    <div x-show="reportsOpen" 
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 transform scale-95"
+                         x-transition:enter-end="opacity-100 transform scale-100"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100 transform scale-100"
+                         x-transition:leave-end="opacity-0 transform scale-95"
+                         class="mt-2 ml-4 space-y-1 border-l-2 border-gray-700 pl-4">
+                        
+                        <a href="attendance_report.php" 
+                           class="group flex items-center px-3 py-2 rounded-lg transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'attendance_report.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800' ?>">
+                            <div class="w-6 h-6 rounded-md bg-blue-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
+                                <i class="fas fa-calendar-check text-blue-400 text-xs"></i>
+                            </div>
+                            <span class="text-sm font-medium">Attendance Report</span>
+                        </a>
+
+                        <a href="overtime_report.php" 
+                           class="group flex items-center px-3 py-2 rounded-lg transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'overtime_report.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800' ?>">
+                            <div class="w-6 h-6 rounded-md bg-yellow-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
+                                <i class="fas fa-clock text-yellow-400 text-xs"></i>
+                            </div>
+                            <span class="text-sm font-medium">Overtime Report</span>
+                        </a>
+
+                        <a href="payroll_report.php" 
+                           class="group flex items-center px-3 py-2 rounded-lg transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'payroll_report.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800' ?>">
+                            <div class="w-6 h-6 rounded-md bg-emerald-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
+                                <i class="fas fa-dollar-sign text-emerald-400 text-xs"></i>
+                            </div>
+                            <span class="text-sm font-medium">Payroll Report</span>
+                        </a>
+
+                        <a href="leave_report.php" 
+                           class="group flex items-center px-3 py-2 rounded-lg transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'leave_report.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800' ?>">
+                            <div class="w-6 h-6 rounded-md bg-purple-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
+                                <i class="fas fa-calendar-times text-purple-400 text-xs"></i>
+                            </div>
+                            <span class="text-sm font-medium">Leave Report</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <!-- System Section -->
             <div class="space-y-2">
                 <h3 class="text-xs uppercase text-gray-400 tracking-wider font-semibold px-3 mb-3">System</h3>

@@ -1122,7 +1122,15 @@ button:hover {
                   data-ot-hours="<?= $hasLog ? $overtimeHours : '0' ?>"
                   data-start-ot="<?= $hasLog && isset($otDetails['start_ot']) ? $otDetails['start_ot'] : '' ?>"
                   data-end-ot="<?= $hasLog && isset($otDetails['end_ot']) ? $otDetails['end_ot'] : '' ?>"
-                  data-max-ot-hours="<?= $hasLog && isset($otDetails['max_ot_hours']) ? $otDetails['max_ot_hours'] : '0' ?>">
+                  data-max-ot-hours="<?= $hasLog && isset($otDetails['max_ot_hours']) ? $otDetails['max_ot_hours'] : '0' ?>"
+                  <?php 
+                  // Add scheduled start time for Restday OT calculation
+                  if ($hasDate) {
+                    $scheduleForRestday = getScheduleForDate($employee_id, $log['log_date'], $pdo);
+                    $scheduledStartTime = $scheduleForRestday['time_in'] ?? '07:00 AM';
+                    echo 'data-scheduled-start="' . htmlspecialchars($scheduledStartTime) . '"';
+                  }
+                  ?>>
                   
                   <td class="px-8 py-6 whitespace-nowrap">
                     <div class="flex items-center">
@@ -1855,20 +1863,17 @@ button:hover {
                         
                         <div class="grid grid-cols-1 gap-4 mt-5">
                             <div class="space-y-2">
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                                    OT Date <span class="text-red-500 text-sm">*</span>
-                                </label>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Date</label>
                                 <div class="relative">
-           <input type="date" id="selected_date" name="selected_date" 
+           <input type="text" id="selected_date" name="selected_date" 
              class="w-full pl-10 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm"
-             required>
+             readonly>
                                     <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
                                         <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
                                             <i class="fas fa-calendar text-white text-xs"></i>
                                         </div>
                                     </div>
                                 </div>
-                                <p class="text-xs text-slate-600 font-medium">Select the date when overtime was performed</p>
                             </div>
 
                             <!-- Hidden Time In and Time Out fields for form submission -->
@@ -1974,7 +1979,69 @@ function formatDuration(hours) {
     }
 }
 
-// Utility: compute Restday OT hours from hidden time fields
+// Utility: compute Restday OT hours from Start OT to End OT
+function computeRDOTHrsFromStartToEnd() {
+    const startOTStr = document.getElementById('start_ot_time')?.value || '';
+    const endOTStr = document.getElementById('end_ot_time')?.value || '';
+    
+    console.log('computeRDOTHrsFromStartToEnd - Start OT:', startOTStr, 'End OT:', endOTStr);
+    
+    if (!startOTStr || !endOTStr) {
+        console.warn('Start OT or End OT not available for Restday OT calculation');
+        return 0;
+    }
+
+    // Try a few parsing strategies to be resilient to formats
+    const parseDateTime = (s) => {
+        if (!s) return null;
+        // 1) Time with AM/PM format (most common in UI)
+        if (/\d{1,2}:\d{2}\s?(AM|PM)/i.test(s)) {
+            const d = new Date('2000-01-01 ' + s);
+            if (!isNaN(d.getTime())) return d;
+        }
+        // 2) ISO-like: YYYY-MM-DD HH:MM[:SS]
+        const isoLike = new Date(s.replace(' ', 'T'));
+        if (!isNaN(isoLike.getTime())) return isoLike;
+        // 3) If only time provided, pair with arbitrary date
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) {
+            const d = new Date('2000-01-01T' + s.padStart(5, '0'));
+            if (!isNaN(d.getTime())) return d;
+        }
+        // 3) Manual parse fallback
+        const m = s.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        if (m) {
+            const [_, Y, M, D, h, i, sec] = m;
+            const d = new Date(Number(Y), Number(M) - 1, Number(D), Number(h), Number(i), Number(sec || 0));
+            if (!isNaN(d.getTime())) return d;
+        }
+        return null;
+    };
+
+    try {
+        const scheduledStart = parseDateTime(scheduledStartTime);
+        const startOT = parseDateTime(startOTStr);
+        const endOT = parseDateTime(endOTStr);
+        
+        if (!startOT || !endOT) {
+            console.warn('Could not parse Start OT or End OT times');
+            return 0;
+        }
+
+        let diffMs = endOT.getTime() - startOT.getTime();
+        if (diffMs < 0) diffMs = Math.abs(diffMs);
+        const diffHours = diffMs / (1000 * 60 * 60);
+        
+        // For Restday OT, calculate hours from Start OT to End OT
+        // Typically no lunch deduction since it's already the specific OT period
+        const workHours = diffHours;
+        return Number.isFinite(workHours) ? workHours : 0;
+    } catch (e) {
+        console.error('computeRDOTHrsFromStartToEnd error:', e);
+        return 0;
+    }
+}
+
+// Utility: compute regular total work hours from time in to time out (for fallback)
 function computeRDOTHrsFromHiddenFields() {
     const timeInStr = document.getElementById('selected_time_in')?.value || '';
     const timeOutStr = document.getElementById('selected_time_out')?.value || '';
@@ -2036,7 +2103,16 @@ function initializeTimePicker(maxHours) {
         return;
     }
     
-    rangeInfo.textContent = `Maximum available: ${formatDuration(maxHours)}`;
+    // Check if this is Restday OT to show lunch deduction info
+    const otTypeSelect = document.getElementById('ot_type');
+    const isRestdayOT = otTypeSelect && otTypeSelect.value === 'Restday OT';
+    
+    if (isRestdayOT) {
+        const payableHours = Math.max(0, maxHours - 1);
+        rangeInfo.innerHTML = `Maximum available: ${formatDuration(maxHours)} <span class="text-orange-600 font-semibold">(Payable: ${formatDuration(payableHours)} after 1hr lunch deduction)</span>`;
+    } else {
+        rangeInfo.textContent = `Maximum available: ${formatDuration(maxHours)}`;
+    }
     
     function updateHiddenInput() {
         const hours = parseInt(hoursInput.value) || 0;
@@ -2055,7 +2131,14 @@ function initializeTimePicker(maxHours) {
             validationInfo.className = 'mt-0.5 text-xs text-red-500 truncate';
         } else {
             hiddenInput.value = totalHours.toFixed(2);
-            validationInfo.textContent = `Selected: ${formatDuration(totalHours)}`;
+            
+            // For Restday OT, show both selected and payable hours
+            if (isRestdayOT) {
+                const payableHours = Math.max(0, totalHours - 1);
+                validationInfo.innerHTML = `Selected: ${formatDuration(totalHours)} <span class="text-orange-600 font-semibold">(Payable: ${formatDuration(payableHours)})</span>`;
+            } else {
+                validationInfo.textContent = `Selected: ${formatDuration(totalHours)}`;
+            }
             validationInfo.className = 'mt-0.5 text-xs text-emerald-600 truncate';
         }
     }
@@ -2106,7 +2189,14 @@ function formatMinutesToTime(totalMinutes) {
 
 // Open overtime modal with data
 function openOvertimeModal(button) {
+    console.log('openOvertimeModal called with button:', button);
+    
     const row = button.closest('tr');
+    if (!row) {
+        console.error('No table row found for button');
+        return;
+    }
+    
     const timeLogId = row.dataset.logId;
     const timeIn = row.dataset.timeIn;
     const timeOut = row.dataset.timeOut;
@@ -2115,6 +2205,7 @@ function openOvertimeModal(button) {
     const startOT = row.dataset.startOt || '';
     const endOT = row.dataset.endOt || '';
     const maxOTHours = parseFloat(row.dataset.maxOtHours) || 0;
+    const scheduledStart = row.dataset.scheduledStart || '';
     
     console.log('Modal Data:', { timeLogId, timeIn, timeOut, otHours, date, startOT, endOT, maxOTHours }); // Debug log
     
@@ -2163,10 +2254,12 @@ function openOvertimeModal(button) {
     // Set default OT type to Regular OT
     document.getElementById('ot_type').value = 'Regular OT';
     
-    // Store regular OT hours for restoration when switching types
+    // Store regular OT hours and original start OT for restoration when switching types
     const overtimeForm = document.getElementById('overtimeForm');
     if (overtimeForm) {
         overtimeForm.dataset.regularOtHours = (otHours || 0).toFixed(2);
+        overtimeForm.dataset.originalStartOt = startOT || '';
+        overtimeForm.dataset.scheduledStartTime = scheduledStart || '';
     }
     
     // Clear previous values
@@ -2536,14 +2629,49 @@ document.addEventListener('DOMContentLoaded', function() {
             const hoursInput = document.getElementById('overtime_hours');
             const formEl = document.getElementById('overtimeForm');
             if (!hoursInput) return;
+            
             if (type === 'Restday OT') {
-                const workHours = computeRDOTHrsFromHiddenFields();
+                const workHours = computeRDOTHrsFromStartToEnd();
                 hoursInput.value = workHours.toFixed(2);
+                
+                // Update MAX OT AVAILABLE display
+                document.getElementById('display_max_ot_hours').value = formatDuration(workHours);
+                
+                // For Restday OT, set start OT to the selected time in
+                const timeInValue = document.getElementById('selected_time_in')?.value || '';
+                if (timeInValue) {
+                    try {
+                        // Format the time in to display format
+                        const timeInFormatted = new Date('2000-01-01 ' + timeInValue).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                        });
+                        
+                        // Update both the hidden field and display field for start OT
+                        document.getElementById('start_ot_time').value = timeInFormatted;
+                        document.getElementById('display_start_ot').value = timeInFormatted;
+                        
+                        console.log('Updated Start OT for Restday OT:', timeInFormatted);
+                    } catch (error) {
+                        console.error('Error formatting time for Restday OT:', error);
+                        // Fallback to original time format
+                        document.getElementById('start_ot_time').value = timeInValue;
+                        document.getElementById('display_start_ot').value = timeInValue;
+                    }
+                }
             } else {
-                // Restore regular OT hours captured when modal opened
+                // Restore regular OT hours and start OT time
                 const fallback = formEl?.dataset?.regularOtHours;
                 if (fallback !== undefined && fallback !== null) {
                     hoursInput.value = fallback;
+                }
+                
+                // Restore original start OT time for regular OT (from data attributes)
+                const originalStartOT = formEl?.dataset?.originalStartOt || '';
+                if (originalStartOT) {
+                    document.getElementById('start_ot_time').value = originalStartOT;
+                    document.getElementById('display_start_ot').value = originalStartOT;
                 }
             }
             // Trigger an input event to ensure any UI bindings react
@@ -2553,11 +2681,150 @@ document.addEventListener('DOMContentLoaded', function() {
         if (otTypeSelect.value === 'Restday OT') {
             const hoursInput = document.getElementById('overtime_hours');
             if (hoursInput) {
-                const workHours = computeRDOTHrsFromHiddenFields();
+                const workHours = computeRDOTHrsFromStartToEnd();
                 hoursInput.value = workHours.toFixed(2);
+                
+                // Update MAX OT AVAILABLE display
+                document.getElementById('display_max_ot_hours').value = formatDuration(workHours);
+                
+                // Also set start OT to time in for Restday OT
+                const timeInValue = document.getElementById('selected_time_in')?.value || '';
+                if (timeInValue) {
+                    try {
+                        const timeInFormatted = new Date('2000-01-01 ' + timeInValue).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                        });
+                        document.getElementById('start_ot_time').value = timeInFormatted;
+                        document.getElementById('display_start_ot').value = timeInFormatted;
+                    } catch (error) {
+                        document.getElementById('start_ot_time').value = timeInValue;
+                        document.getElementById('display_start_ot').value = timeInValue;
+                    }
+                }
+                
                 try { hoursInput.dispatchEvent(new Event('input', { bubbles: true })); } catch(e) {}
             }
         }
+    }
+    
+    // Add event listener for Start OT time changes (only for Restday OT)
+    const startOTInput = document.getElementById('start_ot_time');
+    if (startOTInput) {
+        startOTInput.addEventListener('change', function() {
+            const otTypeSelect = document.getElementById('ot_type');
+            if (otTypeSelect && otTypeSelect.value === 'Restday OT') {
+                console.log('Start OT changed for Restday OT:', this.value);
+                const hoursInput = document.getElementById('overtime_hours');
+                if (hoursInput) {
+                    const workHours = computeRDOTHrsFromStartToEnd();
+                    hoursInput.value = workHours.toFixed(2);
+                    console.log('Updated RDOT hours to:', workHours.toFixed(2));
+                    
+                    // Update MAX OT AVAILABLE display
+                    document.getElementById('display_max_ot_hours').value = formatDuration(workHours);
+                    
+                    // Trigger input event to update any UI bindings
+                    try { 
+                        hoursInput.dispatchEvent(new Event('input', { bubbles: true })); 
+                        // Also update the time picker if it exists
+                        const maxOTHours = parseFloat(hoursInput.value) || 0;
+                        initializeTimePicker(maxOTHours);
+                    } catch(e) {
+                        console.warn('Error updating hours input:', e);
+                    }
+                }
+            }
+        });
+    }
+    
+    // Add event listener for End OT time changes (only for Restday OT)
+    const endOTInput = document.getElementById('end_ot_time');
+    if (endOTInput) {
+        endOTInput.addEventListener('change', function() {
+            const otTypeSelect = document.getElementById('ot_type');
+            if (otTypeSelect && otTypeSelect.value === 'Restday OT') {
+                console.log('End OT changed for Restday OT:', this.value);
+                const hoursInput = document.getElementById('overtime_hours');
+                if (hoursInput) {
+                    const workHours = computeRDOTHrsFromStartToEnd();
+                    hoursInput.value = workHours.toFixed(2);
+                    console.log('Updated RDOT hours to:', workHours.toFixed(2));
+                    
+                    // Update MAX OT AVAILABLE display
+                    document.getElementById('display_max_ot_hours').value = formatDuration(workHours);
+                    
+                    // Trigger input event to update any UI bindings
+                    try { 
+                        hoursInput.dispatchEvent(new Event('input', { bubbles: true })); 
+                        // Also update the time picker if it exists
+                        const maxOTHours = parseFloat(hoursInput.value) || 0;
+                        initializeTimePicker(maxOTHours);
+                    } catch(e) {
+                        console.warn('Error updating hours input:', e);
+                    }
+                }
+            }
+        });
+    }
+    
+    // Add event listeners for display Start OT and End OT fields as well
+    const displayStartOT = document.getElementById('display_start_ot');
+    const displayEndOT = document.getElementById('display_end_ot');
+    
+    if (displayStartOT) {
+        displayStartOT.addEventListener('change', function() {
+            const otTypeSelect = document.getElementById('ot_type');
+            if (otTypeSelect && otTypeSelect.value === 'Restday OT') {
+                // Sync with hidden field
+                document.getElementById('start_ot_time').value = this.value;
+                
+                // Recalculate hours
+                const hoursInput = document.getElementById('overtime_hours');
+                if (hoursInput) {
+                    const workHours = computeRDOTHrsFromStartToEnd();
+                    hoursInput.value = workHours.toFixed(2);
+                    console.log('Updated RDOT hours from display Start OT to:', workHours.toFixed(2));
+                    
+                    // Update MAX OT AVAILABLE display
+                    document.getElementById('display_max_ot_hours').value = formatDuration(workHours);
+                    
+                    try { 
+                        hoursInput.dispatchEvent(new Event('input', { bubbles: true })); 
+                        const maxOTHours = parseFloat(hoursInput.value) || 0;
+                        initializeTimePicker(maxOTHours);
+                    } catch(e) {}
+                }
+            }
+        });
+    }
+    
+    if (displayEndOT) {
+        displayEndOT.addEventListener('change', function() {
+            const otTypeSelect = document.getElementById('ot_type');
+            if (otTypeSelect && otTypeSelect.value === 'Restday OT') {
+                // Sync with hidden field
+                document.getElementById('end_ot_time').value = this.value;
+                
+                // Recalculate hours
+                const hoursInput = document.getElementById('overtime_hours');
+                if (hoursInput) {
+                    const workHours = computeRDOTHrsFromStartToEnd();
+                    hoursInput.value = workHours.toFixed(2);
+                    console.log('Updated RDOT hours from display End OT to:', workHours.toFixed(2));
+                    
+                    // Update MAX OT AVAILABLE display
+                    document.getElementById('display_max_ot_hours').value = formatDuration(workHours);
+                    
+                    try { 
+                        hoursInput.dispatchEvent(new Event('input', { bubbles: true })); 
+                        const maxOTHours = parseFloat(hoursInput.value) || 0;
+                        initializeTimePicker(maxOTHours);
+                    } catch(e) {}
+                }
+            }
+        });
     }
 });
 
@@ -2660,7 +2927,15 @@ function submitOvertimeForm(form) {
     formData.append('time_log_id', timeLogId);
     formData.append('ot_type', otType);
     formData.append('reason', reason);
-    formData.append('overtime_hours', overtimeHours);
+    
+    // For Restday OT, automatically subtract 1 hour for lunch break
+    let finalOvertimeHours = parseFloat(overtimeHours) || 0;
+    if (otType === 'Restday OT') {
+        finalOvertimeHours = Math.max(0, finalOvertimeHours - 1);
+        console.log('Restday OT detected - Original hours:', overtimeHours, 'After lunch deduction:', finalOvertimeHours);
+    }
+    
+    formData.append('overtime_hours', finalOvertimeHours.toFixed(2));
     formData.append('time_in', timeIn);
     formData.append('time_out', timeOut);
     formData.append('attachment', attachment);

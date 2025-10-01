@@ -5,136 +5,210 @@ require '../config/db.php';
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
-$month = date('n');
-$year = date('Y');
-$daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-
-$dateHeaders = [];
-for ($day = 1; $day <= $daysInMonth; $day++) {
-    $dateHeaders[] = date('Y-m-d', strtotime("$year-$month-$day"));
+// Validate date inputs
+function validateDate($date, $format = 'Y-m-d') {
+    $d = DateTime::createFromFormat($format, $date);
+    return $d && $d->format($format) === $date;
 }
 
-// Fetch employee list
-$stmt = $pdo->query("SELECT id, fname, lname FROM employees ORDER BY lname ASC");
+// Get date parameters from form or use current month as default
+$startDate = isset($_GET['start_date']) && !empty($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
+$endDate = isset($_GET['end_date']) && !empty($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'log_date';
+$order = isset($_GET['order']) ? $_GET['order'] : 'asc';
+
+// Validate dates
+if (!validateDate($startDate) || !validateDate($endDate)) {
+    die('Invalid date format. Please use YYYY-MM-DD format.');
+}
+
+// Ensure start date is not after end date
+if (strtotime($startDate) > strtotime($endDate)) {
+    die('Start date cannot be after end date.');
+}
+
+// Generate date headers for the specified range
+$dateHeaders = [];
+$start = new DateTime($startDate);
+$end = new DateTime($endDate);
+$interval = DateInterval::createFromDateString('1 day');
+$period = new DatePeriod($start, $interval, $end->modify('+1 day'));
+
+foreach ($period as $dt) {
+    $dateHeaders[] = $dt->format('Y-m-d');
+}
+
+// Fetch employee list with optional search filter
+$employeeQuery = "SELECT id, fname, lname, company FROM employees";
+$params = [];
+
+if (!empty($search)) {
+    $employeeQuery .= " WHERE (fname LIKE :search OR lname LIKE :search OR company LIKE :search)";
+    $params['search'] = "%$search%";
+}
+
+// Add sorting
+$validSorts = ['fname', 'lname', 'company', 'log_date'];
+$validOrders = ['asc', 'desc'];
+$sortColumn = in_array($sort, $validSorts) ? $sort : 'lname';
+$sortOrder = in_array($order, $validOrders) ? $order : 'asc';
+
+if ($sortColumn !== 'log_date') {
+    $employeeQuery .= " ORDER BY $sortColumn $sortOrder";
+} else {
+    $employeeQuery .= " ORDER BY lname ASC";
+}
+
+$stmt = $pdo->prepare($employeeQuery);
+$stmt->execute($params);
 $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch work schedule mappings
-$scheduleStmt = $pdo->query("
-    SELECT ews.employee_id, ews.effective_date, ws.time_out 
-    FROM employee_work_schedule ews
-    JOIN work_schedules ws ON ews.work_schedule_id = ws.id
-");
-$schedules = $scheduleStmt->fetchAll(PDO::FETCH_ASSOC);
+// No longer needed since we're using post_ot_requests table directly
 
-$workMap = [];
-foreach ($schedules as $sched) {
-    $workMap[$sched['employee_id']][$sched['effective_date']] = $sched['time_out'];
+// Fetch approved overtime requests from post2_overtime_requests table
+$otQuery = "
+    SELECT pot.employee_id, pot.ot_duration, pot.ot_type, tl.log_date, e.fname, e.lname
+    FROM post2_overtime_requests pot
+    LEFT JOIN time_logs tl ON pot.time_log_id = tl.id
+    LEFT JOIN employees e ON pot.employee_id = e.id
+    WHERE pot.status = 'approved' AND tl.log_date BETWEEN :start_date AND :end_date
+";
+
+$otParams = [
+    'start_date' => $startDate,
+    'end_date' => $endDate
+];
+
+// Add search filter for overtime records if specified
+if (!empty($search)) {
+    $otQuery .= " AND (e.fname LIKE :search OR e.lname LIKE :search OR e.company LIKE :search)";
+    $otParams['search'] = "%$search%";
 }
 
-// Fetch approved regular OT
-$otStmt = $pdo->prepare("
-    SELECT aos.employee_id, aos.ot_date, aos.extended_time_out 
-    FROM approved_overtime_schedule aos 
-    WHERE aos.ot_date BETWEEN :start AND :end
-");
-$otStmt->execute([
-    'start' => "$year-$month-01",
-    'end' => "$year-$month-$daysInMonth"
-]);
+// Add sorting for overtime records
+if ($sortColumn === 'log_date') {
+    $otQuery .= " ORDER BY tl.log_date $sortOrder";
+} else {
+    $otQuery .= " ORDER BY e.$sortColumn $sortOrder, tl.log_date ASC";
+}
+
+$otStmt = $pdo->prepare($otQuery);
+$otStmt->execute($otParams);
 $otRecords = $otStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch approved RDOT
-$rdotStmt = $pdo->prepare("
-    SELECT employee_id, rest_day_date, expected_time_in, expected_time_out
-    FROM rest_day_overtime_requests
-    WHERE status = 'Approved' AND rest_day_date BETWEEN :start AND :end
-");
-$rdotStmt->execute([
-    'start' => "$year-$month-01",
-    'end' => "$year-$month-$daysInMonth"
-]);
-$rdotRecords = $rdotStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Combine OT + RDOT into one map
+// Process approved overtime requests
 $otMap = [];
 
 foreach ($otRecords as $ot) {
     $emp_id = $ot['employee_id'];
-    $date = $ot['ot_date'];
-    $extended_out = $ot['extended_time_out'];
-
-    $effective_dates = array_keys($workMap[$emp_id] ?? []);
-    rsort($effective_dates);
-
-    $schedule_out = null;
-    foreach ($effective_dates as $eff_date) {
-        if ($eff_date <= $date) {
-            $schedule_out = $workMap[$emp_id][$eff_date];
-            break;
-        }
-    }
-
-    if ($schedule_out) {
-        $scheduled = new DateTime($schedule_out);
-        $extended = new DateTime($extended_out);
-        $interval = $scheduled->diff($extended);
-        $hours = $interval->h + ($interval->i / 60);
-
-        if ($hours > 0) {
+    $date = $ot['log_date'];
+    $hours = floatval($ot['ot_duration'] ?? 0);
+    $ot_type = $ot['ot_type'] ?? '';
+    
+    if ($hours > 0 && $date && $emp_id) {
+        // If there are multiple OT entries for the same employee on the same date, sum them up
+        if (isset($otMap[$emp_id][$date])) {
+            $otMap[$emp_id][$date]['hours'] += $hours;
+            // If any entry is RDOT, mark the whole day as RDOT
+            if ($ot_type === 'Restday OT') {
+                $otMap[$emp_id][$date]['is_rdot'] = true;
+            }
+        } else {
             $otMap[$emp_id][$date] = [
                 'hours' => $hours,
-                'is_rdot' => false
+                'is_rdot' => ($ot_type === 'Restday OT')
             ];
         }
     }
 }
 
-foreach ($rdotRecords as $rdot) {
-    $emp_id = $rdot['employee_id'];
-    $date = $rdot['rest_day_date'];
-    $time_in = $rdot['expected_time_in'];
-    $time_out = $rdot['expected_time_out'];
-
-    if ($time_in && $time_out) {
-        $start = new DateTime($time_in);
-        $end = new DateTime($time_out);
-        $interval = $start->diff($end);
-        $hours = $interval->h + ($interval->i / 60);
-
-        if ($hours > 0) {
-            $otMap[$emp_id][$date] = [
-                'hours' => $hours,
-                'is_rdot' => true
-            ];
+// Filter employees to only show those with overtime in the selected period
+if (!empty($search) || !empty($otMap)) {
+    $employeesWithOT = [];
+    foreach ($employees as $emp) {
+        // Include employee if they have OT records or if no search filter
+        if (isset($otMap[$emp['id']]) || empty($search)) {
+            $employeesWithOT[] = $emp;
         }
     }
+    $employees = $employeesWithOT;
 }
 
 // Create spreadsheet
 $spreadsheet = new Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
 
-// Headers
-$sheet->setCellValue('A1', 'Name');
+// Add title row with date range
+$titleText = 'OVERTIME REPORT - ' . date('F j, Y', strtotime($startDate)) . ' to ' . date('F j, Y', strtotime($endDate));
+$sheet->setCellValue('A1', $titleText);
+
+// Merge title across all columns (we'll adjust this after determining column count)
+$totalCols = count($dateHeaders) + 3; // Name + dates + 2 totals
+$lastCol = Coordinate::stringFromColumnIndex($totalCols);
+$sheet->mergeCells("A1:{$lastCol}1");
+
+// Style title row
+$sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+$sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+$sheet->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4472C4');
+$sheet->getStyle('A1')->getFont()->getColor()->setRGB('FFFFFF');
+$sheet->getRowDimension('1')->setRowHeight(25);
+
+// Headers (now on row 2)
+$sheet->setCellValue('A2', 'Name');
 $colIndex = 2;
 foreach ($dateHeaders as $date) {
-    $cell = Coordinate::stringFromColumnIndex($colIndex++) . '1';
-    $sheet->setCellValue($cell, date('M d', strtotime($date)));
+    $cell = Coordinate::stringFromColumnIndex($colIndex++) . '2';
+    $sheet->setCellValue($cell, date('M j', strtotime($date))); // Changed format to "M j" for better spacing
 }
-$sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex++) . '1', 'TOTAL OT HRS');
-$sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . '1', 'TOTAL RDOT HRS');
+$sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex++) . '2', 'TOTAL OT HRS');
+$sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . '2', 'TOTAL RDOT HRS');
 
-// Style headers
+// Style headers (row 2)
 $highestCol = Coordinate::stringFromColumnIndex($colIndex);
-$sheet->getStyle("A1:{$highestCol}1")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D9E1F2');
-$sheet->getStyle("A1:{$highestCol}1")->getFont()->setBold(true);
+$headerRange = "A2:{$highestCol}2";
 
-// Fill data rows
-$row = 2;
+// Header styling
+$sheet->getStyle($headerRange)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E7E6E6');
+$sheet->getStyle($headerRange)->getFont()->setBold(true)->setSize(11);
+$sheet->getStyle($headerRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+$sheet->getStyle($headerRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_MEDIUM);
+$sheet->getRowDimension('2')->setRowHeight(22);
+
+// Set proper column widths to prevent overflow
+$sheet->getColumnDimension('A')->setWidth(35); // Name column - much wider for full names
+
+// Date columns - adequate width for "MMM J" format (July 5, July 15, etc.)
+for ($i = 2; $i <= ($colIndex - 2); $i++) {
+    $colLetter = Coordinate::stringFromColumnIndex($i);
+    $sheet->getColumnDimension($colLetter)->setWidth(12);
+}
+
+// Total columns - wider for totals
+$totalOTCol = Coordinate::stringFromColumnIndex($colIndex - 1);
+$totalRDOTCol = Coordinate::stringFromColumnIndex($colIndex);
+$sheet->getColumnDimension($totalOTCol)->setWidth(18);
+$sheet->getColumnDimension($totalRDOTCol)->setWidth(18);
+
+// Set row height for better readability
+$sheet->getDefaultRowDimension()->setRowHeight(20);
+
+// Fill data rows (starting from row 3)
+$row = 3;
 foreach ($employees as $emp) {
-    $sheet->setCellValue("A{$row}", "{$emp['lname']}, {$emp['fname']}");
+    // Format name as "Last Name, First Name"
+    $fullName = trim($emp['lname'] . ', ' . $emp['fname']);
+    $sheet->setCellValue("A{$row}", $fullName);
+    
+    // Style name cell - make it bold
+    $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(11);
+    $sheet->getStyle("A{$row}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+    
     $totalOT = 0;
     $totalRDOT = 0;
     $col = 2;
@@ -144,28 +218,80 @@ foreach ($employees as $emp) {
 
         if (isset($otMap[$emp['id']][$date])) {
             $entry = $otMap[$emp['id']][$date];
-            $hours = number_format($entry['hours'], 2);
-            $label = $entry['is_rdot'] ? "RDOT: $hours" : $hours;
-            $sheet->setCellValue($cell, $label);
+            $hours = $entry['hours'];
+            
+            // Display just the hours (no decimal if whole number)
+            $displayHours = ($hours == floor($hours)) ? (int)$hours : number_format($hours, 2);
+            $sheet->setCellValue($cell, $displayHours);
 
+            // Apply styling for RDOT (Restday OT) or regular OT
             if ($entry['is_rdot']) {
+                $sheet->getStyle($cell)->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('D9D9D9'); // Dark gray background for RDOT
+                $sheet->getStyle($cell)->getFont()->setBold(true)->getColor()->setRGB('333333'); // Dark gray text
                 $totalRDOT += $entry['hours'];
             } else {
+                $sheet->getStyle($cell)->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('E6F3FF'); // Light blue background for regular OT
+                $sheet->getStyle($cell)->getFont()->setBold(true)->getColor()->setRGB('0066CC'); // Dark blue text
                 $totalOT += $entry['hours'];
             }
+            
+            // Center align and add border
+            $sheet->getStyle($cell)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle($cell)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         } else {
             $sheet->setCellValue($cell, '');
+            // Add alternating row color for empty cells
+            if ($row % 2 == 0) {
+                $sheet->getStyle($cell)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8F9FA');
+            }
         }
     }
 
-    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col++) . $row, number_format($totalOT, 2));
-    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col) . $row, number_format($totalRDOT, 2));
+    // Add totals with enhanced formatting
+    $totalOTCell = Coordinate::stringFromColumnIndex($col++) . $row;
+    $totalRDOTCell = Coordinate::stringFromColumnIndex($col) . $row;
+    
+    $sheet->setCellValue($totalOTCell, $totalOT > 0 ? number_format($totalOT, 2) : '');
+    $sheet->setCellValue($totalRDOTCell, $totalRDOT > 0 ? number_format($totalRDOT, 2) : '');
+    
+    // Style total cells with better appearance
+    $sheet->getStyle($totalOTCell)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+    $sheet->getStyle($totalRDOTCell)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+    
+    // Enhanced styling for totals
+    if ($totalOT > 0) {
+        $sheet->getStyle($totalOTCell)->getFont()->setBold(true)->setSize(11)->getColor()->setRGB('0066CC');
+        $sheet->getStyle($totalOTCell)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E6F3FF');
+    }
+    if ($totalRDOT > 0) {
+        $sheet->getStyle($totalRDOTCell)->getFont()->setBold(true)->setSize(11)->getColor()->setRGB('333333');
+        $sheet->getStyle($totalRDOTCell)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D9D9D9');
+    }
+    
+    // Add borders to total cells
+    $sheet->getStyle($totalOTCell)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_MEDIUM);
+    $sheet->getStyle($totalRDOTCell)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_MEDIUM);
+    
     $row++;
 }
 
+// Apply borders to all data cells (excluding title row)
+$lastRow = $row - 1;
+$dataRange = "A2:{$highestCol}{$lastRow}";
+$sheet->getStyle($dataRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+
+// Add a thicker border around the entire data area
+$sheet->getStyle("A1:{$highestCol}{$lastRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THICK);
+
 // Output
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-header('Content-Disposition: attachment;filename="Overtime_Report_' . date('F_Y') . '.xlsx"');
+// Create filename with actual date range
+$filename = 'Overtime_Report_' . date('M-d-Y', strtotime($startDate)) . '_to_' . date('M-d-Y', strtotime($endDate)) . '.xlsx';
+header('Content-Disposition: attachment;filename="' . $filename . '"');
 header('Cache-Control: max-age=0');
 
 $writer = new Xlsx($spreadsheet);
