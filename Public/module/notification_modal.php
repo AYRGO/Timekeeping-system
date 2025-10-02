@@ -26,7 +26,7 @@ function sendEmail($to, $name, $subject, $body) {
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = 'it.resourcestaff@gmail.com';
-        $mail->Password   = 'fqbr ocgu jcfh jwdy';  // App password from working configuration
+        $mail->Password   = 'plpe ycwj ztqb kxqk';  
         $mail->SMTPSecure = 'tls';
         $mail->Port       = 587;
 
@@ -141,8 +141,8 @@ foreach ($leave_results as $leave) {
         'source_table' => $leave['source_table']
     ];
 
-    // Only send email notifications for pending table entries that changed status
-    if (in_array($raw_status, ['approved', 'rejected', 'declined']) && !$leave['notified'] && $leave['source_table'] === 'pending') {
+    // Send email notifications for both pending and post table entries that haven't been notified
+    if (in_array($raw_status, ['approved', 'rejected', 'declined']) && !$leave['notified']) {
         $subject = "Leave Request {$status}";
         $body = "<p>Hi {$employee['fname']},<br>Your leave request from <strong>$range</strong> for <strong>{$leave['leave_type']}</strong> was <strong>$status</strong>.</p>";
 
@@ -150,10 +150,58 @@ foreach ($leave_results as $leave) {
             $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($leave['explanation'])) . "</p>";
         }
 
-        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
-            $update = $pdo->prepare("UPDATE leave_requests SET notified = 1 WHERE id = ?");
+        // Enhanced email body with complete information
+        $enhanced_body = "
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
+            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
+                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>Leave Request {$status}</h2>
+                
+                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
+                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
+                    <p><strong>Leave Type:</strong> " . ucfirst($leave['leave_type']) . "</p>
+                    <p><strong>Date Range:</strong> $range</p>
+                    <p><strong>Request ID:</strong> #{$leave['id']}</p>
+                    <p><strong>Submitted:</strong> " . date('F j, Y g:i A', strtotime($leave['created_at'])) . "</p>
+                </div>
+                
+                <div style='background: " . ($raw_status === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . ($raw_status === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
+                    <h3 style='color: " . ($raw_status === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . ($raw_status === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
+                </div>";
+        
+        if (!empty($leave['reason'])) {
+            $enhanced_body .= "
+                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($leave['reason'])) . "</p>
+                </div>";
+        }
+        
+        if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($leave['explanation'])) {
+            $enhanced_body .= "
+                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
+                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($leave['explanation'])) . "</p>
+                </div>";
+        }
+        
+        $enhanced_body .= "
+                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
+                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
+                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+                </div>
+            </div>
+        </div>";
+
+        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $enhanced_body)) {
+            // Update the correct table based on source
+            if ($leave['source_table'] === 'pending') {
+                $update = $pdo->prepare("UPDATE leave_requests SET notified = 1 WHERE id = ?");
+            } else {
+                $update = $pdo->prepare("UPDATE post_leave_requests SET notified = 1 WHERE id = ?");
+            }
             $result = $update->execute([$leave['id']]);
-            error_log("Leave notification update for ID {$leave['id']}: " . ($result ? 'Success' : 'Failed'));
+            error_log("Leave notification update for ID {$leave['id']} in {$leave['source_table']} table: " . ($result ? 'Success' : 'Failed'));
         }
     }
 }
@@ -209,16 +257,83 @@ foreach ($schedule_results as $sched) {
         'source_table' => $sched['source_table']
     ];
 
-    if (in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified'] && $sched['source_table'] === 'pending') {
+    // Send email notifications for both pending and post table entries that haven't been notified
+    if (in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified']) {
         $subject = "Schedule Change Request {$status}";
         $body = "<p>Hi {$employee['fname']},<br>Your schedule change request for <strong>$range</strong> was <strong>$status</strong>.</p>";
         if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
             $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($sched['explanation'])) . "</p>";
         }
-        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
-            $update = $pdo->prepare("UPDATE schedule_change_requests SET notified = 1 WHERE id = ?");
+        // Enhanced email body with complete schedule information
+        $current_schedule = ($sched['current_time_in'] && $sched['current_time_out']) ? 
+            date('g:i A', strtotime($sched['current_time_in'])) . ' - ' . date('g:i A', strtotime($sched['current_time_out'])) : 'Not specified';
+        $requested_schedule = ($sched['requested_time_in'] && $sched['requested_time_out']) ? 
+            date('g:i A', strtotime($sched['requested_time_in'])) . ' - ' . date('g:i A', strtotime($sched['requested_time_out'])) : 'Not specified';
+            
+        $enhanced_body = "
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
+            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
+                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>🕒 Schedule Change Request {$status}</h2>
+                
+                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
+                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
+                    <p><strong>Date Range:</strong> $range</p>
+                    <p><strong>Request ID:</strong> #{$sched['id']}</p>
+                    <p><strong>Submitted:</strong> " . date('F j, Y g:i A', strtotime($sched['created_at'])) . "</p>
+                </div>
+                
+                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #1e40af; margin: 0 0 15px 0;'>📅 Schedule Details</h3>
+                    <div style='display: flex; justify-content: space-between; margin-bottom: 10px;'>
+                        <div style='flex: 1; margin-right: 10px;'>
+                            <strong>Current Schedule:</strong><br>
+                            <span style='background: #fee2e2; padding: 5px 10px; border-radius: 5px; color: #991b1b;'>$current_schedule</span>
+                        </div>
+                        <div style='flex: 1; margin-left: 10px;'>
+                            <strong>Requested Schedule:</strong><br>
+                            <span style='background: #dcfce7; padding: 5px 10px; border-radius: 5px; color: #166534;'>$requested_schedule</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style='background: " . (strtolower($sched['status']) === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . (strtolower($sched['status']) === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
+                    <h3 style='color: " . (strtolower($sched['status']) === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . (strtolower($sched['status']) === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
+                </div>";
+        
+        if (!empty($sched['reason'])) {
+            $enhanced_body .= "
+                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($sched['reason'])) . "</p>
+                </div>";
+        }
+        
+        if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
+            $enhanced_body .= "
+                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
+                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($sched['explanation'])) . "</p>
+                </div>";
+        }
+        
+        $enhanced_body .= "
+                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
+                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
+                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+                </div>
+            </div>
+        </div>";
+
+        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $enhanced_body)) {
+            // Update the correct table based on source
+            if ($sched['source_table'] === 'pending') {
+                $update = $pdo->prepare("UPDATE schedule_change_requests SET notified = 1 WHERE id = ?");
+            } else {
+                $update = $pdo->prepare("UPDATE post_schedule_change_requests SET notified = 1 WHERE id = ?");
+            }
             $result = $update->execute([$sched['id']]);
-            error_log("Schedule change notification update for ID {$sched['id']}: " . ($result ? 'Success' : 'Failed'));
+            error_log("Schedule change notification update for ID {$sched['id']} in {$sched['source_table']} table: " . ($result ? 'Success' : 'Failed'));
         }
     }
 }
@@ -270,7 +385,8 @@ foreach ($adjust_results as $adjustment) {
         'source_table' => $adjustment['source_table']
     ];
 
-    if (in_array($raw_status, ['approved', 'declined', 'rejected']) && !$adjustment['notified'] && $adjustment['source_table'] === 'pending') {
+    // Send email notifications for both pending and post table entries that haven't been notified
+    if (in_array($raw_status, ['approved', 'declined', 'rejected']) && !$adjustment['notified']) {
         $subject = "Time Adjustment Request {$status}";
         $body = "<p>Hi {$employee['fname']},<br>Your time adjustment request for <strong>$date</strong> was <strong>$status</strong>.</p>";
 
@@ -278,10 +394,78 @@ foreach ($adjust_results as $adjustment) {
             $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>";
         }
 
-        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
-            $update = $pdo->prepare("UPDATE time_adjustment_requests SET notified = 1 WHERE id = ?");
+        // Enhanced email body with complete time adjustment information
+        $current_time_in = $adjustment['current_time_in'] ? date('g:i A', strtotime($adjustment['current_time_in'])) : 'Not recorded';
+        $current_time_out = $adjustment['current_time_out'] ? date('g:i A', strtotime($adjustment['current_time_out'])) : 'Not recorded';
+        $requested_time_in = $adjustment['requested_time_in'] ? date('g:i A', strtotime($adjustment['requested_time_in'])) : 'Not specified';
+        $requested_time_out = $adjustment['requested_time_out'] ? date('g:i A', strtotime($adjustment['requested_time_out'])) : 'Not specified';
+        
+        $enhanced_body = "
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
+            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
+                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>⏰ Time Adjustment Request {$status}</h2>
+                
+                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
+                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
+                    <p><strong>Date:</strong> " . date('F j, Y', strtotime($adjustment['log_date'])) . "</p>
+                    <p><strong>Request ID:</strong> #{$adjustment['id']}</p>
+                    <p><strong>Submitted:</strong> " . date('F j, Y g:i A', strtotime($adjustment['created_at'])) . "</p>
+                </div>
+                
+                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #1e40af; margin: 0 0 15px 0;'>🕐 Time Details</h3>
+                    <div style='margin-bottom: 15px;'>
+                        <strong>Current Times:</strong><br>
+                        <div style='background: #fee2e2; padding: 10px; border-radius: 5px; margin: 5px 0;'>
+                            <span style='color: #991b1b;'>Time In: $current_time_in | Time Out: $current_time_out</span>
+                        </div>
+                    </div>
+                    <div>
+                        <strong>Requested Times:</strong><br>
+                        <div style='background: #dcfce7; padding: 10px; border-radius: 5px; margin: 5px 0;'>
+                            <span style='color: #166534;'>Time In: $requested_time_in | Time Out: $requested_time_out</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style='background: " . ($raw_status === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . ($raw_status === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
+                    <h3 style='color: " . ($raw_status === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . ($raw_status === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
+                </div>";
+        
+        if (!empty($adjustment['reason'])) {
+            $enhanced_body .= "
+                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>
+                </div>";
+        }
+        
+        if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($adjustment['reason'])) {
+            $enhanced_body .= "
+                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
+                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>
+                </div>";
+        }
+        
+        $enhanced_body .= "
+                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
+                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
+                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+                </div>
+            </div>
+        </div>";
+
+        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $enhanced_body)) {
+            // Update the correct table based on source
+            if ($adjustment['source_table'] === 'pending') {
+                $update = $pdo->prepare("UPDATE time_adjustment_requests SET notified = 1 WHERE id = ?");
+            } else {
+                $update = $pdo->prepare("UPDATE post_time_adjustment_requests SET notified = 1 WHERE id = ?");
+            }
             $result = $update->execute([$adjustment['id']]);
-            error_log("Time adjustment notification update for ID {$adjustment['id']}: " . ($result ? 'Success' : 'Failed'));
+            error_log("Time adjustment notification update for ID {$adjustment['id']} in {$adjustment['source_table']} table: " . ($result ? 'Success' : 'Failed'));
         }
     }
 }
@@ -298,15 +482,19 @@ $pending_ot_stmt = $pdo->prepare("
 $pending_ot_stmt->execute([$current_user_id]);
 $pending_ot_results = $pending_ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Then get processed overtime requests
+// Then get processed overtime requests from both post tables
 $ot_stmt = $pdo->prepare("
-    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified
+    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, 'post_ot_requests' as source_table
     FROM post_ot_requests
     WHERE employee_id = ?
+    UNION ALL
+    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, 'post2_overtime_requests' as source_table
+    FROM post2_overtime_requests
+    WHERE employee_id = ?
     ORDER BY COALESCE(approved_at, created_at) DESC
-    LIMIT 10
+    LIMIT 20
 ");
-$ot_stmt->execute([$current_user_id]);
+$ot_stmt->execute([$current_user_id, $current_user_id]);
 $ot_results = $ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Process pending overtime requests
@@ -338,6 +526,75 @@ foreach ($pending_ot_results as $ot) {
         'table_name' => 'overtime_requests',
         'source_table' => 'pending'
     ];
+
+    // Send email notifications for overtime requests that haven't been notified
+    // Note: overtime_requests table doesn't have a 'notified' column, so we'll check if it exists first
+    if (in_array($raw_status, ['approved', 'declined', 'rejected'])) {
+        $subject = "Overtime Request {$status}";
+        $date_str = date('F j, Y', strtotime($ot['date']));
+        $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$date_str}</strong> ({$duration} hours) was <strong>{$status}</strong>.</p>";
+
+        if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
+            $body .= "<p><strong>Reason:</strong> " . nl2br(htmlspecialchars($ot['reason'])) . "</p>";
+        }
+
+        // Enhanced email body with complete overtime information
+        $start_time = $ot['start_time'] ? date('g:i A', strtotime($ot['start_time'])) : 'Not specified';
+        $end_time = $ot['end_time'] ? date('g:i A', strtotime($ot['end_time'])) : 'Not specified';
+        
+        $enhanced_body = "
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
+            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
+                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>⏰ Overtime Request {$status}</h2>
+                
+                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
+                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
+                    <p><strong>Date:</strong> {$date_str}</p>
+                    <p><strong>Overtime Type:</strong> {$ot_type}</p>
+                    <p><strong>Duration:</strong> {$duration} hours</p>
+                    <p><strong>Request ID:</strong> #{$ot['id']}</p>
+                    <p><strong>Submitted:</strong> " . date('F j, Y g:i A', strtotime($ot['created_at'])) . "</p>
+                </div>
+                
+                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>🕐 Time Schedule</h3>
+                    <p><strong>Start Time:</strong> $start_time</p>
+                    <p><strong>End Time:</strong> $end_time</p>
+                </div>
+                
+                <div style='background: " . ($raw_status === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . ($raw_status === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
+                    <h3 style='color: " . ($raw_status === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . ($raw_status === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
+                </div>";
+        
+        if (!empty($ot['reason'])) {
+            $enhanced_body .= "
+                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
+                </div>";
+        }
+        
+        if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
+            $enhanced_body .= "
+                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
+                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
+                </div>";
+        }
+        
+        $enhanced_body .= "
+                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
+                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
+                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+                </div>
+            </div>
+        </div>";
+
+        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $enhanced_body)) {
+            error_log("Overtime notification sent for ID {$ot['id']} - Status: {$status}");
+        }
+    }
 }
 
 // Process post overtime requests
@@ -409,9 +666,92 @@ foreach ($ot_results as $ot) {
         'ot_duration' => $ot['ot_duration'],
         'ot_type' => $ot_type,
         'request_id' => $ot['id'],
-        'table_name' => 'post_ot_requests',
+        'table_name' => $ot['source_table'],
         'source_table' => 'post'
     ];
+
+    // Send email notifications for post overtime requests that haven't been notified
+    if (in_array($raw_status, ['approved', 'declined', 'rejected']) && !$ot['notified']) {
+        $subject = "Overtime Request {$status}";
+        $date_str = $log_date ? date('F j, Y', strtotime($log_date)) : 'Unknown Date';
+        $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$ot_type}</strong> on <strong>{$date_str}</strong> ({$duration} hours) was <strong>{$status}</strong>.</p>";
+
+        if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
+            $body .= "<p><strong>Reason:</strong> " . nl2br(htmlspecialchars($ot['reason'])) . "</p>";
+        }
+
+        // Enhanced email body with complete overtime information
+        $actual_time_in_display = $actual_time_in ? date('g:i A', strtotime($actual_time_in)) : 'Not recorded';
+        $actual_time_out_display = $actual_time_out ? date('g:i A', strtotime($actual_time_out)) : 'Not recorded';
+        $start_ot_display = $start_ot ? date('g:i A', strtotime($start_ot)) : 'Not calculated';
+        $end_ot_display = $end_ot ? date('g:i A', strtotime($end_ot)) : 'Not calculated';
+        
+        $enhanced_body = "
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
+            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
+                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>⏰ Overtime Request {$status}</h2>
+                
+                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
+                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
+                    <p><strong>Date:</strong> {$date_str}</p>
+                    <p><strong>Overtime Type:</strong> {$ot_type}</p>
+                    <p><strong>Duration:</strong> {$duration} hours</p>
+                    <p><strong>Request ID:</strong> #{$ot['id']}</p>
+                    <p><strong>Processed:</strong> " . date('F j, Y g:i A', strtotime($created_at)) . "</p>
+                </div>
+                
+                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #1e40af; margin: 0 0 15px 0;'>🕐 Time Details</h3>
+                    <div style='margin-bottom: 10px;'>
+                        <strong>Work Schedule:</strong><br>
+                        <span style='background: #e0e7ff; padding: 5px 10px; border-radius: 5px; color: #3730a3;'>In: $actual_time_in_display | Out: $actual_time_out_display</span>
+                    </div>
+                    <div>
+                        <strong>Overtime Period:</strong><br>
+                        <span style='background: #fbbf24; padding: 5px 10px; border-radius: 5px; color: #92400e;'>Start: $start_ot_display | End: $end_ot_display</span>
+                    </div>
+                </div>
+                
+                <div style='background: " . ($raw_status === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . ($raw_status === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
+                    <h3 style='color: " . ($raw_status === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . ($raw_status === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
+                </div>";
+        
+        if (!empty($ot['reason'])) {
+            $enhanced_body .= "
+                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
+                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
+                </div>";
+        }
+        
+        if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
+            $enhanced_body .= "
+                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
+                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
+                </div>";
+        }
+        
+        $enhanced_body .= "
+                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
+                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
+                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+                </div>
+            </div>
+        </div>";
+
+        if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $enhanced_body)) {
+            // Update the correct table based on source_table
+            if ($ot['source_table'] === 'post_ot_requests') {
+                $update = $pdo->prepare("UPDATE post_ot_requests SET notified = 1 WHERE id = ?");
+            } else {
+                $update = $pdo->prepare("UPDATE post2_overtime_requests SET notified = 1 WHERE id = ?");
+            }
+            $result = $update->execute([$ot['id']]);
+            error_log("Overtime notification update for ID {$ot['id']} in {$ot['source_table']} table: " . ($result ? 'Success' : 'Failed'));
+        }
+    }
 }
 
 
