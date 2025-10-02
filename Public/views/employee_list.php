@@ -177,11 +177,6 @@ function sort_link($column, $label) {
                                     <i class="fas fa-plus mr-2"></i>
                                     Add Employee
                                 </a>
-                                <button onclick="document.getElementById('dateModal').classList.remove('hidden')" 
-                                        class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition-all duration-200 shadow-sm hover:shadow-md">
-                                    <i class="fas fa-file-export mr-2"></i>
-                                    Attendance Report
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -434,53 +429,6 @@ function sort_link($column, $label) {
 
                 </div>
             </main>
-        </div>
-    </div>
-
-    <!-- Date Modal -->
-    <div id="dateModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden z-50">
-        <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-md mx-4">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-semibold text-gray-800">
-                    <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>
-                    Generate Attendance Report
-                </h2>
-                <button onclick="document.getElementById('dateModal').classList.add('hidden')" 
-                        class="text-gray-400 hover:text-gray-600 transition-colors">
-                    <i class="fas fa-times text-lg"></i>
-                </button>
-            </div>
-            
-            <form action="../controller/generate_attendance_report.php" method="get" class="space-y-4">
-                <div>
-                    <label for="start_date" class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-calendar-plus text-green-500 mr-1"></i>
-                        Start Date
-                    </label>
-                    <input type="date" name="start_date" id="start_date" required 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-                </div>
-                <div>
-                    <label for="end_date" class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-calendar-minus text-red-500 mr-1"></i>
-                        End Date
-                    </label>
-                    <input type="date" name="end_date" id="end_date" required 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-                </div>
-                <div class="flex justify-end gap-3 pt-6">
-                    <button type="button" onclick="document.getElementById('dateModal').classList.add('hidden')" 
-                            class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-                        <i class="fas fa-times mr-1"></i>
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                        <i class="fas fa-download mr-1"></i>
-                        Generate Report
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 

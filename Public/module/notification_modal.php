@@ -15,36 +15,31 @@ $notifications = [];
 function sendEmail($to, $name, $subject, $body) {
     $mail = new PHPMailer(true);
     try {
-        // Validate required SMTP configuration
-        if (!EnvLoader::get('SMTP_HOST') || !EnvLoader::get('SMTP_USER') || !EnvLoader::get('SMTP_PASS')) {
-            error_log("SMTP configuration missing in environment variables");
-            return false;
-        }
+        // Enable debug logging
+        $mail->SMTPDebug = 2;
+        $mail->Debugoutput = function($str, $level) {
+            error_log("PHPMailer debug: [$level] $str");
+        };
         
         $mail->CharSet    = 'UTF-8';
         $mail->isSMTP();
-        $mail->Host       = EnvLoader::get('SMTP_HOST');
+        $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = EnvLoader::get('SMTP_USER');
+        $mail->Username   = 'it.resourcestaff@gmail.com';
+        $mail->Password   = 'fqbr ocgu jcfh jwdy';  // App password from working configuration
+        $mail->SMTPSecure = 'tls';
+        $mail->Port       = 587;
 
-        // ✅ Use Gmail App Password here (NOT your real Gmail password)
-        $mail->Password   = EnvLoader::get('SMTP_PASS');
-
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = EnvLoader::get('SMTP_PORT') ?: 587;
-
+        // Ensure proper SSL verification
         $mail->SMTPOptions = [
             'ssl' => [
-                'verify_peer'       => false,
-                'verify_peer_name'  => false,
-                'allow_self_signed' => true,
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+                'allow_self_signed' => false
             ]
         ];
 
-        $mail->setFrom(
-            EnvLoader::get('SMTP_FROM_EMAIL') ?: EnvLoader::get('SMTP_USER'), 
-            EnvLoader::get('SMTP_FROM_NAME') ?: 'System Notification'
-        );
+        $mail->setFrom('it.resourcestaff@gmail.com', 'MailBot - IT Support Specialist');
         $mail->addAddress($to, $name);
 
         $mail->isHTML(true);
@@ -54,7 +49,9 @@ function sendEmail($to, $name, $subject, $body) {
         $mail->send();
         return true;
     } catch (Exception $e) {
-        error_log("Email could not be sent. PHPMailer Error: {$mail->ErrorInfo}");
+        error_log("Failed to send email to {$to} - Error: {$mail->ErrorInfo}");
+        error_log("Message that failed: {$subject}");
+        error_log("Error details: " . $e->getMessage());
         return false;
     }
 }
@@ -155,7 +152,8 @@ foreach ($leave_results as $leave) {
 
         if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
             $update = $pdo->prepare("UPDATE leave_requests SET notified = 1 WHERE id = ?");
-            $update->execute([$leave['id']]);
+            $result = $update->execute([$leave['id']]);
+            error_log("Leave notification update for ID {$leave['id']}: " . ($result ? 'Success' : 'Failed'));
         }
     }
 }
@@ -219,7 +217,8 @@ foreach ($schedule_results as $sched) {
         }
         if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
             $update = $pdo->prepare("UPDATE schedule_change_requests SET notified = 1 WHERE id = ?");
-            $update->execute([$sched['id']]);
+            $result = $update->execute([$sched['id']]);
+            error_log("Schedule change notification update for ID {$sched['id']}: " . ($result ? 'Success' : 'Failed'));
         }
     }
 }
@@ -281,7 +280,8 @@ foreach ($adjust_results as $adjustment) {
 
         if (sendEmail($employee['personal_email'], "{$employee['fname']} {$employee['lname']}", $subject, $body)) {
             $update = $pdo->prepare("UPDATE time_adjustment_requests SET notified = 1 WHERE id = ?");
-            $update->execute([$adjustment['id']]);
+            $result = $update->execute([$adjustment['id']]);
+            error_log("Time adjustment notification update for ID {$adjustment['id']}: " . ($result ? 'Success' : 'Failed'));
         }
     }
 }

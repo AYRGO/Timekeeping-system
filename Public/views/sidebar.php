@@ -150,13 +150,13 @@ try {
             </div>
 
             <!-- Reports Section -->
-            <div class="space-y-2" x-data="{ reportsOpen: false }">
+            <div class="space-y-2" x-data="{ reportsOpen: <?= in_array(basename($_SERVER['PHP_SELF']), ['attendance_report.php', 'overtime_report.php', 'payroll_report.php', 'leave_report.php']) ? 'true' : 'false' ?> }">
                 <h3 class="text-xs uppercase text-gray-400 tracking-wider font-semibold px-3 mb-3">Reports</h3>
 
                 <!-- Reports Parent Menu -->
                 <div class="relative">
                     <button @click="reportsOpen = !reportsOpen" 
-                           class="group flex items-center justify-between w-full px-3 py-3 rounded-xl transition-all duration-200 hover:bg-gray-800 hover:shadow-md">
+                           class="group flex items-center justify-between w-full px-3 py-3 rounded-xl transition-all duration-200 hover:bg-gray-800 hover:shadow-md <?= in_array(basename($_SERVER['PHP_SELF']), ['attendance_report.php', 'overtime_report.php', 'payroll_report.php', 'leave_report.php']) ? 'bg-white bg-opacity-5 border border-gray-700' : '' ?>">
                         <div class="flex items-center">
                             <div class="w-8 h-8 rounded-lg bg-green-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
                                 <i class="fas fa-chart-bar text-green-400 text-sm"></i>

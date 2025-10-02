@@ -14,24 +14,24 @@ $pageTitle = $isHistoryView ? 'Leave Requests History' : 'Leave Requests';
 // Fetch leave requests with employee names and attachments 
 
 if ($isHistoryView) {
-    // Fetch all from both tables - use processed_at for sorting history
+    // Fetch all from both tables - use created_at for sorting history
     $sql = "
-        SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, processed_at, explanation, employee_id, fname, lname
+        SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, explanation, employee_id, fname, lname
         FROM (
             SELECT lr.id, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.attachment_lr,
-                   lr.created_at, lr.created_at AS processed_at, '' AS explanation, lr.employee_id,
+                   lr.created_at, '' AS explanation, lr.employee_id,
                    e.fname, e.lname
             FROM leave_requests lr
             JOIN employees e ON lr.employee_id = e.id
             WHERE lr.status != 'pending'
             UNION ALL
             SELECT plr.id, plr.leave_type, plr.start_date, plr.end_date, plr.reason, plr.status, plr.attachment_lr,
-                   plr.created_at, COALESCE(plr.processed_at, plr.created_at) AS processed_at, plr.explanation, plr.employee_id,
+                   plr.created_at, plr.explanation, plr.employee_id,
                    e.fname, e.lname
             FROM post_leave_requests plr
             JOIN employees e ON plr.employee_id = e.id
         ) AS all_requests
-        ORDER BY processed_at DESC
+        ORDER BY created_at DESC
     ";
 } else {
     // Fetch from leave_requests table (current requests) - only pending
@@ -197,11 +197,11 @@ function getLeaveTypeBadge($type) {
                 let leaveRequests = <?php echo json_encode($leave_requests); ?>;
                 const isHistoryView = <?php echo json_encode($isHistoryView); ?>;
                 
-                // Sort by processed_at descending (newest first) for history view, or by ID for current view
+                // Sort by created_at descending (newest first) for history view, or by ID for current view
                 if (isHistoryView) {
                     leaveRequests = leaveRequests.sort((a, b) => {
-                        const dateA = new Date(a.processed_at || a.created_at || 0);
-                        const dateB = new Date(b.processed_at || b.created_at || 0);
+                        const dateA = new Date(a.created_at || 0);
+                        const dateB = new Date(b.created_at || 0);
                         return dateB - dateA;
                     });
                 } else {
@@ -395,17 +395,11 @@ function getLeaveTypeBadge($type) {
                     return requests.sort((a, b) => {
                         switch(sortBy) {
                             case 'created_at_desc':
+                            case 'processed_at_desc':
                                 return new Date(b.created_at) - new Date(a.created_at);
                             case 'created_at_asc':
-                                return new Date(a.created_at) - new Date(b.created_at);
-                            case 'processed_at_desc':
-                                const dateB = new Date(b.processed_at || b.created_at || 0);
-                                const dateA = new Date(a.processed_at || a.created_at || 0);
-                                return dateB - dateA;
                             case 'processed_at_asc':
-                                const dateA2 = new Date(a.processed_at || a.created_at || 0);
-                                const dateB2 = new Date(b.processed_at || b.created_at || 0);
-                                return dateA2 - dateB2;
+                                return new Date(a.created_at) - new Date(b.created_at);
                             case 'employee_asc':
                                 return (a.fname + ' ' + a.lname).localeCompare(b.fname + ' ' + b.lname);
                             case 'employee_desc':
@@ -452,7 +446,7 @@ function getLeaveTypeBadge($type) {
                 });
 
                 // Initial render with default sorting
-                const defaultSort = isHistoryView ? 'processed_at_desc' : 'created_at_desc';
+                const defaultSort = 'created_at_desc';
                 document.getElementById('sortSelect').value = defaultSort;
                 filteredRequests = sortRequests(filteredRequests, defaultSort);
                 updateTable();
