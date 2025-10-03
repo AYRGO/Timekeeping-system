@@ -372,25 +372,22 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 }
                             }
                             
-                            if ($timeOut && $timeOut !== 'INC' && !$leaveType && !$isAutoIncomplete) {
-                                $actualTimeOut = date('H:i:s', strtotime($timeOut));
-                                $scheduledTimeOut = $schedule_out_24h;
-                                $earliestAllowedOut = date('H:i:s', strtotime($scheduledTimeOut . ' -15 minutes'));
-                                
-                                // Calculate undertime minutes (if left before earliest allowed time)
-                                if (!$isCrossMidnight && $actualTimeOut < $earliestAllowedOut) {
-                                    $undertimeSeconds = strtotime($earliestAllowedOut) - strtotime($actualTimeOut);
-                                    $undertimeMinutes = round($undertimeSeconds / 60);
-                                }
-                            }
-                            
-                            // Updated status calculation
+            if ($timeOut && $timeOut !== 'INC' && !$leaveType && !$isAutoIncomplete) {
+                $actualTimeOut = date('H:i:s', strtotime($timeOut));
+                $scheduledTimeOut = $schedule_out_24h;
+                
+                // Calculate undertime minutes (if left before scheduled time out)
+                if (!$isCrossMidnight && $actualTimeOut < $scheduledTimeOut) {
+                    $undertimeSeconds = strtotime($scheduledTimeOut) - strtotime($actualTimeOut);
+                    $undertimeMinutes = round($undertimeSeconds / 60);
+                }
+            }                            // Updated status calculation
                             $status = '-';
                             $badgeClass = 'bg-gray-100 text-gray-800';
 
                             if ($leaveType) {
                                 // Employee is on approved leave
-                                $status = 'Leave';
+                                $status = 'On Leave';
                                 $badgeClass = 'bg-purple-100 text-purple-800';
                             } elseif ($isAutoIncomplete || !$timeOut || $timeOut === 'INC') {
                                 // Missing time out or auto-marked incomplete
@@ -409,20 +406,17 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 // Check if late (arrived after grace period)
                                 $isLate = $actualTimeIn > $graceTimeIn;
                                 
-                                // Check if undertime (left early - more than 15 minutes before scheduled out)
-                                $earliestAllowedOut = date('H:i:s', strtotime($scheduledTimeOut . ' -15 minutes'));
-                                $isUndertime = false;
-                                
-                                if ($isCrossMidnight) {
-                                    // For cross-midnight shifts, we need to handle the time comparison differently
-                                    // The scheduled out time might be on the next day
-                                    $isUndertime = false; // For cross-midnight, consider complete unless obviously early
-                                } else {
-                                    // Regular shift - check if left significantly early
-                                    $isUndertime = $actualTimeOut < $earliestAllowedOut;
-                                }
-                                
-                                // Determine final status - prioritize Late over Undertime
+                // Check if undertime (left early before scheduled time out)
+                $isUndertime = false;
+                
+                if ($isCrossMidnight) {
+                    // For cross-midnight shifts, we need to handle the time comparison differently
+                    // The scheduled out time might be on the next day
+                    $isUndertime = false; // For cross-midnight, consider complete unless obviously early
+                } else {
+                    // Regular shift - check if left before scheduled time out
+                    $isUndertime = $actualTimeOut < $scheduledTimeOut;
+                }                                // Determine final status - prioritize Late over Undertime
                                 if ($isLate) {
                                     $status = $lateMinutes > 0 ? "Late ({$lateMinutes}mins)" : 'Late';
                                     $badgeClass = 'bg-orange-100 text-orange-800';

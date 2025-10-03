@@ -988,15 +988,103 @@ function editRequestFromModal(requestType, requestId, tableName, sourceTable) {
 }
 
 function cancelRequestFromModal(requestId, tableName, sourceTable) {
-    if (!confirm('Are you sure you want to cancel this request?\n\nThis action cannot be undone and will permanently remove the request from the system.')) {
-        return;
+    // Check if this is a leave request
+    if (tableName === 'leave_requests' || tableName.includes('leave')) {
+        if (!confirm('Are you sure you want to cancel this leave request?\n\nThis action cannot be undone.')) {
+            return;
+        }
+        
+        // Handle leave request cancellation specially
+        cancelLeaveRequest(requestId, tableName, sourceTable);
+    } else {
+        if (!confirm('Are you sure you want to cancel this request?\n\nThis action cannot be undone and will permanently remove the request from the system.')) {
+            return;
+        }
+        
+        // Call the existing unsubmitRequest function with sourceTable for other request types
+        unsubmitRequest(requestId, tableName, sourceTable);
     }
-    
-    // Call the existing unsubmitRequest function with sourceTable
-    unsubmitRequest(requestId, tableName, sourceTable);
     
     // Close the modal after initiating cancel (it will only reload if successful)
     closeActivityModal();
+}
+
+function cancelLeaveRequest(requestId, tableName, sourceTable) {
+    // Show loading state with better visual feedback
+    const buttons = document.querySelectorAll(`button[onclick*="${requestId}"][onclick*="${tableName}"]`);
+    buttons.forEach(button => {
+        if (button.textContent.trim().includes('Cancel') || button.textContent.trim().includes('Unsubmit')) {
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Cancelling...';
+            button.classList.add('opacity-75', 'cursor-not-allowed');
+        }
+    });
+    
+    console.log(`Cancelling leave request - ID: ${requestId}, Table: ${tableName}, Source: ${sourceTable}`);
+    
+    // Make AJAX request to cancel leave request
+    fetch('../controller/cancel_leave_request.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            id: requestId,
+            table: tableName,
+            source_table: sourceTable
+        })
+    })
+    .then(response => {
+        // Check if response is ok first
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Cancel leave request response:', data); // Debug logging
+        
+        if (data.success === true) {
+            // Show success message
+            alert('✅ Leave request successfully cancelled!');
+            
+            // Add a fade out effect before reload
+            buttons.forEach(button => {
+                button.style.opacity = '0.5';
+            });
+            
+            // Force page reload to reflect database changes
+            setTimeout(() => {
+                window.location.reload(true); // Force reload from server
+            }, 500);
+        } else {
+            // Show error message and restore button - DO NOT RELOAD
+            console.error('Cancel failed:', data);
+            alert('❌ Error: ' + (data.message || 'Failed to cancel leave request'));
+            
+            // Restore button state
+            buttons.forEach(button => {
+                if (button.textContent.includes('Cancelling')) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-times mr-1"></i>Cancel Request';
+                    button.classList.remove('opacity-75', 'cursor-not-allowed');
+                }
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Network/Parse Error:', error);
+        alert('🔥 Network error occurred. Please check your connection and try again.');
+        
+        // Restore button state
+        buttons.forEach(button => {
+            if (button.textContent.includes('Cancelling')) {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-times mr-1"></i>Cancel Request';
+                button.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        });
+    });
 }
 
 function closeActivityModal() {

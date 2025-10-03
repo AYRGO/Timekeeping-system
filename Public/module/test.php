@@ -542,6 +542,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
+        /* Date input specific styling */
+        input[type="date"].form-control {
+            padding: 16px 20px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        input[type="date"].form-control::-webkit-calendar-picker-indicator {
+            background: transparent;
+            bottom: 0;
+            color: transparent;
+            cursor: pointer;
+            height: auto;
+            left: 0;
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: auto;
+        }
+        
+        input[type="date"].form-control::-webkit-inner-spin-button,
+        input[type="date"].form-control::-webkit-clear-button {
+            display: none;
+        }
+        
+        /* Custom calendar icon */
+        input[type="date"].form-control::before {
+            content: '📅';
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+            pointer-events: none;
+        }
+        
         .textarea { 
             min-height: 150px; 
             resize: vertical;
@@ -780,38 +819,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
                     <div class="step-description">Choose the date for which you want to request a time adjustment</div>
                     
                     <div class="form-group">
-                        <label class="form-label">Filter by Month</label>
-                        <select id="monthFilter" class="form-control" style="margin-bottom: 20px;">
-                            <option value="">-- All Months --</option>
-                            <?php
-                            $months = [];
-                            foreach ($logs as $log) {
-                                $month = (new DateTime($log['log_date']))->format('Y-m');
-                                $months[$month] = (new DateTime($log['log_date']))->format('F Y');
-                            }
-                            foreach (array_unique($months) as $monthVal => $monthLabel): ?>
-                                <option value="<?= $monthVal ?>"><?= $monthLabel ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group">
                         <label class="form-label required">Select Date</label>
-                        <select name="log_date" required class="form-control" id="logDateSelect">
-                            <option value="">-- Choose a date --</option>
-                            <?php foreach (array_reverse($logs) as $log): ?>
-                                <?php
-                                $d = new DateTime($log['log_date']);
-                                $in = $log['time_in'] ? (new DateTime($log['time_in']))->format('g:i A') : 'No IN';
-                                $out = $log['time_out'] ? (new DateTime($log['time_out']))->format('g:i A') : 'No OUT';
-                                $selected = ($_SESSION['adjustment_form']['log_date'] == $log['log_date']) ? 'selected' : '';
-                                $month = $d->format('Y-m');
-                                ?>
-                                <option value="<?= $log['log_date'] ?>" data-month="<?= $month ?>" <?= $selected ?>>
-                                    <?= $d->format('F j, Y (l)') ?> - In: <?= $in ?> | Out: <?= $out ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <input type="date" name="log_date" required class="form-control" id="logDateInput" 
+                               value="<?= $_SESSION['adjustment_form']['log_date'] ?>"
+                               min="2025-07-01" max="<?= date('Y-m-d') ?>">
+                        <div id="dateInfo" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea; display: none;">
+                            <div style="font-weight: 600; color: #333; margin-bottom: 8px;">Current Log Information:</div>
+                            <div id="timeInfo" style="color: #666;"></div>
+                        </div>
+                        <div id="noLogWarning" style="margin-top: 15px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; color: #856404; display: none;">
+                            ⚠️ <strong>No existing log found for this date.</strong> A new time log entry will be created when you submit this request.
+                        </div>
                     </div>
+                    
+                    <!-- Hidden data for JavaScript -->
+                    <script type="application/json" id="logsData">
+                    <?php 
+                    $logsJson = [];
+                    foreach ($logs as $log) {
+                        $in = $log['time_in'] ? (new DateTime($log['time_in']))->format('g:i A') : 'No IN';
+                        $out = $log['time_out'] ? (new DateTime($log['time_out']))->format('g:i A') : 'No OUT';
+                        $logsJson[$log['log_date']] = [
+                            'time_in' => $in,
+                            'time_out' => $out,
+                            'formatted_date' => (new DateTime($log['log_date']))->format('F j, Y (l)')
+                        ];
+                    }
+                    echo json_encode($logsJson);
+                    ?>
+                    </script>
 
                 <?php elseif ($current_step == 2): ?>
                     <div class="step-title">🕐 Set Requested Times</div>
@@ -947,17 +983,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
     </div>
 
 <script>
-    // Month filter functionality
-    document.getElementById('monthFilter')?.addEventListener('change', function() {
-        var selectedMonth = this.value;
-        var options = document.querySelectorAll('#logDateSelect option[data-month]');
-        options.forEach(function(opt) {
-            if (!selectedMonth || opt.getAttribute('data-month') === selectedMonth) {
-                opt.style.display = '';
-            } else {
-                opt.style.display = 'none';
+    // Date input functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const dateInput = document.getElementById('logDateInput');
+        const dateInfo = document.getElementById('dateInfo');
+        const timeInfo = document.getElementById('timeInfo');
+        const noLogWarning = document.getElementById('noLogWarning');
+        
+        // Get logs data from JSON script
+        const logsDataScript = document.getElementById('logsData');
+        const logsData = logsDataScript ? JSON.parse(logsDataScript.textContent) : {};
+        
+        function updateDateInfo(selectedDate) {
+            if (!selectedDate) {
+                dateInfo.style.display = 'none';
+                noLogWarning.style.display = 'none';
+                return;
             }
-        });
+            
+            if (logsData[selectedDate]) {
+                const log = logsData[selectedDate];
+                timeInfo.innerHTML = `
+                    <strong>${log.formatted_date}</strong><br>
+                    Time In: <span style="color: #28a745; font-weight: 600;">${log.time_in}</span> | 
+                    Time Out: <span style="color: #dc3545; font-weight: 600;">${log.time_out}</span>
+                `;
+                dateInfo.style.display = 'block';
+                noLogWarning.style.display = 'none';
+            } else {
+                const dateObj = new Date(selectedDate + 'T00:00:00');
+                const formattedDate = dateObj.toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                dateInfo.style.display = 'none';
+                noLogWarning.innerHTML = `
+                    ⚠️ <strong>No existing log found for ${formattedDate}.</strong> 
+                    A new time log entry will be created when you submit this request.
+                `;
+                noLogWarning.style.display = 'block';
+            }
+        }
+        
+        if (dateInput) {
+            // Update info on page load if date is already selected
+            if (dateInput.value) {
+                updateDateInfo(dateInput.value);
+            }
+            
+            // Update info when date changes
+            dateInput.addEventListener('change', function() {
+                updateDateInfo(this.value);
+            });
+        }
     });
 
     // File upload handling
@@ -1028,7 +1108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
             
             // Validate current step
             <?php if ($current_step == 1): ?>
-                const logDate = document.querySelector('select[name="log_date"]').value;
+                const logDate = document.querySelector('input[name="log_date"]').value;
                 if (!logDate) {
                     alert('Please select a date to continue.');
                     return;
