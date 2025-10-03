@@ -209,7 +209,7 @@ foreach ($leave_results as $leave) {
 // --- Schedule Requests (from both tables) ---
 $schedule_stmt = $pdo->prepare("
     SELECT scr.id, scr.work_schedule_id, scr.status, scr.start_date, scr.end_date, scr.created_at, scr.notified, scr.explanation, scr.reason,
-           scr.current_work_schedule_id, 'pending' as source_table,
+           scr.current_work_schedule_id, scr.attachment_scr, 'pending' as source_table,
            current_ws.time_in as current_time_in, current_ws.time_out as current_time_out,
            new_ws.time_in as requested_time_in, new_ws.time_out as requested_time_out
     FROM schedule_change_requests scr
@@ -218,7 +218,7 @@ $schedule_stmt = $pdo->prepare("
     WHERE scr.employee_id = ?
     UNION ALL
     SELECT pscr.id, pscr.work_schedule_id, pscr.status, pscr.start_date, pscr.end_date, pscr.created_at, pscr.notified, pscr.explanation, pscr.reason,
-           pscr.current_work_schedule_id, 'approved' as source_table,
+           pscr.current_work_schedule_id, pscr.attachment_scr, 'approved' as source_table,
            current_ws2.time_in as current_time_in, current_ws2.time_out as current_time_out,
            new_ws2.time_in as requested_time_in, new_ws2.time_out as requested_time_out
     FROM post_schedule_change_requests pscr
@@ -252,6 +252,8 @@ foreach ($schedule_results as $sched) {
         'current_time_out' => $sched['current_time_out'],
         'requested_time_in' => $sched['requested_time_in'],
         'requested_time_out' => $sched['requested_time_out'],
+        'attachment_scr' => $sched['attachment_scr'] ?? '',
+        'work_schedule_id' => $sched['work_schedule_id'],
         'request_id' => $sched['id'],
         'table_name' => 'schedule_change_requests',
         'source_table' => $sched['source_table']

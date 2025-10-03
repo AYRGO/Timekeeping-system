@@ -352,6 +352,8 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                             'reason' => $activity['reason'] ?? '',
                             'explanation' => $activity['explanation'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
+                            'work_schedule_id' => $activity['work_schedule_id'] ?? '',
+                            'attachment_scr' => $activity['attachment_scr'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
                         ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
@@ -433,11 +435,49 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
 </div>
 
 <script>
+// Make work schedules available to JavaScript
+const workSchedules = <?= json_encode($work_schedules ?? []) ?>;
+
+// Function to find schedule by ID  
+function findScheduleById(scheduleId) {
+    return workSchedules.find(ws => ws.id == scheduleId);
+}
+
+// Function to find schedule by time
+function findScheduleByTime(timeIn, timeOut) {
+    return workSchedules.find(ws => {
+        const wsTimeInFormatted = new Date('1970-01-01 ' + ws.time_in).toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit', hour12: true});
+        const wsTimeOutFormatted = new Date('1970-01-01 ' + ws.time_out).toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit', hour12: true});
+        return wsTimeInFormatted === timeIn && wsTimeOutFormatted === timeOut;
+    });
+}
+
+// Function to get schedule display name from ID
+function getScheduleDisplayName(scheduleId) {
+    const schedule = findScheduleById(scheduleId);
+    if (schedule) {
+        const timeInDisplay = formatTime12Hour(schedule.time_in);
+        const timeOutDisplay = formatTime12Hour(schedule.time_out);
+        return `${timeInDisplay} - ${timeOutDisplay}`;
+    }
+    return 'Unknown Schedule';
+}
+
 function showActivityDetails(title, dataJson) {
     try {
-        console.log('Raw JSON string:', dataJson); // Debug: show raw JSON string
+        console.log('🔍 showActivityDetails called:', {
+            title: title,
+            timestamp: new Date().toISOString(),
+            jsonLength: dataJson ? dataJson.length : 0
+        });
+        console.log('📋 Raw JSON string:', dataJson);
+        
         const data = JSON.parse(dataJson);
-        console.log('Parsed Data:', data); // Debug: show parsed data
+        console.log('📊 Parsed Data:', data);
+        console.log('📎 Attachment in parsed data:', {
+            attachment_scr: data.attachment_scr,
+            hasAttachment: !!(data.attachment_scr && data.attachment_scr.trim())
+        });
         
         const modal = document.getElementById('activityModal');
         const modalContent = document.getElementById('modalContent');
@@ -652,11 +692,11 @@ function showActivityDetails(title, dataJson) {
                                                 class="w-full p-3 border-2 border-gray-300 bg-gray-100 rounded-lg text-lg font-bold text-green-900 focus:ring-2 focus:ring-green-400 disabled:cursor-not-allowed" 
                                                 disabled 
                                                 onchange="updateScheduleDisplay('${data.request_id}')">
-                                            ${generateScheduleOptions(data.requested_time_in, data.requested_time_out)}
+                                            ${generateScheduleOptions(data.requested_time_in, data.requested_time_out, data.work_schedule_id)}
                                         </select>
                                         <input type="hidden" id="edit-schedule-hidden-${data.request_id}" 
-                                               value="${data.requested_time_in} - ${data.requested_time_out}" 
-                                               data-original="${data.requested_time_in} - ${data.requested_time_out}">
+                                               value="${data.work_schedule_id || ''}" 
+                                               data-original="${data.work_schedule_id || ''}">
                                     </div>
                                 </div>
                             </div>
@@ -696,6 +736,9 @@ function showActivityDetails(title, dataJson) {
                 const dateRange = `${data.start_date} to ${data.end_date}`;
                 content += createInfoBlock('Effective Period', dateRange, 'fa-calendar-alt', 'font-semibold', 'bg-gray-50', isEditable, data.request_id, 'date_range');
             }
+
+            // Attachment section for schedule change requests
+            content += createAttachmentSection(data.attachment_scr, data.request_id, data.table_name, data.status);
         } else if (data.type.includes('Overtime')) {
             // Always show OT Date section 
             console.log('OT Date Debug - Raw data:', data.ot_date); // Debug log
@@ -823,7 +866,28 @@ function showActivityDetails(title, dataJson) {
             content += createInfoBlock('Administrator Response', data.explanation, 'fa-user-shield', 'text-sm leading-relaxed text-red-700', 'bg-red-50 border-red-200');
         }
         
+        // PRESERVE EXISTING ATTACHMENT SECTIONS BEFORE REPLACING CONTENT
+        const existingAttachments = modalBody.querySelectorAll('[data-attachment-section]');
+        let preservedAttachmentHtml = '';
+        
+        existingAttachments.forEach(section => {
+            preservedAttachmentHtml += section.outerHTML;
+            console.log('💾 Preserving attachment section:', section.getAttribute('data-attachment-section'));
+        });
+        
         modalBody.innerHTML = content;
+        
+        // RESTORE PRESERVED ATTACHMENT SECTIONS
+        if (preservedAttachmentHtml) {
+            modalBody.insertAdjacentHTML('beforeend', preservedAttachmentHtml);
+            console.log('🔄 Restored', existingAttachments.length, 'attachment sections after content reload');
+        }
+        
+        // Mark modal as successfully loaded and protect from replacement
+        modalBody.setAttribute('data-loaded', 'true');
+        modalBody.setAttribute('data-load-timestamp', new Date().toISOString());
+        
+        console.log('✅ Modal content loaded successfully with attachments');
         
         // Initialize time displays if this is a time adjustment
         if (data.type && data.type.includes('Time Adjustment') && data.request_id) {
@@ -831,6 +895,15 @@ function showActivityDetails(title, dataJson) {
                 initializeTimeDisplay(data.request_id);
             }, 100);
         }
+        
+        // Verify attachment sections are present
+        setTimeout(() => {
+            const attachmentSectionsLoaded = modalBody.querySelectorAll('[data-attachment-section]');
+            console.log('🔍 Attachment sections after modal load:', attachmentSectionsLoaded.length);
+            if (attachmentSectionsLoaded.length > 0) {
+                console.log('✅ Attachment sections successfully loaded in modal');
+            }
+        }, 50);
         
         // Add Edit and Cancel buttons if applicable (status is 'pending' and we have request data)
         const unsubmitContainer = document.getElementById('unsubmitButtonContainer');
@@ -857,6 +930,11 @@ function showActivityDetails(title, dataJson) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
         
+        // Add protection against accidental data loss
+        const hasAttachment = !!(data.attachment_scr && data.attachment_scr.trim());
+        modal.setAttribute('data-has-attachments', hasAttachment);
+        modal.setAttribute('data-request-id', data.request_id || '');
+        
         // Trigger animation
         setTimeout(() => {
             modalContent.classList.remove('scale-95', 'opacity-0');
@@ -878,6 +956,12 @@ function showActivityDetails(title, dataJson) {
         const modalBody = document.getElementById('modalBody');
         
         if (modal && modalContent && modalTitle && modalBody) {
+            // Don't replace content if modal was already successfully loaded
+            if (modalBody.getAttribute('data-loaded') === 'true') {
+                console.log('🛡️ Preventing error handler from replacing successfully loaded modal content');
+                return;
+            }
+            
             modalTitle.textContent = 'Error Loading Details';
             modalBody.innerHTML = `
                 <div class="border border-red-200 rounded-lg p-4 bg-red-50">
@@ -961,6 +1045,128 @@ function createInfoBlock(label, value, icon, valueClass = 'font-semibold', conta
                     <p class="text-gray-800 ${valueClass}">${value}</p>
                 </div>
             </div>
+        </div>
+    `;
+}
+
+function createAttachmentSection(attachmentScr, requestId, tableName, status) {
+    console.log('🔧 createAttachmentSection called with:', {
+        attachmentScr: attachmentScr,
+        requestId: requestId,
+        tableName: tableName,
+        status: status,
+        timestamp: new Date().toISOString()
+    });
+    
+    const isPending = status && status.toLowerCase() === 'pending';
+    const hasAttachment = attachmentScr && attachmentScr.trim() !== '';
+    
+    // STORE ATTACHMENT DATA GLOBALLY FOR RESTORATION
+    window.lastKnownAttachmentData = {
+        attachmentScr: attachmentScr,
+        requestId: requestId,
+        tableName: tableName,
+        status: status
+    };
+    console.log('💾 Stored attachment data globally:', window.lastKnownAttachmentData);
+    
+    console.log('📎 Attachment evaluation:', {
+        isPending: isPending,
+        hasAttachment: hasAttachment,
+        attachmentScrLength: attachmentScr ? attachmentScr.length : 0,
+        attachmentScrValue: attachmentScr,
+        trimmedValue: attachmentScr ? attachmentScr.trim() : 'null'
+    });
+    
+    let attachmentContent = '';
+    
+    if (hasAttachment) {
+        // Get file name from path
+        const fileName = attachmentScr.split('/').pop() || attachmentScr.split('\\').pop() || attachmentScr;
+        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+        
+        // Determine file icon
+        let fileIcon = 'fa-file';
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(fileExtension)) {
+            fileIcon = 'fa-file-image';
+        } else if (fileExtension === 'pdf') {
+            fileIcon = 'fa-file-pdf';
+        } else if (['doc', 'docx'].includes(fileExtension)) {
+            fileIcon = 'fa-file-word';
+        } else if (['xls', 'xlsx'].includes(fileExtension)) {
+            fileIcon = 'fa-file-excel';
+        }
+        
+        attachmentContent = `
+            <div class="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div class="flex items-center space-x-3">
+                    <i class="fas ${fileIcon} text-blue-600 text-lg"></i>
+                    <div>
+                        <p class="font-medium text-blue-900">${fileName}</p>
+                        <p class="text-xs text-blue-600">Supporting Document</p>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="viewAttachment('${attachmentScr}', '${fileName}', event)" 
+                            class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-eye mr-1"></i>View
+                    </button>
+                    ${isPending ? `
+                    <button onclick="deleteAttachment('${requestId}', '${tableName}', '${attachmentScr}')" 
+                            class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
+                        <i class="fas fa-trash mr-1"></i>Delete
+                    </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    } else {
+        attachmentContent = `
+            <div class="p-4 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
+                <i class="fas fa-paperclip text-gray-400 text-2xl mb-2"></i>
+                <p>No attachment found</p>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-4" data-attachment-section="${requestId}" data-persist="true">
+            <div class="flex items-center justify-between mb-3">
+                <h5 class="font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-paperclip text-gray-600 mr-2"></i>
+                    Supporting Document
+                </h5>
+                ${isPending && requestId ? `
+                <button onclick="showAttachmentUpload('${requestId}', '${tableName}')" 
+                        class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                    <i class="fas fa-plus mr-1"></i>Add New
+                </button>
+                ` : ''}
+            </div>
+            ${attachmentContent}
+            
+            <!-- File upload section (hidden by default) -->
+            ${isPending && requestId ? `
+            <div id="upload-section-${requestId}" class="hidden mt-3 p-3 bg-white border border-gray-200 rounded-lg">
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select New Attachment</label>
+                    <input type="file" id="attachment-input-${requestId}" 
+                           accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                           class="w-full p-2 border border-gray-300 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                    <p class="text-xs text-gray-500 mt-1">Accepted: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Max 10MB)</p>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="uploadAttachment('${requestId}', '${tableName}')" 
+                            class="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                        <i class="fas fa-upload mr-1"></i>Upload
+                    </button>
+                    <button onclick="hideAttachmentUpload('${requestId}')" 
+                            class="px-4 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-times mr-1"></i>Cancel
+                    </button>
+                </div>
+            </div>
+            ` : ''}
         </div>
     `;
 }
@@ -1088,6 +1294,11 @@ function cancelLeaveRequest(requestId, tableName, sourceTable) {
 }
 
 function closeActivityModal() {
+    console.log('❌ closeActivityModal called:', {
+        timestamp: new Date().toISOString(),
+        stack: new Error().stack
+    });
+    
     const modal = document.getElementById('activityModal');
     const modalContent = document.getElementById('modalContent');
     
@@ -1098,6 +1309,7 @@ function closeActivityModal() {
     setTimeout(() => {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+        console.log('🚪 Modal fully closed');
     }, 300);
 }
 
@@ -1335,8 +1547,17 @@ function updateTimeAdjustment(requestId, tableName, timeInValue, timeOutValue) {
 }
 
 // Function to update schedule change request
-function updateScheduleChange(requestId, tableName, newSchedule, newDateRange = null) {
-    if (!confirm(`Update schedule change to: "${newSchedule}"${newDateRange ? ` for period: ${newDateRange}` : ''}?`)) {
+function updateScheduleChange(requestId, tableName, newScheduleId, newDateRange = null) {
+    // Get the schedule display name for confirmation
+    const schedule = findScheduleById(newScheduleId);
+    let scheduleDisplay = 'Unknown Schedule';
+    if (schedule) {
+        const timeInDisplay = formatTime12Hour(schedule.time_in);
+        const timeOutDisplay = formatTime12Hour(schedule.time_out);
+        scheduleDisplay = `${timeInDisplay} - ${timeOutDisplay}`;
+    }
+    
+    if (!confirm(`Update schedule change to: "${scheduleDisplay}"${newDateRange ? ` for period: ${newDateRange}` : ''}?`)) {
         return;
     }
     
@@ -1351,7 +1572,7 @@ function updateScheduleChange(requestId, tableName, newSchedule, newDateRange = 
     const updateData = {
         request_id: requestId,
         table_name: tableName,
-        new_schedule: newSchedule,
+        work_schedule_id: newScheduleId,  // Send the actual schedule ID
         new_date_range: newDateRange
     };
     
@@ -1380,7 +1601,7 @@ function updateScheduleChange(requestId, tableName, newSchedule, newDateRange = 
             // Update original values to reflect the new saved state
             const scheduleHidden = document.getElementById(`edit-schedule-hidden-${requestId}`);
             if (scheduleHidden) {
-                scheduleHidden.setAttribute('data-original', newSchedule);
+                scheduleHidden.setAttribute('data-original', newScheduleId);
             }
             
             const dateRangeInput = document.getElementById(`edit-date-range-${requestId}`);
@@ -1734,32 +1955,19 @@ function generateAMPMOptions(selectedTime) {
 }
 
 // Generate schedule options for schedule change requests
-function generateScheduleOptions(requestedTimeIn, requestedTimeOut) {
-    console.log('generateScheduleOptions called with:', requestedTimeIn, requestedTimeOut);
+function generateScheduleOptions(requestedTimeIn, requestedTimeOut, currentScheduleId = null) {
+    console.log('generateScheduleOptions called with:', requestedTimeIn, requestedTimeOut, 'currentScheduleId:', currentScheduleId);
     
-    // Common work schedules (matching the schedule_change_form.php)
-    const schedules = [
-        { id: 1, time_in: '06:00:00', time_out: '14:00:00' },   // 6 AM - 2 PM
-        { id: 2, time_in: '07:00:00', time_out: '15:00:00' },   // 7 AM - 3 PM
-        { id: 3, time_in: '08:00:00', time_out: '16:00:00' },   // 8 AM - 4 PM
-        { id: 4, time_in: '09:00:00', time_out: '17:00:00' },   // 9 AM - 5 PM
-        { id: 5, time_in: '10:00:00', time_out: '18:00:00' },   // 10 AM - 6 PM
-        { id: 6, time_in: '11:00:00', time_out: '19:00:00' },   // 11 AM - 7 PM
-        { id: 7, time_in: '12:00:00', time_out: '20:00:00' },   // 12 PM - 8 PM
-        { id: 8, time_in: '13:00:00', time_out: '21:00:00' },   // 1 PM - 9 PM
-        { id: 9, time_in: '14:00:00', time_out: '22:00:00' },   // 2 PM - 10 PM
-        { id: 10, time_in: '15:00:00', time_out: '23:00:00' },  // 3 PM - 11 PM
-        { id: 11, time_in: '16:00:00', time_out: '00:00:00' },  // 4 PM - 12 AM
-        { id: 12, time_in: '17:00:00', time_out: '01:00:00' },  // 5 PM - 1 AM
-        { id: 13, time_in: '18:00:00', time_out: '02:00:00' },  // 6 PM - 2 AM
-        { id: 14, time_in: '19:00:00', time_out: '03:00:00' },  // 7 PM - 3 AM
-        { id: 15, time_in: '20:00:00', time_out: '04:00:00' },  // 8 PM - 4 AM
-        { id: 16, time_in: '21:00:00', time_out: '05:00:00' },  // 9 PM - 5 AM
-        { id: 17, time_in: '22:00:00', time_out: '06:00:00' },  // 10 PM - 6 AM
-        { id: 18, time_in: '23:00:00', time_out: '07:00:00' },  // 11 PM - 7 AM
-        { id: 19, time_in: '00:00:00', time_out: '08:00:00' },  // 12 AM - 8 AM
-        { id: 20, time_in: '01:00:00', time_out: '09:00:00' }   // 1 AM - 9 AM
-    ];
+    // Use dynamic work schedules from database
+    const allowedIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    const schedules = workSchedules.filter(ws => allowedIds.includes(parseInt(ws.id)));
+    
+    // Sort schedules by time_in ascending (matching schedule_change_form.php)
+    schedules.sort((a, b) => {
+        const timeA = new Date('1970-01-01 ' + a.time_in);
+        const timeB = new Date('1970-01-01 ' + b.time_in);
+        return timeA - timeB;
+    });
     
     // Convert requested times to compare format
     const requestedSchedule = `${requestedTimeIn} - ${requestedTimeOut}`;
@@ -1768,19 +1976,26 @@ function generateScheduleOptions(requestedTimeIn, requestedTimeOut) {
     let options = '<option value="" disabled>Choose work hours</option>';
     
     schedules.forEach(schedule => {
-        // Convert 24-hour to 12-hour format for display
+        // Convert 24-hour to 12-hour format for display (matching schedule_change_form.php format)
         const timeInDisplay = formatTime12Hour(schedule.time_in);
         const timeOutDisplay = formatTime12Hour(schedule.time_out);
         const scheduleDisplay = `${timeInDisplay} - ${timeOutDisplay}`;
         
-        // Check if this matches the requested schedule
-        const isSelected = scheduleDisplay === requestedSchedule ? 'selected' : '';
-        
-        if (isSelected) {
-            console.log('Schedule option selected:', scheduleDisplay);
+        // Check if this matches the requested schedule OR if this is the current schedule ID
+        let isSelected = false;
+        if (currentScheduleId && schedule.id == currentScheduleId) {
+            isSelected = true;
+        } else if (scheduleDisplay === requestedSchedule) {
+            isSelected = true;
         }
         
-        options += `<option value="${schedule.id}" data-schedule="${scheduleDisplay}" ${isSelected}>${scheduleDisplay}</option>`;
+        const selectedAttr = isSelected ? 'selected' : '';
+        
+        if (isSelected) {
+            console.log('Schedule option selected:', scheduleDisplay, 'ID:', schedule.id);
+        }
+        
+        options += `<option value="${schedule.id}" data-schedule="${scheduleDisplay}" ${selectedAttr}>${scheduleDisplay}</option>`;
     });
     
     return options;
@@ -1825,30 +2040,15 @@ function updateScheduleDisplay(requestId) {
     const hiddenInput = document.getElementById(`edit-schedule-hidden-${requestId}`);
     
     if (scheduleSelect && hiddenInput) {
+        // Store the actual schedule ID value
+        const scheduleId = scheduleSelect.value;
+        hiddenInput.value = scheduleId;
+        
+        // Get the display text for logging
         const selectedOption = scheduleSelect.options[scheduleSelect.selectedIndex];
-        const scheduleValue = selectedOption.getAttribute('data-schedule') || selectedOption.textContent;
+        const scheduleDisplay = selectedOption.getAttribute('data-schedule') || selectedOption.textContent;
         
-        hiddenInput.value = scheduleValue;
-        
-        console.log(`Updated schedule for request ${requestId}: ${scheduleValue}`);
-        
-        // Check for changes to enable save button
-        checkForChanges(requestId);
-    }
-}
-
-// Function to update schedule display when dropdown changes
-function updateScheduleDisplay(requestId) {
-    const scheduleSelect = document.getElementById(`edit-schedule-${requestId}`);
-    const hiddenInput = document.getElementById(`edit-schedule-hidden-${requestId}`);
-    
-    if (scheduleSelect && hiddenInput) {
-        const selectedOption = scheduleSelect.options[scheduleSelect.selectedIndex];
-        const scheduleValue = selectedOption.getAttribute('data-schedule') || selectedOption.textContent;
-        
-        hiddenInput.value = scheduleValue;
-        
-        console.log(`Updated schedule for request ${requestId}: ${scheduleValue}`);
+        console.log(`Updated schedule for request ${requestId}: ID=${scheduleId}, Display=${scheduleDisplay}`);
         
         // Check for changes to enable save button
         checkForChanges(requestId);
@@ -2153,9 +2353,9 @@ function saveAllChanges(requestType, requestId, tableName, sourceTable) {
     }
     
     if (hasScheduleChanges) {
-        const newSchedule = scheduleHidden ? scheduleHidden.value : null;
+        const newScheduleId = scheduleHidden ? scheduleHidden.value : null;
         const newDateRange = dateRangeInput ? dateRangeInput.value : null;
-        updateScheduleChange(requestId, tableName, newSchedule, newDateRange);
+        updateScheduleChange(requestId, tableName, newScheduleId, newDateRange);
         return;
     }
     
@@ -2396,5 +2596,326 @@ document.addEventListener('DOMContentLoaded', function() {
             this.style.transform = 'translateY(0)';
         });
     }
+    
+    // Protect modal data when window regains focus (after viewing attachment)
+    window.addEventListener('focus', function() {
+        const modal = document.getElementById('activityModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            console.log('🔒 Window focus regained - protecting modal data');
+            
+            // Check if attachment sections are still present
+            const attachmentSections = modal.querySelectorAll('[data-attachment-section]');
+            
+            if (attachmentSections.length === 0) {
+                console.warn('⚠️ No attachment sections found after focus - restoring...');
+                // Restore attachment section if it was removed
+                if (window.lastKnownAttachmentData) {
+                    const modalBody = modal.querySelector('.modal-body');
+                    if (modalBody) {
+                        const data = window.lastKnownAttachmentData;
+                        const attachmentHtml = createAttachmentSection(data.attachmentScr, data.requestId, data.tableName, data.status);
+                        modalBody.insertAdjacentHTML('beforeend', attachmentHtml);
+                        console.log('✅ Attachment section restored on focus');
+                    }
+                }
+            } else {
+                attachmentSections.forEach(section => {
+                    section.setAttribute('data-persist', 'true');
+                    section.setAttribute('data-protected', 'true');
+                    console.log('✅ Attachment section protected:', section.getAttribute('data-attachment-section'));
+                });
+            }
+        }
+    });
+    
+    // Set up MutationObserver to track AND PREVENT DOM changes in modal
+    const modal = document.getElementById('activityModal');
+    if (modal) {
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList') {
+                    mutation.removedNodes.forEach(function(node) {
+                        if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute && node.hasAttribute('data-attachment-section')) {
+                            console.error('🚨 ATTACHMENT SECTION REMOVED FROM DOM - RESTORING!', {
+                                sectionId: node.getAttribute('data-attachment-section'),
+                                timestamp: new Date().toISOString(),
+                                mutation: mutation
+                            });
+                            
+                            // IMMEDIATELY RESTORE THE ATTACHMENT SECTION
+                            setTimeout(() => {
+                                const targetContainer = mutation.target;
+                                if (targetContainer && window.lastKnownAttachmentData) {
+                                    console.log('🔧 Restoring attachment section to:', targetContainer);
+                                    const data = window.lastKnownAttachmentData;
+                                    const attachmentHtml = createAttachmentSection(data.attachmentScr, data.requestId, data.tableName, data.status);
+                                    targetContainer.insertAdjacentHTML('beforeend', attachmentHtml);
+                                    console.log('✅ Attachment section restored automatically');
+                                } else {
+                                    console.warn('⚠️ Could not restore - missing container or data');
+                                }
+                            }, 10);
+                        }
+                    });
+                }
+            });
+        });
+        
+        observer.observe(modal, {
+            childList: true,
+            subtree: true
+        });
+        
+        console.log('🔍 MutationObserver set up to track AND RESTORE attachment section changes');
+    }
+    
+    // Add global error handler to catch any JavaScript errors
+    window.addEventListener('error', function(event) {
+        const modal = document.getElementById('activityModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            console.error('🚨 JavaScript error detected while modal is open:', {
+                message: event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                error: event.error,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Check if this error might have affected attachment sections
+            const attachmentSections = modal.querySelectorAll('[data-attachment-section]');
+            console.log('📎 Attachment sections after error:', attachmentSections.length);
+        }
+    });
 });
+
+// Attachment related functions
+function viewAttachment(attachmentPath, fileName, event) {
+    // Prevent event bubbling that might close modal or trigger other actions
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+    }
+    
+    console.log('👀 viewAttachment called with:', {
+        attachmentPath: attachmentPath,
+        fileName: fileName,
+        timestamp: new Date().toISOString(),
+        eventType: event ? event.type : 'no-event'
+    });
+    
+    // Check if attachment section exists BEFORE opening
+    const attachmentSections = document.querySelectorAll('[data-attachment-section]');
+    console.log('📎 Attachment sections BEFORE view:', attachmentSections.length);
+    attachmentSections.forEach((section, index) => {
+        console.log(`  Section ${index}:`, section.getAttribute('data-attachment-section'), 'Visible:', !section.classList.contains('hidden'));
+    });
+    
+    if (!attachmentPath) {
+        alert('No attachment to view.');
+        return;
+    }
+    
+    // Use the secure attachment viewer
+    const attachmentUrl = `../controller/view_attachment.php?file=${encodeURIComponent(attachmentPath)}`;
+    console.log('🔗 Opening URL:', attachmentUrl);
+    
+    // Track successful opening
+    console.log('🚀 About to open new window...');
+    
+    try {
+        const newWindow = window.open(attachmentUrl, '_blank');
+        if (newWindow) {
+            console.log('✅ New window opened successfully');
+            // Ensure modal stays open and data persists
+            newWindow.focus();
+            
+            // Check if attachment section is still there AFTER opening
+            setTimeout(() => {
+                const attachmentSectionsAfter = document.querySelectorAll('[data-attachment-section]');
+                console.log('📎 Attachment sections AFTER view:', attachmentSectionsAfter.length);
+                attachmentSectionsAfter.forEach((section, index) => {
+                    console.log(`  Section ${index} after:`, section.getAttribute('data-attachment-section'), 'Visible:', !section.classList.contains('hidden'));
+                });
+                
+                if (attachmentSectionsAfter.length === 0) {
+                    console.error('🚨 ATTACHMENT SECTION DISAPPEARED! Investigating...');
+                    console.log('📋 Modal body content:', document.getElementById('modalBody')?.innerHTML?.substring(0, 500) + '...');
+                }
+            }, 100);
+            
+        } else {
+            console.log('❌ Failed to open new window (popup blocked?)');
+            alert('Please allow popups for this site to view attachments.');
+        }
+    } catch (error) {
+        console.error('💥 Error opening attachment window:', error);
+        alert('Error opening attachment: ' + error.message);
+    }
+    
+    // Explicitly return false to prevent any form submission or page navigation
+    return false;
+}
+
+function deleteAttachment(requestId, tableName, attachmentPath) {
+    if (!confirm(`Are you sure you want to delete this attachment?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    // Show loading state
+    const deleteBtn = event.target;
+    const originalText = deleteBtn.innerHTML;
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Deleting...';
+    
+    const deleteData = {
+        request_id: requestId,
+        table_name: tableName,
+        attachment_path: attachmentPath
+    };
+    
+    console.log('Deleting attachment:', deleteData);
+    
+    fetch('../controller/delete_schedule_attachment.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(deleteData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Delete attachment response:', data);
+        
+        if (data.success) {
+            alert('✅ Attachment deleted successfully!');
+            
+            // Refresh the page to reflect changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            console.error('Delete attachment failed:', data);
+            alert('❌ Error: ' + (data.message || 'Failed to delete attachment'));
+            
+            // Restore button state
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Network/Parse Error:', error);
+        alert('🔥 Network error occurred: ' + error.message);
+        
+        // Restore button state
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = originalText;
+    });
+}
+
+function showAttachmentUpload(requestId, tableName) {
+    const uploadSection = document.getElementById(`upload-section-${requestId}`);
+    if (uploadSection) {
+        uploadSection.classList.remove('hidden');
+    }
+}
+
+function hideAttachmentUpload(requestId) {
+    const uploadSection = document.getElementById(`upload-section-${requestId}`);
+    const fileInput = document.getElementById(`attachment-input-${requestId}`);
+    
+    if (uploadSection) {
+        uploadSection.classList.add('hidden');
+    }
+    
+    if (fileInput) {
+        fileInput.value = '';
+    }
+}
+
+function uploadAttachment(requestId, tableName) {
+    const fileInput = document.getElementById(`attachment-input-${requestId}`);
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a file to upload.');
+        return;
+    }
+    
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+        alert('File size must be less than 10MB.');
+        return;
+    }
+    
+    // Validate file type
+    const allowedTypes = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'];
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (!allowedTypes.includes(fileExtension)) {
+        alert('Invalid file type. Please upload PDF, JPG, PNG, DOC, DOCX, XLS, or XLSX files only.');
+        return;
+    }
+    
+    // Show loading state
+    const uploadBtn = event.target;
+    const originalText = uploadBtn.innerHTML;
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Uploading...';
+    
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('attachment', file);
+    formData.append('request_id', requestId);
+    formData.append('table_name', tableName);
+    
+    console.log('Uploading attachment for request:', requestId, 'table:', tableName, 'file:', file.name);
+    
+    fetch('../controller/upload_schedule_attachment.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Upload attachment response:', data);
+        
+        if (data.success) {
+            alert('✅ Attachment uploaded successfully!');
+            
+            // Hide upload section and clear input
+            hideAttachmentUpload(requestId);
+            
+            // Refresh the page to reflect changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            console.error('Upload attachment failed:', data);
+            alert('❌ Error: ' + (data.message || 'Failed to upload attachment'));
+            
+            // Restore button state
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Network/Parse Error:', error);
+        alert('🔥 Network error occurred: ' + error.message);
+        
+        // Restore button state
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = originalText;
+    });
+}
 </script>
