@@ -293,6 +293,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                             'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
                             'reason' => $activity['reason'] ?? '',
                             'explanation' => $activity['explanation'] ?? '',
+                            'attachment' => $activity['attachment'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
@@ -315,6 +316,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                             'time_in' => !empty($activity['time_in']) ? date('g:i A', strtotime($activity['time_in'])) : '',
                             'time_out' => !empty($activity['time_out']) ? date('g:i A', strtotime($activity['time_out'])) : '',
                             'explanation' => $activity['explanation'] ?? '',
+                            'attachment' => $activity['attachment'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
@@ -331,6 +333,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                             'end_date' => !empty($activity['end_date']) ? date('M j, Y', strtotime($activity['end_date'])) : '',
                             'reason' => $activity['reason'] ?? '',
                             'explanation' => $activity['explanation'] ?? '',
+                            'attachment_lr' => $activity['attachment_lr'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
@@ -476,7 +479,11 @@ function showActivityDetails(title, dataJson) {
         console.log('📊 Parsed Data:', data);
         console.log('📎 Attachment in parsed data:', {
             attachment_scr: data.attachment_scr,
-            hasAttachment: !!(data.attachment_scr && data.attachment_scr.trim())
+            attachment_lr: data.attachment_lr,
+            attachment: data.attachment,
+            hasAttachment: !!(data.attachment_scr && data.attachment_scr.trim()),
+            hasAttachmentLr: !!(data.attachment_lr && data.attachment_lr.trim()),
+            hasAttachmentGeneric: !!(data.attachment && data.attachment.trim())
         });
         
         const modal = document.getElementById('activityModal');
@@ -651,10 +658,16 @@ function showActivityDetails(title, dataJson) {
             if (data.status.toLowerCase() === 'approved' && data.processed_at) {
                 content += createInfoBlock('Processed Date', new Date(data.processed_at).toLocaleString(), 'fa-check-circle', 'text-sm text-green-700', 'bg-green-50 border-green-200');
             }
+            
+            // Attachment section for time adjustment requests
+            content += createAttachmentSection(data.attachment, data.request_id, data.table_name, data.status);
         } else if (data.type.includes('Leave')) {
             if (data.start_date && data.end_date) {
                 content += createInfoBlock('Leave Period', `${data.start_date} to ${data.end_date}`, 'fa-calendar-week');
             }
+            
+            // Attachment section for leave requests
+            content += createAttachmentSection(data.attachment_lr, data.request_id, data.table_name, data.status);
         } else if (data.type.includes('Schedule')) {
             if (data.current_time_in && data.current_time_out && data.requested_time_in && data.requested_time_out) {
                 // Check if request is pending and can be edited
@@ -733,7 +746,77 @@ function showActivityDetails(title, dataJson) {
             // Effective Period (editable for pending requests)
             if (data.start_date && data.end_date) {
                 const isEditable = data.status && data.status.toLowerCase() === 'pending' && data.request_id;
-                const dateRange = `${data.start_date} to ${data.end_date}`;
+                
+                // Format dates properly - handle YYYY-MM-DD format from database
+                let formattedStartDate = data.start_date;
+                let formattedEndDate = data.end_date;
+                
+                console.log('Raw dates from database:', {
+                    start_date: data.start_date,
+                    end_date: data.end_date,
+                    start_type: typeof data.start_date,
+                    end_type: typeof data.end_date
+                });
+                
+                try {
+                    // Handle YYYY-MM-DD format specifically
+                    if (typeof data.start_date === 'string' && data.start_date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        const [year, month, day] = data.start_date.split('-');
+                        if (parseInt(year) > 1900) {
+                            const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            formattedStartDate = startDate.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                            });
+                        }
+                    } else {
+                        // Try parsing as regular date
+                        const startDate = new Date(data.start_date);
+                        if (startDate.getTime() && startDate.getFullYear() > 1900) {
+                            formattedStartDate = startDate.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                            });
+                        }
+                    }
+                    
+                    // Handle end date the same way
+                    if (typeof data.end_date === 'string' && data.end_date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        const [year, month, day] = data.end_date.split('-');
+                        if (parseInt(year) > 1900) {
+                            const endDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            formattedEndDate = endDate.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                            });
+                        }
+                    } else {
+                        // Try parsing as regular date
+                        const endDate = new Date(data.end_date);
+                        if (endDate.getTime() && endDate.getFullYear() > 1900) {
+                            formattedEndDate = endDate.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.error('Date formatting error:', e);
+                    console.log('Problematic dates:', {start: data.start_date, end: data.end_date});
+                }
+                
+                console.log('Formatted dates:', {
+                    original_start: data.start_date,
+                    original_end: data.end_date,
+                    formatted_start: formattedStartDate,
+                    formatted_end: formattedEndDate
+                });
+                
+                const dateRange = `${formattedStartDate} to ${formattedEndDate}`;
                 content += createInfoBlock('Effective Period', dateRange, 'fa-calendar-alt', 'font-semibold', 'bg-gray-50', isEditable, data.request_id, 'date_range');
             }
 
@@ -852,6 +935,21 @@ function showActivityDetails(title, dataJson) {
                     </div>
                 `;
             }
+            
+            // Attachment section for overtime requests
+            console.log('🕰️ Overtime attachment debug:', {
+                attachmentValue: data.attachment,
+                requestId: data.request_id,
+                tableName: data.table_name,
+                status: data.status,
+                allAttachmentFields: {
+                    attachment: data.attachment,
+                    attachment_scr: data.attachment_scr,
+                    attachment_lr: data.attachment_lr,
+                    attachment_ot: data.attachment_ot
+                }
+            });
+            content += createAttachmentSection(data.attachment, data.request_id, data.table_name, data.status);
         }
         
         // Employee reason (editable for pending requests)
@@ -866,22 +964,8 @@ function showActivityDetails(title, dataJson) {
             content += createInfoBlock('Administrator Response', data.explanation, 'fa-user-shield', 'text-sm leading-relaxed text-red-700', 'bg-red-50 border-red-200');
         }
         
-        // PRESERVE EXISTING ATTACHMENT SECTIONS BEFORE REPLACING CONTENT
-        const existingAttachments = modalBody.querySelectorAll('[data-attachment-section]');
-        let preservedAttachmentHtml = '';
-        
-        existingAttachments.forEach(section => {
-            preservedAttachmentHtml += section.outerHTML;
-            console.log('💾 Preserving attachment section:', section.getAttribute('data-attachment-section'));
-        });
-        
+        // Directly replace content (no preservation to prevent duplicate attachment blocks)
         modalBody.innerHTML = content;
-        
-        // RESTORE PRESERVED ATTACHMENT SECTIONS
-        if (preservedAttachmentHtml) {
-            modalBody.insertAdjacentHTML('beforeend', preservedAttachmentHtml);
-            console.log('🔄 Restored', existingAttachments.length, 'attachment sections after content reload');
-        }
         
         // Mark modal as successfully loaded and protect from replacement
         modalBody.setAttribute('data-loaded', 'true');
@@ -896,12 +980,23 @@ function showActivityDetails(title, dataJson) {
             }, 100);
         }
         
-        // Verify attachment sections are present
+        // Verify attachment sections are present and protect them
         setTimeout(() => {
             const attachmentSectionsLoaded = modalBody.querySelectorAll('[data-attachment-section]');
             console.log('🔍 Attachment sections after modal load:', attachmentSectionsLoaded.length);
             if (attachmentSectionsLoaded.length > 0) {
                 console.log('✅ Attachment sections successfully loaded in modal');
+                
+                // PROTECT each attachment section from removal
+                attachmentSectionsLoaded.forEach(section => {
+                    const requestId = section.getAttribute('data-attachment-section');
+                    if (requestId && window.protectAttachmentSection) {
+                        window.protectAttachmentSection(requestId);
+                    }
+                });
+                
+                // Skip deduplication for now to prevent removal
+                // dedupeAttachmentSections();
             }
         }, 50);
         
@@ -1055,13 +1150,18 @@ function createAttachmentSection(attachmentScr, requestId, tableName, status) {
         requestId: requestId,
         tableName: tableName,
         status: status,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        attachmentType: typeof attachmentScr,
+        attachmentValue: attachmentScr,
+        isEmptyString: attachmentScr === '',
+        isNull: attachmentScr === null,
+        isUndefined: attachmentScr === undefined
     });
     
     const isPending = status && status.toLowerCase() === 'pending';
     const hasAttachment = attachmentScr && attachmentScr.trim() !== '';
     
-    // STORE ATTACHMENT DATA GLOBALLY FOR RESTORATION
+    // Store metadata and setup protection
     window.lastKnownAttachmentData = {
         attachmentScr: attachmentScr,
         requestId: requestId,
@@ -1069,6 +1169,32 @@ function createAttachmentSection(attachmentScr, requestId, tableName, status) {
         status: status
     };
     console.log('💾 Stored attachment data globally:', window.lastKnownAttachmentData);
+    
+    // Setup self-preservation mechanism
+    window.protectAttachmentSection = function(requestId) {
+        const section = document.querySelector(`[data-attachment-section="${requestId}"]`);
+        if (section) {
+            // Override the remove method to prevent deletion
+            const originalRemove = section.remove;
+            section.remove = function() {
+                console.log('🛡️ BLOCKING removal of attachment section:', requestId);
+                // Instead of removing, just hide temporarily then restore
+                this.style.opacity = '0.5';
+                setTimeout(() => {
+                    this.style.opacity = '1';
+                    console.log('🔄 Attachment section visibility restored');
+                }, 100);
+                return false;
+            };
+            
+            // Mark as protected
+            section.setAttribute('data-removal-protected', 'true');
+            section.style.position = 'relative';
+            section.style.zIndex = '1000';
+            
+            console.log('🛡️ Attachment section protected from removal');
+        }
+    };
     
     console.log('📎 Attachment evaluation:', {
         isPending: isPending,
@@ -1098,50 +1224,54 @@ function createAttachmentSection(attachmentScr, requestId, tableName, status) {
         }
         
         attachmentContent = `
-            <div class="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div class="flex items-center space-x-3">
-                    <i class="fas ${fileIcon} text-blue-600 text-lg"></i>
-                    <div>
-                        <p class="font-medium text-blue-900">${fileName}</p>
-                        <p class="text-xs text-blue-600">Supporting Document</p>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-start space-x-3 flex-1 min-w-0">
+                        <div class="flex-shrink-0">
+                            <i class="fas ${fileIcon} text-blue-600 text-lg mt-1"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-blue-900 break-words text-sm leading-tight">${fileName}</p>
+                            <p class="text-xs text-blue-600 mt-1">Supporting Document</p>
+                        </div>
                     </div>
-                </div>
-                <div class="flex space-x-2">
-                    <button onclick="viewAttachment('${attachmentScr}', '${fileName}', event)" 
-                            class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                        <i class="fas fa-eye mr-1"></i>View
-                    </button>
-                    ${isPending ? `
-                    <button onclick="deleteAttachment('${requestId}', '${tableName}', '${attachmentScr}')" 
-                            class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
-                        <i class="fas fa-trash mr-1"></i>Delete
-                    </button>
-                    ` : ''}
+                    <div class="flex flex-col gap-2 ml-3">
+                        <button onclick="viewAttachment('${attachmentScr}', '${fileName}', event)" 
+                                class="inline-flex items-center px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
+                            <i class="fas fa-eye mr-1"></i>View
+                        </button>
+                        ${isPending ? `
+                        <button onclick="showAttachmentUpload(${requestId}, '${tableName}')" 
+                                class="inline-flex items-center px-3 py-1.5 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors whitespace-nowrap">
+                            <i class="fas fa-exchange-alt mr-1"></i>Replace
+                        </button>
+                        ` : ''}
+                    </div>
                 </div>
             </div>
         `;
     } else {
         attachmentContent = `
             <div class="p-4 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
-                <i class="fas fa-paperclip text-gray-400 text-2xl mb-2"></i>
-                <p>No attachment found</p>
+                <i class="fas fa-paperclip text-gray-400 text-xl mb-2"></i>
+                <p class="text-sm">No attachment found</p>
+                ${isPending && requestId ? `
+                <button onclick="showAttachmentUpload('${requestId}', '${tableName}')" 
+                        class="mt-2 inline-flex items-center px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-upload mr-1"></i>Add Attachment
+                </button>
+                ` : ''}
             </div>
         `;
     }
     
     return `
         <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-4" data-attachment-section="${requestId}" data-persist="true">
-            <div class="flex items-center justify-between mb-3">
+            <div class="mb-3">
                 <h5 class="font-semibold text-gray-800 flex items-center">
                     <i class="fas fa-paperclip text-gray-600 mr-2"></i>
                     Supporting Document
                 </h5>
-                ${isPending && requestId ? `
-                <button onclick="showAttachmentUpload('${requestId}', '${tableName}')" 
-                        class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
-                    <i class="fas fa-plus mr-1"></i>Add New
-                </button>
-                ` : ''}
             </div>
             ${attachmentContent}
             
@@ -1152,16 +1282,16 @@ function createAttachmentSection(attachmentScr, requestId, tableName, status) {
                     <label class="block text-sm font-medium text-gray-700 mb-2">Select New Attachment</label>
                     <input type="file" id="attachment-input-${requestId}" 
                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                           class="w-full p-2 border border-gray-300 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
-                    <p class="text-xs text-gray-500 mt-1">Accepted: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Max 10MB)</p>
+                           class="w-full p-2 border border-gray-300 rounded-lg text-sm file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                    <p class="text-xs text-gray-500 mt-1 break-words">Accepted formats: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Max 10MB)</p>
                 </div>
-                <div class="flex space-x-2">
+                <div class="flex flex-wrap gap-2">
                     <button onclick="uploadAttachment('${requestId}', '${tableName}')" 
-                            class="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                            class="inline-flex items-center px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
                         <i class="fas fa-upload mr-1"></i>Upload
                     </button>
                     <button onclick="hideAttachmentUpload('${requestId}')" 
-                            class="px-4 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
+                            class="inline-flex items-center px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
                         <i class="fas fa-times mr-1"></i>Cancel
                     </button>
                 </div>
@@ -1572,7 +1702,8 @@ function updateScheduleChange(requestId, tableName, newScheduleId, newDateRange 
     const updateData = {
         request_id: requestId,
         table_name: tableName,
-        work_schedule_id: newScheduleId,  // Send the actual schedule ID
+        new_schedule: scheduleDisplay,  // Send the schedule display format that controller expects
+        work_schedule_id: newScheduleId,  // Also send the ID for reference
         new_date_range: newDateRange
     };
     
@@ -1602,12 +1733,28 @@ function updateScheduleChange(requestId, tableName, newScheduleId, newDateRange 
             const scheduleHidden = document.getElementById(`edit-schedule-hidden-${requestId}`);
             if (scheduleHidden) {
                 scheduleHidden.setAttribute('data-original', newScheduleId);
+                scheduleHidden.value = newScheduleId;
             }
             
             const dateRangeInput = document.getElementById(`edit-date-range-${requestId}`);
             if (dateRangeInput && newDateRange) {
                 dateRangeInput.setAttribute('data-original', newDateRange);
+                dateRangeInput.value = newDateRange;
             }
+            
+            // Update the display in the modal to show the new schedule
+            const scheduleSelect = document.getElementById(`edit-schedule-${requestId}`);
+            if (scheduleSelect) {
+                scheduleSelect.value = newScheduleId;
+                
+                // Update the static display as well
+                const staticDisplay = document.querySelector(`#schedule-change-block-${requestId} .text-gray-800`);
+                if (staticDisplay && scheduleDisplay) {
+                    staticDisplay.textContent = scheduleDisplay;
+                }
+            }
+            
+            console.log('Schedule updated in database:', data);
             
             // Reset to view mode
             resetToViewMode(requestId);
@@ -2597,38 +2744,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Protect modal data when window regains focus (after viewing attachment)
+    // Enhanced focus handler with smart restoration and duplication prevention
     window.addEventListener('focus', function() {
         const modal = document.getElementById('activityModal');
         if (modal && !modal.classList.contains('hidden')) {
-            console.log('🔒 Window focus regained - protecting modal data');
+            console.log('🔒 Window focus regained');
             
-            // Check if attachment sections are still present
-            const attachmentSections = modal.querySelectorAll('[data-attachment-section]');
-            
-            if (attachmentSections.length === 0) {
-                console.warn('⚠️ No attachment sections found after focus - restoring...');
-                // Restore attachment section if it was removed
-                if (window.lastKnownAttachmentData) {
+            // Only restore if we're sure no sections exist and we have data
+            setTimeout(() => {
+                const attachmentSections = modal.querySelectorAll('[data-attachment-section]');
+                console.log('📊 Focus check - existing sections:', attachmentSections.length);
+                
+                if (attachmentSections.length === 0 && window.lastKnownAttachmentData) {
+                    console.log('🔧 Restoring disappeared attachment section on focus');
                     const modalBody = modal.querySelector('.modal-body');
-                    if (modalBody) {
+                    if (modalBody && !modalBody.querySelector('[data-attachment-section]')) {
                         const data = window.lastKnownAttachmentData;
                         const attachmentHtml = createAttachmentSection(data.attachmentScr, data.requestId, data.tableName, data.status);
                         modalBody.insertAdjacentHTML('beforeend', attachmentHtml);
                         console.log('✅ Attachment section restored on focus');
                     }
+                } else if (attachmentSections.length > 1) {
+                    console.log('🧹 Multiple attachment sections detected, deduplicating');
+                    dedupeAttachmentSections();
                 }
-            } else {
-                attachmentSections.forEach(section => {
-                    section.setAttribute('data-persist', 'true');
-                    section.setAttribute('data-protected', 'true');
-                    console.log('✅ Attachment section protected:', section.getAttribute('data-attachment-section'));
-                });
-            }
+            }, 150);
         }
     });
     
-    // Set up MutationObserver to track AND PREVENT DOM changes in modal
+    // Set up MutationObserver to monitor attempts to remove protected sections
     const modal = document.getElementById('activityModal');
     if (modal) {
         const observer = new MutationObserver(function(mutations) {
@@ -2636,25 +2780,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (mutation.type === 'childList') {
                     mutation.removedNodes.forEach(function(node) {
                         if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute && node.hasAttribute('data-attachment-section')) {
-                            console.error('🚨 ATTACHMENT SECTION REMOVED FROM DOM - RESTORING!', {
-                                sectionId: node.getAttribute('data-attachment-section'),
-                                timestamp: new Date().toISOString(),
-                                mutation: mutation
-                            });
+                            const sectionId = node.getAttribute('data-attachment-section');
+                            console.error('🚨 PROTECTED ATTACHMENT SECTION WAS REMOVED DESPITE PROTECTION:', sectionId);
+                            console.trace('Removal stack trace:');
                             
-                            // IMMEDIATELY RESTORE THE ATTACHMENT SECTION
-                            setTimeout(() => {
-                                const targetContainer = mutation.target;
-                                if (targetContainer && window.lastKnownAttachmentData) {
-                                    console.log('🔧 Restoring attachment section to:', targetContainer);
-                                    const data = window.lastKnownAttachmentData;
-                                    const attachmentHtml = createAttachmentSection(data.attachmentScr, data.requestId, data.tableName, data.status);
-                                    targetContainer.insertAdjacentHTML('beforeend', attachmentHtml);
-                                    console.log('✅ Attachment section restored automatically');
-                                } else {
-                                    console.warn('⚠️ Could not restore - missing container or data');
-                                }
-                            }, 10);
+                            // This should not happen if protection is working
+                            // Restore as a last resort
+                            if (window.lastKnownAttachmentData && window.lastKnownAttachmentData.requestId == sectionId) {
+                                setTimeout(() => {
+                                    const modalBody = modal.querySelector('.modal-body');
+                                    if (modalBody && !modalBody.querySelector(`[data-attachment-section="${sectionId}"]`)) {
+                                        const data = window.lastKnownAttachmentData;
+                                        const attachmentHtml = createAttachmentSection(data.attachmentScr, data.requestId, data.tableName, data.status);
+                                        modalBody.insertAdjacentHTML('beforeend', attachmentHtml);
+                                        console.log('🆘 Emergency restoration of protected section');
+                                    }
+                                }, 10);
+                            }
                         }
                     });
                 }
@@ -2666,7 +2808,7 @@ document.addEventListener('DOMContentLoaded', function() {
             subtree: true
         });
         
-        console.log('🔍 MutationObserver set up to track AND RESTORE attachment section changes');
+        console.log('🔍 MutationObserver set up (monitoring only)');
     }
     
     // Add global error handler to catch any JavaScript errors
@@ -2688,6 +2830,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Utility: remove duplicate attachment sections (keep protected ones first, then first occurrence per requestId)
+function dedupeAttachmentSections() {
+    const sections = document.querySelectorAll('[data-attachment-section]');
+    if (!sections.length) return;
+    
+    const sectionsByRequest = {};
+    
+    // Group sections by request ID
+    sections.forEach(section => {
+        const id = section.getAttribute('data-attachment-section');
+        if (!sectionsByRequest[id]) {
+            sectionsByRequest[id] = [];
+        }
+        sectionsByRequest[id].push(section);
+    });
+    
+    // For each request ID, keep only one section (prefer protected ones)
+    Object.keys(sectionsByRequest).forEach(requestId => {
+        const sectionsForRequest = sectionsByRequest[requestId];
+        if (sectionsForRequest.length > 1) {
+            console.log('🧹 Deduplicating', sectionsForRequest.length, 'sections for request', requestId);
+            
+            // Find the best section to keep (protected first, then first one)
+            const protectedSection = sectionsForRequest.find(s => s.getAttribute('data-protected') === 'true');
+            const sectionToKeep = protectedSection || sectionsForRequest[0];
+            
+            // Remove all others
+            sectionsForRequest.forEach(section => {
+                if (section !== sectionToKeep) {
+                    console.log('🗑️ Removing duplicate section for request', requestId);
+                    section.remove();
+                }
+            });
+        }
+    });
+}
 
 // Attachment related functions
 function viewAttachment(attachmentPath, fileName, event) {
@@ -2731,19 +2910,58 @@ function viewAttachment(attachmentPath, fileName, event) {
             // Ensure modal stays open and data persists
             newWindow.focus();
             
-            // Check if attachment section is still there AFTER opening
-            setTimeout(() => {
+            // LOCK DOWN ATTACHMENT SECTIONS TO PREVENT REMOVAL
+            const lockDownAttachments = () => {
                 const attachmentSectionsAfter = document.querySelectorAll('[data-attachment-section]');
                 console.log('📎 Attachment sections AFTER view:', attachmentSectionsAfter.length);
-                attachmentSectionsAfter.forEach((section, index) => {
-                    console.log(`  Section ${index} after:`, section.getAttribute('data-attachment-section'), 'Visible:', !section.classList.contains('hidden'));
+                
+                // Apply maximum protection to each section
+                attachmentSectionsAfter.forEach(section => {
+                    const requestId = section.getAttribute('data-attachment-section');
+                    console.log('🔒 Applying maximum protection to section:', requestId);
+                    
+                    // Apply removal protection
+                    if (window.protectAttachmentSection) {
+                        window.protectAttachmentSection(requestId);
+                    }
+                    
+                    // Additional DOM protection
+                    section.setAttribute('data-protected', 'true');
+                    section.setAttribute('data-removal-blocked', 'true');
+                    section.style.position = 'relative';
+                    section.style.zIndex = '1001';
+                    
+                    // Make it unremovable by overriding parent methods too
+                    if (section.parentNode) {
+                        const originalRemoveChild = section.parentNode.removeChild;
+                        section.parentNode.removeChild = function(child) {
+                            if (child === section) {
+                                console.log('🛡️ BLOCKED removeChild attempt on protected attachment section');
+                                return section; // Return the section instead of removing it
+                            }
+                            return originalRemoveChild.call(this, child);
+                        };
+                    }
                 });
                 
-                if (attachmentSectionsAfter.length === 0) {
-                    console.error('🚨 ATTACHMENT SECTION DISAPPEARED! Investigating...');
-                    console.log('📋 Modal body content:', document.getElementById('modalBody')?.innerHTML?.substring(0, 500) + '...');
+                // If no sections exist but we have data, restore
+                if (attachmentSectionsAfter.length === 0 && window.lastKnownAttachmentData) {
+                    console.log('🆘 Emergency restoration - no sections found');
+                    const modalBody = document.getElementById('modalBody');
+                    if (modalBody) {
+                        const data = window.lastKnownAttachmentData;
+                        const attachmentHtml = createAttachmentSection(data.attachmentScr, data.requestId, data.tableName, data.status);
+                        modalBody.insertAdjacentHTML('beforeend', attachmentHtml);
+                        console.log('✅ Emergency attachment section restored');
+                    }
                 }
-            }, 100);
+            };
+            
+            // Apply protection immediately and repeatedly
+            lockDownAttachments();
+            setTimeout(lockDownAttachments, 10);
+            setTimeout(lockDownAttachments, 50);
+            setTimeout(lockDownAttachments, 200);
             
         } else {
             console.log('❌ Failed to open new window (popup blocked?)');
@@ -2769,15 +2987,29 @@ function deleteAttachment(requestId, tableName, attachmentPath) {
     deleteBtn.disabled = true;
     deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Deleting...';
     
+    // Determine attachment column name based on table
+    const attachmentColumns = {
+        'leave_requests': 'attachment_lr',
+        'post_leave_requests': 'attachment_lr',
+        'time_adjustment_requests': 'attachment',
+        'post_time_adjustment_requests': 'attachment',
+        'overtime_requests': 'attachment_ot',
+        'post_ot_requests': 'attachment',
+        'schedule_change_requests': 'attachment_scr',
+        'post_schedule_change_requests': 'attachment_scr'
+    };
+    
+    const attachmentColumn = attachmentColumns[tableName] || 'attachment';
+    
     const deleteData = {
         request_id: requestId,
         table_name: tableName,
-        attachment_path: attachmentPath
+        attachment_column: attachmentColumn
     };
     
     console.log('Deleting attachment:', deleteData);
     
-    fetch('../controller/delete_schedule_attachment.php', {
+    fetch('../controller/delete_attachment.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -2869,37 +3101,91 @@ function uploadAttachment(requestId, tableName) {
     uploadBtn.disabled = true;
     uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Uploading...';
     
+    // Determine attachment column name based on table
+    const attachmentColumns = {
+        'leave_requests': 'attachment_lr',
+        'post_leave_requests': 'attachment_lr',
+        'time_adjustment_requests': 'attachment',
+        'post_time_adjustment_requests': 'attachment',
+        'overtime_requests': 'attachment_ot',
+        'post_ot_requests': 'attachment',
+        'schedule_change_requests': 'attachment_scr',
+        'post_schedule_change_requests': 'attachment_scr'
+    };
+    
+    const attachmentColumn = attachmentColumns[tableName] || 'attachment';
+    
     // Create FormData for file upload
     const formData = new FormData();
     formData.append('attachment', file);
     formData.append('request_id', requestId);
     formData.append('table_name', tableName);
+    formData.append('attachment_column', attachmentColumn);
     
-    console.log('Uploading attachment for request:', requestId, 'table:', tableName, 'file:', file.name);
+    console.log('Uploading attachment for request:', requestId, 'table:', tableName, 'column:', attachmentColumn, 'file:', file.name);
     
-    fetch('../controller/upload_schedule_attachment.php', {
+    // Use generic upload controller for all request types
+    fetch('../controller/upload_attachment.php', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'same-origin'  // Include cookies for session
     })
     .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
+        console.log('Upload response status:', response.status);
+        console.log('Upload response headers:', response.headers);
+        
+        // First get the response as text to see what we're dealing with
+        return response.text().then(text => {
+            console.log('Raw server response:', text);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: Server error - ${text.substring(0, 300)}`);
+            }
+            
+            // Try to parse as JSON
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('JSON parse error:', e);
+                console.error('Response was not JSON, got:', text.substring(0, 500));
+                throw new Error('Server returned invalid JSON response. Check server logs.');
+            }
+        });
     })
     .then(data => {
         console.log('Upload attachment response:', data);
         
         if (data.success) {
-            alert('✅ Attachment uploaded successfully!');
+            alert('✅ Attachment replaced successfully!');
             
             // Hide upload section and clear input
             hideAttachmentUpload(requestId);
             
-            // Refresh the page to reflect changes
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            // Update the attachment section in-place with new file
+            const existingSection = document.querySelector(`[data-attachment-section="${requestId}"]`);
+            const newFilename = data.filename || data.new_filename; // Handle both possible response formats
+            if (existingSection && newFilename) {
+                // Update the stored attachment data
+                if (window.lastKnownAttachmentData) {
+                    window.lastKnownAttachmentData.attachmentScr = newFilename;
+                }
+                
+                // Create new attachment section HTML
+                const newAttachmentHtml = createAttachmentSection(newFilename, requestId, tableName, 'pending');
+                
+                // Replace the existing section
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = newAttachmentHtml;
+                const newSection = tempDiv.firstElementChild;
+                
+                existingSection.parentNode.replaceChild(newSection, existingSection);
+                console.log('✅ Attachment section updated with new file:', data.new_filename);
+            } else {
+                // Fallback: reload page if we can't update in-place
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            }
         } else {
             console.error('Upload attachment failed:', data);
             alert('❌ Error: ' + (data.message || 'Failed to upload attachment'));

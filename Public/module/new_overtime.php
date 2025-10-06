@@ -1804,7 +1804,7 @@ button:hover {
                                                        id="minutes-input" 
                                                        min="0" 
                                                        max="59"
-                                                       step="15"
+                                                       step="1"
                                                        value="0"
                                                        class="w-12 h-8 text-center border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-200 bg-slate-50/50 hover:bg-white shadow-sm">
                                             </div>
@@ -2143,11 +2143,6 @@ function initializeTimePicker(maxHours) {
         }
     }
     
-    // Round minutes to nearest 15-minute increment
-    function roundMinutes(minutes) {
-        return Math.round(minutes / 15) * 15;
-    }
-    
     // Input event listeners
     hoursInput.addEventListener('input', function() {
         let value = parseInt(this.value);
@@ -2160,13 +2155,6 @@ function initializeTimePicker(maxHours) {
         let value = parseInt(this.value);
         if (value < 0) this.value = 0;
         if (value > 59) this.value = 59;
-        updateHiddenInput();
-    });
-    
-    // Round minutes on blur for 15-minute increments
-    minutesInput.addEventListener('blur', function() {
-        const rounded = roundMinutes(parseInt(this.value) || 0);
-        this.value = rounded;
         updateHiddenInput();
     });
     

@@ -1,17 +1,28 @@
 <?php
 session_start();
 
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Set JSON header early
+header('Content-Type: application/json');
+
+// Log the upload attempt
+error_log('Upload schedule attachment started - Session: ' . print_r($_SESSION, true));
+error_log('POST data: ' . print_r($_POST, true));
+error_log('FILES data: ' . print_r($_FILES, true));
+
 // Check if user is logged in
 if (!isset($_SESSION['employee']['id'])) {
+    error_log('Upload failed: User not logged in');
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized access']);
     exit;
 }
 
 // Database connection
-require_once '../config/database.php';
-
-header('Content-Type: application/json');
+require_once '../config/db.php';
 
 try {
     // Validate request method
@@ -127,13 +138,22 @@ try {
     
     // Update database with new attachment path (store relative path)
     $relativePath = 'schedule_attachments/' . $filename;
+    error_log("About to update database - Table: {$tableName}, ID: {$requestId}, Path: {$relativePath}");
+    
     $stmt = $pdo->prepare("UPDATE {$tableName} SET attachment_scr = ? WHERE id = ?");
     $success = $stmt->execute([$relativePath, $requestId]);
+    
+    error_log("Database update result: " . ($success ? 'SUCCESS' : 'FAILED'));
+    error_log("Rows affected: " . $stmt->rowCount());
     
     if (!$success) {
         // Clean up uploaded file if database update fails
         unlink($filePath);
         throw new Exception('Failed to update database');
+    }
+    
+    if ($stmt->rowCount() === 0) {
+        error_log("Warning: No rows were updated. Request ID might not exist or conditions not met.");
     }
     
     // Log the activity
@@ -144,7 +164,9 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Attachment uploaded successfully',
-        'filename' => $filename
+        'filename' => $filename,
+        'new_filename' => $filename,  // Also include for compatibility
+        'file_path' => $relativePath
     ]);
     
 } catch (Exception $e) {

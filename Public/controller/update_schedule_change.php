@@ -22,14 +22,14 @@ try {
     }
     
     // Validate required fields
-    if (!isset($data['request_id']) || !isset($data['table_name']) || !isset($data['new_schedule'])) {
+    if (!isset($data['request_id']) || !isset($data['table_name']) || !isset($data['work_schedule_id'])) {
         echo json_encode(['success' => false, 'message' => 'Missing required fields']);
         exit;
     }
     
     $requestId = (int)$data['request_id'];
     $tableName = $data['table_name'];
-    $newSchedule = $data['new_schedule'];
+    $workScheduleId = (int)$data['work_schedule_id'];
     $newDateRange = $data['new_date_range'] ?? null;
     $employeeId = $_SESSION['employee']['id'];
     
@@ -44,11 +44,27 @@ try {
         exit;
     }
     
-    // Connect to database
+    // Validate that the work_schedule_id exists
     require_once '../config/db.php';
     
+    $scheduleCheckStmt = $pdo->prepare("SELECT id, time_in, time_out FROM work_schedules WHERE id = ?");
+    $scheduleCheckStmt->execute([$workScheduleId]);
+    $schedule = $scheduleCheckStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$schedule) {
+        echo json_encode(['success' => false, 'message' => 'Invalid schedule ID']);
+        exit;
+    }
+    
     try {
-        // First, verify that this request belongs to the logged-in user
+        // First, let's check what columns exist in the table
+        $columnsQuery = "DESCRIBE `$tableName`";
+        $columnsStmt = $pdo->prepare($columnsQuery);
+        $columnsStmt->execute();
+        $columns = $columnsStmt->fetchAll(PDO::FETCH_COLUMN);
+        error_log("Available columns in $tableName: " . json_encode($columns));
+        
+        // Verify that this request belongs to the logged-in user
         $verifyQuery = "SELECT employee_id, status FROM `$tableName` WHERE id = ? LIMIT 1";
         $verifyStmt = $pdo->prepare($verifyQuery);
         $verifyStmt->execute([$requestId]);
@@ -70,64 +86,45 @@ try {
             exit;
         }
         
-        // Parse the new schedule to extract time_in and time_out
-        // Expected format: "6:00 AM - 2:00 PM"
-        if (preg_match('/(\d{1,2}):(\d{2}) (AM|PM) - (\d{1,2}):(\d{2}) (AM|PM)/', $newSchedule, $matches)) {
-            // Convert times to 24-hour format
-            $timeInHour = $matches[1];
-            $timeInMinute = $matches[2];
-            $timeInAMPM = $matches[3];
-            
-            $timeOutHour = $matches[4];
-            $timeOutMinute = $matches[5];
-            $timeOutAMPM = $matches[6];
-            
-            // Convert to 24-hour format
-            if ($timeInAMPM === 'PM' && $timeInHour != 12) {
-                $timeInHour += 12;
-            } elseif ($timeInAMPM === 'AM' && $timeInHour == 12) {
-                $timeInHour = 0;
-            }
-            
-            if ($timeOutAMPM === 'PM' && $timeOutHour != 12) {
-                $timeOutHour += 12;
-            } elseif ($timeOutAMPM === 'AM' && $timeOutHour == 12) {
-                $timeOutHour = 0;
-            }
-            
-            $requestedTimeIn = sprintf('%02d:%02d:00', $timeInHour, $timeInMinute);
-            $requestedTimeOut = sprintf('%02d:%02d:00', $timeOutHour, $timeOutMinute);
-            
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Invalid schedule format']);
-            exit;
-        }
-        
         // Build update query
         $updateFields = [];
         $updateValues = [];
         
-        $updateFields[] = 'requested_time_in = ?';
-        $updateValues[] = $requestedTimeIn;
-        
-        $updateFields[] = 'requested_time_out = ?';
-        $updateValues[] = $requestedTimeOut;
+        // Update the work_schedule_id (this is the field that stores the requested schedule)
+        if (isset($data['work_schedule_id'])) {
+            $updateFields[] = 'work_schedule_id = ?';
+            $updateValues[] = (int)$data['work_schedule_id'];
+        }
         
         // Handle date range if provided
         if ($newDateRange) {
-            // Parse date range (expected format: YYYY-MM-DD to YYYY-MM-DD or single date)
+            // Parse date range (expected format: "Oct 10, 2025 to Oct 10, 2025" or "2025-10-10 to 2025-10-10")
             if (strpos($newDateRange, ' to ') !== false) {
-                list($startDate, $endDate) = explode(' to ', $newDateRange);
-                $updateFields[] = 'start_date = ?';
-                $updateValues[] = $startDate;
-                $updateFields[] = 'end_date = ?';
-                $updateValues[] = $endDate;
+                list($startDateRaw, $endDateRaw) = explode(' to ', $newDateRange);
+                
+                // Convert to YYYY-MM-DD format for database
+                $startDate = date('Y-m-d', strtotime(trim($startDateRaw)));
+                $endDate = date('Y-m-d', strtotime(trim($endDateRaw)));
+                
+                if ($startDate && $startDate !== '1970-01-01' && $endDate && $endDate !== '1970-01-01') {
+                    $updateFields[] = 'start_date = ?';
+                    $updateValues[] = $startDate;
+                    $updateFields[] = 'end_date = ?';
+                    $updateValues[] = $endDate;
+                } else {
+                    error_log("Date conversion failed for: " . $newDateRange);
+                }
             } else {
                 // Single date
-                $updateFields[] = 'start_date = ?';
-                $updateValues[] = $newDateRange;
-                $updateFields[] = 'end_date = ?';
-                $updateValues[] = $newDateRange;
+                $singleDate = date('Y-m-d', strtotime(trim($newDateRange)));
+                if ($singleDate && $singleDate !== '1970-01-01') {
+                    $updateFields[] = 'start_date = ?';
+                    $updateValues[] = $singleDate;
+                    $updateFields[] = 'end_date = ?';
+                    $updateValues[] = $singleDate;
+                } else {
+                    error_log("Single date conversion failed for: " . $newDateRange);
+                }
             }
         }
         
@@ -139,18 +136,36 @@ try {
         
         $updateQuery = "UPDATE `$tableName` SET " . implode(', ', $updateFields) . " WHERE id = ? AND employee_id = ? LIMIT 1";
         
+        // Log the query for debugging
+        error_log("Schedule Update Query: " . $updateQuery);
+        error_log("Schedule Update Values: " . json_encode($updateValues));
+        
         $updateStmt = $pdo->prepare($updateQuery);
         $result = $updateStmt->execute($updateValues);
         
+        // Log the result
+        error_log("Update result: " . ($result ? 'true' : 'false'));
+        error_log("Rows affected: " . $updateStmt->rowCount());
+        
         if ($result && $updateStmt->rowCount() > 0) {
+            // Format schedule display for response
+            $timeInDisplay = date("g:i A", strtotime($schedule['time_in']));
+            $timeOutDisplay = date("g:i A", strtotime($schedule['time_out']));
+            $scheduleDisplay = "$timeInDisplay - $timeOutDisplay";
+            
             echo json_encode([
                 'success' => true, 
                 'message' => 'Schedule change updated successfully',
-                'new_schedule' => $newSchedule,
-                'requested_time_in' => $requestedTimeIn,
-                'requested_time_out' => $requestedTimeOut,
+                'new_schedule_id' => $workScheduleId,
+                'new_schedule_display' => $scheduleDisplay,
                 'date_range' => $newDateRange,
-                'affected_rows' => $updateStmt->rowCount()
+                'affected_rows' => $updateStmt->rowCount(),
+                'debug_info' => [
+                    'query' => $updateQuery,
+                    'values' => $updateValues,
+                    'request_id' => $requestId,
+                    'employee_id' => $employeeId
+                ]
             ]);
         } else {
             echo json_encode(['success' => false, 'message' => 'No rows updated. Request may not exist or you may not have permission.']);

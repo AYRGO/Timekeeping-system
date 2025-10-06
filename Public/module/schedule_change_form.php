@@ -87,10 +87,10 @@
               <label class="flex items-center text-lg font-semibold text-gray-800 mb-3">
                 <i class="fas fa-paperclip text-green-600 mr-2"></i>
                 Supporting Document
-                <span class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full ml-2 font-bold">Required</span>
+                <span class="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded-full ml-2 font-bold">Optional</span>
               </label>
               <div class="relative">
-                <input type="file" name="attachment_scr" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" required
+                <input type="file" name="attachment_scr" id="fileInput" accept=".pdf,.jpg,.jpeg,.png"
                        class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
               </div>
               <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">

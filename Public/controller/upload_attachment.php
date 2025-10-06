@@ -62,8 +62,8 @@ try {
         'post_leave_requests' => '../uploads/leave_attachments/',
         'schedule_change_requests' => '../uploads/schedule_attachments/',
         'post_schedule_change_requests' => '../uploads/schedule_attachments/',
-        'time_adjustment_requests' => '../uploads/time_adjustments/',
-        'post_time_adjustment_requests' => '../uploads/time_adjustments/',
+        'time_adjustment_requests' => '../uploads/',
+        'post_time_adjustment_requests' => '../uploads/',
         'overtime_requests' => '../uploads/overtime_attachments/',
         'post_ot_requests' => '../uploads/overtime_attachments/',
         'new_ot_requests' => '../uploads/overtime_attachments/'

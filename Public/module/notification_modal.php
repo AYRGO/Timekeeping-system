@@ -97,11 +97,11 @@ if ($current_user_id) {
 // --- Leave Requests (from both tables) ---
 // Pending leave requests
 $leave_stmt = $pdo->prepare("
-    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, reason, 'pending' as source_table
+    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, reason, attachment_lr, 'pending' as source_table
     FROM leave_requests 
     WHERE employee_id = ?
     UNION ALL
-    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, reason, 'approved' as source_table
+    SELECT id, leave_type, status, start_date, end_date, created_at, notified, explanation, reason, attachment_lr, 'approved' as source_table
     FROM post_leave_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
@@ -138,6 +138,7 @@ foreach ($leave_results as $leave) {
         'start_date' => $leave['start_date'],
         'end_date' => $leave['end_date'],
         'reason' => $leave['reason'] ?? '',
+        'attachment_lr' => $leave['attachment_lr'] ?? '',
         'source_table' => $leave['source_table']
     ];
 
@@ -342,11 +343,11 @@ foreach ($schedule_results as $sched) {
 
 // --- Time Adjustment Requests (from both tables) ---
 $adjust_stmt = $pdo->prepare("
-    SELECT id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, status, reason, created_at, notified, 'pending' as source_table
+    SELECT id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, status, reason, created_at, notified, attachment, 'pending' as source_table
     FROM time_adjustment_requests 
     WHERE employee_id = ?
     UNION ALL
-    SELECT id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, status, reason, created_at, notified, 'approved' as source_table
+    SELECT id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, status, reason, created_at, notified, attachment, 'approved' as source_table
     FROM post_time_adjustment_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
@@ -382,6 +383,7 @@ foreach ($adjust_results as $adjustment) {
         'current_time_out' => $adjustment['current_time_out'],
         'requested_time_in' => $adjustment['requested_time_in'],
         'requested_time_out' => $adjustment['requested_time_out'],
+        'attachment' => $adjustment['attachment'] ?? '',
         'request_id' => $adjustment['id'],
         'table_name' => 'time_adjustment_requests',
         'source_table' => $adjustment['source_table']
@@ -475,7 +477,7 @@ foreach ($adjust_results as $adjustment) {
 // --- Overtime Requests (from both tables) ---
 // First get pending overtime requests
 $pending_ot_stmt = $pdo->prepare("
-    SELECT id, employee_id, date, start_time, end_time, reason, duration_hours, status, created_at, 'pending' as source_table
+    SELECT id, employee_id, date, start_time, end_time, reason, duration_hours, status, created_at, attachment_ot as attachment, 'pending' as source_table
     FROM overtime_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
@@ -486,11 +488,11 @@ $pending_ot_results = $pending_ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Then get processed overtime requests from both post tables
 $ot_stmt = $pdo->prepare("
-    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, 'post_ot_requests' as source_table
+    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, attachment, 'post_ot_requests' as source_table
     FROM post_ot_requests
     WHERE employee_id = ?
     UNION ALL
-    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, 'post2_overtime_requests' as source_table
+    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, attachment, 'post2_overtime_requests' as source_table
     FROM post2_overtime_requests
     WHERE employee_id = ?
     ORDER BY COALESCE(approved_at, created_at) DESC
@@ -524,6 +526,8 @@ foreach ($pending_ot_results as $ot) {
         'end_ot' => $ot['end_time'] ?? null,
         'ot_duration' => $ot['duration_hours'],
         'ot_type' => $ot_type,
+        'ot_date' => $ot['date'],
+        'attachment' => $ot['attachment'] ?? '',
         'request_id' => $ot['id'],
         'table_name' => 'overtime_requests',
         'source_table' => 'pending'
@@ -667,6 +671,8 @@ foreach ($ot_results as $ot) {
         'end_ot' => $end_ot,
         'ot_duration' => $ot['ot_duration'],
         'ot_type' => $ot_type,
+        'ot_date' => $log_date,
+        'attachment' => $ot['attachment'] ?? '',
         'request_id' => $ot['id'],
         'table_name' => $ot['source_table'],
         'source_table' => 'post'

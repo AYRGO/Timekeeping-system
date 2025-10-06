@@ -20,12 +20,31 @@ if (empty($attachmentPath)) {
 // Allow schedule_attachments subdirectory but prevent traversal attacks
 $attachmentPath = str_replace(['../', '..\\'], '', $attachmentPath);
 
-// Determine full path - check multiple possible locations
-$possiblePaths = [
-    '../uploads/' . $attachmentPath,  // Direct in uploads
-    '../uploads/schedule_attachments/' . basename($attachmentPath),  // In schedule_attachments folder
-    '../uploads/' . basename($attachmentPath)  // Just filename in uploads root
-];
+// Determine full path - check multiple possible locations based on file naming pattern
+$possiblePaths = [];
+
+// Check if it's a leave attachment (starts with lr_)
+if (preg_match('/^lr_/', basename($attachmentPath))) {
+    $possiblePaths[] = '../uploads/leave_attachments/' . basename($attachmentPath);
+    $possiblePaths[] = '../uploads/' . $attachmentPath;  // In case path includes directory
+}
+// Check if it's an overtime attachment (starts with ot_)
+elseif (preg_match('/^ot_/', basename($attachmentPath))) {
+    $possiblePaths[] = '../uploads/overtime_attachments/' . basename($attachmentPath);
+    $possiblePaths[] = '../uploads/' . $attachmentPath;
+}
+// Check if it's a time adjustment attachment (starts with attach_)
+elseif (preg_match('/^attach_/', basename($attachmentPath)) || preg_match('/uploads\/attach_/', $attachmentPath)) {
+    $possiblePaths[] = '../' . $attachmentPath;  // For paths like uploads/attach_680e21cd91505.JPG
+    $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
+    $possiblePaths[] = '../uploads/time_adjustment_attachments/' . basename($attachmentPath);
+}
+// Schedule attachments or default
+else {
+    $possiblePaths[] = '../uploads/schedule_attachments/' . basename($attachmentPath);
+    $possiblePaths[] = '../uploads/' . $attachmentPath;  // Direct in uploads
+    $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
+}
 
 $fullPath = null;
 foreach ($possiblePaths as $path) {
