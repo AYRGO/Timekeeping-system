@@ -236,47 +236,7 @@ try {
                 exit;
             }
 
-            // ✅ Check leave credits BEFORE inserting
-            if ($leaveType !== 'LWOP') {
-                // Map halfday types to their base credit types for validation
-                $creditTypeToCheck = $leaveType;
-                if ($leaveType === 'halfday') {
-                    $creditTypeToCheck = 'vacation';
-                } elseif ($leaveType === 'halfday_sick') {
-                    $creditTypeToCheck = 'sick';
-                }
-                
-                $stmt = $pdo->prepare("
-                    SELECT balance FROM leave_credits 
-                    WHERE employee_id = :employee_id AND leave_type = :leave_type AND year = :year
-                ");
-                $stmt->execute([
-                    'employee_id' => $employee_id,
-                    'leave_type'  => $creditTypeToCheck,  // Use mapped credit type
-                    'year'        => date('Y')
-                ]);
-                $creditRow = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                $startDate = new DateTime($start);
-                $endDate = new DateTime($end);
-                $daysRequested = $startDate->diff($endDate)->days + 1; // Inclusive
-
-                // Calculate actual days needed based on leave type
-                $actualDaysNeeded = $daysRequested;
-                if ($leaveType === 'halfday' || $leaveType === 'halfday_sick') {
-                    $actualDaysNeeded = $daysRequested * 0.5; // Half days
-                }
-
-                if (!$creditRow) {
-                    header("Location: time_log_create.php?leave_request=no_credit_record");
-                    exit;
-                }
-
-                if ($creditRow['balance'] < $actualDaysNeeded) {
-                    header("Location: time_log_create.php?leave_request=insufficient_credits");
-                    exit;
-                }
-            }
+            // ✅ Credit restrictions removed - Allow all leave requests regardless of balance
 
             // ✅ Handle File Upload
             $attachmentPath = null;
@@ -944,7 +904,7 @@ document.addEventListener("DOMContentLoaded", function () {
         
         if (!selectedType) return;
 
-        // Reset state
+        // Reset state - Always enable submission (no restrictions)
         leaveBalanceDisplay.classList.remove("hidden");
         enableSubmitButton();
 
@@ -985,7 +945,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const icon = container.querySelector('i');
         const textSpan = container.querySelector('span');
 
-        // Handle different leave types
+        // Handle different leave types - Show info only, no restrictions
         if (selectedType === "lwop") {
             // Update for LWOP (blue/info style)
             container.className = "bg-blue-50 border border-blue-200 rounded-xl p-4";
@@ -995,48 +955,27 @@ document.addEventListener("DOMContentLoaded", function () {
         } else if (selectedType === "halfday" || selectedType === "halfday_sick") {
             requestedDays = requestedDays * 0.5; // Half days
             const displayType = creditType.replace('_', ' ').toUpperCase();
-            if (balance < requestedDays) {
-                // Insufficient credits (red)
-                container.className = "bg-red-50 border border-red-200 rounded-xl p-4";
-                icon.className = "fas fa-exclamation-circle text-red-600 mr-3";
-                textSpan.className = "text-red-700 font-medium";
-                textSpan.textContent = `❌ Not enough ${displayType} credits! You need ${requestedDays} day(s) but only have ${balance} day(s).`;
-                disableSubmitButton();
-            } else {
-                // Sufficient credits (green)
-                container.className = "bg-green-50 border border-green-200 rounded-xl p-4";
-                icon.className = "fas fa-check-circle text-green-600 mr-3";
-                textSpan.className = "text-green-700 font-medium";
-                textSpan.textContent = `✅ You have ${balance} ${displayType} day(s) available.`;
-            }
+            // Always show as informational (blue) - no restrictions
+            container.className = "bg-blue-50 border border-blue-200 rounded-xl p-4";
+            icon.className = "fas fa-info-circle text-blue-600 mr-3";
+            textSpan.className = "text-blue-700 font-medium";
+            textSpan.textContent = `ℹ️ Requesting ${requestedDays} day(s) of ${displayType}. Available: ${balance} day(s). (No restrictions applied)`;
         } else {
-            if (balance < requestedDays) {
-                // Insufficient credits (red)
-                container.className = "bg-red-50 border border-red-200 rounded-xl p-4";
-                icon.className = "fas fa-exclamation-circle text-red-600 mr-3";
-                textSpan.className = "text-red-700 font-medium";
-                textSpan.textContent = `❌ Not enough credits! You need ${requestedDays} day(s) but only have ${balance} day(s).`;
-                disableSubmitButton();
-            } else {
-                // Sufficient credits (green)
-                container.className = "bg-green-50 border border-green-200 rounded-xl p-4";
-                icon.className = "fas fa-check-circle text-green-600 mr-3";
-                textSpan.className = "text-green-700 font-medium";
-                textSpan.textContent = `✅ You have ${balance} day(s) available.`;
-            }
+            // Always show as informational (blue) - no restrictions
+            container.className = "bg-blue-50 border border-blue-200 rounded-xl p-4";
+            icon.className = "fas fa-info-circle text-blue-600 mr-3";
+            textSpan.className = "text-blue-700 font-medium";
+            textSpan.textContent = `ℹ️ Requesting ${requestedDays} day(s). Available credits: ${balance} day(s). (No restrictions applied)`;
         }
+
+        // Always ensure button is enabled - no restrictions
+        enableSubmitButton();
     }
 
     function disableSubmitButton() {
-        submitBtn.disabled = true;
-        submitBtn.classList.remove("bg-green-600", "hover:bg-green-700");
-        submitBtn.classList.add("opacity-50", "cursor-not-allowed", "bg-gray-400");
-        const btnText = submitBtn.querySelector('span');
-        if (btnText) {
-            btnText.textContent = "Insufficient Leave Credits";
-        } else {
-            submitBtn.textContent = "Insufficient Leave Credits";
-        }
+        // Function kept for compatibility but no longer disables button
+        // Always keep button enabled - no credit restrictions
+        enableSubmitButton();
     }
 
     function enableSubmitButton() {
@@ -1060,11 +999,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const leaveForm = document.getElementById('leaveRequestForm');
     if (leaveForm) {
         leaveForm.addEventListener('submit', function (e) {
-            if (submitBtn.disabled) {
-                e.preventDefault();
-                alert("Cannot submit: Insufficient leave credits!");
-                return false;
-            }
+            // No credit checks - always allow submission
             if (!confirm("Are you sure you want to submit this leave request?")) {
                 e.preventDefault();
             }
@@ -1086,9 +1021,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const alerts = {
         leave_request: {
             success: "Leave request submitted successfully!",
-            invalid_dates: "Invalid leave date range submitted.",
-            insufficient_credits: "❌ Insufficient leave credits for this request!",
-            no_credit_record: "❌ No leave credit record found for this leave type!"
+            invalid_dates: "Invalid leave date range submitted."
         },
         schedule_change: {
             success: "Schedule change request submitted successfully!"
@@ -1180,17 +1113,7 @@ function closeEditModal() {
     }, 5000);
 </script>
 <!--Start of Tawk.to Script-->
-<script type="text/javascript">
-var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
-(function(){
-var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
-s1.async=true;
-s1.src='https://embed.tawk.to/68636c761c010c190e038444/1iv25vcme';
-s1.charset='UTF-8';
-s1.setAttribute('crossorigin','*');
-s0.parentNode.insertBefore(s1,s0);
-})();
-</script>
+
 <!--End of Tawk.to Script-->
 
 <script>
@@ -1230,24 +1153,5 @@ function toggleLeaveMenu() {
 </script>
 
 </main>
-
-<!-- Footer -->
-<footer class="bg-gray-50 border-t border-gray-200">
-    <div class="max-w-7xl mx-auto px-6 py-2">
-        <div class="flex flex-col md:flex-row justify-between items-center text-xs text-gray-400">
-            <div class="md:mb-0">
-                © <?= date('Y') ?> RSS Harley System. All rights reserved.
-            </div>
-            <div class="flex items-center space-x-4">
-                <span>Version 2.1.0</span>
-                <div class="flex items-center space-x-1">
-                    <i class="fas fa-shield-alt text-green-500"></i>
-                    <span>Secure Connection</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</footer>
-
 </body>
 </html>

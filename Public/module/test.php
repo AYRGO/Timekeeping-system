@@ -112,7 +112,8 @@ if (!isset($_SESSION['adjustment_form'])) {
         'requested_time_in' => '',
         'requested_time_out' => '',
         'reason' => '',
-        'attachment' => ''
+        'attachment' => '',
+        'adjustment_type' => ''
     ];
 }
 
@@ -168,6 +169,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
     }
     if (isset($_POST['reason'])) {
         $_SESSION['adjustment_form']['reason'] = $_POST['reason'];
+    }
+    if (isset($_POST['adjustment_type'])) {
+        $_SESSION['adjustment_form']['adjustment_type'] = $_POST['adjustment_type'];
     }
 
     // Handle file upload - IMPROVED LOGIC
@@ -851,14 +855,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
 
                 <?php elseif ($current_step == 2): ?>
                     <div class="step-title">🕐 Set Requested Times</div>
-                    <div class="step-description">Enter your requested time in and time out (optional)</div>
+                    <div class="step-description">Choose what you want to adjust and enter the new time</div>
                     
                     <div class="form-group">
-                        <label class="form-label">Requested Time In</label>
+                        <label class="form-label required">What do you want to adjust?</label>
+                        <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px 20px; border: 2px solid #e9ecef; border-radius: 10px; transition: all 0.3s ease;">
+                                <input type="radio" name="adjustment_type" value="time_in" 
+                                       <?= (isset($_SESSION['adjustment_form']['adjustment_type']) && $_SESSION['adjustment_form']['adjustment_type'] == 'time_in') ? 'checked' : '' ?>
+                                       onchange="toggleTimeInputs()" style="margin: 0;">
+                                <span style="font-weight: 600;">Time In Only</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px 20px; border: 2px solid #e9ecef; border-radius: 10px; transition: all 0.3s ease;">
+                                <input type="radio" name="adjustment_type" value="time_out" 
+                                       <?= (isset($_SESSION['adjustment_form']['adjustment_type']) && $_SESSION['adjustment_form']['adjustment_type'] == 'time_out') ? 'checked' : '' ?>
+                                       onchange="toggleTimeInputs()" style="margin: 0;">
+                                <span style="font-weight: 600;">Time Out Only</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px 20px; border: 2px solid #e9ecef; border-radius: 10px; transition: all 0.3s ease;">
+                                <input type="radio" name="adjustment_type" value="both" 
+                                       <?= (isset($_SESSION['adjustment_form']['adjustment_type']) && $_SESSION['adjustment_form']['adjustment_type'] == 'both') ? 'checked' : '' ?>
+                                       onchange="toggleTimeInputs()" style="margin: 0;">
+                                <span style="font-weight: 600;">Both Times</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" id="timeInGroup" style="display: none;">
+                        <label class="form-label required">Requested Time In</label>
                         <input type="time" name="requested_time_in" class="form-control" value="<?= $_SESSION['adjustment_form']['requested_time_in'] ?>">
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Requested Time Out</label>
+                    <div class="form-group" id="timeOutGroup" style="display: none;">
+                        <label class="form-label required">Requested Time Out</label>
                         <input type="time" name="requested_time_out" class="form-control" value="<?= $_SESSION['adjustment_form']['requested_time_out'] ?>">
                     </div>
 
@@ -983,6 +1011,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
     </div>
 
 <script>
+    // Toggle time inputs based on adjustment type
+    function toggleTimeInputs() {
+        const adjustmentType = document.querySelector('input[name="adjustment_type"]:checked')?.value;
+        const timeInGroup = document.getElementById('timeInGroup');
+        const timeOutGroup = document.getElementById('timeOutGroup');
+        const radioLabels = document.querySelectorAll('input[name="adjustment_type"]');
+        
+        // Reset all radio label styles
+        radioLabels.forEach(radio => {
+            const label = radio.closest('label');
+            if (radio.checked) {
+                label.style.borderColor = '#667eea';
+                label.style.background = '#f8f9ff';
+                label.style.color = '#333';
+            } else {
+                label.style.borderColor = '#e9ecef';
+                label.style.background = 'white';
+                label.style.color = '#666';
+            }
+        });
+        
+        // Show/hide time inputs based on selection
+        if (adjustmentType === 'time_in') {
+            timeInGroup.style.display = 'block';
+            timeOutGroup.style.display = 'none';
+            // Clear time out value
+            document.querySelector('input[name="requested_time_out"]').value = '';
+        } else if (adjustmentType === 'time_out') {
+            timeInGroup.style.display = 'none';
+            timeOutGroup.style.display = 'block';
+            // Clear time in value
+            document.querySelector('input[name="requested_time_in"]').value = '';
+        } else if (adjustmentType === 'both') {
+            timeInGroup.style.display = 'block';
+            timeOutGroup.style.display = 'block';
+        } else {
+            timeInGroup.style.display = 'none';
+            timeOutGroup.style.display = 'none';
+        }
+    }
+
     // Date input functionality
     document.addEventListener('DOMContentLoaded', function() {
         const dateInput = document.getElementById('logDateInput');
@@ -1038,6 +1107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
                 updateDateInfo(this.value);
             });
         }
+        
+        // Initialize time inputs toggle on page load
+        toggleTimeInputs();
     });
 
     // File upload handling
@@ -1111,6 +1183,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
                 const logDate = document.querySelector('input[name="log_date"]').value;
                 if (!logDate) {
                     alert('Please select a date to continue.');
+                    return;
+                }
+            <?php elseif ($current_step == 2): ?>
+                const adjustmentType = document.querySelector('input[name="adjustment_type"]:checked')?.value;
+                if (!adjustmentType) {
+                    alert('Please select what you want to adjust.');
+                    return;
+                }
+                
+                const timeIn = document.querySelector('input[name="requested_time_in"]').value;
+                const timeOut = document.querySelector('input[name="requested_time_out"]').value;
+                
+                if (adjustmentType === 'time_in' && !timeIn) {
+                    alert('Please enter the requested time in.');
+                    return;
+                } else if (adjustmentType === 'time_out' && !timeOut) {
+                    alert('Please enter the requested time out.');
+                    return;
+                } else if (adjustmentType === 'both' && (!timeIn || !timeOut)) {
+                    alert('Please enter both requested times.');
                     return;
                 }
             <?php elseif ($current_step == 3): ?>

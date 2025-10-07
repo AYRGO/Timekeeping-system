@@ -50,7 +50,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                     <thead class="bg-gray-50 sticky top-0 z-10">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">
-                                Date
+                                Date Filed
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                                 Request Details
@@ -590,22 +590,22 @@ function showActivityDetails(title, dataJson) {
                                     <div class="flex items-center space-x-1">
                                         <select id="edit-time-out-hour-${data.request_id}" 
                                                 class="w-12 h-8 text-center border border-gray-300 bg-gray-100 rounded text-xs font-bold focus:ring-1 focus:ring-green-400 focus:border-green-400" 
-                                                disabled data-original="${extractHour(data.requested_time_out || data.current_time_out)}" 
+                                                disabled data-original="${extractHour(data.requested_time_out || data.current_time_out || '')}" 
                                                 onchange="updateTimeDisplay(${data.request_id}, 'out'); checkForChanges(${data.request_id})">
-                                            ${generateHourOptions(data.requested_time_out || data.current_time_out)}
+                                            ${generateHourOptions(data.requested_time_out || data.current_time_out || '')}
                                         </select>
                                         <span class="text-gray-400">:</span>
                                         <select id="edit-time-out-minute-${data.request_id}" 
                                                 class="w-12 h-8 text-center border border-gray-300 bg-gray-100 rounded text-xs font-bold focus:ring-1 focus:ring-green-400 focus:border-green-400" 
-                                                disabled data-original="${extractMinute(data.requested_time_out || data.current_time_out)}" 
+                                                disabled data-original="${extractMinute(data.requested_time_out || data.current_time_out || '')}" 
                                                 onchange="updateTimeDisplay(${data.request_id}, 'out'); checkForChanges(${data.request_id})">
-                                            ${generateMinuteOptions(data.requested_time_out || data.current_time_out)}
+                                            ${generateMinuteOptions(data.requested_time_out || data.current_time_out || '')}
                                         </select>
                                         <select id="edit-time-out-ampm-${data.request_id}" 
                                                 class="w-14 h-8 text-center border border-gray-300 bg-gray-100 rounded text-xs font-bold focus:ring-1 focus:ring-green-400 focus:border-green-400" 
-                                                disabled data-original="${extractAMPM(data.requested_time_out || data.current_time_out)}" 
+                                                disabled data-original="${extractAMPM(data.requested_time_out || data.current_time_out || '')}" 
                                                 onchange="updateTimeDisplay(${data.request_id}, 'out'); checkForChanges(${data.request_id})">
-                                            ${generateAMPMOptions(data.requested_time_out || data.current_time_out)}
+                                            ${generateAMPMOptions(data.requested_time_out || data.current_time_out || '')}
                                         </select>
                                     </div>
                                     <input type="hidden" id="edit-time-out-${data.request_id}" value="${data.requested_time_out || data.current_time_out || ''}" data-original="${data.requested_time_out || data.current_time_out || ''}">
@@ -2022,13 +2022,13 @@ function convertTo24Hour(time12h) {
 function extractHour(time12h) {
     console.log('extractHour called with:', time12h);
     if (!time12h || time12h === '') {
-        console.log('No time provided, defaulting to 08');
-        return '08';
+        console.log('No time provided, returning empty for user choice');
+        return '';
     }
     const [time] = time12h.split(/\s/);
     if (!time) {
-        console.log('No time part found, defaulting to 08');
-        return '08';
+        console.log('No time part found, returning empty');
+        return '';
     }
     const [hours] = time.split(':');
     const result = hours || '08';
@@ -2038,9 +2038,9 @@ function extractHour(time12h) {
 
 function extractMinute(time12h) {
     console.log('extractMinute called with:', time12h);
-    if (!time12h || time12h === '') return '00';
+    if (!time12h || time12h === '') return '';
     const [time] = time12h.split(/\s/);
-    if (!time) return '00';
+    if (!time) return '';
     const [, minutes] = time.split(':');
     const result = minutes || '00';
     console.log('Extracted minute:', result);
@@ -2049,7 +2049,7 @@ function extractMinute(time12h) {
 
 function extractAMPM(time12h) {
     console.log('extractAMPM called with:', time12h);
-    if (!time12h || time12h === '') return 'AM';
+    if (!time12h || time12h === '') return '';
     const parts = time12h.split(/\s/);
     const result = parts[1] ? parts[1].toUpperCase() : 'AM';
     console.log('Extracted AM/PM:', result);
@@ -2061,6 +2061,12 @@ function generateHourOptions(selectedTime) {
     const currentHour = extractHour(selectedTime);
     console.log('generateHourOptions - extracted currentHour:', currentHour);
     let options = '';
+    
+    // If no time selected, add placeholder
+    if (!currentHour || currentHour === '') {
+        options += '<option value="" selected disabled>--</option>';
+    }
+    
     for (let i = 1; i <= 12; i++) {
         const hour = i.toString().padStart(2, '0');
         // Normalize both values for comparison - remove leading zeros
@@ -2081,6 +2087,11 @@ function generateMinuteOptions(selectedTime) {
     console.log('generateMinuteOptions - extracted currentMinute:', currentMinute);
     let options = '';
     
+    // If no time selected, add placeholder
+    if (!currentMinute || currentMinute === '') {
+        options += '<option value="" selected disabled>--</option>';
+    }
+    
     // Generate all minute options (00-59) to allow exact time selection
     for (let i = 0; i < 60; i++) {
         const minute = i.toString().padStart(2, '0');
@@ -2095,10 +2106,19 @@ function generateMinuteOptions(selectedTime) {
 
 function generateAMPMOptions(selectedTime) {
     const currentAMPM = extractAMPM(selectedTime);
-    return `
+    let options = '';
+    
+    // If no time selected, add placeholder
+    if (!currentAMPM || currentAMPM === '') {
+        options += '<option value="" selected disabled>--</option>';
+    }
+    
+    options += `
         <option value="AM" ${currentAMPM === 'AM' ? 'selected' : ''}>AM</option>
         <option value="PM" ${currentAMPM === 'PM' ? 'selected' : ''}>PM</option>
     `;
+    
+    return options;
 }
 
 // Generate schedule options for schedule change requests

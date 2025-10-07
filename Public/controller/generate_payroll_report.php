@@ -447,30 +447,23 @@ foreach ($attendanceData as $employeeId => $data) {
         // Apply cell formatting based on status and details
         $cellStyle = $sheet->getStyle($currentColLetter . $row);
         
-        if ($status === 'P') {
-            // Present - Green background
-            $cellStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFD4EDDA');
-            $cellStyle->getFont()->getColor()->setARGB('FF155724');
-            $cellStyle->getFont()->setBold(true);
-        } elseif (in_array($status, ['SL', 'VL', 'EL'])) {
-            // Leave types - Yellow background
-            $cellStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFEAA7');
-            $cellStyle->getFont()->getColor()->setARGB('FF856404');
-            $cellStyle->getFont()->setBold(true);
-        } elseif ($status === 'OFF') {
-            // Day off - Dark gray background
+        if ($status === 'OFF') {
+            // Day off - Dark gray background (keep this color)
             $cellStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF6C757D');
             $cellStyle->getFont()->getColor()->setARGB('FFFFFFFF');
             $cellStyle->getFont()->setBold(true);
-        } elseif (!empty($details)) {
-            // Late/Undertime - Orange background
-            $cellStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFE4B5');
-            $cellStyle->getFont()->getColor()->setARGB('FF8B4513');
+        } elseif (!empty($details) && (is_numeric($details) || $details === 'Incomplete')) {
+            // Minutes (late/undertime) or "Incomplete" - red font
+            $cellStyle->getFont()->getColor()->setARGB('FFDC3545');
+            $cellStyle->getFont()->setBold(true);
+        } elseif (empty($status) && empty($details)) {
+            // Empty cells (absent) - medium gray background
+            $cellStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFA0A3A7');
+            $cellStyle->getFont()->getColor()->setARGB('FF000000');
             $cellStyle->getFont()->setBold(true);
         } else {
-            // Absent or incomplete - Dark gray background
-            $cellStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF808080');
-            $cellStyle->getFont()->getColor()->setARGB('FFFFFFFF');
+            // All other statuses - no background color, just bold text
+            $cellStyle->getFont()->setBold(true); 
         }
         
         // Add borders and alignment
@@ -491,7 +484,6 @@ foreach ($attendanceData as $employeeId => $data) {
     $sheet->getStyle($totalColLetter . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $sheet->getStyle($totalColLetter . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
     $sheet->getStyle($totalColLetter . $row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-    $sheet->getStyle($totalColLetter . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE3F2FD');
     
     // Add row borders and formatting
     $rowRange = "A{$row}:{$lastCol}{$row}";
@@ -508,10 +500,7 @@ foreach ($attendanceData as $employeeId => $data) {
     $sheet->getStyle("B{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
     $sheet->getStyle("B{$row}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
     
-    // Alternate row colors for name and schedule columns only
-    if ($row % 2 == 1) {
-        $sheet->getStyle("A{$row}:B{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF8F9FA');
-    }
+    // No alternating row colors
     
     $row++;
 }
@@ -523,11 +512,11 @@ $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(14); // Increased
 
 $row++;
 $legendItems = [
-    ['P', 'Present (Complete - No Late/Undertime)', 'FFD4EDDA', 'FF155724'],
-    ['SL/VL/EL', 'Leave Types (Sick/Vacation/Emergency)', 'FFFFEAA7', 'FF856404'], 
-    ['OFF', 'Scheduled Day Off', 'FF6C757D', 'FFFFFFFF'],
-    ['240', 'Late/Undertime Minutes (Total)', 'FFFFE4B5', 'FF8B4513'],
-    ['(Blank)', 'Absent/Incomplete', 'FF808080', 'FFFFFFFF']
+    ['P', 'Present (Complete - No Late/Undertime)', false],
+    ['SL/VL/EL', 'Leave Types (Sick/Vacation/Emergency)', false], 
+    ['OFF', 'Scheduled Day Off', true], // Keep color for OFF
+    ['240', 'Late/Undertime Minutes (Total)', false],
+    ['(Blank)', 'Absent/Incomplete', false]
 ];
 
 foreach ($legendItems as $i => $legend) {
@@ -536,8 +525,10 @@ foreach ($legendItems as $i => $legend) {
     $sheet->setCellValue("B{$legendRow}", $legend[1]);
     
     // Apply legend formatting
-    $sheet->getStyle("A{$legendRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB($legend[2]);
-    $sheet->getStyle("A{$legendRow}")->getFont()->getColor()->setARGB($legend[3]);
+    if ($legend[2]) { // Only apply color for OFF status
+        $sheet->getStyle("A{$legendRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF6C757D');
+        $sheet->getStyle("A{$legendRow}")->getFont()->getColor()->setARGB('FFFFFFFF');
+    }
     $sheet->getStyle("A{$legendRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $sheet->getStyle("A{$legendRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 }
