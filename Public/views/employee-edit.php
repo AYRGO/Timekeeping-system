@@ -259,8 +259,11 @@ $scheduleOptions = [
     16 => ['in' => '08:30 AM', 'out' => '04:30 PM'],
     17 => ['in' => '06:00 AM', 'out' => '12:00 PM'],
     18 => ['in' => '06:00 AM', 'out' => '02:30 PM'],
-    19 => ['in' => '07:00 PM', 'out' => '04:00 AM'],
-];
+                            19 => ['in' => '07:00 PM', 'out' => '03:00 AM'],    
+                            20 => ['in' => '07:00 PM', 'out' => '04:30 AM'],
+                            21 => ['in' => '05:00 PM', 'out' => '02:00 AM'],
+                            22 => ['in' => '05:30 PM', 'out' => '02:00 AM'],
+];  
 
 // Sort schedule options by 'in' time (earliest to latest)
 function timeToSortable($time) {
@@ -746,6 +749,10 @@ uasort($sortedScheduleOptions, function($a, $b) {
                             16 => ['in' => '08:30 AM', 'out' => '04:30 PM'],
                             17 => ['in' => '06:00 AM', 'out' => '12:00 PM'],
                             18 => ['in' => '06:00 AM', 'out' => '02:30 PM'],
+                            19 => ['in' => '07:00 PM', 'out' => '03:00 AM'],    
+                            20 => ['in' => '07:00 PM', 'out' => '04:30 AM'],
+                            21 => ['in' => '05:00 PM', 'out' => '02:00 AM'],
+                            22 => ['in' => '05:30 PM', 'out' => '02:00 AM'],
                         ];
                         ?>
                         <div class="overflow-x-auto">

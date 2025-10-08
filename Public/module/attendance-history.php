@@ -58,6 +58,10 @@ $schedule_times = [
         18 => ['in' => '06:00:00', 'out' => '14:30:00'],
         19 => ['in' => '19:00:00', 'out' => '3:00:00'],
         20 => ['in' => '19:00:00', 'out' => '4:30:00'],
+        21 => ['in' => '17:00:00', 'out' => '2:00:00'],
+        22 => ['in' => '17:30:00', 'out' => '2:00:00'],
+
+
 ];
 
 // Fetch all logs for July 1, 2025 onwards - Updated to include status and log_out_date columns

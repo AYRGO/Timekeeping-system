@@ -79,22 +79,39 @@ $currentYear = date('Y');
                         <div class="p-8">
                             <form action="../controller/generate_leave_report.php" method="get" class="space-y-8">
                                 
-                                <!-- Year Selection Card -->
-                                <div class="bg-gray-50 rounded-xl p-6 border-2 border-gray-200 hover:border-violet-400 transition-all max-w-md mx-auto">
-                                    <div class="flex items-center gap-3 mb-4">
-                                        <div class="w-10 h-10 bg-violet-500 rounded-lg flex items-center justify-center">
-                                            <i class="fas fa-calendar text-white"></i>
+                                <!-- Date Range Selection -->
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <!-- Start Date -->
+                                    <div class="bg-gray-50 rounded-xl p-6 border-2 border-gray-200 hover:border-violet-400 transition-all">
+                                        <div class="flex items-center gap-3 mb-4">
+                                            <div class="w-10 h-10 bg-violet-500 rounded-lg flex items-center justify-center">
+                                                <i class="fas fa-calendar-alt text-white"></i>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs text-violet-600 font-medium uppercase tracking-wide">From</p>
+                                                <h3 class="text-sm font-bold text-gray-800">Start Date</h3>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p class="text-xs text-violet-600 font-medium uppercase tracking-wide">Select</p>
-                                            <h3 class="text-sm font-bold text-gray-800">Report Year</h3>
-                                        </div>
+                                        <input type="date" name="start_date" id="start_date" 
+                                               value="<?= date('Y-m-01') ?>" 
+                                               class="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all">
                                     </div>
-                                    <select name="year" id="year" class="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all">
-                                        <?php for ($y = 2020; $y <= date('Y') + 1; $y++): ?>
-                                            <option value="<?= $y ?>" <?= $y == $currentYear ? 'selected' : '' ?>><?= $y ?></option>
-                                        <?php endfor; ?>
-                                    </select>
+                                    
+                                    <!-- End Date -->
+                                    <div class="bg-gray-50 rounded-xl p-6 border-2 border-gray-200 hover:border-violet-400 transition-all">
+                                        <div class="flex items-center gap-3 mb-4">
+                                            <div class="w-10 h-10 bg-violet-500 rounded-lg flex items-center justify-center">
+                                                <i class="fas fa-calendar-check text-white"></i>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs text-violet-600 font-medium uppercase tracking-wide">To</p>
+                                                <h3 class="text-sm font-bold text-gray-800">End Date</h3>
+                                            </div>
+                                        </div>
+                                        <input type="date" name="end_date" id="end_date" 
+                                               value="<?= date('Y-m-t') ?>" 
+                                               class="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all">
+                                    </div>
                                 </div>
 
                                 <!-- Quick Presets Section -->
@@ -104,14 +121,14 @@ $currentYear = date('Y');
                                         <h3 class="text-sm font-semibold text-gray-700">Quick Select</h3>
                                     </div>
                                     <div class="flex flex-wrap gap-3">
-                                        <button type="button" onclick="setYear('current')" class="px-6 py-2.5 bg-white border-2 border-violet-200 text-violet-700 rounded-full text-sm font-semibold hover:bg-violet-500 hover:text-white hover:border-violet-500 transition-all hover:scale-105 shadow-sm">
-                                            <i class="fas fa-calendar-day mr-2"></i>Current Year
+                                        <button type="button" onclick="setDateRange('current_month')" class="px-6 py-2.5 bg-white border-2 border-violet-200 text-violet-700 rounded-full text-sm font-semibold hover:bg-violet-500 hover:text-white hover:border-violet-500 transition-all hover:scale-105 shadow-sm">
+                                            <i class="fas fa-calendar-day mr-2"></i>Current Month
                                         </button>
-                                        <button type="button" onclick="setYear('previous')" class="px-6 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-full text-sm font-semibold hover:bg-gray-600 hover:text-white hover:border-gray-600 transition-all hover:scale-105 shadow-sm">
-                                            <i class="fas fa-history mr-2"></i>Previous Year
+                                        <button type="button" onclick="setDateRange('previous_month')" class="px-6 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-full text-sm font-semibold hover:bg-gray-600 hover:text-white hover:border-gray-600 transition-all hover:scale-105 shadow-sm">
+                                            <i class="fas fa-history mr-2"></i>Previous Month
                                         </button>
-                                        <button type="button" onclick="setYear('2023')" class="px-6 py-2.5 bg-white border-2 border-purple-200 text-purple-700 rounded-full text-sm font-semibold hover:bg-purple-500 hover:text-white hover:border-purple-500 transition-all hover:scale-105 shadow-sm">
-                                            <i class="fas fa-calendar-alt mr-2"></i>2023
+                                        <button type="button" onclick="setDateRange('current_year')" class="px-6 py-2.5 bg-white border-2 border-purple-200 text-purple-700 rounded-full text-sm font-semibold hover:bg-purple-500 hover:text-white hover:border-purple-500 transition-all hover:scale-105 shadow-sm">
+                                            <i class="fas fa-calendar-alt mr-2"></i>Current Year
                                         </button>
                                     </div>
                                 </div>
@@ -139,23 +156,31 @@ $currentYear = date('Y');
     </div>
 
     <script>
-        function setYear(preset) {
-            const yearSelect = document.getElementById('year');
-            const currentYear = new Date().getFullYear();
+        function setDateRange(preset) {
+            const startDateInput = document.getElementById('start_date');
+            const endDateInput = document.getElementById('end_date');
+            const now = new Date();
             
             switch(preset) {
-                case 'current':
-                    yearSelect.value = currentYear;
+                case 'current_month':
+                    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    startDateInput.value = currentMonthStart.toISOString().split('T')[0];
+                    endDateInput.value = currentMonthEnd.toISOString().split('T')[0];
                     break;
                     
-                case 'previous':
-                    yearSelect.value = currentYear - 1;
+                case 'previous_month':
+                    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+                    startDateInput.value = prevMonthStart.toISOString().split('T')[0];
+                    endDateInput.value = prevMonthEnd.toISOString().split('T')[0];
                     break;
                     
-                default:
-                    if (!isNaN(preset)) {
-                        yearSelect.value = preset;
-                    }
+                case 'current_year':
+                    const yearStart = new Date(now.getFullYear(), 0, 1);
+                    const yearEnd = new Date(now.getFullYear(), 11, 31);
+                    startDateInput.value = yearStart.toISOString().split('T')[0];
+                    endDateInput.value = yearEnd.toISOString().split('T')[0];
                     break;
             }
         }

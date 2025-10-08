@@ -1,9 +1,15 @@
 <?php 
 // File: monthly_leave_credit.php
-include('../config/db.php');
+include(__DIR__ . '/../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
 $currentYear = date('Y');
+$executionTime = date('Y-m-d H:i:s');
+$processedEmployees = 0;
+$logMessages = [];
+
+echo "🔄 Starting monthly leave credit accrual process at {$executionTime}\n";
+echo "📅 Processing for year: {$currentYear}\n\n";
 
 // Step 1: Fetch all active employees
 $employees = $pdo->query("SELECT id FROM employees WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
@@ -24,6 +30,13 @@ $leaveTypes = [
 // Step 3: Loop through each employee and leave type
 foreach ($employees as $emp) {
     $employee_id = $emp['id'];
+    
+    // Get employee details for logging
+    $empStmt = $pdo->prepare("SELECT CONCAT(fname, ' ', lname) as full_name FROM employees WHERE id = ?");
+    $empStmt->execute([$employee_id]);
+    $empName = $empStmt->fetchColumn() ?: "Employee ID: {$employee_id}";
+    
+    $employeeUpdates = [];
 
     foreach ($leaveTypes as $type => $rules) {
         // Check if leave_credits row exists
@@ -61,6 +74,17 @@ foreach ($employees as $emp) {
                     WHERE id = ?
                 ");
                 $update->execute([$newBalance, $monthlyIncrement, $newCarryOver, $row['id']]);
+                
+                // Log the update
+                $employeeUpdates[] = sprintf(
+                    "  %s: %.2f days (added: %.2f, balance: %.2f→%.2f%s)",
+                    ucfirst($type),
+                    $monthlyIncrement,
+                    $toBalance + $toCarryOver,
+                    $currentBalance,
+                    $newBalance,
+                    $type === 'vacation' && $toCarryOver > 0 ? ", carry-over: +{$toCarryOver}" : ""
+                );
             }
 
         } else {
@@ -91,8 +115,42 @@ foreach ($employees as $emp) {
                 $carryOver,
                 $currentYear
             ]);
+            
+            // Log the new record
+            if (isset($rules['monthly_increment'])) {
+                $employeeUpdates[] = sprintf(
+                    "  %s: %.2f days (new record, initial balance: %.2f)",
+                    ucfirst($type),
+                    $monthlyIncrement,
+                    $balance
+                );
+            }
         }
+    }
+    
+    // Log employee updates if any occurred
+    if (!empty($employeeUpdates)) {
+        $logMessages[] = "👤 {$empName}:\n" . implode("\n", $employeeUpdates);
+        $processedEmployees++;
     }
 }
 
-echo "✅ Leave credits updated successfully for " . count($employees) . " employees.\n";
+// Display execution summary
+echo "\n" . str_repeat("=", 60) . "\n";
+echo "📊 EXECUTION SUMMARY\n";
+echo str_repeat("=", 60) . "\n";
+echo "📅 Execution Time: {$executionTime}\n";
+echo "👥 Total Employees: " . count($employees) . "\n";
+echo "✅ Employees Processed: {$processedEmployees}\n";
+echo "🎯 Leave Types Processed: Vacation Leave (1.25 days/month), Sick Leave (0.42 days/month)\n\n";
+
+// Display detailed logs if any
+if (!empty($logMessages)) {
+    echo "📝 DETAILED PROCESSING LOG:\n";
+    echo str_repeat("-", 40) . "\n";
+    foreach ($logMessages as $message) {
+        echo $message . "\n\n";
+    }
+}
+
+echo "✅ Monthly leave credit accrual process completed successfully!\n";
