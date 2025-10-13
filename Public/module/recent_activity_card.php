@@ -1346,31 +1346,42 @@ function cancelRequestFromModal(requestId, tableName, sourceTable) {
 }
 
 function cancelLeaveRequest(requestId, tableName, sourceTable) {
+    console.log(`🚀 Starting cancelLeaveRequest - ID: ${requestId}, Table: ${tableName}, Source: ${sourceTable}`);
+    
     // Show loading state with better visual feedback
-    const buttons = document.querySelectorAll(`button[onclick*="${requestId}"][onclick*="${tableName}"]`);
+    const buttons = document.querySelectorAll(`button[onclick*="${requestId}"]`);
+    console.log(`Found ${buttons.length} buttons for request ${requestId}`);
+    
     buttons.forEach(button => {
-        if (button.textContent.trim().includes('Cancel') || button.textContent.trim().includes('Unsubmit')) {
+        const buttonText = button.textContent.trim();
+        console.log(`Button text: "${buttonText}"`);
+        if (buttonText.includes('Cancel') || buttonText.includes('Unsubmit')) {
             button.disabled = true;
             button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Cancelling...';
             button.classList.add('opacity-75', 'cursor-not-allowed');
+            console.log(`Button updated to loading state`);
         }
     });
     
-    console.log(`Cancelling leave request - ID: ${requestId}, Table: ${tableName}, Source: ${sourceTable}`);
+    console.log(`📤 Sending request to cancel leave - ID: ${requestId}, Table: ${tableName}, Source: ${sourceTable}`);
     
     // Make AJAX request to cancel leave request
+    const requestData = {
+        id: requestId,
+        table: tableName,
+        source_table: sourceTable
+    };
+    console.log('📦 Request payload:', requestData);
+    
     fetch('../controller/cancel_leave_request.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            id: requestId,
-            table: tableName,
-            source_table: sourceTable
-        })
+        body: JSON.stringify(requestData)
     })
     .then(response => {
+        console.log('📨 Response received:', response.status, response.statusText);
         // Check if response is ok first
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1378,7 +1389,7 @@ function cancelLeaveRequest(requestId, tableName, sourceTable) {
         return response.json();
     })
     .then(data => {
-        console.log('Cancel leave request response:', data); // Debug logging
+        console.log('📋 Cancel leave request response:', data); // Debug logging
         
         if (data.success === true) {
             // Show success message
@@ -1409,8 +1420,16 @@ function cancelLeaveRequest(requestId, tableName, sourceTable) {
         }
     })
     .catch(error => {
-        console.error('Network/Parse Error:', error);
-        alert('🔥 Network error occurred. Please check your connection and try again.');
+        console.error('❌ Network/Parse Error Details:', {
+            error: error,
+            message: error.message,
+            stack: error.stack,
+            requestId: requestId,
+            tableName: tableName,
+            sourceTable: sourceTable
+        });
+        
+        alert(`🔥 Network error occurred: ${error.message}\n\nPlease check your connection and try again.`);
         
         // Restore button state
         buttons.forEach(button => {
@@ -1418,6 +1437,7 @@ function cancelLeaveRequest(requestId, tableName, sourceTable) {
                 button.disabled = false;
                 button.innerHTML = '<i class="fas fa-times mr-1"></i>Cancel Request';
                 button.classList.remove('opacity-75', 'cursor-not-allowed');
+                console.log('Button state restored');
             }
         });
     });

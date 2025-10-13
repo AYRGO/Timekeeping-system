@@ -238,13 +238,12 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time Out</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours Worked</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OT Status</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($currentPageDates)): ?>
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                             <div class="flex flex-col items-center gap-2">
                                 <i class="fas fa-search text-4xl text-gray-300"></i>
                                 <?php if (!empty($searchDate)): ?>
@@ -515,34 +514,6 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                     <div class="text-xs text-green-600 mt-1">
                                         <i class="fas fa-check mr-1"></i>Adjusted
                                     </div>
-                                <?php endif; ?>
-                            </td>
-                            <td class="px-6 py-4">
-                                <?php 
-                                $otStatus = $otStatusMap[$logDate] ?? null;
-                                if ($otStatus && !$isAutoIncomplete): 
-                                    $otBadgeClass = '';
-                                    switch (strtolower($otStatus)) {
-                                        case 'pending':
-                                            $otBadgeClass = 'bg-yellow-100 text-yellow-800';
-                                            break;
-                                        case 'approved':
-                                            $otBadgeClass = 'bg-green-100 text-green-800';
-                                            break;
-                                        case 'rejected':
-                                            $otBadgeClass = 'bg-red-100 text-red-800';
-                                            break;
-                                        default:
-                                            $otBadgeClass = 'bg-gray-100 text-gray-800';
-                                    }
-                                ?>
-                                    <span class="px-3 py-1 text-xs font-semibold rounded-full <?= $otBadgeClass ?>">
-                                        <?= ucfirst($otStatus) ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="text-gray-400 text-sm">
-                                        <?= $isAutoIncomplete ? 'N/A' : '-' ?>
-                                    </span>
                                 <?php endif; ?>
                             </td>
                         </tr>

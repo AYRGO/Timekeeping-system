@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Cancel Leave Request</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-container { max-width: 600px; margin: 0 auto; }
+        .test-item { margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+        .result { margin-top: 10px; padding: 10px; border-radius: 3px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Test Cancel Leave Request</h1>
+        
+        <div class="test-item">
+            <h3>Test Half Day Leave Cancellation</h3>
+            <p>This will test the cancel functionality for half day leaves</p>
+            
+            <form id="testForm">
+                <div>
+                    <label>Request ID: <input type="number" id="requestId" placeholder="Enter request ID" value="1"></label>
+                </div>
+                <div>
+                    <label>Table Name: 
+                        <select id="tableName">
+                            <option value="post_leave_requests">post_leave_requests</option>
+                            <option value="leave_requests">leave_requests</option>
+                        </select>
+                    </label>
+                </div>
+                <div>
+                    <button type="button" onclick="testCancel()">Test Cancel Request</button>
+                    <button type="button" onclick="clearResult()">Clear Result</button>
+                </div>
+            </form>
+            
+            <div id="result"></div>
+        </div>
+        
+        <div class="test-item">
+            <h3>Debug Information</h3>
+            <p>Check the browser console for detailed logs</p>
+            <button type="button" onclick="checkServer()">Test Server Connection</button>
+        </div>
+    </div>
+
+    <script>
+        function testCancel() {
+            const requestId = document.getElementById('requestId').value;
+            const tableName = document.getElementById('tableName').value;
+            
+            if (!requestId) {
+                showResult('Please enter a request ID', 'error');
+                return;
+            }
+            
+            console.log('🧪 Starting test cancel request:', { requestId, tableName });
+            
+            const requestData = {
+                id: requestId,
+                table: tableName
+            };
+            
+            fetch('./controller/cancel_leave_request.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => {
+                console.log('Response status:', response.status, response.statusText);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                if (data.success) {
+                    showResult(`✅ Success: ${data.message}`, 'success');
+                } else {
+                    showResult(`❌ Error: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showResult(`🔥 Network Error: ${error.message}`, 'error');
+            });
+        }
+        
+        function checkServer() {
+            fetch('./controller/cancel_leave_request.php', {
+                method: 'GET'
+            })
+            .then(response => {
+                console.log('Server check - Status:', response.status);
+                showResult(`Server responded with status: ${response.status}`, response.ok ? 'success' : 'error');
+            })
+            .catch(error => {
+                console.error('Server check error:', error);
+                showResult(`Server not reachable: ${error.message}`, 'error');
+            });
+        }
+        
+        function showResult(message, type) {
+            const result = document.getElementById('result');
+            result.className = `result ${type}`;
+            result.innerHTML = message;
+        }
+        
+        function clearResult() {
+            document.getElementById('result').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

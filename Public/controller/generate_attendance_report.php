@@ -163,35 +163,10 @@ $sheet->freezePane('A5');
 
 // Fill Data
 $row = 5;
-$previousDate = '';
 foreach ($timeLogs as $log) {
     $empName = $log['fname'] . ' ' . $log['lname'];
     $employeeId = $log['employee_id'];
     $logDate = $log['log_date'];
-    
-    // Add date title and spacing between different dates for clear distinction
-    if ($previousDate !== '' && $previousDate !== $logDate) {
-        $row++; // Add empty row for spacing
-        
-        // Add date title row
-        $sheet->mergeCells("A{$row}:G{$row}");
-        $sheet->setCellValue("A{$row}", "Date: " . date('F j, Y (l)', strtotime($logDate)));
-        $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(11);
-        $sheet->getStyle("A{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE6F3FF');
-        $sheet->getStyle("A{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle("A{$row}:G{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        $row++;
-    } elseif ($previousDate === '') {
-        // Add date title for first date
-        $sheet->mergeCells("A{$row}:G{$row}");
-        $sheet->setCellValue("A{$row}", "Date: " . date('F j, Y (l)', strtotime($logDate)));
-        $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(11);
-        $sheet->getStyle("A{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE6F3FF');
-        $sheet->getStyle("A{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle("A{$row}:G{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        $row++;
-    }
-    $previousDate = $logDate;
     
     // Determine log out date - use log_out_date if available, otherwise use log_date
     $logOutDate = !empty($log['log_out_date']) ? $log['log_out_date'] : $log['log_date'];
