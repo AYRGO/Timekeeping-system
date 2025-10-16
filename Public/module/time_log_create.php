@@ -491,6 +491,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment
                 exit;
             }
         }
+
+        // Handle Schedule Request
+        if (isset($_POST['action']) && $_POST['action'] === 'schedule_request') {
+            $schedule_date = $_POST['schedule_date'] ?? '';
+            $request_type = $_POST['request_type'] ?? '';
+            $new_schedule_id = $_POST['new_schedule_id'] ?? null;
+            $reason = trim($_POST['reason'] ?? '');
+
+            // Validate inputs
+            if (empty($schedule_date) || empty($request_type) || empty($reason)) {
+                header("Location: time_log_create.php?schedule=invalid_input#scheduleView");
+                exit;
+            }
+
+            // Validate date is in the future
+            if ($schedule_date < date('Y-m-d')) {
+                header("Location: time_log_create.php?schedule=past_date#scheduleView");
+                exit;
+            }
+
+            // Insert schedule change request
+            try {
+                $stmt = $pdo->prepare("
+                    INSERT INTO schedule_change_requests (employee_id, request_date, request_type, new_schedule_id, reason, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, 'pending', NOW())
+                ");
+
+                $success = $stmt->execute([
+                    $employee_id,
+                    $schedule_date,
+                    $request_type,
+                    $new_schedule_id ?: null,
+                    $reason
+                ]);
+
+                if ($success) {
+                    header("Location: time_log_create.php?schedule=success#scheduleView");
+                    exit;
+                } else {
+                    header("Location: time_log_create.php?schedule=error#scheduleView");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                // If the table doesn't exist, handle gracefully
+                error_log("Schedule request error: " . $e->getMessage());
+                header("Location: time_log_create.php?schedule=error#scheduleView");
+                exit;
+            }
+        }
     }
 } catch (Exception $e) {
     die("Error: " . $e->getMessage());
@@ -824,7 +873,10 @@ $announcementCount = $stmt->fetchColumn();
     <?php include 'leave_credits.php'; ?>
 </div>
 
-
+<!-- Schedule Management View -->
+<div id="scheduleView" class="hidden px-4 mt-12 space-y-10 max-w-6xl mx-auto">
+    <?php include 'schedule_content.php'; ?>
+</div>
 
 <?php include 'leave_request_form.php'; ?>
 

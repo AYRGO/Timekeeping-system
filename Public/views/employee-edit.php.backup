@@ -184,33 +184,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Update Default Weekly Schedule (using day_of_week structure)
+    // Update Default Weekly Schedule
     if (isset($_POST['action']) && $_POST['action'] === 'update_weekly_schedule' && isset($_POST['weekly_sched'])) {
         $weekly_sched = $_POST['weekly_sched'];
-        $days = ['Sunday' => 0, 'Monday' => 1, 'Tuesday' => 2, 'Wednesday' => 3, 'Thursday' => 4, 'Friday' => 5, 'Saturday' => 6];
-        
-        // Delete existing default schedules for this employee
-        $pdo->prepare("DELETE FROM employee_default_schedules WHERE employee_id = ?")->execute([$employeeId]);
-        
-        // Insert new weekly schedule (one row per day)
-        $stmt = $pdo->prepare("INSERT INTO employee_default_schedules (employee_id, day_of_week, work_schedule_id, is_rest_day, effective_from, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        
-        foreach ($days as $dayName => $dayNum) {
-            $scheduleId = $weekly_sched[$dayName] ?? null;
-            
-            if ($scheduleId === 'OFF' || $scheduleId === '' || $scheduleId === null) {
-                // Rest day
-                $stmt->execute([$employeeId, $dayNum, null, 1, date('Y-m-d')]);
-            } else {
-                // Regular schedule
-                $stmt->execute([$employeeId, $dayNum, (int)$scheduleId, 0, date('Y-m-d')]);
-            }
+        $days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+        // Prepare columns for insert/update
+        $cols = [];
+        $vals = [];
+        foreach($days as $d) {
+            $col = strtolower($d);
+            $cols[] = "$col = ?";
+            $vals[] = $weekly_sched[$d] ? intval($weekly_sched[$d]) : null;
         }
-        
-        // Note: schedule_override_history table uses different columns (schedule_date, original_schedule_id, new_schedule_id, override_reason, applied_by)
-        // Skipping history logging for weekly schedule updates since it's for daily overrides
-        
-        echo "<script>alert('Weekly schedule updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId#weekly-schedule';</script>";
+        // Check if exists
+        $check = $pdo->prepare("SELECT id FROM employee_default_schedules WHERE employee_id = ? LIMIT 1");
+        $check->execute([$employeeId]);
+        if ($check->fetch()) {
+            // Update
+            $stmt = $pdo->prepare("UPDATE employee_default_schedules SET ".implode(',', $cols).", updated_at = NOW() WHERE employee_id = ?");
+            $vals[] = $employeeId;
+            $stmt->execute($vals);
+        } else {
+            // Insert
+            $colnames = implode(',', array_map(function($d){return strtolower($d);}, $days));
+            $placeholders = implode(',', array_fill(0, count($days), '?'));
+            $stmt = $pdo->prepare("INSERT INTO employee_default_schedules (employee_id, $colnames) VALUES (?, $placeholders)");
+            array_unshift($vals, $employeeId);
+            $stmt->execute($vals);
+        }
+        // Optionally add to schedule_override_history
+        $pdo->prepare("INSERT INTO schedule_override_history (employee_id, change_type, change_details, changed_by, changed_at) VALUES (?, 'weekly_default', ?, ?, NOW())")
+            ->execute([$employeeId, json_encode($weekly_sched), $_SESSION['user_id'] ?? 'admin']);
+        echo "<script>alert('Weekly schedule updated!'); window.location.href = 'employee-edit.php?id=$employeeId#weekly-schedule';</script>";
         exit;
     }
     
@@ -229,7 +234,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("INSERT INTO employee_rotating_schedules (employee_id, pattern_id, start_date, cycle_start_date, end_date, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
         $stmt->execute([$employeeId, $pattern_id, $start_date, $cycle_start_date, $end_date]);
         
-        // Note: Skipping history logging - table structure incompatible with rotating schedule tracking
+        // Add to history
+        $pdo->prepare("INSERT INTO schedule_override_history (employee_id, change_type, change_details, changed_by, changed_at) VALUES (?, 'rotating_assignment', ?, ?, NOW())")
+            ->execute([$employeeId, json_encode(['pattern_id' => $pattern_id, 'start_date' => $start_date, 'cycle_start_date' => $cycle_start_date]), $_SESSION['user_id'] ?? 'admin']);
         
         echo "<script>alert('Rotating schedule assigned!'); window.location.href = 'employee-edit.php?id=$employeeId#rotating-schedule';</script>";
         exit;
@@ -243,7 +250,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->prepare("UPDATE employee_rotating_schedules SET end_date = ? WHERE id = ? AND employee_id = ?")
             ->execute([date('Y-m-d'), $rotating_id, $employeeId]);
         
-        // Note: Skipping history logging - table structure incompatible
+        // Add to history
+        $pdo->prepare("INSERT INTO schedule_override_history (employee_id, change_type, change_details, changed_by, changed_at) VALUES (?, 'rotating_removed', ?, ?, NOW())")
+            ->execute([$employeeId, json_encode(['rotating_id' => $rotating_id]), $_SESSION['user_id'] ?? 'admin']);
         
         echo "<script>alert('Rotating schedule removed!'); window.location.href = 'employee-edit.php?id=$employeeId#rotating-schedule';</script>";
         exit;
@@ -432,6 +441,12 @@ uasort($sortedScheduleOptions, function($a, $b) {
                 <button onclick="openTab(event, 'weekly-schedule')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
                     <i class="fas fa-calendar-week mr-2"></i>Weekly Schedule
                 </button>
+                <button onclick="openTab(event, 'rotating-schedule')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
+                    <i class="fas fa-sync-alt mr-2"></i>Rotating Schedule
+                </button>
+                <button onclick="openTab(event, 'schedule-summary')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
+                    <i class="fas fa-list-alt mr-2"></i>Schedule Summary
+                </button>
                 <button onclick="openTab(event, 'checklist')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
                     <i class="fas fa-tasks mr-2"></i>201 Checklist
                 </button>
@@ -557,19 +572,10 @@ uasort($sortedScheduleOptions, function($a, $b) {
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold text-gray-800 mb-6">Default Weekly Schedule</h2>
                     <?php
-                    // Fetch current weekly schedule for employee (using day_of_week structure)
-                    $weeklySchedStmt = $pdo->prepare("SELECT day_of_week, work_schedule_id, is_rest_day FROM employee_default_schedules WHERE employee_id = ? ORDER BY day_of_week");
-                    $weeklySchedStmt->execute([$employeeId]);
-                    $weeklyRows = $weeklySchedStmt->fetchAll(PDO::FETCH_ASSOC);
-                    
-                    // Convert to associative array by day name
-                    $weekly = [];
-                    $dayMapping = [0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'];
-                    foreach ($weeklyRows as $row) {
-                        $dayName = $dayMapping[$row['day_of_week']];
-                        $weekly[$dayName] = $row['is_rest_day'] ? null : $row['work_schedule_id'];
-                    }
-                    
+                    // Fetch current weekly schedule for employee
+                    $weeklySched = $pdo->prepare("SELECT * FROM employee_default_schedules WHERE employee_id = ? LIMIT 1");
+                    $weeklySched->execute([$employeeId]);
+                    $weekly = $weeklySched->fetch(PDO::FETCH_ASSOC);
                     $days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
                     // Get all work schedules
                     $allSchedules = $pdo->query("SELECT id, name, time_in, time_out FROM work_schedules ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
@@ -583,7 +589,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 <select name="weekly_sched[<?= $d ?>]" class="w-full p-2 border rounded">
                                     <option value="">-- OFF / Rest Day --</option>
                                     <?php foreach($allSchedules as $sched): ?>
-                                        <option value="<?= $sched['id'] ?>" <?= (isset($weekly[$d]) && $weekly[$d] == $sched['id']) ? 'selected' : '' ?>>
+                                        <option value="<?= $sched['id'] ?>" <?= ($weekly && $weekly[strtolower($d)]) == $sched['id'] ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($sched['name']) ?> (<?= date('g:i A', strtotime($sched['time_in'])) ?> - <?= date('g:i A', strtotime($sched['time_out'])) ?>)
                                         </option>
                                     <?php endforeach; ?>
@@ -600,7 +606,6 @@ uasort($sortedScheduleOptions, function($a, $b) {
                 </div>
             </div>
 
-            <?php /* ROTATING SCHEDULE TAB - TEMPORARILY DISABLED
             <!-- Rotating Schedule Tab -->
             <div id="rotating-schedule" class="tab-content">
                 <div class="bg-white rounded-lg shadow-md p-6">
@@ -750,9 +755,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                     </div>
                 </div>
             </div>
-            END ROTATING SCHEDULE TAB */ ?>
 
-            <?php /* SCHEDULE SUMMARY TAB - TEMPORARILY DISABLED
             <!-- Schedule Summary Tab -->
             <div id="schedule-summary" class="tab-content">
                 <div class="bg-white rounded-lg shadow-md p-6">
@@ -970,7 +973,6 @@ uasort($sortedScheduleOptions, function($a, $b) {
                     </div>
                 </div>
             </div>
-            END SCHEDULE SUMMARY TAB */ ?>
 
             <!-- Current Schedule Tab - Calendar Scheduling System -->
             <div id="current-schedule" class="tab-content active">
@@ -1047,6 +1049,722 @@ uasort($sortedScheduleOptions, function($a, $b) {
                         <div class="flex justify-end mt-6">
                             <button type="submit" name="update_credits" value="1" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition">
                                 <i class="fas fa-save mr-2"></i>Update Leave Credits
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+              <!-- Leave Requests Tab -->
+            <div id="leave-requests" class="tab-content">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6">Leave Requests</h2>
+                    <?php if (empty($leaveRequests)): ?>
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-calendar-alt text-4xl mb-4 opacity-50"></i>
+                            <p>No leave requests found</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="w-full table-auto">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start Date</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">End Date</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attachment</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notified</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <?php foreach ($leaveRequests as $request): ?>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            #<?= $request['id'] ?>
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                <?= ucfirst(str_replace('_', ' ', $request['leave_type'])) ?>
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <?= date('M d, Y', strtotime($request['start_date'])) ?>
+
+                    CREATE TABLE IF NOT EXISTS schedule_pattern_details (
+                        id INT(11) NOT NULL AUTO_INCREMENT,
+                        pattern_id INT(11) NOT NULL,
+                        day_of_cycle INT(11) NOT NULL,
+                        work_schedule_id INT(11),
+                        is_rest_day BOOLEAN DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id),
+                        FOREIGN KEY (pattern_id) REFERENCES schedule_patterns(id) ON DELETE CASCADE,
+                        FOREIGN KEY (work_schedule_id) REFERENCES work_schedules(id) ON DELETE SET NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+                    CREATE TABLE IF NOT EXISTS employee_schedule_assignments (
+                        id INT(11) NOT NULL AUTO_INCREMENT,
+                        employee_id INT(11) NOT NULL,
+                        schedule_pattern_id INT(11),
+                        work_schedule_id INT(11),
+                        assignment_type ENUM('pattern','fixed','custom') NOT NULL,
+                        start_date DATE NOT NULL,
+                        end_date DATE,
+                        cycle_start_date DATE,
+                        created_by INT(11),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id),
+                        FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+                        FOREIGN KEY (schedule_pattern_id) REFERENCES schedule_patterns(id) ON DELETE SET NULL,
+                        FOREIGN KEY (work_schedule_id) REFERENCES work_schedules(id) ON DELETE SET NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+                    CREATE TABLE IF NOT EXISTS calendar_schedule_overrides (
+                        id INT(11) NOT NULL AUTO_INCREMENT,
+                        employee_id INT(11) NOT NULL,
+                        schedule_date DATE NOT NULL,
+                        original_schedule_id INT(11),
+                        override_schedule_id INT(11),
+                        override_type ENUM('schedule_change','rest_day','overtime','holiday') NOT NULL,
+                        reason TEXT,
+                        is_approved BOOLEAN DEFAULT 0,
+                        approved_by INT(11),
+                        approved_at DATETIME,
+                        created_by INT(11),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id),
+                        FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+                        FOREIGN KEY (original_schedule_id) REFERENCES work_schedules(id) ON DELETE SET NULL,
+                        FOREIGN KEY (override_schedule_id) REFERENCES work_schedules(id) ON DELETE SET NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+                    CREATE TABLE IF NOT EXISTS holiday_calendar (
+                        id INT(11) NOT NULL AUTO_INCREMENT,
+                        holiday_name VARCHAR(255) NOT NULL,
+                        holiday_date DATE NOT NULL,
+                        holiday_type ENUM('regular','special','company') NOT NULL,
+                        is_recurring BOOLEAN DEFAULT 0,
+                        recurrence_pattern VARCHAR(255),
+                        applies_to_all BOOLEAN DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+                    -- Indexes for performance
+                    CREATE INDEX idx_assign_emp_dates ON employee_schedule_assignments(employee_id, start_date, end_date);
+                    CREATE INDEX idx_overrides_emp_date ON calendar_schedule_overrides(employee_id, schedule_date);
+                    CREATE INDEX idx_pattern_details ON schedule_pattern_details(pattern_id, day_of_cycle);
+                    ");
+
+                    // Seed sample data if tables are empty
+                    $patternCount = $pdo->query("SELECT COUNT(*) FROM schedule_patterns")->fetchColumn();
+                    
+                    if ($patternCount == 0) {
+                        // Create sample schedule patterns
+                        $pdo->exec("
+                            INSERT INTO schedule_patterns (pattern_name, description, cycle_length) VALUES
+                            ('5-Day Work Week', 'Monday to Friday work schedule', 7),
+                            ('4-Day Work Week', '4 days on, 3 days off', 7),
+                            ('Rotating Shift', '2 weeks day, 2 weeks night', 28)
+                        ");
+                        
+                        // Get work schedules to link patterns
+                        $schedules = $pdo->query("SELECT id FROM work_schedules LIMIT 3")->fetchAll(PDO::FETCH_COLUMN);
+                        
+                        // Setup pattern details (1=Monday, 2=Tuesday, ..., 6=Saturday, 7=Sunday)
+                        for ($d = 1; $d <= 7; $d++) {
+                            $isRestDay = ($d == 6 || $d == 7) ? 1 : 0; // Weekend rest days
+                            $schedId = $isRestDay ? null : $defaultSchedule;
+                            $pdo->prepare("INSERT INTO schedule_pattern_details (pattern_id, day_of_cycle, work_schedule_id, is_rest_day) VALUES (?, ?, ?, ?)")
+                                ->execute([$pattern_id, $d, $schedId, $isRestDay]);
+                        }
+
+                        // Add a sample holiday
+                        $pdo->prepare("INSERT INTO holiday_calendar (holiday_name, holiday_date, holiday_type, is_recurring) VALUES (?, ?, ?, ?)")
+                            ->execute(['New Year Day', '2025-01-01', 'regular', 1]);
+                    }
+                }
+
+                // Calendar Helper Functions
+                function getMonthsNav_schedule($year, $month) {
+                    $prev = date('Y-n', strtotime("$year-$month-01 -1 month"));
+                    $next = date('Y-n', strtotime("$year-$month-01 +1 month"));
+                    return ['prev'=>$prev, 'next'=>$next];
+                }
+
+                function getScheduleCell_admin($pdo, $employee_id, $date, $scheduleOptions) {
+                    $cell = ['date'=>$date, 'employee_id'=>$employee_id, 'base_schedule'=>null, 'actual_schedule'=>null, 'is_rest_day'=>0, 'is_holiday'=>0, 'has_override'=>0, 'override_status'=>null, 'schedule_color'=>'#9ca3af', 'override_data'=>null, 'source'=>'none'];
+
+                    // PRIORITY 1: Check for daily override in employee_daily_schedules
+                    $dailyStmt = $pdo->prepare("SELECT * FROM employee_daily_schedules WHERE employee_id = ? AND schedule_date = ? LIMIT 1");
+                    $dailyStmt->execute([$employee_id, $date]);
+                    $dailyOverride = $dailyStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($dailyOverride) {
+                        $cell['has_override'] = 1;
+                        $cell['override_status'] = 'approved';
+                        $cell['override_data'] = $dailyOverride;
+                        $cell['source'] = 'daily_override';
+                        
+                        if ($dailyOverride['is_rest_day']) {
+                            $cell['is_rest_day'] = 1;
+                            $cell['schedule_color'] = '#ef4444'; // Red for OFF day
+                            $cell['actual_schedule'] = null;
+                        } elseif ($dailyOverride['work_schedule_id']) {
+                            // Get schedule details from work_schedules
+                            $schedStmt = $pdo->prepare("SELECT * FROM work_schedules WHERE id = ?");
+                            $schedStmt->execute([$dailyOverride['work_schedule_id']]);
+                            $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
+                            
+                            if ($sched) {
+                                $cell['actual_schedule'] = [
+                                    'id' => $sched['id'],
+                                    'time_in' => $sched['time_in'],
+                                    'time_out' => $sched['time_out'],
+                                    'name' => $sched['name'] ?? 'Schedule ' . $sched['id']
+                                ];
+                                $cell['schedule_color'] = '#10b981'; // Green for approved override
+                            }
+                        }
+                        return $cell; // Return early - highest priority
+                    }
+
+                    // PRIORITY 2: Check for rotating schedule in employee_rotating_schedules
+                    $rotatingStmt = $pdo->prepare("SELECT * FROM employee_rotating_schedules WHERE employee_id = ? AND start_date <= ? AND (end_date IS NULL OR end_date >= ?) ORDER BY start_date DESC LIMIT 1");
+                    $rotatingStmt->execute([$employee_id, $date, $date]);
+                    $rotating = $rotatingStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($rotating) {
+                        // Calculate which day of the cycle we're on
+                        $cycleStart = strtotime($rotating['cycle_start_date']);
+                        $currentDate = strtotime($date);
+                        $daysDiff = floor(($currentDate - $cycleStart) / 86400);
+                        
+                        // Get pattern details
+                        $patternStmt = $pdo->prepare("SELECT * FROM rotating_schedule_patterns WHERE id = ?");
+                        $patternStmt->execute([$rotating['pattern_id']]);
+                        $pattern = $patternStmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($pattern) {
+                            $cycleLength = $pattern['cycle_length'];
+                            $dayInCycle = ($daysDiff % $cycleLength) + 1; // 1-indexed
+                            
+                            // Get schedule for this day in the pattern
+                            $patternDayStmt = $pdo->prepare("SELECT rpd.*, ws.* FROM rotating_schedule_pattern_days rpd LEFT JOIN work_schedules ws ON rpd.work_schedule_id = ws.id WHERE rpd.pattern_id = ? AND rpd.day_number = ? LIMIT 1");
+                            $patternDayStmt->execute([$rotating['pattern_id'], $dayInCycle]);
+                            $patternDay = $patternDayStmt->fetch(PDO::FETCH_ASSOC);
+                            
+                            if ($patternDay) {
+                                $cell['source'] = 'rotating_pattern';
+                                if ($patternDay['is_rest_day']) {
+                                    $cell['is_rest_day'] = 1;
+                                    $cell['schedule_color'] = '#6b7280'; // Gray for rest day
+                                } elseif ($patternDay['work_schedule_id']) {
+                                    $cell['actual_schedule'] = [
+                                        'id' => $patternDay['id'],
+                                        'time_in' => $patternDay['time_in'],
+                                        'time_out' => $patternDay['time_out'],
+                                        'name' => $patternDay['name'] ?? 'Schedule ' . $patternDay['id']
+                                    ];
+                                    $cell['schedule_color'] = '#8b5cf6'; // Purple for rotating
+                                }
+                                return $cell;
+                            }
+                        }
+                    }
+
+                    // PRIORITY 3: Check for weekly default in employee_default_schedules
+                    $weeklyStmt = $pdo->prepare("SELECT * FROM employee_default_schedules WHERE employee_id = ? LIMIT 1");
+                    $weeklyStmt->execute([$employee_id]);
+                    $weekly = $weeklyStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($weekly) {
+                        // Get day name (Monday, Tuesday, etc.)
+                        $dayName = strtolower(date('l', strtotime($date)));
+                        $scheduleId = $weekly[$dayName] ?? null;
+                        
+                        if ($scheduleId) {
+                            // Get schedule details
+                            $schedStmt = $pdo->prepare("SELECT * FROM work_schedules WHERE id = ?");
+                            $schedStmt->execute([$scheduleId]);
+                            $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
+                            
+                            if ($sched) {
+                                $cell['source'] = 'weekly_default';
+                                $cell['actual_schedule'] = [
+                                    'id' => $sched['id'],
+                                    'time_in' => $sched['time_in'],
+                                    'time_out' => $sched['time_out'],
+                                    'name' => $sched['name'] ?? 'Schedule ' . $sched['id']
+                                ];
+                                $cell['schedule_color'] = '#3b82f6'; // Blue for weekly default
+                                return $cell;
+                            }
+                        } else {
+                            // No schedule for this day = rest day
+                            $cell['is_rest_day'] = 1;
+                            $cell['schedule_color'] = '#f3f4f6';
+                            $cell['source'] = 'weekly_default';
+                            return $cell;
+                        }
+                    }
+
+                    // PRIORITY 4: Check for holiday
+                    $hstmt = $pdo->prepare("SELECT * FROM company_holidays WHERE DATE(holiday_date) = DATE(?) OR (is_recurring=1 AND DATE_FORMAT(holiday_date, '%m-%d') = DATE_FORMAT(?, '%m-%d')) LIMIT 1");
+                    $hstmt->execute([$date, $date]);
+                    $holiday = $hstmt->fetch(PDO::FETCH_ASSOC);
+                    if ($holiday) {
+                        $cell['is_holiday'] = 1;
+                        $cell['holiday'] = $holiday;
+                        $cell['schedule_color'] = '#fbbf24'; // Yellow for holidays
+                        $cell['is_rest_day'] = 1;
+                        $cell['source'] = 'holiday';
+                        return $cell;
+                    }
+
+                    // PRIORITY 5: Check weekend (fallback)
+                    $dayOfWeek = date('w', strtotime($date));
+                    if ($dayOfWeek == 0 || $dayOfWeek == 6) {
+                        $cell['is_rest_day'] = 1;
+                        $cell['schedule_color'] = '#f3f4f6'; // Light gray for weekends
+                        $cell['source'] = 'weekend';
+                    }
+
+                    return $cell;
+                }
+
+                function getTimeLogStatus_admin($pdo, $employee_id, $date, $scheduleOptions) {
+                    $timeLog = $pdo->prepare("
+                        SELECT tl.*, e.fname, e.lname, e.official_sched 
+                        FROM time_logs tl 
+                        JOIN employees e ON tl.employee_id = e.id 
+                        WHERE tl.employee_id = ? AND tl.log_date = ?
+                    ");
+                    $timeLog->execute([$employee_id, $date]);
+                    $log = $timeLog->fetch(PDO::FETCH_ASSOC);
+                    
+                    $scheduleInfo = getScheduleCell_admin($pdo, $employee_id, $date, $scheduleOptions);
+                    
+                    $status = [
+                        'has_log' => (bool)$log,
+                        'log_data' => $log,
+                        'schedule_info' => $scheduleInfo,
+                        'status' => 'No Data',
+                        'time_in' => null,
+                        'time_out' => null
+                    ];
+                    
+                    if ($log) {
+                        $status['time_in'] = $log['time_in'];
+                        $status['time_out'] = $log['time_out'];
+                        
+                        if ($scheduleInfo['is_rest_day'] && !$scheduleInfo['has_override']) {
+                            $status['status'] = 'Rest Day Work';
+                        } elseif ($scheduleInfo['is_holiday']) {
+                            $status['status'] = 'Holiday Work';
+                        } elseif ($log['status'] === 'incomplete' || !$log['time_out'] || $log['time_out'] === 'INC') {
+                            $status['status'] = 'Incomplete';
+                        } else {
+                            $scheduledIn = $scheduleInfo['actual_schedule']['time_in'] ?? '08:00:00';
+                            $actualIn = $log['time_in'];
+                            
+                            if ($actualIn > date('H:i:s', strtotime($scheduledIn . ' +15 minutes'))) {
+                                $status['status'] = 'Late';
+                            } else {
+                                $status['status'] = 'Present';
+                            }
+                        }
+                    } else {
+                        if ($scheduleInfo['is_rest_day']) {
+                            $status['status'] = 'Rest Day';
+                        } elseif ($scheduleInfo['is_holiday']) {
+                            $status['status'] = 'Holiday';
+                        } else {
+                            $status['status'] = 'Absent';
+                        }
+                    }
+                    
+                    return $status;
+                }
+
+                function monthMatrix_admin($year,$month){
+                    $first = strtotime("$year-$month-01");
+                    $start_w = date('w',$first);
+                    $days = date('t',$first);
+                    $matrix = [];
+                    $week = array_fill(0,7,null);
+                    $day = 1;
+                    $wday = $start_w;
+                    while ($day <= $days) {
+                        $week[$wday] = date('Y-m-d', strtotime("$year-$month-$day"));
+                        $wday++;
+                        if ($wday === 7) {
+                            $matrix[] = $week;
+                            $week = array_fill(0,7,null);
+                            $wday = 0;
+                        }
+                        $day++;
+                    }
+                    if (array_filter($week)) $matrix[] = $week;
+                    return $matrix;
+                }
+
+                // Handle form submissions
+                if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+                    if ($_POST['action'] === 'add_override') {
+                        $schedule_employee_id = (int)$_POST['employee_id'];
+                        $schedule_date = $_POST['schedule_date'];
+                        $override_schedule_input = $_POST['override_schedule_id'] ?? '';
+                        $reason = $_POST['reason'] ?? '';
+                        $override_type = $_POST['override_type'] ?? 'schedule_change';
+                        
+                        // Handle "OFF" option - set override_schedule_id to null for rest day
+                        if ($override_schedule_input === 'OFF' || $override_schedule_input === '') {
+                            $work_schedule_id = null;
+                            $is_rest_day = 1;
+                        } else {
+                            $work_schedule_id = (int)$override_schedule_input;
+                            $is_rest_day = 0;
+                        }
+                        
+                        // Use employee_daily_schedules table (advanced calendar system)
+                        // First delete any existing override for this date
+                        $pdo->prepare("DELETE FROM employee_daily_schedules WHERE employee_id = ? AND schedule_date = ?")
+                            ->execute([$schedule_employee_id, $schedule_date]);
+                        
+                        // Insert new daily override
+                        $stmt = $pdo->prepare("INSERT INTO employee_daily_schedules (employee_id, schedule_date, work_schedule_id, is_rest_day, notes, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                        $stmt->execute([$schedule_employee_id, $schedule_date, $work_schedule_id, $is_rest_day, $reason]);
+                        
+                        // Add to audit trail
+                        $pdo->prepare("INSERT INTO schedule_override_history (employee_id, change_type, change_details, changed_by, changed_at) VALUES (?, 'daily_override', ?, ?, NOW())")
+                            ->execute([$schedule_employee_id, json_encode(['date' => $schedule_date, 'schedule_id' => $work_schedule_id, 'is_rest_day' => $is_rest_day, 'reason' => $reason]), $_SESSION['user_id'] ?? 'admin']);
+                        
+                        echo "<script>alert('Schedule override created successfully!'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
+                        exit;
+                    } elseif ($_POST['action'] === 'approve_override' && !empty($_POST['override_id'])) {
+                        $id = (int)$_POST['override_id'];
+                        // Not needed anymore since we auto-approve in employee_daily_schedules
+                        echo "<script>alert('Override already applied!'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
+                        exit;
+                    }
+                }
+
+                // UI Setup
+                $emp_id = $employeeId; // Use current employee ID from context
+                $ym = isset($_GET['ym']) ? $_GET['ym'] : date('Y-n');
+                list($year, $month) = explode('-', $ym);
+                $month = (int)$month; $year = (int)$year;
+                $nav = getMonthsNav_schedule($year,$month);
+                $matrix = monthMatrix_admin($year,$month);
+
+                // Fetch work schedules and daily overrides for employee
+                $workSchedules_cal = $pdo->query("SELECT * FROM work_schedules ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+                $pendingOverrides = $pdo->prepare("SELECT eds.*, ws.name as schedule_name, ws.time_in, ws.time_out FROM employee_daily_schedules eds LEFT JOIN work_schedules ws ON eds.work_schedule_id = ws.id WHERE eds.employee_id = ? AND eds.schedule_date >= ? ORDER BY eds.schedule_date ASC LIMIT 10");
+                $pendingOverrides->execute([$emp_id, date('Y-m-d')]);
+                $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
+                ?>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">Schedule Calendar - <?= htmlspecialchars($employee['fname'] . ' ' . $employee['lname']) ?></h2>
+                            <p class="text-sm text-gray-600">Advanced calendar-based scheduling with patterns, overrides & holidays</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-500">Employee ID: <?= $emp_id ?></div>
+                            <div class="text-sm text-gray-500">Current Schedule: <?= htmlspecialchars($employee['official_sched'] ?? 'Not Set') ?></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Calendar -->
+                        <div class="lg:col-span-2 bg-white rounded shadow p-4">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <a href="employee-edit.php?id=<?= $emp_id ?>&ym=<?= htmlspecialchars($nav['prev']) ?>#current-schedule" class="px-3 py-1 rounded hover:bg-gray-100">‹ Prev</a>
+                                    <span class="mx-3 font-medium"><?= date('F Y', strtotime("$year-$month-01")) ?></span>
+                                    <a href="employee-edit.php?id=<?= $emp_id ?>&ym=<?= htmlspecialchars($nav['next']) ?>#current-schedule" class="px-3 py-1 rounded hover:bg-gray-100">Next ›</a>
+                                </div>
+                                <div>
+                                    <a href="employee-edit.php?id=<?= $emp_id ?>&ym=<?= date('Y-n') ?>#current-schedule" class="text-sm text-blue-600">Today</a>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-7 gap-1 text-sm">
+                                <?php $weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; foreach($weekdays as $wd): ?>
+                                    <div class="text-center font-semibold py-2 bg-gray-50"><?= $wd ?></div>
+                                <?php endforeach; ?>
+
+                                <?php foreach($matrix as $week): ?>
+                                    <?php foreach($week as $cellDate): ?>
+                                        <?php if (!$cellDate): ?>
+                                            <div class="p-2 border h-28 bg-gray-50"></div>
+                                        <?php else: 
+                                              $cell = getScheduleCell_admin($pdo,$emp_id,$cellDate,$scheduleOptions);
+                                              $timeStatus = getTimeLogStatus_admin($pdo,$emp_id,$cellDate,$scheduleOptions);
+                                              $isToday = $cellDate === date('Y-m-d');
+                                              $color = $cell['schedule_color'] ?? '#9ca3af';
+                                              
+                                              $statusColors = [
+                                                  'Present' => '#10b981', 'Late' => '#f59e0b', 'Incomplete' => '#ef4444',
+                                                  'Absent' => '#ef4444', 'Rest Day' => '#6b7280', 'Holiday' => '#8b5cf6',
+                                                  'Rest Day Work' => '#06b6d4', 'Holiday Work' => '#06b6d4'
+                                              ];
+                                              $statusColor = $statusColors[$timeStatus['status']] ?? $color;
+                                        ?>
+                                            <div class="p-2 border h-32 flex flex-col justify-between"
+                                                 style="background:linear-gradient(120deg,<?= htmlspecialchars($statusColor) ?>22,transparent); border-left: 4px solid <?= htmlspecialchars($statusColor) ?>;">
+                                              <div class="flex justify-between items-start">
+                                                <div class="<?= $isToday ? 'font-bold text-blue-600' : 'text-gray-700' ?>"><?= date('j', strtotime($cellDate)) ?></div>
+                                                <?php if ($cell['is_holiday']): ?>
+                                                  <div class="text-xs px-1 py-0.5 bg-red-100 text-red-700 rounded">Holiday</div>
+                                                <?php elseif ($cell['has_override']): ?>
+                                                  <div class="text-xs px-1 py-0.5 bg-yellow-100 text-yellow-800 rounded"><?= htmlspecialchars($cell['override_status']) ?></div>
+                                                <?php endif; ?>
+                                              </div>
+
+                                              <!-- Status Badge -->
+                                              <div class="text-xs mb-1">
+                                                <div class="font-medium text-center px-1 py-0.5 rounded text-white text-xs" style="background-color: <?= htmlspecialchars($statusColor) ?>;">
+                                                  <?= htmlspecialchars($timeStatus['status']) ?>
+                                                </div>
+                                              </div>
+
+                                              <!-- Schedule Info -->
+                                              <div class="text-xs">
+                                                <?php if ($cell['has_override'] && $cell['override_status'] === 'approved'): ?>
+                                                  <?php if ($cell['actual_schedule']): ?>
+                                                    <div class="text-center text-green-700 font-semibold">
+                                                      📅 Sched <?= $cell['actual_schedule']['id'] ?>
+                                                    </div>
+                                                    <div class="text-center text-gray-600">
+                                                      <?= htmlspecialchars($cell['actual_schedule']['time_in']) ?> - <?= htmlspecialchars($cell['actual_schedule']['time_out']) ?>
+                                                    </div>
+                                                  <?php else: ?>
+                                                    <div class="text-center text-red-700 font-bold">🚫 OFF</div>
+                                                  <?php endif; ?>
+                                                <?php elseif ($cell['is_rest_day'] && !$cell['actual_schedule']): ?>
+                                                  <div class="text-gray-500 italic text-center">Rest Day</div>
+                                                <?php elseif ($cell['actual_schedule']): ?>
+                                                  <div class="text-center text-gray-700">
+                                                    Sched <?= $cell['actual_schedule']['id'] ?>
+                                                  </div>
+                                                  <div class="text-center text-gray-600">
+                                                    <?= htmlspecialchars($cell['actual_schedule']['time_in']) ?> - <?= htmlspecialchars($cell['actual_schedule']['time_out']) ?>
+                                                  </div>
+                                                <?php else: ?>
+                                                  <div class="text-gray-400 text-center">No Schedule</div>
+                                                <?php endif; ?>
+                                              </div>
+
+                                              <!-- Time Log Info -->
+                                              <?php if ($timeStatus['has_log']): ?>
+                                                <div class="text-xs text-gray-600 text-center">
+                                                  <?php if ($timeStatus['time_in']): ?>
+                                                    In: <?= date('g:i A', strtotime($timeStatus['time_in'])) ?>
+                                                  <?php endif; ?>
+                                                  <?php if ($timeStatus['time_out'] && $timeStatus['time_out'] !== 'INC'): ?>
+                                                    | Out: <?= date('g:i A', strtotime($timeStatus['time_out'])) ?>
+                                                  <?php endif; ?>
+                                                </div>
+                                              <?php endif; ?>
+
+                                              <div class="flex gap-1 mt-2">
+                                                <button onclick="openOverride_admin('<?= $cellDate ?>')" class="text-xs px-2 py-1 border rounded bg-white hover:bg-gray-50">Override</button>
+                                              </div>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <!-- Sidebar -->
+                        <div class="bg-gray-50 rounded shadow p-4">
+                            <!-- Status Legend -->
+                            <div class="mb-6">
+                                <h3 class="font-semibold text-gray-800 mb-3">Status Legend</h3>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-4 h-4 rounded" style="background-color: #10b981;"></div>
+                                        <span>Present / Approved Override</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-4 h-4 rounded" style="background-color: #f59e0b;"></div>
+                                        <span>Late / Pending Override</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-4 h-4 rounded" style="background-color: #ef4444;"></div>
+                                        <span>Absent / OFF Day</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-4 h-4 rounded" style="background-color: #3b82f6;"></div>
+                                        <span>Regular Schedule</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-4 h-4 rounded" style="background-color: #6b7280;"></div>
+                                        <span>Rest Day (Weekend)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-4 h-4 rounded" style="background-color: #fbbf24;"></div>
+                                        <span>Holiday</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h3 class="font-medium mb-2 text-gray-800">Create Schedule Override</h3>
+                            <form method="post" class="space-y-3" action="employee-edit.php?id=<?= $emp_id ?>#current-schedule">
+                                <input type="hidden" name="action" value="add_override">
+                                <input type="hidden" name="employee_id" value="<?= $emp_id ?>">
+                                <div>
+                                    <label class="text-xs block text-gray-600 mb-1">Date</label>
+                                    <input type="date" name="schedule_date" id="override_date" required class="w-full p-2 border rounded text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-xs block text-gray-600 mb-1">New Schedule</label>
+                                    <select name="override_schedule_id" id="override_schedule_select" required class="w-full p-2 border rounded text-sm">
+                                        <option value="">-- Select Schedule --</option>
+                                        <option value="OFF" class="font-semibold text-red-600">🚫 OFF / Rest Day</option>
+                                        <optgroup label="Available Schedules">
+                                            <?php foreach($sortedScheduleOptions as $schedId => $schedTime): ?>
+                                                <option value="<?= $schedId ?>">
+                                                    Schedule <?= $schedId ?> (<?= htmlspecialchars($schedTime['in']) ?> - <?= htmlspecialchars($schedTime['out']) ?>)
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-xs block text-gray-600 mb-1">Type</label>
+                                    <select name="override_type" class="w-full p-2 border rounded text-sm">
+                                        <option value="schedule_change">Schedule Change</option>
+                                        <option value="rest_day">Rest Day / OFF</option>
+                                        <option value="overtime">Overtime</option>
+                                        <option value="holiday">Holiday</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-xs block text-gray-600 mb-1">Reason</label>
+                                    <textarea name="reason" class="w-full p-2 border rounded text-sm" rows="2" placeholder="Reason for schedule override"></textarea>
+                                </div>
+                                <div>
+                                    <button type="submit" class="w-full px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition">
+                                        <i class="fas fa-calendar-plus mr-1"></i>Create Override
+                                    </button>
+                                </div>
+                            </form>
+
+                            <?php if ($pendingOverrides): ?>
+                            <hr class="my-4">
+                            <h3 class="font-medium mb-2 text-gray-800">Upcoming Daily Overrides</h3>
+                            <div class="space-y-2 text-sm max-h-60 overflow-y-auto">
+                                <?php foreach($pendingOverrides as $o): ?>
+                                    <div class="border p-2 rounded bg-white">
+                                        <div class="font-medium"><?= date('M d, Y', strtotime($o['schedule_date'])) ?></div>
+                                        <?php if ($o['is_rest_day']): ?>
+                                            <div class="text-xs text-red-600 font-semibold">🚫 OFF / Rest Day</div>
+                                        <?php else: ?>
+                                            <div class="text-xs text-green-600 font-semibold"><?= htmlspecialchars($o['schedule_name'] ?? 'Schedule ' . $o['work_schedule_id']) ?></div>
+                                            <?php if ($o['time_in']): ?>
+                                                <div class="text-xs text-gray-600"><?= date('g:i A', strtotime($o['time_in'])) ?> - <?= date('g:i A', strtotime($o['time_out'])) ?></div>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                        <?php if ($o['notes']): ?>
+                                            <div class="text-xs text-gray-500 mt-1"><?= htmlspecialchars($o['notes']) ?></div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                function openOverride_admin(date) {
+                    const input = document.getElementById('override_date');
+                    if (input) {
+                        input.value = date;
+                        input.scrollIntoView({behavior:'smooth', block:'center'});
+                        input.focus();
+                    }
+                }
+                </script>
+            </div>
+
+            <?php include('../views/tabs/employee-checklist-tab.php'); ?>
+
+            <!-- Leave Credits Tab -->
+            <div id="leave-credits" class="tab-content">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6">Leave Credits (<?= date('Y') ?>)</h2>
+
+                    <form method="post">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <?php
+                            $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND year = ?");
+                            $stmt->execute([$employeeId, date('Y')]);
+                            $credits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                            // If no credits exist, create default entries
+                            if (empty($credits)) {
+                                foreach ($leaveTypes as $type) {
+                                    $stmt = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, year, balance) VALUES (?, ?, ?, 0)");
+                                    $stmt->execute([$employeeId, $type, date('Y')]);
+                                }
+                                // Re-fetch after creating
+                                $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND year = ?");
+                                $stmt->execute([$employeeId, date('Y')]);
+                                $credits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            }
+
+                            foreach ($credits as $credit):
+                                $leaveType = $credit['leave_type'];
+                                // Skip halfday vacation, halfday sick, lwop, halfday
+                                if (in_array($leaveType, ['halfday_vacation', 'halfday_sick', 'lwop', 'halfday'])) continue;
+                                $label = ucwords(str_replace('_', ' ', $leaveType));
+                            ?>
+                            <div class="border border-gray-200 p-4 rounded-lg bg-gray-50">
+                                <h3 class="text-sm font-semibold mb-2 text-gray-800"><?= $label ?></h3>
+
+                                <label class="text-xs block mb-1 text-gray-600">Balance</label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    name="credits[<?= $leaveType ?>][balance]" 
+                                    value="<?= $credit['balance'] ?>" 
+                                    class="w-full mb-2 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                />
+
+                                <input 
+                                    type="hidden" 
+                                    name="credits[<?= $leaveType ?>][monthly_increment]" 
+                                    value="<?= $credit['monthly_increment'] ?? 0 ?>" 
+                                />
+
+                                <?php if ($leaveType === 'vacation'): ?>
+                                    <label class="text-xs block mb-1 text-gray-600">Carry Over</label>
+                                    <input 
+                                        type="number" 
+                                        step="0.01" 
+                                        name="credits[vacation][carry_over]" 
+                                        value="<?= $credit['carry_over'] ?? 0 ?>" 
+                                        class="w-full mb-2 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    />
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <div class="flex justify-end mt-6">
+                            <button type="submit" name="update_credits" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md transition">
+                                <i class="fas fa-save mr-2"></i>Save Credits
                             </button>
                         </div>
                     </form>

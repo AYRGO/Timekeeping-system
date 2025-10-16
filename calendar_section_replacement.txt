@@ -1,0 +1,535 @@
+            <!-- Current Schedule Tab - Calendar Scheduling System -->
+            <div id="current-schedule" class="tab-content">
+                <?php
+                // Calendar Scheduling System Integration - Admin View
+                
+                // Initialize calendar tables if not exists
+                try {
+                    $result = $pdo->query("SHOW TABLES LIKE 'schedule_patterns'")->fetch();
+                    $init = !$result;
+                } catch (Exception $e) {
+                    $init = true;
+                }
+
+                if ($init) {
+                    $pdo->exec("
+                    -- Calendar scheduling tables compatible with existing MySQL structure
+                    CREATE TABLE IF NOT EXISTS schedule_patterns (
+                        id INT(11) NOT NULL AUTO_INCREMENT,
+                        pattern_name VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        cycle_length INT(11) NOT NULL,
+                        is_active BOOLEAN DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+                    CREATE TABLE IF NOT EXISTS schedule_pattern_details (
+                        id INT(11) NOT NULL AUTO_INCREMENT,
+                        pattern_id INT(11) NOT NULL,
+                        day_of_cycle INT(11) NOT NULL,
+                        work_schedule_id INT(11),
+                        is_rest_day BOOLEAN DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id),
+                        FOREIGN KEY (pattern_id) REFERENCES schedule_patterns(id) ON DELETE CASCADE,
+                        FOREIGN KEY (work_schedule_id) REFERENCES work_schedules(id) ON DELETE SET NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+                    CREATE TABLE IF NOT EXISTS employee_schedule_assignments (
+                        id INT(11) NOT NULL AUTO_INCREMENT,
+                        employee_id INT(11) NOT NULL,
+                        schedule_pattern_id INT(11),
+                        work_schedule_id INT(11),
+                        assignment_type ENUM('pattern','fixed','custom') NOT NULL,
+                        start_date DATE NOT NULL,
+                        end_date DATE,
+                        cycle_start_date DATE,
+                        created_by INT(11),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id),
+                        FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+                        FOREIGN KEY (schedule_pattern_id) REFERENCES schedule_patterns(id) ON DELETE SET NULL,
+                        FOREIGN KEY (work_schedule_id) REFERENCES work_schedules(id) ON DELETE SET NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+                    CREATE TABLE IF NOT EXISTS calendar_schedule_overrides (
+                        id INT(11) NOT NULL AUTO_INCREMENT,
+                        employee_id INT(11) NOT NULL,
+                        schedule_date DATE NOT NULL,
+                        original_schedule_id INT(11),
+                        override_schedule_id INT(11),
+                        override_type ENUM('schedule_change','rest_day','overtime','holiday') NOT NULL,
+                        reason TEXT,
+                        is_approved BOOLEAN DEFAULT 0,
+                        approved_by INT(11),
+                        approved_at DATETIME,
+                        created_by INT(11),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id),
+                        FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+                        FOREIGN KEY (original_schedule_id) REFERENCES work_schedules(id) ON DELETE SET NULL,
+                        FOREIGN KEY (override_schedule_id) REFERENCES work_schedules(id) ON DELETE SET NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+                    CREATE TABLE IF NOT EXISTS holiday_calendar (
+                        id INT(11) NOT NULL AUTO_INCREMENT,
+                        holiday_name VARCHAR(255) NOT NULL,
+                        holiday_date DATE NOT NULL,
+                        holiday_type ENUM('regular','special','company') DEFAULT 'regular',
+                        is_recurring BOOLEAN DEFAULT 0,
+                        description TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+                    -- Indexes for performance
+                    CREATE INDEX idx_assign_emp_dates ON employee_schedule_assignments(employee_id, start_date, end_date);
+                    CREATE INDEX idx_overrides_emp_date ON calendar_schedule_overrides(employee_id, schedule_date);
+                    CREATE INDEX idx_pattern_details ON schedule_pattern_details(pattern_id, day_of_cycle);
+                    ");
+
+                    // Seed sample data if tables are empty
+                    $patternCount = $pdo->query("SELECT COUNT(*) FROM schedule_patterns")->fetchColumn();
+                    
+                    if ($patternCount == 0) {
+                        // Create sample schedule patterns
+                        $pdo->exec("
+                            INSERT INTO schedule_patterns (pattern_name, description, cycle_length) VALUES
+                            ('5-Day Work Week', 'Monday to Friday work schedule', 7),
+                            ('4-Day Work Week', '4 days on, 3 days off', 7),
+                            ('Rotating Shift', '2 weeks day, 2 weeks night', 28)
+                        ");
+                        
+                        // Get work schedules to link patterns
+                        $schedules = $pdo->query("SELECT id FROM work_schedules LIMIT 3")->fetchAll(PDO::FETCH_COLUMN);
+                        if (!empty($schedules)) {
+                            // 5-day pattern details (Mon-Fri work, Sat-Sun rest)
+                            for ($day = 1; $day <= 7; $day++) {
+                                $isRestDay = ($day == 1 || $day == 7) ? 1 : 0; // Sunday and Saturday
+                                $scheduleId = $isRestDay ? null : $schedules[0];
+                                $pdo->prepare("INSERT INTO schedule_pattern_details (pattern_id, day_of_cycle, work_schedule_id, is_rest_day) VALUES (1, ?, ?, ?)")
+                                    ->execute([$day, $scheduleId, $isRestDay]);
+                            }
+                        }
+                    }
+                }
+
+                // Handle form submissions for admin actions
+                if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
+                    if ($_POST['admin_action'] === 'approve_override') {
+                        $override_id = (int)$_POST['override_id'];
+                        $approve = $_POST['approve'] === 'true';
+                        
+                        $stmt = $pdo->prepare("
+                            UPDATE calendar_schedule_overrides 
+                            SET is_approved = ?, approved_by = ?, approved_at = NOW() 
+                            WHERE id = ?
+                        ");
+                        $stmt->execute([$approve ? 1 : -1, $_SESSION['user_id'] ?? 1, $override_id]);
+                        
+                        echo json_encode(['success' => true, 'message' => $approve ? 'Override approved' : 'Override rejected']);
+                        exit;
+                    }
+                    
+                    if ($_POST['admin_action'] === 'assign_schedule') {
+                        $assignment_type = $_POST['assignment_type'];
+                        $start_date = $_POST['start_date'];
+                        $end_date = $_POST['end_date'] ?: null;
+                        $schedule_id = $_POST['work_schedule_id'] ?: null;
+                        $pattern_id = $_POST['schedule_pattern_id'] ?: null;
+                        
+                        $stmt = $pdo->prepare("
+                            INSERT INTO employee_schedule_assignments 
+                            (employee_id, assignment_type, start_date, end_date, work_schedule_id, schedule_pattern_id, created_by, cycle_start_date) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ");
+                        $stmt->execute([
+                            $employeeId, 
+                            $assignment_type, 
+                            $start_date, 
+                            $end_date, 
+                            $schedule_id, 
+                            $pattern_id, 
+                            $_SESSION['user_id'] ?? 1,
+                            $start_date
+                        ]);
+                        
+                        header("Location: employee-edit.php?id=$employeeId&success=schedule_assigned");
+                        exit;
+                    }
+                }
+
+                // Get schedule assignment data
+                $currentAssignment = $pdo->prepare("
+                    SELECT esa.*, sp.pattern_name, ws.name as schedule_name 
+                    FROM employee_schedule_assignments esa
+                    LEFT JOIN schedule_patterns sp ON sp.id = esa.schedule_pattern_id
+                    LEFT JOIN work_schedules ws ON ws.id = esa.work_schedule_id
+                    WHERE esa.employee_id = ? 
+                    AND (esa.end_date IS NULL OR esa.end_date >= CURDATE())
+                    ORDER BY esa.start_date DESC
+                    LIMIT 1
+                ");
+                $currentAssignment->execute([$employeeId]);
+                $assignment = $currentAssignment->fetch(PDO::FETCH_ASSOC);
+
+                // Get pending override requests
+                $pendingOverrides = $pdo->prepare("
+                    SELECT cso.*, ws1.name as original_name, ws2.name as override_name 
+                    FROM calendar_schedule_overrides cso
+                    LEFT JOIN work_schedules ws1 ON ws1.id = cso.original_schedule_id
+                    LEFT JOIN work_schedules ws2 ON ws2.id = cso.override_schedule_id
+                    WHERE cso.employee_id = ? AND cso.is_approved = 0
+                    ORDER BY cso.created_at DESC
+                ");
+                $pendingOverrides->execute([$employeeId]);
+                $overrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
+
+                // Get available schedules and patterns
+                $workSchedules = $pdo->query("SELECT * FROM work_schedules ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+                $schedulePatterns = $pdo->query("SELECT * FROM schedule_patterns WHERE is_active = 1 ORDER BY pattern_name")->fetchAll(PDO::FETCH_ASSOC);
+
+                // Calendar setup
+                $ym = isset($_GET['ym']) ? $_GET['ym'] : date('Y-n');
+                list($year, $month) = explode('-', $ym);
+                $month = (int)$month; 
+                $year = (int)$year;
+
+                function getMonthsNav_admin($year, $month) {
+                    $prev = date('Y-n', strtotime("$year-$month-01 -1 month"));
+                    $next = date('Y-n', strtotime("$year-$month-01 +1 month"));
+                    return ['prev'=>$prev, 'next'=>$next];
+                }
+
+                $nav = getMonthsNav_admin($year, $month);
+                ?>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">
+                            <i class="fas fa-calendar-check mr-2 text-blue-600"></i>Schedule Management
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="openScheduleAssignModal()" 
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                <i class="fas fa-plus mr-2"></i>Assign Schedule
+                            </button>
+                            <button onclick="openHolidayModal()" 
+                                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                                <i class="fas fa-calendar-plus mr-2"></i>Add Holiday
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Current Assignment Info -->
+                    <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                        <h3 class="font-semibold mb-2 text-blue-800">Current Schedule Assignment</h3>
+                        <?php if ($assignment): ?>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <span class="text-gray-600">Type:</span>
+                                    <span class="font-medium ml-2"><?= ucfirst($assignment['assignment_type']) ?></span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600">Schedule:</span>
+                                    <span class="font-medium ml-2">
+                                        <?= $assignment['pattern_name'] ?: $assignment['schedule_name'] ?: 'None' ?>
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600">Period:</span>
+                                    <span class="font-medium ml-2">
+                                        <?= date('M j, Y', strtotime($assignment['start_date'])) ?>
+                                        <?= $assignment['end_date'] ? ' - ' . date('M j, Y', strtotime($assignment['end_date'])) : ' (Ongoing)' ?>
+                                    </span>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <p class="text-gray-600">No active schedule assignment. Click "Assign Schedule" to set one.</p>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Pending Override Requests -->
+                    <?php if (!empty($overrides)): ?>
+                        <div class="mb-6 p-4 bg-yellow-50 rounded-lg">
+                            <h3 class="font-semibold mb-3 text-yellow-800">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>Pending Override Requests
+                            </h3>
+                            <div class="space-y-3">
+                                <?php foreach ($overrides as $override): ?>
+                                    <div class="flex justify-between items-center p-3 bg-white rounded border">
+                                        <div>
+                                            <div class="font-medium">
+                                                <?= date('M j, Y', strtotime($override['schedule_date'])) ?>
+                                            </div>
+                                            <div class="text-sm text-gray-600">
+                                                <?= $override['override_name'] ?: 'Rest Day Request' ?>
+                                                <span class="mx-2">•</span>
+                                                <?= htmlspecialchars($override['reason']) ?>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button onclick="approveOverride(<?= $override['id'] ?>, true)" 
+                                                    class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                                                <i class="fas fa-check mr-1"></i>Approve
+                                            </button>
+                                            <button onclick="approveOverride(<?= $override['id'] ?>, false)" 
+                                                    class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm">
+                                                <i class="fas fa-times mr-1"></i>Reject
+                                            </button>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Calendar Navigation -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-4">
+                            <button onclick="changeAdminMonth('<?= h($nav['prev']) ?>')" 
+                               class="p-2 rounded-lg hover:bg-gray-100 text-gray-600">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <h3 id="admin-calendar-title" class="text-xl font-bold text-gray-800">
+                                <?= date('F Y', strtotime("$year-$month-01")) ?>
+                            </h3>
+                            <button onclick="changeAdminMonth('<?= h($nav['next']) ?>')" 
+                               class="p-2 rounded-lg hover:bg-gray-100 text-gray-600">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        <button onclick="changeAdminMonth('<?= date('Y-n') ?>')" 
+                           class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200">
+                            <i class="fas fa-calendar-day mr-1"></i> Today
+                        </button>
+                    </div>
+
+                    <!-- Calendar Grid -->
+                    <div id="admin-calendar-grid" class="grid grid-cols-7 gap-2 text-sm">
+                        <!-- This will be populated by AJAX -->
+                        <div class="col-span-7 text-center py-8">
+                            <i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>
+                            <br><span class="text-gray-500 mt-2">Loading calendar...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Schedule Assignment Modal -->
+                <div id="scheduleAssignModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+                    <div class="flex items-center justify-center min-h-screen px-4">
+                        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold">Assign Schedule</h3>
+                                <button onclick="closeScheduleAssignModal()" class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+
+                            <form method="post" class="space-y-4">
+                                <input type="hidden" name="admin_action" value="assign_schedule">
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Assignment Type</label>
+                                    <select name="assignment_type" id="assignment_type" onchange="toggleScheduleFields()" 
+                                            class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="fixed">Fixed Schedule</option>
+                                        <option value="pattern">Pattern-Based</option>
+                                    </select>
+                                </div>
+
+                                <div id="fixed_schedule_field">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Work Schedule</label>
+                                    <select name="work_schedule_id" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="">Select Schedule</option>
+                                        <?php foreach ($workSchedules as $ws): ?>
+                                            <option value="<?= $ws['id'] ?>">
+                                                <?= htmlspecialchars($ws['name'] ?? 'Schedule ' . $ws['id']) ?>
+                                                (<?= date('g:i A', strtotime($ws['time_in'])) ?> - <?= date('g:i A', strtotime($ws['time_out'])) ?>)
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div id="pattern_schedule_field" style="display: none;">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Schedule Pattern</label>
+                                    <select name="schedule_pattern_id" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        <option value="">Select Pattern</option>
+                                        <?php foreach ($schedulePatterns as $pattern): ?>
+                                            <option value="<?= $pattern['id'] ?>">
+                                                <?= htmlspecialchars($pattern['pattern_name']) ?>
+                                                (<?= $pattern['cycle_length'] ?> day cycle)
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                                    <input type="date" name="start_date" required value="<?= date('Y-m-d') ?>"
+                                           class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">End Date (Optional)</label>
+                                    <input type="date" name="end_date"
+                                           class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                </div>
+
+                                <div class="flex gap-3">
+                                    <button type="button" onclick="closeScheduleAssignModal()"
+                                            class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                        Assign Schedule
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Schedule Detail Modal -->
+                <div id="adminScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+                    <div class="flex items-center justify-center min-h-screen px-4">
+                        <div class="bg-white rounded-lg p-6 w-full max-w-lg">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold">Schedule Details</h3>
+                                <button onclick="closeAdminScheduleModal()" class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div id="admin-schedule-details">
+                                <!-- Content will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                // Helper function for HTML escaping
+                function h(str) {
+                    return String(str).replace(/[&<>"']/g, function(match) {
+                        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[match];
+                    });
+                }
+
+                // Initialize admin calendar on page load
+                document.addEventListener('DOMContentLoaded', function() {
+                    changeAdminMonth('<?= $ym ?>');
+                });
+
+                // AJAX function to change calendar month
+                function changeAdminMonth(ym) {
+                    const calendarGrid = document.getElementById('admin-calendar-grid');
+                    const calendarTitle = document.getElementById('admin-calendar-title');
+                    
+                    calendarGrid.innerHTML = '<div class="col-span-7 text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i><br><span class="text-gray-500 mt-2">Loading...</span></div>';
+                    
+                    fetch(`employee_calendar_admin_ajax.php?employee_id=<?= $employeeId ?>&ym=${ym}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                calendarGrid.innerHTML = data.calendar_html;
+                                calendarTitle.textContent = data.month_title;
+                                
+                                // Update browser URL without refresh
+                                const newUrl = new URL(window.location);
+                                newUrl.searchParams.set('ym', ym);
+                                window.history.pushState({}, '', newUrl);
+                            } else {
+                                throw new Error(data.error || 'Failed to load calendar');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error loading calendar:', error);
+                            calendarGrid.innerHTML = '<div class="col-span-7 text-center py-8 text-red-500"><i class="fas fa-exclamation-triangle text-2xl"></i><br><span class="mt-2">Error loading calendar. Please refresh the page.</span></div>';
+                        });
+                }
+
+                // Schedule assignment modal functions
+                function openScheduleAssignModal() {
+                    document.getElementById('scheduleAssignModal').classList.remove('hidden');
+                }
+
+                function closeScheduleAssignModal() {
+                    document.getElementById('scheduleAssignModal').classList.add('hidden');
+                }
+
+                function toggleScheduleFields() {
+                    const assignmentType = document.getElementById('assignment_type').value;
+                    const fixedField = document.getElementById('fixed_schedule_field');
+                    const patternField = document.getElementById('pattern_schedule_field');
+                    
+                    if (assignmentType === 'pattern') {
+                        fixedField.style.display = 'none';
+                        patternField.style.display = 'block';
+                    } else {
+                        fixedField.style.display = 'block';
+                        patternField.style.display = 'none';
+                    }
+                }
+
+                // Admin schedule detail modal
+                function openAdminScheduleModal(date, employeeId) {
+                    // Show loading state
+                    document.getElementById('admin-schedule-details').innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+                    document.getElementById('adminScheduleModal').classList.remove('hidden');
+                    
+                    // Build detailed view for the selected date
+                    const detailsHtml = `
+                        <div class="space-y-4">
+                            <div class="border-b pb-2 mb-4">
+                                <h4 class="font-semibold text-lg">${new Date(date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
+                            </div>
+                            <div class="text-center text-gray-500">
+                                <p>Schedule details for this date will be implemented with additional features.</p>
+                                <p class="mt-2 text-sm">Click elsewhere to close this modal.</p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    setTimeout(() => {
+                        document.getElementById('admin-schedule-details').innerHTML = detailsHtml;
+                    }, 500);
+                }
+
+                function closeAdminScheduleModal() {
+                    document.getElementById('adminScheduleModal').classList.add('hidden');
+                }
+
+                // Approve/Reject override
+                function approveOverride(overrideId, approve) {
+                    const formData = new FormData();
+                    formData.append('admin_action', 'approve_override');
+                    formData.append('override_id', overrideId);
+                    formData.append('approve', approve);
+
+                    fetch('employee-edit.php?id=<?= $employeeId ?>', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload(); // Refresh to show updated status
+                        } else {
+                            alert('Error: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while processing the request');
+                    });
+                }
+
+                // Handle browser back/forward buttons
+                window.addEventListener('popstate', function(event) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const ym = urlParams.get('ym') || '<?= date('Y-n') ?>';
+                    changeAdminMonth(ym);
+                });
+                </script>
+            </div>

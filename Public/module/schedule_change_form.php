@@ -1,10 +1,10 @@
-<!-- Request Change Schedule -->
-<div id="scheduleView" class="hidden mt-8">
-  <div class="flex justify-center items-start min-h-[70vh] px-4">
-    <div class="w-full max-w-6xl">
+<!-- Schedule Change Modal -->
+<div id="scheduleChangeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50" style="display: none;">
+  <div class="flex items-center justify-center min-h-screen px-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
 
-      <!-- Modern Header with Gradient -->
-      <div class="bg-gradient-to-r from-green-600 to-green-700 p-6 rounded-t-2xl shadow-lg">
+      <!-- Modal Header with Close Button -->
+      <div class="bg-gradient-to-r from-green-600 to-green-700 p-6 rounded-t-2xl shadow-lg relative">
         <div class="flex items-center justify-center space-x-3">
           <div class="bg-white bg-opacity-20 p-2 rounded-full">
             <i class="fas fa-calendar-alt text-white text-xl"></i>
@@ -12,11 +12,17 @@
           <h2 class="text-3xl font-bold text-white">Schedule Change Request</h2>
         </div>
         <p class="text-green-100 text-center mt-2">Submit your schedule modification request</p>
+        
+        <!-- Close Button -->
+        <button onclick="closeScheduleChangeModal()" 
+                class="absolute top-4 right-4 text-white hover:text-gray-200 text-2xl">
+          <i class="fas fa-times"></i>
+        </button>
       </div>
 
-      <!-- Horizontal Form Layout -->
-      <div class="bg-white rounded-b-2xl shadow-xl border border-green-100 -mt-1">
-        <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm" class="p-8">
+      <!-- Modal Form Content -->
+      <div class="p-8">
+        <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm"
           <?= csrf_token_field() ?>
           <input type="hidden" name="submit_schedule_change" value="1">
 
@@ -106,63 +112,121 @@
           </div>
 
           <!-- Submit Button -->
-          <div class="flex justify-center pt-6 border-t border-gray-100">
+          <div class="flex gap-4 pt-6 border-t border-gray-100">
+            <button type="button" onclick="closeScheduleChangeModal()"
+                    class="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium">
+              <i class="fas fa-times mr-2"></i>Cancel
+            </button>
             <button type="submit" id="submitBtn"
-                    class="group relative px-12 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-              <div class="flex items-center space-x-3">
+                    class="flex-1 group relative px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold shadow-lg hover:shadow-xl">
+              <div class="flex items-center justify-center space-x-2">
                 <i class="fas fa-paper-plane group-hover:translate-x-1 transition-transform duration-200"></i>
                 <span>Submit Request</span>
               </div>
-              <div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 rounded-xl transition-opacity duration-200"></div>
             </button>
           </div>
         </form>
 
         <!-- Message Box -->
-        <div id="messageBox" class="hidden mx-8 mb-6 p-4 text-center text-white rounded-xl font-medium"></div>
+        <div id="messageBox" class="hidden mb-6 p-4 text-center text-white rounded-xl font-medium"></div>
       </div>
     </div>
   </div>
 </div>
 
 <style>
-/* Form Animations */
-#scheduleView:not(.hidden) {
-    animation: fadeIn 0.3s ease-out;
+/* Modal Animations */
+#scheduleChangeModal {
+    animation: modalFadeIn 0.3s ease-out;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+@keyframes modalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#scheduleChangeModal .bg-white {
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(-20px) scale(0.95); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+    }
 }
 
 /* Enhanced focus effects */
-#scheduleView input:focus, 
-#scheduleView select:focus, 
-#scheduleView textarea:focus {
+#scheduleChangeModal input:focus, 
+#scheduleChangeModal select:focus, 
+#scheduleChangeModal textarea:focus {
     transform: translateY(-1px);
 }
 
 /* Button hover effects */
-#scheduleView button:hover {
+#scheduleChangeModal button:hover {
     transform: translateY(-1px);
 }
 
 /* Error states */
-#scheduleView .border-red-400 {
+#scheduleChangeModal .border-red-400 {
     border-color: #f87171 !important;
     background-color: #fef2f2 !important;
 }
 
 /* Responsive adjustments */
 @media (max-width: 1024px) {
-    #scheduleView .lg\\:grid-cols-2 {
+    #scheduleChangeModal .lg\\:grid-cols-2 {
         grid-template-columns: 1fr;
     }
+    
+    #scheduleChangeModal .max-w-4xl {
+        max-width: 95vw;
+    }
+}
+
+/* Modal backdrop blur effect */
+#scheduleChangeModal {
+    backdrop-filter: blur(4px);
 }
 </style>
 
 <script>
+// Modal Functions
+function openScheduleChangeModal(date) {
+    const modal = document.getElementById('scheduleChangeModal');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    
+    // If a date was provided, set it in the date range field
+    if (date) {
+        setTimeout(function() {
+            const dateRangeField = document.getElementById('date_range');
+            if (dateRangeField) {
+                // Set the date range to just the selected date
+                dateRangeField.value = date + ' - ' + date;
+            }
+        }, 100);
+    }
+    
+    // Reset form
+    document.getElementById('scheduleChangeForm').reset();
+    // Clear any error states
+    document.querySelectorAll('.border-red-400').forEach(field => {
+        field.classList.remove('border-red-400');
+    });
+}
+
+function closeScheduleChangeModal() {
+    const modal = document.getElementById('scheduleChangeModal');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto'; // Re-enable background scrolling
+}
+
 // Form Validation
 document.getElementById('scheduleChangeForm').addEventListener('submit', function(e) {
     const requiredFields = this.querySelectorAll('[required]');
@@ -183,7 +247,7 @@ document.getElementById('scheduleChangeForm').addEventListener('submit', functio
         e.preventDefault();
         this.querySelector('.border-red-400')?.focus();
         
-        // Scroll to first error
+        // Scroll to first error within modal
         this.querySelector('.border-red-400')?.scrollIntoView({
             behavior: 'smooth',
             block: 'center'
@@ -191,8 +255,25 @@ document.getElementById('scheduleChangeForm').addEventListener('submit', functio
     }
 });
 
-// Hide schedule view function
+// Close modal when clicking outside
+document.getElementById('scheduleChangeModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeScheduleChangeModal();
+    }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('scheduleChangeModal');
+        if (modal.style.display === 'block') {
+            closeScheduleChangeModal();
+        }
+    }
+});
+
+// Legacy function for compatibility
 function hideScheduleView() {
-    document.getElementById('scheduleView').classList.add('hidden');
+    closeScheduleChangeModal();
 }
 </script>

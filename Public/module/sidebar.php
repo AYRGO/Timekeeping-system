@@ -1,5 +1,5 @@
 <!-- Sidebar -->
-       <aside id="sidebar" class="w-64 bg-white shadow-lg flex flex-col fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out fixed h-full">
+       <aside id="sidebar" class="w-64 bg-white shadow-lg flex flex-col fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out h-full">
 
             <!-- Logo -->
             <div class="p-6 flex justify-center">
@@ -19,8 +19,8 @@
                     <span class="text-base">News Feed</span>
                 </a>
                 <a href="#" onclick="showSection('scheduleView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
-                    <i class="fas fa-calendar-alt text-lg"></i>
-                    <span class="text-base">Request Change Schedule</span>
+                    <i class="fas fa-calendar-check text-lg"></i>
+                    <span class="text-base">Schedule Management</span>
                 </a>
                 <a href="#" onclick="showSection('overtimeView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
                     <i class="fas fa-clock text-lg"></i>
