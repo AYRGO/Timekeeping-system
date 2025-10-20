@@ -174,40 +174,48 @@ try {
     }
     ?>
 
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <!-- Calendar -->
-        <div class="lg:col-span-3 bg-white rounded-lg shadow p-6">
-            <!-- Calendar Navigation -->
-            <div class="flex items-center justify-between mb-6">
-                <div class="flex items-center gap-4">
-                    <a href="?ym=<?= h_schedule($nav_schedule['prev']) ?>#scheduleView" 
-                       onclick="showSection('scheduleView')"
-                       class="p-2 rounded-lg hover:bg-gray-100 text-gray-600">
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
-                    <h3 class="text-2xl font-bold text-gray-800">
-                        <?= date('F Y', strtotime("$year_schedule-$month_schedule-01")) ?>
-                    </h3>
-                    <a href="?ym=<?= h_schedule($nav_schedule['next']) ?>#scheduleView" 
-                       onclick="showSection('scheduleView')"
-                       class="p-2 rounded-lg hover:bg-gray-100 text-gray-600">
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
-                </div>
-                <a href="?ym=<?= date('Y-n') ?>#scheduleView" 
+<div class="bg-white">
+    <!-- Calendar -->
+    <div class="bg-white">
+        <!-- Calendar Navigation -->
+        <div class="flex items-center justify-between px-8 py-5 border-b border-gray-200 bg-white">
+            <div class="flex items-center gap-4">
+                <a href="?ym=<?= h_schedule($nav_schedule['prev']) ?>#scheduleView" 
                    onclick="showSection('scheduleView')"
-                   class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200">
-                    <i class="fas fa-calendar-day mr-1"></i> Today
+                   class="w-9 h-9 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                <h3 class="text-2xl font-semibold text-gray-900">
+                    <?= date('F Y', strtotime("$year_schedule-$month_schedule-01")) ?>
+                </h3>
+                <a href="?ym=<?= h_schedule($nav_schedule['next']) ?>#scheduleView" 
+                   onclick="showSection('scheduleView')"
+                   class="w-9 h-9 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors">
+                    <i class="fas fa-chevron-right"></i>
                 </a>
             </div>
+            <div class="flex gap-3">
+                <a href="?ym=<?= date('Y-n') ?>#scheduleView" 
+                   onclick="showSection('scheduleView')"
+                   class="px-4 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                    Today
+                </a>
+                <button onclick="openScheduleChangeModal()"
+                        class="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm">
+                    <i class="fas fa-plus mr-2 text-xs"></i>New Request
+                </button>
+            </div>
+        </div>
 
             <!-- Calendar Grid -->
-            <div class="grid grid-cols-7 gap-1 text-sm">
+            <div class="grid grid-cols-7 gap-0 border-l border-t border-gray-200">
                 <!-- Weekday Headers -->
                 <?php $weekdays_schedule = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; 
-                      foreach($weekdays_schedule as $wd): ?>
-                    <div class="text-center font-semibold py-3 text-gray-700 bg-gray-50 rounded">
-                        <?= substr($wd, 0, 3) ?>
+                      foreach($weekdays_schedule as $idx => $wd): 
+                        $isWeekend = ($idx == 0 || $idx == 6);
+                ?>
+                    <div class="text-center py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50 border-r border-b border-gray-200">
+                        <?= $wd ?>
                     </div>
                 <?php endforeach; ?>
 
@@ -215,141 +223,122 @@ try {
                 <?php foreach($matrix_schedule as $week): ?>
                     <?php foreach($week as $cellDate): ?>
                         <?php if (!$cellDate): ?>
-                            <div class="h-28 bg-gray-50 rounded border border-gray-100"></div>
+                            <div class="min-h-[140px] bg-gray-50/30 border-r border-b border-gray-200"></div>
                         <?php else: 
                               $cell = getScheduleCell_schedule($pdo, $employee_id, $cellDate);
                               $isToday = $cellDate === date('Y-m-d');
                               $isPast = $cellDate < date('Y-m-d');
                               
-                              // Determine background color based on source
-                              $bgColor = $cell['schedule_color'];
+                              // Clean, minimal styling like Monday.com
+                              $bgClass = 'bg-white hover:bg-gray-50';
+                              $borderClass = 'border-r border-b border-gray-200';
+                              
+                              if ($isToday) {
+                                  $bgClass = 'bg-blue-50/30';
+                              }
+                              
+                              if ($isPast) {
+                                  $bgClass .= ' opacity-50';
+                              }
                         ?>
-                            <div class="h-28 p-2 border rounded-lg relative overflow-hidden transition-all hover:shadow-md <?= $isToday ? 'ring-2 ring-blue-500' : '' ?>"
-                                 style="background: linear-gradient(135deg, <?= h_schedule($bgColor) ?>20, <?= h_schedule($bgColor) ?>05); border-color: <?= h_schedule($bgColor) ?>40;">
+                            <div class="min-h-[140px] p-3 <?= $bgClass ?> <?= $borderClass ?> transition-colors <?= !$isPast ? 'cursor-pointer' : '' ?>"
+                                 <?= !$isPast ? "onclick=\"openScheduleChangeModal('$cellDate')\"" : '' ?>>
                               
                               <!-- Date Number -->
-                              <div class="flex justify-between items-start mb-1">
-                                <span class="text-sm font-bold <?= $isToday ? 'text-blue-600' : 'text-gray-700' ?>">
+                              <div class="flex items-center justify-between mb-3">
+                                <span class="text-sm font-semibold <?= $isToday ? 'bg-blue-600 text-white w-7 h-7 flex items-center justify-center rounded-full' : 'text-gray-700' ?>">
                                   <?= date('j', strtotime($cellDate)) ?>
                                 </span>
+                                
                                 <?php if ($cell['source'] === 'daily_override'): ?>
-                                  <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Override</span>
-                                <?php elseif ($cell['source'] === 'holiday'): ?>
-                                  <i class="fas fa-star text-yellow-500 text-xs"></i>
+                                  <span class="text-xs text-green-600 font-medium">Override</span>
+                                <?php elseif ($cell['is_holiday']): ?>
+                                  <i class="fas fa-star text-amber-500 text-xs"></i>
                                 <?php endif; ?>
                               </div>
 
-                              <!-- Schedule Info -->
+                              <!-- Schedule Card (if exists) -->
                               <?php if ($cell['is_rest_day'] || $cell['is_holiday']): ?>
-                                <div class="text-xs font-medium text-gray-600 mb-1">
-                                  <i class="fas fa-<?= $cell['is_holiday'] ? 'star' : 'bed' ?> mr-1"></i>
-                                  <?= $cell['is_holiday'] ? 'HOLIDAY' : 'OFF' ?>
+                                <div class="p-2.5 rounded-lg <?= $cell['is_holiday'] ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50 border border-gray-200' ?>">
+                                  <div class="flex items-center gap-2 mb-1">
+                                    <div class="w-1 h-8 rounded-full <?= $cell['is_holiday'] ? 'bg-amber-500' : 'bg-gray-400' ?>"></div>
+                                    <div class="flex-1 min-w-0">
+                                      <div class="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                                        <?= $cell['is_holiday'] ? 'HOLIDAY' : 'REST DAY' ?>
+                                      </div>
+                                      <?php if ($cell['is_holiday'] && isset($cell['holiday'])): ?>
+                                        <div class="text-xs text-gray-600 truncate mt-0.5">
+                                          <?= h_schedule($cell['holiday']['holiday_name']) ?>
+                                        </div>
+                                      <?php endif; ?>
+                                    </div>
+                                  </div>
                                 </div>
-                                <?php if ($cell['is_holiday'] && isset($cell['holiday'])): ?>
-                                  <div class="text-xs text-gray-500 truncate">
-                                    <?= h_schedule($cell['holiday']['holiday_name']) ?>
-                                  </div>
-                                <?php endif; ?>
                               <?php elseif ($cell['actual_schedule']): ?>
-                                <div class="text-xs">
-                                  <div class="font-medium text-gray-700 mb-1 truncate">
-                                    <?= h_schedule($cell['actual_schedule']['name'] ?? 'Schedule') ?>
-                                  </div>
-                                  <div class="text-gray-600">
-                                    <i class="fas fa-clock text-xs mr-1"></i>
-                                    <?= date('g:i A', strtotime($cell['actual_schedule']['time_in'])) ?>
-                                  </div>
-                                  <div class="text-gray-600">
-                                    <i class="fas fa-arrow-right text-xs mr-1"></i>
-                                    <?= date('g:i A', strtotime($cell['actual_schedule']['time_out'])) ?>
+                                <?php 
+                                  // Color coding based on source
+                                  $cardColor = 'blue';
+                                  if ($cell['source'] === 'daily_override') {
+                                      $cardColor = 'green';
+                                  } elseif ($cell['source'] === 'weekly_default') {
+                                      $cardColor = 'blue';
+                                  }
+                                ?>
+                                <div class="p-2.5 rounded-lg bg-<?= $cardColor ?>-50 border border-<?= $cardColor ?>-200 hover:shadow-md transition-shadow">
+                                  <div class="flex items-start gap-2">
+                                    <div class="w-1 h-full rounded-full bg-<?= $cardColor ?>-500"></div>
+                                    <div class="flex-1 min-w-0">
+                                      <?php if (!empty($cell['actual_schedule']['name'])): ?>
+                                        <div class="text-xs font-semibold text-gray-800 truncate mb-1">
+                                          <?= h_schedule($cell['actual_schedule']['name']) ?>
+                                        </div>
+                                      <?php endif; ?>
+                                      <div class="flex items-center gap-1.5 text-xs text-gray-600">
+                                        <i class="fas fa-clock text-[10px]"></i>
+                                        <span class="font-medium"><?= date('g:i A', strtotime($cell['actual_schedule']['time_in'])) ?></span>
+                                      </div>
+                                      <div class="flex items-center gap-1.5 text-xs text-gray-600 mt-0.5">
+                                        <i class="fas fa-arrow-right text-[10px]"></i>
+                                        <span class="font-medium"><?= date('g:i A', strtotime($cell['actual_schedule']['time_out'])) ?></span>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                               <?php else: ?>
                                 <div class="text-xs text-gray-400 italic">
-                                  <i class="fas fa-question-circle mr-1"></i>No Schedule
+                                  No schedule
                                 </div>
-                              <?php endif; ?>
-
-                              <!-- Source Badge (bottom left) -->
-                              <div class="absolute bottom-1 left-1">
-                                <?php if ($cell['source'] === 'weekly_default'): ?>
-                                  <span class="text-xs text-blue-600" title="Weekly Default">
-                                    <i class="fas fa-calendar-week"></i>
-                                  </span>
-                                <?php elseif ($cell['source'] === 'daily_override'): ?>
-                                  <span class="text-xs text-green-600" title="Daily Override">
-                                    <i class="fas fa-calendar-check"></i>
-                                  </span>
-                                <?php endif; ?>
-                              </div>
-
-                              <!-- Click for details (future dates only) -->
-                              <?php if (!$isPast): ?>
-                                <button onclick="openScheduleChangeModal('<?= $cellDate ?>')" 
-                                        class="absolute inset-0 w-full h-full opacity-0 hover:opacity-10 bg-blue-500 transition-opacity cursor-pointer"
-                                        title="Click to request schedule change">
-                                </button>
                               <?php endif; ?>
                             </div>
                         <?php endif; ?>
                     <?php endforeach; ?>
                 <?php endforeach; ?>
             </div>
-        </div>
-
-        <!-- Sidebar -->
-        <div class="space-y-6">
-            <!-- Status Legend -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h4 class="font-semibold mb-4 text-gray-800">
-                    <i class="fas fa-info-circle mr-2 text-blue-600"></i>Schedule Legend
-                </h4>
-                <div class="space-y-3 text-sm">
-                    <div class="flex items-center gap-3">
-                        <div class="w-4 h-4 rounded-full" style="background-color: #10b981;"></div>
-                        <span>Daily Override</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="w-4 h-4 rounded-full" style="background-color: #3b82f6;"></div>
-                        <span>Weekly Default</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="w-4 h-4 rounded-full" style="background-color: #fbbf24;"></div>
-                        <span>Holiday</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="w-4 h-4 rounded-full" style="background-color: #ef4444;"></div>
-                        <span>Rest Day (Override)</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="w-4 h-4 rounded-full" style="background-color: #f3f4f6;"></div>
-                        <span>Rest Day (Default)</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="w-4 h-4 rounded-full" style="background-color: #9ca3af;"></div>
-                        <span>No Schedule</span>
-                    </div>
+            
+            <!-- Bottom Legend Bar -->
+            <div class="px-8 py-4 bg-gray-50 border-t border-gray-200">
+              <div class="flex flex-wrap gap-8 text-sm text-gray-600 items-center">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-4 h-4 rounded bg-green-500"></div>
+                  <span>Daily Override</span>
                 </div>
-                
-                <div class="mt-4 pt-4 border-t border-gray-200">
-                    <h5 class="text-xs font-semibold text-gray-600 mb-2">ICONS</h5>
-                    <div class="space-y-2 text-xs text-gray-600">
-                        <div><i class="fas fa-calendar-week w-4 text-blue-600"></i> Weekly Schedule</div>
-                        <div><i class="fas fa-calendar-check w-4 text-green-600"></i> Override</div>
-                        <div><i class="fas fa-star w-4 text-yellow-500"></i> Holiday</div>
-                    </div>
+                <div class="flex items-center gap-2.5">
+                  <div class="w-4 h-4 rounded bg-blue-500"></div>
+                  <span>Weekly Schedule</span>
                 </div>
-            </div>
-
-            <!-- Quick Request -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h4 class="font-semibold mb-4 text-gray-800">
-                    <i class="fas fa-edit mr-2 text-blue-600"></i>Request Schedule Change
-                </h4>
-                <button onclick="openScheduleChangeModal()"
-                        class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                    <i class="fas fa-plus mr-2"></i>New Request
-                </button>
+                <div class="flex items-center gap-2.5">
+                  <div class="w-4 h-4 rounded bg-amber-500"></div>
+                  <span>Holiday</span>
+                </div>
+                <div class="flex items-center gap-2.5">
+                  <div class="w-4 h-4 rounded bg-gray-400"></div>
+                  <span>Rest Day</span>
+                </div>
+                <div class="flex items-center gap-2.5 ml-auto">
+                  <i class="fas fa-info-circle text-blue-500"></i>
+                  <span class="text-gray-500">Click any date to request a schedule change</span>
+                </div>
+              </div>
             </div>
         </div>
     </div>
@@ -424,3 +413,80 @@ try {
 // Schedule content JavaScript functions are now handled by the modal in schedule_change_form.php
 // The openScheduleChangeModal() function is defined in the schedule_change_form.php file
 </script>
+
+<style>
+/* Full-screen Monday.com-inspired calendar - SCOPED TO SCHEDULE VIEW ONLY */
+
+/* Remove default margins and ensure full width - ONLY for schedule view */
+#scheduleView {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+}
+
+/* Calendar takes full viewport - ONLY inside schedule view */
+#scheduleView .grid.grid-cols-7 {
+    min-height: calc(100vh - 200px);
+}
+
+/* Subtle hover effect on calendar cells - ONLY inside schedule view */
+#scheduleView .min-h-\[160px\]:hover {
+    background-color: #f9fafb !important;
+}
+
+/* Today's date circle - ONLY inside schedule view */
+#scheduleView .bg-blue-600.rounded-full {
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+/* Schedule card hover effect - ONLY inside schedule view */
+#scheduleView .rounded-lg.hover\:shadow-md {
+    transition: all 0.2s ease;
+}
+
+#scheduleView .rounded-lg.hover\:shadow-md:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+/* Smooth transitions - ONLY inside schedule view */
+#scheduleView * {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+
+/* Clean borders - ONLY inside schedule view */
+#scheduleView .border-gray-200 {
+    border-color: #e5e7eb;
+}
+
+/* Calendar grid consistency - ONLY inside schedule view */
+#scheduleView .grid.grid-cols-7 > div {
+    position: relative;
+}
+
+/* Vertical accent line in schedule cards - ONLY inside schedule view */
+#scheduleView .w-1.h-10,
+#scheduleView .w-1.h-full {
+    flex-shrink: 0;
+}
+
+/* Text truncation - ONLY inside schedule view */
+#scheduleView .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Button hover states - ONLY inside schedule view */
+#scheduleView button:hover,
+#scheduleView a:hover {
+    transform: translateY(0);
+}
+
+/* Ensure cells grow to fill space evenly - ONLY inside schedule view */
+#scheduleView .min-h-\[160px\] {
+    flex: 1;
+}
+</style>

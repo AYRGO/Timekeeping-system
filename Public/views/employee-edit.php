@@ -248,6 +248,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo "<script>alert('Rotating schedule removed!'); window.location.href = 'employee-edit.php?id=$employeeId#rotating-schedule';</script>";
         exit;
     }
+    
+    // Add New Schedule
+    if (isset($_POST['action']) && $_POST['action'] === 'add_schedule') {
+        $time_in = $_POST['time_in'] ?? '';
+        $time_out = $_POST['time_out'] ?? '';
+        $name = $_POST['schedule_name'] ?? null;
+        
+        if ($time_in && $time_out) {
+            $stmt = $pdo->prepare("INSERT INTO work_schedules (name, time_in, time_out) VALUES (?, ?, ?)");
+            $stmt->execute([$name, $time_in, $time_out]);
+            echo "<script>alert('Schedule added successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+            exit;
+        } else {
+            echo "<script>alert('Please provide both time in and time out.');</script>";
+        }
+    }
+    
+    // Edit Schedule
+    if (isset($_POST['action']) && $_POST['action'] === 'edit_schedule') {
+        $schedule_id = $_POST['schedule_id'] ?? 0;
+        $time_in = $_POST['time_in'] ?? '';
+        $time_out = $_POST['time_out'] ?? '';
+        $name = $_POST['schedule_name'] ?? null;
+        
+        if ($schedule_id && $time_in && $time_out) {
+            $stmt = $pdo->prepare("UPDATE work_schedules SET name = ?, time_in = ?, time_out = ? WHERE id = ?");
+            $stmt->execute([$name, $time_in, $time_out, $schedule_id]);
+            echo "<script>alert('Schedule updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+            exit;
+        } else {
+            echo "<script>alert('Invalid schedule data.');</script>";
+        }
+    }
+    
+    // Delete Schedule
+    if (isset($_POST['action']) && $_POST['action'] === 'delete_schedule') {
+        $schedule_id = $_POST['schedule_id'] ?? 0;
+        
+        if ($schedule_id) {
+            // Check if any employee is using this schedule
+            $checkStmt = $pdo->prepare("SELECT COUNT(*) as count FROM employees WHERE official_sched = ?");
+            $checkStmt->execute([$schedule_id]);
+            $count = $checkStmt->fetch(PDO::FETCH_ASSOC)['count'];
+            
+            if ($count > 0) {
+                echo "<script>alert('Cannot delete schedule. It is currently assigned to $count employee(s).');</script>";
+            } else {
+                $stmt = $pdo->prepare("DELETE FROM work_schedules WHERE id = ?");
+                $stmt->execute([$schedule_id]);
+                echo "<script>alert('Schedule deleted successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+                exit;
+            }
+        }
+    }
 }
 
 // Fetch employee
@@ -281,6 +335,11 @@ $overtimeRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt = $pdo->prepare("SELECT * FROM time_adjustment_requests WHERE employee_id = ? ORDER BY created_at DESC");
 $stmt->execute([$employeeId]);
 $timeAdjustmentRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch all schedules from work_schedules table
+$stmt = $pdo->prepare("SELECT * FROM work_schedules ORDER BY id ASC");
+$stmt->execute();
+$allSchedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Helper function for status badges
 function getStatusBadge($status) {
@@ -449,6 +508,9 @@ uasort($sortedScheduleOptions, function($a, $b) {
                 </button>
                 <button onclick="openTab(event, 'time-adjustments')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
                     <i class="fas fa-history mr-2"></i>Time Adjustments (<?= count($timeAdjustmentRequests) ?>)
+                </button>
+                <button onclick="openTab(event, 'manage-schedules')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
+                    <i class="fas fa-cog mr-2"></i>Manage Schedules (<?= count($allSchedules) ?>)
                 </button>
             </div>
             
@@ -1608,6 +1670,188 @@ uasort($sortedScheduleOptions, function($a, $b) {
                     <?php endif; ?>
                 </div>
             </div>
+
+            <!-- Manage Schedules Tab -->
+            <div id="manage-schedules" class="tab-content">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">
+                            <i class="fas fa-cog mr-2 text-blue-600"></i>Manage Work Schedules
+                        </h2>
+                        <button onclick="toggleAddScheduleForm()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+                            <i class="fas fa-plus mr-2"></i>Add New Schedule
+                        </button>
+                    </div>
+
+                    <!-- Add Schedule Form (Hidden by default) -->
+                    <div id="addScheduleForm" class="hidden mb-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Add New Schedule</h3>
+                        <form method="post" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input type="hidden" name="action" value="add_schedule">
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Name (Optional)</label>
+                                <input type="text" name="schedule_name" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                       placeholder="e.g., Morning Shift, Night Shift">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Time In <span class="text-red-500">*</span></label>
+                                <input type="time" name="time_in" required
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Time Out <span class="text-red-500">*</span></label>
+                                <input type="time" name="time_out" required
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div class="md:col-span-3 flex justify-end gap-2">
+                                <button type="button" onclick="toggleAddScheduleForm()" 
+                                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition">
+                                    Cancel
+                                </button>
+                                <button type="submit" 
+                                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+                                    <i class="fas fa-save mr-2"></i>Save Schedule
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Schedules Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full table-auto">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time In</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time Out</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Employees Using</th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <?php foreach ($allSchedules as $sched): 
+                                    // Count employees using this schedule
+                                    $countStmt = $pdo->prepare("SELECT COUNT(*) as count FROM employees WHERE official_sched = ?");
+                                    $countStmt->execute([$sched['id']]);
+                                    $empCount = $countStmt->fetch(PDO::FETCH_ASSOC)['count'];
+                                    
+                                    // Calculate duration
+                                    $timeIn = new DateTime($sched['time_in']);
+                                    $timeOut = new DateTime($sched['time_out']);
+                                    if ($timeOut < $timeIn) {
+                                        $timeOut->modify('+1 day');
+                                    }
+                                    $interval = $timeIn->diff($timeOut);
+                                    $duration = $interval->format('%h hrs %i min');
+                                ?>
+                                <tr class="hover:bg-gray-50" id="schedule-row-<?= $sched['id'] ?>">
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        <?= $sched['id'] ?>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <span id="name-display-<?= $sched['id'] ?>">
+                                            <?= !empty($sched['name']) ? htmlspecialchars($sched['name']) : '<span class="text-gray-400 italic">No name</span>' ?>
+                                        </span>
+                                        <input type="text" id="name-edit-<?= $sched['id'] ?>" 
+                                               value="<?= htmlspecialchars($sched['name'] ?? '') ?>"
+                                               class="hidden w-full px-2 py-1 border border-gray-300 rounded">
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <span id="timein-display-<?= $sched['id'] ?>">
+                                            <?= date('h:i A', strtotime($sched['time_in'])) ?>
+                                        </span>
+                                        <input type="time" id="timein-edit-<?= $sched['id'] ?>" 
+                                               value="<?= $sched['time_in'] ?>"
+                                               class="hidden w-full px-2 py-1 border border-gray-300 rounded">
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <span id="timeout-display-<?= $sched['id'] ?>">
+                                            <?= date('h:i A', strtotime($sched['time_out'])) ?>
+                                        </span>
+                                        <input type="time" id="timeout-edit-<?= $sched['id'] ?>" 
+                                               value="<?= $sched['time_out'] ?>"
+                                               class="hidden w-full px-2 py-1 border border-gray-300 rounded">
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <?= $duration ?>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-center">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?= $empCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' ?>">
+                                            <?= $empCount ?> employee<?= $empCount != 1 ? 's' : '' ?>
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-center text-sm">
+                                        <div id="actions-view-<?= $sched['id'] ?>">
+                                            <button onclick="editSchedule(<?= $sched['id'] ?>)" 
+                                                    class="text-blue-600 hover:text-blue-800 mr-3">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </button>
+                                            <?php if ($empCount == 0): ?>
+                                                <button onclick="deleteSchedule(<?= $sched['id'] ?>)" 
+                                                        class="text-red-600 hover:text-red-800">
+                                                    <i class="fas fa-trash"></i> Delete
+                                                </button>
+                                            <?php else: ?>
+                                                <span class="text-gray-400 cursor-not-allowed" title="Cannot delete - schedule in use">
+                                                    <i class="fas fa-lock"></i>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div id="actions-edit-<?= $sched['id'] ?>" class="hidden">
+                                            <button onclick="saveSchedule(<?= $sched['id'] ?>)" 
+                                                    class="text-green-600 hover:text-green-800 mr-3">
+                                                <i class="fas fa-check"></i> Save
+                                            </button>
+                                            <button onclick="cancelEdit(<?= $sched['id'] ?>)" 
+                                                    class="text-gray-600 hover:text-gray-800">
+                                                <i class="fas fa-times"></i> Cancel
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Summary Card -->
+                    <div class="mt-6 bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-gray-800 mb-3">Schedule Statistics</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div class="text-center">
+                                <div class="text-lg font-semibold text-gray-900"><?= count($allSchedules) ?></div>
+                                <div class="text-xs text-gray-500">Total Schedules</div>
+                            </div>
+                            <?php
+                            $usedSchedules = 0;
+                            foreach ($allSchedules as $sched) {
+                                $countStmt = $pdo->prepare("SELECT COUNT(*) as count FROM employees WHERE official_sched = ?");
+                                $countStmt->execute([$sched['id']]);
+                                if ($countStmt->fetch(PDO::FETCH_ASSOC)['count'] > 0) {
+                                    $usedSchedules++;
+                                }
+                            }
+                            ?>
+                            <div class="text-center">
+                                <div class="text-lg font-semibold text-blue-600"><?= $usedSchedules ?></div>
+                                <div class="text-xs text-gray-500">In Use</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-lg font-semibold text-gray-600"><?= count($allSchedules) - $usedSchedules ?></div>
+                                <div class="text-xs text-gray-500">Available</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
 <script>
 function toggleEditMode() {
     const editForm = document.getElementById('editForm');
@@ -1659,6 +1903,79 @@ function confirmScheduleChange(scheduleId, inTime, outTime, isCurrent) {
         document.getElementById('scheduleForm').submit();
     }
 }
+
+// Manage Schedules Functions
+function toggleAddScheduleForm() {
+    const form = document.getElementById('addScheduleForm');
+    form.classList.toggle('hidden');
+}
+
+function editSchedule(scheduleId) {
+    // Hide display elements
+    document.getElementById('name-display-' + scheduleId).classList.add('hidden');
+    document.getElementById('timein-display-' + scheduleId).classList.add('hidden');
+    document.getElementById('timeout-display-' + scheduleId).classList.add('hidden');
+    document.getElementById('actions-view-' + scheduleId).classList.add('hidden');
+    
+    // Show edit inputs
+    document.getElementById('name-edit-' + scheduleId).classList.remove('hidden');
+    document.getElementById('timein-edit-' + scheduleId).classList.remove('hidden');
+    document.getElementById('timeout-edit-' + scheduleId).classList.remove('hidden');
+    document.getElementById('actions-edit-' + scheduleId).classList.remove('hidden');
+}
+
+function cancelEdit(scheduleId) {
+    // Show display elements
+    document.getElementById('name-display-' + scheduleId).classList.remove('hidden');
+    document.getElementById('timein-display-' + scheduleId).classList.remove('hidden');
+    document.getElementById('timeout-display-' + scheduleId).classList.remove('hidden');
+    document.getElementById('actions-view-' + scheduleId).classList.remove('hidden');
+    
+    // Hide edit inputs
+    document.getElementById('name-edit-' + scheduleId).classList.add('hidden');
+    document.getElementById('timein-edit-' + scheduleId).classList.add('hidden');
+    document.getElementById('timeout-edit-' + scheduleId).classList.add('hidden');
+    document.getElementById('actions-edit-' + scheduleId).classList.add('hidden');
+}
+
+function saveSchedule(scheduleId) {
+    const name = document.getElementById('name-edit-' + scheduleId).value;
+    const timeIn = document.getElementById('timein-edit-' + scheduleId).value;
+    const timeOut = document.getElementById('timeout-edit-' + scheduleId).value;
+    
+    if (!timeIn || !timeOut) {
+        alert('Please fill in both time in and time out.');
+        return;
+    }
+    
+    // Create form and submit
+    const form = document.createElement('form');
+    form.method = 'post';
+    form.innerHTML = `
+        <input type="hidden" name="action" value="edit_schedule">
+        <input type="hidden" name="schedule_id" value="${scheduleId}">
+        <input type="hidden" name="schedule_name" value="${name}">
+        <input type="hidden" name="time_in" value="${timeIn}">
+        <input type="hidden" name="time_out" value="${timeOut}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function deleteSchedule(scheduleId) {
+    if (confirm('Are you sure you want to delete this schedule?\n\nThis action cannot be undone.')) {
+        // Create form and submit
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.innerHTML = `
+            <input type="hidden" name="action" value="delete_schedule">
+            <input type="hidden" name="schedule_id" value="${scheduleId}">
+        `;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
 </script>
 
 </body>

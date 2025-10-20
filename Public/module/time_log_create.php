@@ -721,6 +721,50 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask-composite: exclude;
 }
+
+/* Sidebar Active Navigation Style */
+.nav-link {
+    position: relative;
+    transition: all 0.2s ease-in-out;
+}
+
+
+.nav-link.active-nav {
+    background-color: #d1fae5 !important;
+    color: #059669 !important;
+    font-weight: 600;
+    border-left: 4px solid #059669;
+    padding-left: calc(0.75rem - 4px); /* Adjust padding to account for border */
+    margin-left: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.nav-link:hover {
+    background-color: #f0fdf4;
+    transform: translateX(2px);
+}
+
+.nav-link.active-nav:hover {
+    background-color: #d1fae5;
+}
+
+.nav-link:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.nav-link i {
+    transition: transform 0.2s ease-in-out;
+}
+
+.nav-link:hover i {
+    transform: scale(1.1);
+}
+
+/* Ensure nav container doesn't clip borders */
+nav {
+    overflow-x: visible !important;
+}
 </style>
 
 </head>
@@ -874,7 +918,7 @@ $announcementCount = $stmt->fetchColumn();
 </div>
 
 <!-- Schedule Management View -->
-<div id="scheduleView" class="hidden px-4 mt-12 space-y-10 max-w-6xl mx-auto">
+<div id="scheduleView" class="hidden">
     <?php include 'schedule_content.php'; ?>
 </div>
 
@@ -1175,7 +1219,40 @@ function showSection(sectionId) {
 
   // Show the selected section
   document.getElementById(sectionId).classList.remove('hidden');
+  
+  // Update active states in sidebar
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.remove('active-nav', 'bg-green-100', 'text-green-700', 'border-l-4', 'border-green-600');
+    link.classList.add('text-gray-700');
+  });
+  
+  // Add active state to clicked link
+  const activeLink = document.querySelector(`.nav-link[data-section="${sectionId}"]`);
+  if (activeLink) {
+    activeLink.classList.add('active-nav', 'bg-green-100', 'text-green-700', 'border-l-4', 'border-green-600');
+    activeLink.classList.remove('text-gray-700');
+  }
+  
+  // If it's a leave submenu item, also highlight the parent
+  if (sectionId === 'requestView' || sectionId === 'leaveCreditsView') {
+    const leaveParent = document.querySelector('.nav-link[data-section="leaveMenu"]');
+    if (leaveParent) {
+      leaveParent.classList.add('active-nav', 'bg-green-100', 'text-green-700', 'border-l-4', 'border-green-600');
+      leaveParent.classList.remove('text-gray-700');
+    }
+    // Make sure submenu is open
+    const submenu = document.getElementById('leaveSubmenu');
+    if (submenu) {
+      submenu.classList.remove('hidden');
+    }
+  }
 }
+
+// Set initial active state on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Set Home as default active
+  showSection('dashboardView');
+});
 </script>
 
 <script>

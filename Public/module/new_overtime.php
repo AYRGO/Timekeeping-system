@@ -840,12 +840,12 @@ button:hover {
 }
 </style>
 
-<div id="overtimeView" class="mt-12 hidden animate-fade-in-up">
-  <div class="w-full px-6 lg:px-8">
+<div id="overtimeView" class="hidden animate-fade-in-up overtime-management-container">
+  <div class="w-full">
     
     <!-- Enhanced Header Section with Full Width -->
-    <div class="bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 rounded-2xl shadow-xl mb-8 overflow-hidden">
-      <div class="relative p-8">
+    <div class="bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 shadow-sm mb-0 border-b-4 border-emerald-700">
+      <div class="relative px-8 py-6">
         <!-- Background decoration -->
         <div class="absolute top-0 right-0 w-64 h-64 opacity-10">
           <i class="fas fa-clock text-9xl transform rotate-12"></i>
@@ -954,25 +954,25 @@ button:hover {
     </div>
 
     <!-- Submit Request Tab Content - Full Width -->
-    <div id="submitContent" class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+    <div id="submitContent" class="bg-white border-t border-gray-200">
       
       <!-- Table Section with Enhanced Layout -->
-      <div class="p-8">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
+      <div class="px-8 py-6">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4">
           <div class="flex-1">
             <h3 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
-              <div class="p-3 bg-emerald-100 rounded-xl mr-4">
-                <i class="fas fa-history text-emerald-600 text-xl"></i>
+              <div class="p-2.5 bg-emerald-50 rounded-lg mr-3 border border-emerald-200">
+                <i class="fas fa-history text-emerald-600 text-lg"></i>
               </div>
               Recent Time Logs (Overtime Requests)
             </h3>
-            <p class="text-gray-600 text-lg">
+            <p class="text-gray-600">
               Review your recent work logs and submit overtime requests for eligible entries
             </p>
           </div>
           
           <!-- Legend -->
-          <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+          <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h4 class="text-sm font-semibold text-gray-700 mb-3">Status Legend</h4>
             <div class="grid grid-cols-2 gap-3 text-xs">
               <div class="flex items-center">
@@ -996,7 +996,7 @@ button:hover {
         </div>
 
         <!-- Records Per Page Selector -->
-        <div class="bg-white rounded-t-2xl border border-gray-200 px-6 py-4 border-b-0">
+        <div class="bg-gray-50 rounded-t-lg border border-gray-200 px-6 py-4 border-b-0">
           <div class="flex items-center justify-between">
             <div class="text-sm text-gray-600">
               <span class="font-medium"><?= $total_records ?></span> total time logs found
@@ -1004,7 +1004,7 @@ button:hover {
             <div class="flex items-center space-x-3">
               <label for="per_page" class="text-sm font-medium text-gray-700">Show:</label>
               <select id="per_page" onchange="changePerPage(this.value)" 
-                      class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-gray-500 focus:border-gray-500">
+                      class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                 <option value="5" <?= $records_per_page == 5 ? 'selected' : '' ?>>5 per page</option>
                 <option value="10" <?= $records_per_page == 10 ? 'selected' : '' ?>>10 per page</option>
                 <option value="20" <?= $records_per_page == 20 ? 'selected' : '' ?>>20 per page</option>
@@ -1015,36 +1015,36 @@ button:hover {
         </div>
 
         <!-- Enhanced Table with Better Responsiveness -->
-        <div class="bg-white rounded-b-2xl border border-gray-200 overflow-hidden shadow-lg border-t-0">
+        <div class="bg-white rounded-b-lg border border-gray-200 shadow-sm border-t-0">
           <div class="overflow-x-auto">
             <table class="min-w-full" id="timeLogsTable">
-              <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
+              <thead class="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
                       <i class="fas fa-calendar-alt mr-2 text-emerald-500"></i>
                       Date & Day
                     </div>
                   </th>
-                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
                       <i class="fas fa-calendar-check mr-2 text-indigo-500"></i>
                       Active Schedule
                     </div>
                   </th>
-                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
                       <i class="fas fa-sign-in-alt mr-2 text-blue-500"></i>
                       Time In
                     </div>
                   </th>
-                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
                       <i class="fas fa-sign-out-alt mr-2 text-orange-500"></i>
                       Time Out
                     </div>
                   </th>
-                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     <div class="flex items-center">
                       <i class="fas fa-clock mr-2 text-purple-500"></i>
                       Work Duration
@@ -3122,3 +3122,70 @@ function validateOvertimeHours() {
     }
 }
 </script>
+
+<style>
+/* Monday.com Full-Width Overtime Management Style */
+
+/* Remove margins and ensure full width - ONLY for overtime view */
+.overtime-management-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+}
+
+/* Full viewport usage */
+.overtime-management-container > .w-full {
+    width: 100% !important;
+    padding: 0 !important;
+}
+
+/* Clean border-based design */
+.overtime-management-container .border-gray-200 {
+    border-color: #e5e7eb;
+}
+
+/* Smooth transitions */
+.overtime-management-container * {
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+}
+
+/* Table hover effects */
+.overtime-management-container table tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+/* Button hover states */
+.overtime-management-container button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Card hover effects */
+.overtime-management-container .bg-white:hover {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Clean rounded corners */
+.overtime-management-container .rounded-2xl {
+    border-radius: 0.75rem;
+}
+
+.overtime-management-container .rounded-xl {
+    border-radius: 0.5rem;
+}
+
+.overtime-management-container .rounded-lg {
+    border-radius: 0.375rem;
+}
+
+/* Enhanced focus states */
+.overtime-management-container input:focus,
+.overtime-management-container select:focus,
+.overtime-management-container textarea:focus {
+    ring-width: 2px;
+    ring-color: rgb(16, 185, 129);
+    border-color: rgb(16, 185, 129);
+}
+</style>

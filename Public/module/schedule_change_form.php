@@ -1,128 +1,223 @@
 <!-- Schedule Change Modal -->
 <div id="scheduleChangeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50" style="display: none;">
   <div class="flex items-center justify-center min-h-screen px-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div class="schedule-change-modal-container bg-white shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
 
-      <!-- Modal Header with Close Button -->
-      <div class="bg-gradient-to-r from-green-600 to-green-700 p-6 rounded-t-2xl shadow-lg relative">
-        <div class="flex items-center justify-center space-x-3">
-          <div class="bg-white bg-opacity-20 p-2 rounded-full">
-            <i class="fas fa-calendar-alt text-white text-xl"></i>
+      <!-- Modal Header - Monday.com Style -->
+      <div class="bg-white border-b-4 border-green-600 px-8 py-6 relative flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <i class="fas fa-calendar-alt text-green-600 text-lg"></i>
+            </div>
+            <div>
+              <h2 class="text-2xl font-bold text-gray-900">Schedule Change Request</h2>
+              <p class="text-sm text-gray-500 mt-0.5">Submit your schedule modification</p>
+            </div>
           </div>
-          <h2 class="text-3xl font-bold text-white">Schedule Change Request</h2>
+          
+          <!-- Close Button -->
+          <button onclick="closeScheduleChangeModal()" 
+                  class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+            <i class="fas fa-times text-lg"></i>
+          </button>
         </div>
-        <p class="text-green-100 text-center mt-2">Submit your schedule modification request</p>
-        
-        <!-- Close Button -->
-        <button onclick="closeScheduleChangeModal()" 
-                class="absolute top-4 right-4 text-white hover:text-gray-200 text-2xl">
-          <i class="fas fa-times"></i>
-        </button>
       </div>
 
       <!-- Modal Form Content -->
-      <div class="p-8">
+      <div class="p-8 overflow-y-auto flex-1">
         <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm"
           <?= csrf_token_field() ?>
           <input type="hidden" name="submit_schedule_change" value="1">
 
-          <!-- Row 1: Date Range and Work Hours -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <!-- Date Range -->
-            <div class="space-y-2">
-              <label for="date_range" class="flex items-center text-lg font-semibold text-gray-800 mb-3">
-                <i class="fas fa-calendar text-green-600 mr-2"></i>
-                Effective Date Range
-              </label>
-              <div class="relative">
-                <input type="text" name="date_range" id="date_range" placeholder="Select date range"
-                       class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white pl-12" required>
-                <i class="fas fa-calendar absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+          <!-- Row 1: Date Range (Full Width) -->
+          <div class="mb-6">
+            <label for="date_range" class="block text-sm font-semibold text-gray-700 mb-2">
+              Effective Date Range
+            </label>
+            <div class="relative">
+              <input type="text" name="date_range" id="date_range" placeholder="Select date range"
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white" required>
+              <i class="fas fa-calendar absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+            </div>
+          </div>
+
+          <!-- Row 2: Work Hours (Full Width) -->
+          <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              Select New Work Schedule
+            </label>
+            
+            <!-- Hidden input to store selected schedule ID -->
+            <input type="hidden" name="work_schedule_id" id="work_schedule_id" required>
+            
+            <!-- Search/Select Input -->
+            <div class="relative mb-3">
+              <input type="text" id="scheduleSearch" placeholder="Type time to search (e.g., 7, 8:00, 3 pm)..."
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white pr-10"
+                     autocomplete="off">
+              <i class="fas fa-search absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+            </div>
+            
+            <!-- Selected schedule display (inline, minimal) -->
+            <div id="selectedScheduleDisplay" class="hidden mb-3">
+              <div class="px-4 py-2 bg-green-50 border-l-4 border-green-500 rounded">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2 flex-1">
+                    <i class="fas fa-check-circle text-green-600 text-sm"></i>
+                    <span class="text-sm font-medium text-gray-700" id="selectedScheduleText"></span>
+                  </div>
+                  <button type="button" onclick="clearScheduleSelection()" 
+                          class="text-gray-400 hover:text-red-500 text-sm transition-colors">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
               </div>
             </div>
-
-            <!-- Work Hours -->
-            <div class="space-y-2">
-              <label for="work_schedule_id" class="flex items-center text-lg font-semibold text-gray-800 mb-3">
-                <i class="fas fa-clock text-green-600 mr-2"></i>
-                New Work Hours
-              </label>
-              <div class="relative">
-                <select name="work_schedule_id" id="work_schedule_id" required
-                        class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white"
-                        style="max-height: 220px; overflow-y: auto;">
-                  <option value="" disabled selected>Choose your work hours</option>
-                  <?php 
-                  $allowed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,22]; // Allowed schedule IDs
-                  // Sort schedules by time_in ascending
-                  $sorted_schedules = array_filter($work_schedules, function($ws) use ($allowed) {
-                      return in_array($ws['id'], $allowed);
-                  });
-                  usort($sorted_schedules, function($a, $b) {
-                      return strtotime($a['time_in']) - strtotime($b['time_in']);
-                  });
-                  foreach ($sorted_schedules as $ws):
-                  ?>
-                      <option value="<?= $ws['id'] ?>">
-                          <?= date("g:i A", strtotime($ws['time_in'])) ?> - <?= date("g:i A", strtotime($ws['time_out'])) ?>
-                      </option>
-                  <?php endforeach; ?>
-                </select>
+            
+            <!-- Schedule Grid (Hidden by default, shows on search) -->
+            <div id="scheduleGrid" class="hidden border border-gray-200 rounded-lg bg-white max-h-[400px] overflow-y-auto">
+              <?php 
+              // Categorize schedules by time
+              $day_shifts = [];
+              $night_shifts = [];
+              $evening_shifts = [];
+              
+              foreach ($work_schedules as $ws) {
+                  $time_in_hour = (int)date("H", strtotime($ws['time_in']));
+                  
+                  if ($time_in_hour >= 5 && $time_in_hour < 12) {
+                      $day_shifts[] = $ws;
+                  } elseif ($time_in_hour >= 17 || $time_in_hour < 5) {
+                      $night_shifts[] = $ws;
+                  } else {
+                      $evening_shifts[] = $ws;
+                  }
+              }
+              
+              // Function to render schedule cards (minimal Monday.com style)
+              function renderScheduleCards($schedules, $category_color) {
+                  foreach ($schedules as $ws) {
+                      $name = !empty($ws['name']) ? htmlspecialchars($ws['name']) : '';
+                      $time_display = date("g:i A", strtotime($ws['time_in'])) . ' - ' . date("g:i A", strtotime($ws['time_out']));
+                      
+                      // Use time as display name if no custom name exists
+                      $display_name = !empty($name) ? $name : $time_display;
+                      
+                      ?>
+                      <div class="schedule-card border-b border-gray-100 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                           data-schedule-id="<?= $ws['id'] ?>"
+                           data-schedule-name="<?= $display_name ?>"
+                           data-schedule-time="<?= $time_display ?>"
+                           onclick="selectSchedule(this)">
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center gap-3 flex-1">
+                            <div class="w-8 h-8 bg-<?= $category_color ?>-100 rounded flex items-center justify-center flex-shrink-0">
+                              <i class="fas fa-clock text-<?= $category_color ?>-600 text-xs"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                              <?php if (!empty($name)): ?>
+                                <div class="font-medium text-gray-900 text-sm"><?= $name ?></div>
+                                <div class="text-gray-500 text-xs"><?= $time_display ?></div>
+                              <?php else: ?>
+                                <div class="font-medium text-gray-900 text-sm"><?= $time_display ?></div>
+                              <?php endif; ?>
+                            </div>
+                          </div>
+                          <div class="schedule-check hidden">
+                            <i class="fas fa-check-circle text-green-500 text-lg"></i>
+                          </div>
+                        </div>
+                      </div>
+                      <?php
+                  }
+              }
+              ?>
+              
+              <!-- Minimal list view -->
+              <div class="schedule-results-container">
+                <?php if (!empty($day_shifts)): ?>
+                  <div class="schedule-category">
+                    <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                      <div class="flex items-center gap-2">
+                        <i class="fas fa-sun text-yellow-500 text-xs"></i>
+                        <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Day Shifts</span>
+                      </div>
+                    </div>
+                    <div class="schedule-list">
+                      <?php renderScheduleCards($day_shifts, 'yellow'); ?>
+                    </div>
+                  </div>
+                <?php endif; ?>
+                
+                <?php if (!empty($evening_shifts)): ?>
+                  <div class="schedule-category">
+                    <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                      <div class="flex items-center gap-2">
+                        <i class="fas fa-cloud-sun text-orange-500 text-xs"></i>
+                        <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Afternoon/Evening</span>
+                      </div>
+                    </div>
+                    <div class="schedule-list">
+                      <?php renderScheduleCards($evening_shifts, 'orange'); ?>
+                    </div>
+                  </div>
+                <?php endif; ?>
+                
+                <?php if (!empty($night_shifts)): ?>
+                  <div class="schedule-category">
+                    <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                      <div class="flex items-center gap-2">
+                        <i class="fas fa-moon text-indigo-500 text-xs"></i>
+                        <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Night Shifts</span>
+                      </div>
+                    </div>
+                    <div class="schedule-list">
+                      <?php renderScheduleCards($night_shifts, 'indigo'); ?>
+                    </div>
+                  </div>
+                <?php endif; ?>
               </div>
             </div>
           </div>
 
-          <!-- Row 2: Reason and Attachment -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <!-- Row 3: Reason and Attachment -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <!-- Reason -->
-            <div class="space-y-2">
-              <label for="reason" class="flex items-center text-lg font-semibold text-gray-800 mb-3">
-                <i class="fas fa-comment-alt text-green-600 mr-2"></i>
+            <div>
+              <label for="reason" class="block text-sm font-semibold text-gray-700 mb-2">
                 Reason for Change
               </label>
               <textarea name="reason" id="reason" rows="4" placeholder="Provide details about your schedule change request..."
-                        class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white resize-none" required></textarea>
-              <p class="text-sm text-gray-500 mt-2">
-                <i class="fas fa-lightbulb mr-1"></i>
-                Be specific about your reason to help with approval
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white resize-none" required></textarea>
+              <p class="text-xs text-gray-500 mt-1.5">
+                Be specific to help with approval
               </p>
             </div>
 
             <!-- Attachment -->
-            <div class="space-y-2">
-              <label class="flex items-center text-lg font-semibold text-gray-800 mb-3">
-                <i class="fas fa-paperclip text-green-600 mr-2"></i>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">
                 Supporting Document
-                <span class="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded-full ml-2 font-bold">Optional</span>
+                <span class="text-xs font-normal text-gray-500 ml-1">(Optional)</span>
               </label>
-              <div class="relative">
-                <input type="file" name="attachment_scr" id="fileInput" accept=".pdf,.jpg,.jpeg,.png"
-                       class="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-lg bg-gray-50 hover:bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
-              </div>
-              <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
-                <div class="flex items-start">
-                  <i class="fas fa-exclamation-triangle text-amber-600 mr-2 mt-0.5"></i>
-                  <div class="text-amber-800 text-sm">
-                    <p class="font-medium">Accepted formats:</p>
-                    <p>PDF, JPG, JPEG, PNG files only (Max 10MB)</p>
-                  </div>
-                </div>
-              </div>
+              <input type="file" name="attachment_scr" id="fileInput" accept=".pdf,.jpg,.jpeg,.png"
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:cursor-pointer">
+              <p class="text-xs text-gray-500 mt-1.5">
+                PDF, JPG, JPEG, PNG (Max 10MB)
+              </p>
             </div>
           </div>
 
           <!-- Submit Button -->
-          <div class="flex gap-4 pt-6 border-t border-gray-100">
+          <div class="flex gap-3 pt-6 border-t border-gray-200">
             <button type="button" onclick="closeScheduleChangeModal()"
-                    class="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium">
-              <i class="fas fa-times mr-2"></i>Cancel
+                    class="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm">
+              Cancel
             </button>
             <button type="submit" id="submitBtn"
-                    class="flex-1 group relative px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold shadow-lg hover:shadow-xl">
-              <div class="flex items-center justify-center space-x-2">
-                <i class="fas fa-paper-plane group-hover:translate-x-1 transition-transform duration-200"></i>
-                <span>Submit Request</span>
-              </div>
+                    class="flex-1 px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm">
+              Submit Request
             </button>
           </div>
         </form>
@@ -135,9 +230,15 @@
 </div>
 
 <style>
-/* Modal Animations */
+/* Scope all styles to the schedule change modal container */
+.schedule-change-modal-container {
+    /* Modal Animations */
+    animation: modalSlideIn 0.3s ease-out;
+}
+
 #scheduleChangeModal {
     animation: modalFadeIn 0.3s ease-out;
+    backdrop-filter: blur(4px);
 }
 
 @keyframes modalFadeIn {
@@ -145,14 +246,10 @@
     to { opacity: 1; }
 }
 
-#scheduleChangeModal .bg-white {
-    animation: modalSlideIn 0.3s ease-out;
-}
-
 @keyframes modalSlideIn {
     from { 
         opacity: 0; 
-        transform: translateY(-20px) scale(0.95); 
+        transform: translateY(-20px) scale(0.98); 
     }
     to { 
         opacity: 1; 
@@ -160,38 +257,69 @@
     }
 }
 
-/* Enhanced focus effects */
-#scheduleChangeModal input:focus, 
-#scheduleChangeModal select:focus, 
-#scheduleChangeModal textarea:focus {
-    transform: translateY(-1px);
-}
-
-/* Button hover effects */
-#scheduleChangeModal button:hover {
-    transform: translateY(-1px);
-}
-
 /* Error states */
-#scheduleChangeModal .border-red-400 {
+.schedule-change-modal-container .border-red-400 {
     border-color: #f87171 !important;
     background-color: #fef2f2 !important;
 }
 
+/* Schedule card styles - Monday.com minimal */
+.schedule-change-modal-container .schedule-card {
+    transition: background-color 0.15s ease;
+}
+
+.schedule-change-modal-container .schedule-card:hover {
+    background-color: #f9fafb;
+}
+
+.schedule-change-modal-container .schedule-card.selected {
+    background-color: #f0fdf4;
+    border-left: 3px solid #22c55e;
+}
+
+.schedule-change-modal-container .schedule-card.selected .schedule-check {
+    display: block !important;
+}
+
+/* Custom scrollbar for schedule grid */
+.schedule-change-modal-container #scheduleGrid::-webkit-scrollbar {
+    width: 6px;
+}
+
+.schedule-change-modal-container #scheduleGrid::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.schedule-change-modal-container #scheduleGrid::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.schedule-change-modal-container #scheduleGrid::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
 /* Responsive adjustments */
 @media (max-width: 1024px) {
-    #scheduleChangeModal .lg\\:grid-cols-2 {
+    .schedule-change-modal-container .lg\\:grid-cols-2 {
         grid-template-columns: 1fr;
-    }
-    
-    #scheduleChangeModal .max-w-4xl {
-        max-width: 95vw;
     }
 }
 
-/* Modal backdrop blur effect */
-#scheduleChangeModal {
-    backdrop-filter: blur(4px);
+/* Focus states - clean and minimal */
+.schedule-change-modal-container input:focus,
+.schedule-change-modal-container textarea:focus {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+/* Empty state for schedule grid */
+.schedule-change-modal-container .schedule-results-container:empty::after {
+    content: "No schedules found";
+    display: block;
+    padding: 3rem;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.875rem;
 }
 </style>
 
@@ -276,4 +404,149 @@ document.addEventListener('keydown', function(e) {
 function hideScheduleView() {
     closeScheduleChangeModal();
 }
+
+// Schedule selection functions
+function selectSchedule(cardElement) {
+    // Remove selection from all cards
+    document.querySelectorAll('#scheduleChangeModal .schedule-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Add selection to clicked card
+    cardElement.classList.add('selected');
+    
+    // Set hidden input value
+    const scheduleId = cardElement.getAttribute('data-schedule-id');
+    const scheduleName = cardElement.getAttribute('data-schedule-name');
+    const scheduleTime = cardElement.getAttribute('data-schedule-time');
+    
+    document.getElementById('work_schedule_id').value = scheduleId;
+    
+    // Show selected schedule display
+    document.getElementById('selectedScheduleDisplay').classList.remove('hidden');
+    document.getElementById('selectedScheduleText').textContent = scheduleName + ' • ' + scheduleTime;
+    
+    // Hide the grid after selection
+    document.getElementById('scheduleGrid').classList.add('hidden');
+    
+    // Clear search input
+    document.getElementById('scheduleSearch').value = scheduleName + ' (' + scheduleTime + ')';
+    
+    // Remove any validation error
+    document.getElementById('scheduleSearch').classList.remove('border-red-400');
+}
+
+function clearScheduleSelection() {
+    // Clear hidden input
+    document.getElementById('work_schedule_id').value = '';
+    
+    // Hide selected display
+    document.getElementById('selectedScheduleDisplay').classList.add('hidden');
+    
+    // Clear search input
+    document.getElementById('scheduleSearch').value = '';
+    
+    // Remove selection from all cards
+    document.querySelectorAll('#scheduleChangeModal .schedule-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Hide grid
+    document.getElementById('scheduleGrid').classList.add('hidden');
+    
+    // Focus search input
+    document.getElementById('scheduleSearch').focus();
+}
+ 
+// Search functionality - shows dropdown on type
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('scheduleSearch');
+    const scheduleGrid = document.getElementById('scheduleGrid');
+    
+    if (searchInput && scheduleGrid) {
+        // Store original grid content
+        const originalGridContent = scheduleGrid.innerHTML;
+        
+        // Show grid when user starts typing
+        searchInput.addEventListener('focus', function() {
+            if (this.value.trim() !== '') {
+                scheduleGrid.classList.remove('hidden');
+            }
+        });
+        
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            
+            if (searchTerm === '') {
+                // Hide grid if search is empty
+                scheduleGrid.classList.add('hidden');
+                // Restore original content
+                scheduleGrid.innerHTML = originalGridContent;
+                return;
+            }
+            
+            // Restore original content first if it was replaced with "no results" message
+            if (!scheduleGrid.querySelector('.schedule-results-container')) {
+                scheduleGrid.innerHTML = originalGridContent;
+            }
+            
+            // Show grid when typing
+            scheduleGrid.classList.remove('hidden');
+            
+            const cards = document.querySelectorAll('#scheduleChangeModal .schedule-card');
+            const categories = document.querySelectorAll('#scheduleChangeModal .schedule-category');
+            
+            let hasVisibleResults = false;
+            
+            // Filter cards - search by time numbers only
+            cards.forEach(card => {
+                const time = card.getAttribute('data-schedule-time').toLowerCase();
+                // Remove all non-numeric characters except colon for better matching
+                const timeNumbers = time.replace(/[^0-9:]/g, '');
+                
+                // Check if search term appears in the time (including formatted and raw numbers)
+                if (time.includes(searchTerm) || timeNumbers.includes(searchTerm)) {
+                    card.style.display = '';
+                    hasVisibleResults = true;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            
+            // Hide empty categories
+            categories.forEach(category => {
+                const visibleCards = category.querySelectorAll('.schedule-card:not([style*="display: none"])');
+                if (visibleCards.length === 0) {
+                    category.style.display = 'none';
+                } else {
+                    category.style.display = '';
+                }
+            });
+            
+            // Show no results message if needed
+            if (!hasVisibleResults) {
+                const noResultsDiv = document.createElement('div');
+                noResultsDiv.className = 'no-results-message p-8 text-center text-gray-400 text-sm';
+                noResultsDiv.textContent = 'No schedules found matching "' + searchTerm + '"';
+                scheduleGrid.innerHTML = '';
+                scheduleGrid.appendChild(noResultsDiv);
+            } else {
+                // Remove no results message if it exists
+                const noResultsMsg = scheduleGrid.querySelector('.no-results-message');
+                if (noResultsMsg) {
+                    noResultsMsg.remove();
+                }
+            }
+        });
+        
+        // Hide grid when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !scheduleGrid.contains(e.target)) {
+                if (!document.getElementById('work_schedule_id').value) {
+                    scheduleGrid.classList.add('hidden');
+                }
+            }
+        });
+    }
+});
 </script>

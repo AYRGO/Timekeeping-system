@@ -1,44 +1,44 @@
 <!-- Sidebar -->
-       <aside id="sidebar" class="w-64 bg-white shadow-lg flex flex-col fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out h-full">
+       <aside id="sidebar" class="w-64 bg-white shadow-lg flex flex-col fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out h-screen">
 
             <!-- Logo -->
-            <div class="p-6 flex justify-center">
-                <img src="../asset/RSS-logo-colour.png" alt="RSS Logo" class="w-32">
+            <div class="p-6 pt-8 flex justify-center">
+                <img src="../asset/RSS-logo-colour.png" alt="RSS Logo" class="w-28 h-auto">
             </div>
 
             <hr class="border-t border-gray-300 w-full mb-4">
 
             <!-- Navigation -->
-            <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
-                <a href="#" onclick="showSection('dashboardView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
+            <nav class="flex-1 px-3 py-2 space-y-2 overflow-y-auto overflow-x-visible">
+                <a href="#" onclick="showSection('dashboardView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="dashboardView">
                     <i class="fas fa-tachometer-alt text-lg"></i>
-                    <span class="text-base">Home</span>
+                    <span class="text-base font-medium">Home</span>
                 </a>
-                <a href="#" onclick="showSection('newsFeedView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
+                <a href="#" onclick="showSection('newsFeedView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="newsFeedView">
                     <i class="fas fa-newspaper text-lg"></i>
-                    <span class="text-base">News Feed</span>
+                    <span class="text-base font-medium">News Feed</span>
                 </a>
-                <a href="#" onclick="showSection('scheduleView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
+                <a href="#" onclick="showSection('scheduleView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="scheduleView">
                     <i class="fas fa-calendar-check text-lg"></i>
-                    <span class="text-base">Schedule Management</span>
+                    <span class="text-base font-medium">Schedule Management</span>
                 </a>
-                <a href="#" onclick="showSection('overtimeView');" class="flex items-center space-x-3 p-2 rounded-lg hover:bg-green-100 text-gray-700">
+                <a href="#" onclick="showSection('overtimeView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="overtimeView">
                     <i class="fas fa-clock text-lg"></i>
-                    <span class="text-base">Overtime</span>
+                    <span class="text-base font-medium">Overtime</span>
                 </a>
               <div class="space-y-1">
-    <button onclick="toggleLeaveMenu()" class="flex items-center justify-between w-full p-2 rounded-lg hover:bg-green-100 text-gray-700">
+    <button onclick="toggleLeaveMenu()" class="nav-link flex items-center justify-between w-full p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="leaveMenu">
         <span class="flex items-center space-x-3">
             <i class="fas fa-plane-departure text-lg"></i>
-            <span class="text-base">Leave</span>
+            <span class="text-base font-medium">Leave</span>
         </span>
         <i class="fas fa-chevron-down text-sm transition-transform" id="leaveMenuIcon"></i>
     </button>
     <div id="leaveSubmenu" class="pl-10 hidden space-y-1">
-        <a href="#" onclick="showSection('requestView');" class="block p-2 rounded hover:bg-green-100 text-gray-700">
+        <a href="#" onclick="showSection('requestView');" class="nav-link block p-2 rounded-lg hover:bg-green-50 text-gray-700 text-sm transition-colors" data-section="requestView">
             Request Leave
         </a>
-        <a href="#" onclick="showSection('leaveCreditsView');" class="block p-2 rounded hover:bg-green-100 text-gray-700">
+        <a href="#" onclick="showSection('leaveCreditsView');" class="nav-link block p-2 rounded-lg hover:bg-green-50 text-gray-700 text-sm transition-colors" data-section="leaveCreditsView">
             Leave Credits
         </a>
     </div>

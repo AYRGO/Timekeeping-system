@@ -43,11 +43,12 @@ $isPaydayToday = (($currentDay == 5 || $currentDay == 20) && $currentHour >= 9);
 if ($isPaydayToday) {
     $daysRemaining = 0;
     $paydayMessage = "Today is Payday! 🎉";
+    $paydayLabel = $today->format('F j, Y'); // Show today's date
 } else {
     $paydayMessage = "$daysRemaining day" . ($daysRemaining === 1 ? '' : 's') . " remaining";
+    $paydayLabel = $nextPayday->format('F j, Y'); // Show next payday date
 }
 
-$paydayLabel = $nextPayday->format('F j, Y');
 ?>
 
 <!-- 💰 Upcoming Payday Card -->
