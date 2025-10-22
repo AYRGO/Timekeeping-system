@@ -19,6 +19,92 @@ $filteredActivities = array_filter($unique_notifications, function ($activity) u
 });
 
 $recentActivities = array_slice($filteredActivities, 0, 10);
+
+// Helper function to get ACTUAL current schedule from calendar (matches schedule_content.php logic)
+function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) {
+    if (!$date) $date = date('Y-m-d');
+    
+    // PRIORITY 1: Check employee_daily_schedules (daily override)
+    try {
+        $stmt = $pdo->prepare("
+            SELECT actual_schedule_id, is_rest_day
+            FROM employee_daily_schedules 
+            WHERE employee_id = ? AND schedule_date = ? 
+            LIMIT 1
+        ");
+        $stmt->execute([$employee_id, $date]);
+        $dailySchedule = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($dailySchedule) {
+            if ($dailySchedule['is_rest_day']) {
+                return ['is_rest_day' => true];
+            }
+            if ($dailySchedule['actual_schedule_id']) {
+                $schedStmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
+                $schedStmt->execute([$dailySchedule['actual_schedule_id']]);
+                $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
+                if ($sched) {
+                    return [
+                        'time_in' => date('g:i A', strtotime($sched['time_in'])),
+                        'time_out' => date('g:i A', strtotime($sched['time_out'])),
+                        'is_rest_day' => false
+                    ];
+                }
+            }
+        }
+        
+        // PRIORITY 2: Check employee_default_schedules (weekly default)
+        $dayOfWeek = date('w', strtotime($date));
+        $stmt = $pdo->prepare("
+            SELECT work_schedule_id, is_rest_day 
+            FROM employee_default_schedules 
+            WHERE employee_id = ? AND day_of_week = ? 
+            AND effective_from <= ? AND (effective_until IS NULL OR effective_until >= ?) 
+            LIMIT 1
+        ");
+        $stmt->execute([$employee_id, $dayOfWeek, $date, $date]);
+        $weeklySchedule = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($weeklySchedule) {
+            if ($weeklySchedule['is_rest_day']) {
+                return ['is_rest_day' => true];
+            }
+            if ($weeklySchedule['work_schedule_id']) {
+                $schedStmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
+                $schedStmt->execute([$weeklySchedule['work_schedule_id']]);
+                $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
+                if ($sched) {
+                    return [
+                        'time_in' => date('g:i A', strtotime($sched['time_in'])),
+                        'time_out' => date('g:i A', strtotime($sched['time_out'])),
+                        'is_rest_day' => false
+                    ];
+                }
+            }
+        }
+        
+        // PRIORITY 3: Fall back to employee's official schedule
+        $empStmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+        $empStmt->execute([$employee_id]);
+        $emp = $empStmt->fetch(PDO::FETCH_ASSOC);
+        $officialSchedId = $emp['official_sched'] ?? 4;
+        
+        $schedStmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
+        $schedStmt->execute([$officialSchedId]);
+        $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
+        if ($sched) {
+            return [
+                'time_in' => date('g:i A', strtotime($sched['time_in'])),
+                'time_out' => date('g:i A', strtotime($sched['time_out'])),
+                'is_rest_day' => false
+            ];
+        }
+    } catch (Exception $e) {
+        // Fallback to empty
+    }
+    
+    return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => false];
+}
 ?>
 
 <!-- ✅ DO NOT TOUCH CONTAINER ABOVE THIS -->
@@ -260,7 +346,11 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                             <?php elseif ($type === 'Leave'): ?>
                                 Leave Request
                             <?php elseif ($type === 'Schedule'): ?>
-                                Schedule Change Request
+                                <?php
+                                // Check if this is a rest day request (work_schedule_id is NULL or is_rest_day is 1)
+                                $isRestDay = (empty($activity['work_schedule_id']) || ($activity['is_rest_day'] ?? 0) == 1);
+                                echo $isRestDay ? 'Add a Day Off' : 'Schedule Change Request';
+                                ?>
                             <?php elseif ($type === 'Time'): ?>
                                 Time Adjustment Request
                             <?php else: ?>
@@ -342,12 +432,18 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
                             View Details
                         </button>
                     <?php } elseif ($type === 'Schedule') { ?>
+                        <?php
+                            // Get ACTUAL current schedule from calendar, not the stored one from request
+                            $actualCurrentSchedule = getActualCurrentScheduleFromCalendar($pdo, $employee_id);
+                            $currentTimeIn = $actualCurrentSchedule['is_rest_day'] ? 'REST DAY' : $actualCurrentSchedule['time_in'];
+                            $currentTimeOut = $actualCurrentSchedule['is_rest_day'] ? '' : $actualCurrentSchedule['time_out'];
+                        ?>
                         <button onclick="showActivityDetails('Schedule Change', `<?= htmlspecialchars(json_encode([
                             'type' => 'Schedule Change',
                             'status' => $status,
                             'date' => $created,
-                            'current_time_in' => !empty($activity['current_time_in']) ? date('g:i A', strtotime($activity['current_time_in'])) : '',
-                            'current_time_out' => !empty($activity['current_time_out']) ? date('g:i A', strtotime($activity['current_time_out'])) : '',
+                            'current_time_in' => $currentTimeIn,
+                            'current_time_out' => $currentTimeOut,
                             'requested_time_in' => !empty($activity['requested_time_in']) ? date('g:i A', strtotime($activity['requested_time_in'])) : '',
                             'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
                             'start_date' => !empty($activity['start_date']) ? date('M j, Y', strtotime($activity['start_date'])) : '',
@@ -407,7 +503,7 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
 
 <!-- Activity Details Modal -->
 <div id="activityModal" class="fixed inset-0 z-50 items-center justify-center bg-black bg-opacity-60 hidden backdrop-blur-sm">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 border border-gray-200/80 transform transition-all duration-300 scale-95 opacity-0" id="modalContent">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl mx-4 border border-gray-200/80 transform transition-all duration-300 scale-95 opacity-0" id="modalContent">
         <!-- Modal Header -->
         <div class="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50 rounded-t-xl">
             <div class="flex items-center">
@@ -669,48 +765,54 @@ function showActivityDetails(title, dataJson) {
             // Attachment section for leave requests
             content += createAttachmentSection(data.attachment_lr, data.request_id, data.table_name, data.status);
         } else if (data.type.includes('Schedule')) {
+            // Full width horizontal container for schedule change
+            content += `<div class="border border-gray-200 rounded-lg p-5 bg-gradient-to-r from-blue-50 to-green-50">`;
+            
             if (data.current_time_in && data.current_time_out && data.requested_time_in && data.requested_time_out) {
                 // Check if request is pending and can be edited
                 const isEditable = data.status && data.status.toLowerCase() === 'pending' && data.request_id;
                 
+                // Header
+                content += `
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-calendar-alt text-blue-600 text-lg mr-2"></i>
+                        <h4 class="text-lg font-semibold text-gray-800">Schedule Change Details</h4>
+                    </div>
+                `;
+                
                 if (isEditable) {
                     content += `
-                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" id="schedule-change-block-${data.request_id}">
-                            <div class="flex items-center justify-between mb-4">
-                                <h4 class="text-lg font-semibold text-gray-800 flex items-center">
-                                    <i class="fas fa-calendar-alt text-blue-600 mr-2"></i>
-                                    Schedule Change Details
-                                </h4>
-                            </div>
-                            
-                            <!-- Current Schedule -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h5 class="font-semibold text-blue-800 mb-2 flex items-center">
+                        <div id="schedule-change-block-${data.request_id}">
+                            <!-- Horizontal Schedule Comparison -->
+                            <div class="flex items-center justify-between gap-4 mb-4">
+                                <div class="flex-1 bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                                    <div class="flex items-center mb-2">
                                         <i class="fas fa-clock text-blue-600 mr-2"></i>
-                                        Current Schedule
-                                    </h5>
-                                    <p class="text-lg font-bold text-blue-900">
+                                        <h5 class="font-semibold text-blue-800 text-sm">Current Schedule</h5>
+                                    </div>
+                                    <p class="text-xl font-bold text-blue-900">
                                         ${data.current_time_in} - ${data.current_time_out}
                                     </p>
                                 </div>
                                 
-                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                                    <h5 class="font-semibold text-green-800 mb-2 flex items-center">
+                                <div class="flex items-center justify-center px-3">
+                                    <i class="fas fa-arrow-right text-gray-400 text-2xl"></i>
+                                </div>
+                                
+                                <div class="flex-1 bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                                    <div class="flex items-center mb-2">
                                         <i class="fas fa-arrow-right text-green-600 mr-2"></i>
-                                        Requested Schedule
-                                    </h5>
-                                    <div class="space-y-3">
-                                        <select id="edit-schedule-${data.request_id}" 
-                                                class="w-full p-3 border-2 border-gray-300 bg-gray-100 rounded-lg text-lg font-bold text-green-900 focus:ring-2 focus:ring-green-400 disabled:cursor-not-allowed" 
-                                                disabled 
-                                                onchange="updateScheduleDisplay('${data.request_id}')">
-                                            ${generateScheduleOptions(data.requested_time_in, data.requested_time_out, data.work_schedule_id)}
-                                        </select>
-                                        <input type="hidden" id="edit-schedule-hidden-${data.request_id}" 
-                                               value="${data.work_schedule_id || ''}" 
-                                               data-original="${data.work_schedule_id || ''}">
+                                        <h5 class="font-semibold text-green-800 text-sm">Requested Schedule</h5>
                                     </div>
+                                    <select id="edit-schedule-${data.request_id}" 
+                                            class="w-full p-2 border-2 border-gray-300 bg-gray-100 rounded-lg text-xl font-bold text-green-900 focus:ring-2 focus:ring-green-400 disabled:cursor-not-allowed" 
+                                            disabled 
+                                            onchange="updateScheduleDisplay('${data.request_id}')">
+                                        ${generateScheduleOptions(data.requested_time_in, data.requested_time_out, data.work_schedule_id)}
+                                    </select>
+                                    <input type="hidden" id="edit-schedule-hidden-${data.request_id}" 
+                                           value="${data.work_schedule_id || ''}" 
+                                           data-original="${data.work_schedule_id || ''}">
                                 </div>
                             </div>
                         </div>
@@ -718,23 +820,27 @@ function showActivityDetails(title, dataJson) {
                 } else {
                     // Non-editable version for approved/declined requests
                     content += `
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <h5 class="font-semibold text-blue-800 mb-2 flex items-center">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="flex-1 bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                                <div class="flex items-center mb-2">
                                     <i class="fas fa-clock text-blue-600 mr-2"></i>
-                                    Current Schedule
-                                </h5>
-                                <p class="text-lg font-bold text-blue-900">
+                                    <h5 class="font-semibold text-blue-800 text-sm">Current Schedule</h5>
+                                </div>
+                                <p class="text-xl font-bold text-blue-900">
                                     ${data.current_time_in} - ${data.current_time_out}
                                 </p>
                             </div>
                             
-                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                                <h5 class="font-semibold text-green-800 mb-2 flex items-center">
+                            <div class="flex items-center justify-center px-3">
+                                <i class="fas fa-arrow-right text-gray-400 text-2xl"></i>
+                            </div>
+                            
+                            <div class="flex-1 bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                                <div class="flex items-center mb-2">
                                     <i class="fas fa-arrow-right text-green-600 mr-2"></i>
-                                    Requested Schedule
-                                </h5>
-                                <p class="text-lg font-bold text-green-900">
+                                    <h5 class="font-semibold text-green-800 text-sm">Requested Schedule</h5>
+                                </div>
+                                <p class="text-xl font-bold text-green-900">
                                     ${data.requested_time_in} - ${data.requested_time_out}
                                 </p>
                             </div>
@@ -742,6 +848,8 @@ function showActivityDetails(title, dataJson) {
                     `;
                 }
             }
+            
+            content += `</div>`; // Close main schedule container
             
             // Effective Period (editable for pending requests)
             if (data.start_date && data.end_date) {

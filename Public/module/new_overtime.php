@@ -396,60 +396,70 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
 
 // Function to get schedule for a specific date (historical accuracy)
 function getScheduleForDate($employee_id, $date, $pdo) {
-    // Fetch employee's default schedule
-    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
-    $stmt->execute([$employee_id]);
-    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-    $default_schedule_id = $employee['official_sched'] ?? 4;
-    
-    // Hardcoded schedule times (matching schedule_tracker.php)
-    $schedule_times = [
-        1 => ['in' => '06:30:00', 'out' => '15:30:00'],
-        2 => ['in' => '08:00:00', 'out' => '19:00:00'],
-        3 => ['in' => '07:30:00', 'out' => '16:30:00'],
-        4 => ['in' => '07:00:00', 'out' => '16:00:00'],
-        5 => ['in' => '08:00:00', 'out' => '17:00:00'],
-        6 => ['in' => '09:00:00', 'out' => '18:00:00'],
-        7 => ['in' => '10:00:00', 'out' => '19:00:00'],
-        8 => ['in' => '06:00:00', 'out' => '15:00:00'],
-        9 => ['in' => '08:00:00', 'out' => '16:30:00'],
-        10 => ['in' => '07:40:00', 'out' => '16:40:00'],
-        11 => ['in' => '06:30:00', 'out' => '15:00:00'],
-        12 => ['in' => '06:30:00', 'out' => '17:30:00'],
-        13 => ['in' => '07:00:00', 'out' => '18:00:00'],
-        14 => ['in' => '06:00:00', 'out' => '17:00:00'],
-        15 => ['in' => '06:00:00', 'out' => '16:00:00'],
-        16 => ['in' => '08:30:00', 'out' => '16:30:00'],
-        17 => ['in' => '06:00:00', 'out' => '12:00:00'],
-        18 => ['in' => '06:00:00', 'out' => '14:30:00'],
-        19 => ['in' => '19:00:00', 'out' => '03:00:00'],
-        20 => ['in' => '19:00:00', 'out' => '04:30:00'],
-    ];
-    
-    // Check for approved schedule changes that were active on the specific date
+    // PRIORITY 1: Check employee_daily_schedule_cache for pre-computed schedule
     $stmt = $pdo->prepare("
-        SELECT work_schedule_id, status, start_date, end_date 
-        FROM post_schedule_change_requests 
-        WHERE employee_id = ? AND status = 'Approved' 
-        AND ? BETWEEN start_date AND end_date 
-        ORDER BY created_at DESC 
+        SELECT 
+            work_schedule_id,
+            schedule_name,
+            time_in,
+            time_out,
+            is_rest_day,
+            is_holiday,
+            source
+        FROM employee_daily_schedule_cache
+        WHERE employee_id = ? AND schedule_date = ?
         LIMIT 1
     ");
     $stmt->execute([$employee_id, $date]);
-    $activeScheduleOnDate = $stmt->fetch(PDO::FETCH_ASSOC);
+    $cache = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Determine which schedule was active on that date
-    $schedule_id = $activeScheduleOnDate ? ($activeScheduleOnDate['work_schedule_id'] ?? $default_schedule_id) : $default_schedule_id;
-    
-    // Get schedule times
-    $schedule_in = $schedule_times[$schedule_id]['in'] ?? '07:00:00';
-    $schedule_out = $schedule_times[$schedule_id]['out'] ?? '16:00:00';
+    if ($cache && $cache['time_in'] && $cache['time_out']) {
+        // Found in cache with valid times
+        $schedule_in = $cache['time_in'];
+        $schedule_out = $cache['time_out'];
+        $schedule_id = $cache['work_schedule_id'] ?? null;
+    } else {
+        // FALLBACK: Check employee_default_schedules + work_schedules
+        $dayOfWeek = date('w', strtotime($date)); // 0=Sunday, 6=Saturday
+        $stmt = $pdo->prepare("
+            SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
+            FROM employee_default_schedules edd
+            LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+            WHERE edd.employee_id = ? 
+              AND edd.day_of_week = ? 
+              AND edd.effective_from <= ? 
+              AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+            LIMIT 1
+        ");
+        $stmt->execute([$employee_id, $dayOfWeek, $date, $date]);
+        $weekly = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($weekly && $weekly['time_in'] && $weekly['time_out']) {
+            $schedule_in = $weekly['time_in'];
+            $schedule_out = $weekly['time_out'];
+            $schedule_id = $weekly['work_schedule_id'];
+        } else {
+            // Final fallback: Use employee's official schedule
+            $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+            $stmt->execute([$employee_id]);
+            $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+            $schedule_id = $employee['official_sched'] ?? 4;
+            
+            // Get times from work_schedules table
+            $stmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
+            $stmt->execute([$schedule_id]);
+            $ws = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            $schedule_in = $ws['time_in'] ?? '07:00:00';
+            $schedule_out = $ws['time_out'] ?? '16:00:00';
+        }
+    }
     
     // Format times for display
     $formatted_in = date('h:i A', strtotime($schedule_in));
     $formatted_out = date('h:i A', strtotime($schedule_out));
     
-    // Determine status for display (matching schedule_tracker.php logic)
+    // Determine status for display
     $today = date('Y-m-d');
     $isToday = ($date === $today);
     $isPast = ($date < $today);
@@ -457,38 +467,24 @@ function getScheduleForDate($employee_id, $date, $pdo) {
     $status_text = '';
     $status_color = 'text-blue-600';
     
-    if ($isPast) {
-        // For past dates, show what was actually active
-        if ($activeScheduleOnDate) {
+    if ($cache) {
+        // Using cached schedule data
+        if ($cache['source'] === 'approved_request') {
             $status_text = "Changed Schedule (ID: {$schedule_id})";
             $status_color = 'text-green-600';
+        } elseif ($cache['source'] === 'admin_override') {
+            $status_text = "Admin Override (ID: {$schedule_id})";
+            $status_color = 'text-purple-600';
         } else {
             $status_text = "Default Schedule";
             $status_color = 'text-blue-600';
         }
+        $was_changed = in_array($cache['source'], ['approved_request', 'admin_override']);
     } else {
-        // For current/future dates, use session data from schedule_tracker.php
-        $current_sched = $_SESSION['current_schedule'] ?? [];
-        
-        if ($isToday && isset($current_sched['status_text'])) {
-            // Use the exact status from schedule tracker for today
-            $status_text = $current_sched['status_text'];
-            $status_color = match($current_sched['status'] ?? 'baseline') {
-                'approved' => 'text-green-600',
-                'pending' => 'text-yellow-600',
-                'declined' => 'text-red-600',
-                default => 'text-blue-600'
-            };
-        } else {
-            // For future dates, determine based on schedule change
-            if ($activeScheduleOnDate) {
-                $status_text = "Changed Schedule (ID: {$schedule_id})";
-                $status_color = 'text-green-600';
-            } else {
-                $status_text = "Default Schedule (ID: {$default_schedule_id})";
-                $status_color = 'text-blue-600';
-            }
-        }
+        // Using fallback data
+        $status_text = "Default Schedule";
+        $status_color = 'text-blue-600';
+        $was_changed = false;
     }
     
     return [
@@ -497,8 +493,8 @@ function getScheduleForDate($employee_id, $date, $pdo) {
         'schedule_id' => $schedule_id,
         'status_text' => $status_text,
         'status_color' => $status_color,
-        'was_changed' => $activeScheduleOnDate ? true : false,
-        'is_default' => !$activeScheduleOnDate
+        'was_changed' => $was_changed,
+        'is_default' => !$was_changed
     ];
 }
 
@@ -622,43 +618,39 @@ $default_time_out = $default_sched['time_out'];
 }
 
 .tab-active {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    border-color: #10b981;
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
-    transform: translateY(-1px);
+    background: white !important;
+    color: #2563eb !important;
+    border-color: #2563eb !important;
 }
 
 .tab-inactive {
-    background: white;
-    color: #6b7280;
-    border-color: #e5e7eb;
-    transition: all 0.3s ease;
+    background: transparent !important;
+    color: #6b7280 !important;
+    border-color: transparent !important;
+    transition: all 0.2s ease;
 }
 
 .tab-inactive:hover {
-    background: #f9fafb;
-    color: #374151;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    color: #111827 !important;
+    border-color: #d1d5db !important;
 }
 
 .status-approved {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    border-color: #10b981;
+    background: #dcfce7;
+    color: #166534;
+    border-color: #bbf7d0;
 }
 
 .status-declined {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white;
-    border-color: #ef4444;
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fecaca;
 }
 
 .status-pending {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
-    border-color: #f59e0b;
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
 }
 
 /* Enhanced table styling */
@@ -843,224 +835,142 @@ button:hover {
 <div id="overtimeView" class="hidden animate-fade-in-up overtime-management-container">
   <div class="w-full">
     
-    <!-- Enhanced Header Section with Full Width -->
-    <div class="bg-gradient-to-br from-emerald-600 via-green-600 to-teal-600 shadow-sm mb-0 border-b-4 border-emerald-700">
-      <div class="relative px-8 py-6">
-        <!-- Background decoration -->
-        <div class="absolute top-0 right-0 w-64 h-64 opacity-10">
-          <i class="fas fa-clock text-9xl transform rotate-12"></i>
-        </div>
-        
-        <div class="relative z-10">
-          <div class="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
-            <div class="flex-1">
-              <div class="flex items-center mb-4">
-                <div class="p-3 bg-white/20 backdrop-blur-sm rounded-xl mr-4">
-                  <i class="fas fa-clock text-3xl text-white"></i>
-                </div>
-                <div>
-                  <h1 class="text-3xl xl:text-4xl font-bold text-white mb-2">
-                    Overtime Management 
-                  </h1>
-                  <p class="text-emerald-100 text-lg">
-                    Submit, track, and manage your overtime requests efficiently
-                  </p>
-                </div>
+    <!-- Modern Header Section - Monday.com/Sprout Style -->
+    <div class="bg-white border-b border-gray-200">
+      <div class="px-8 py-4">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <!-- Left: Icon + Title -->
+          <div class="flex items-center gap-4">
+            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-clock text-white text-lg"></i>
+            </div>
+            <div>
+              <h1 class="text-xl font-semibold text-gray-900">Overtime Management</h1>
+              <p class="text-sm text-gray-500">Submit and track your overtime requests</p>
+            </div>
+          </div>
+          
+          <!-- Right: Stats Overview -->
+          <div class="flex items-center gap-8">
+            <div class="text-center">
+              <div class="text-2xl font-semibold text-gray-900"><?= count($time_logs) ?></div>
+              <div class="text-xs text-gray-500 whitespace-nowrap">Recent Logs</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-semibold text-green-600">
+                <?= count(array_filter($time_logs, function($log) use ($employee_id, $pdo) { 
+                  if (empty($log['time_in']) || empty($log['time_out'])) return false;
+                  $isEligible = isOvertimeEligibleBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
+                  $otHours = calculateOvertimeHoursBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
+                  return $isEligible && $otHours >= 0.5;
+                })) ?>
               </div>
-              
-              <!-- Enhanced Stats Grid -->
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-                <div class="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <div class="text-2xl font-bold text-white"><?= count($time_logs) ?></div>
-                      <div class="text-sm text-emerald-100">Recent Logs</div>
-                    </div>
-                    <div class="p-2 bg-white/20 rounded-lg">
-                      <i class="fas fa-list-alt text-white text-lg"></i>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <div class="text-2xl font-bold text-white">
-                        <?= count(array_filter($time_logs, function($log) use ($employee_id, $pdo) { 
-                          if (empty($log['time_in']) || empty($log['time_out'])) return false;
-                          $isEligible = isOvertimeEligibleBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
-                          $otHours = calculateOvertimeHoursBySchedule($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
-                          return $isEligible && $otHours >= 0.5; // Only count if OT is 30+ minutes
-                        })) ?>
-                      </div>
-                      <div class="text-sm text-emerald-100">OT Eligible</div>
-                    </div>
-                    <div class="p-2 bg-white/20 rounded-lg">
-                      <i class="fas fa-star text-white text-lg"></i>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <div class="text-2xl font-bold text-white"><?= count($overtime_history) ?></div>
-                      <div class="text-sm text-emerald-100">Total Requests</div>
-                    </div>
-                    <div class="p-2 bg-white/20 rounded-lg">
-                      <i class="fas fa-file-alt text-white text-lg"></i>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="bg-white/15 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <div class="text-lg font-bold text-white"><?= htmlspecialchars($default_time_in . ' - ' . $default_time_out) ?></div>
-                      <div class="text-sm text-emerald-100">Today's Schedule</div>
-                    </div>
-                    <div class="p-2 bg-white/20 rounded-lg">
-                      <i class="fas fa-calendar-check text-white text-lg"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <div class="text-xs text-gray-500 whitespace-nowrap">OT Eligible</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-semibold text-gray-900"><?= count($overtime_history) ?></div>
+              <div class="text-xs text-gray-500 whitespace-nowrap">Total Requests</div>
+            </div>
+            <div class="text-center">
+              <div class="text-sm font-medium text-gray-900 whitespace-nowrap"><?= htmlspecialchars($default_time_in . ' - ' . $default_time_out) ?></div>
+              <div class="text-xs text-gray-500 whitespace-nowrap">Today's Schedule</div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Enhanced Tab Navigation -->
-    <div class="bg-white rounded-2xl shadow-xl border border-gray-200 mb-8 overflow-hidden">
-      <div class="p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 class="text-xl font-bold text-gray-900">Overtime Request </h2>
-            <p class="text-gray-600 text-sm">Manage your overtime requests and view submission history</p>
-          </div>
-          <div class="flex space-x-2 bg-white rounded-lg p-1 shadow-sm border border-gray-200">
-            <button id="submitTab" onclick="switchTab('submit')" 
-                    class="flex-1 sm:flex-none px-6 py-3 text-sm font-medium rounded-md transition-all duration-200 tab-active">
-              <i class="fas fa-plus mr-2"></i>Submit Request
-            </button>
-            <button id="historyTab" onclick="switchTab('history')" 
-                    class="flex-1 sm:flex-none px-6 py-3 text-sm font-medium rounded-md transition-all duration-200 tab-inactive">
-              <i class="fas fa-history mr-2"></i>Request History
-            </button>
-          </div>
+    <!-- Modern Tab Navigation with Action Buttons -->
+    <div class="bg-white border-b border-gray-200 px-8">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <button id="submitTab" onclick="switchTab('submit')" 
+                  class="px-4 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600 transition-all duration-200">
+            <i class="fas fa-plus mr-2"></i>Submit Request
+          </button>
+          <button id="historyTab" onclick="switchTab('history')" 
+                  class="px-4 py-3 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:text-gray-900 hover:border-gray-300 transition-all duration-200">
+            <i class="fas fa-history mr-2"></i>Request History
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Submit Request Tab Content - Full Width -->
-    <div id="submitContent" class="bg-white border-t border-gray-200">
+    <!-- Submit Request Tab Content -->
+    <div id="submitContent" class="bg-white">
       
-      <!-- Table Section with Enhanced Layout -->
+      <!-- Table Section -->
       <div class="px-8 py-6">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4">
-          <div class="flex-1">
-            <h3 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
-              <div class="p-2.5 bg-emerald-50 rounded-lg mr-3 border border-emerald-200">
-                <i class="fas fa-history text-emerald-600 text-lg"></i>
-              </div>
-              Recent Time Logs (Overtime Requests)
-            </h3>
-            <p class="text-gray-600">
-              Review your recent work logs and submit overtime requests for eligible entries
-            </p>
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Recent Time Logs</h3>
+            <p class="text-sm text-gray-500 mt-1">Review your work logs and submit overtime requests</p>
           </div>
           
           <!-- Legend -->
-          <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <h4 class="text-sm font-semibold text-gray-700 mb-3">Status Legend</h4>
-            <div class="grid grid-cols-2 gap-3 text-xs">
-              <div class="flex items-center">
-                <div class="w-3 h-3 bg-emerald-400 rounded-full mr-2"></div>
-                <span class="text-gray-600">OT Eligible</span>
-              </div>
-              <div class="flex items-center">
-                <div class="w-3 h-3 bg-blue-400 rounded-full mr-2"></div>
-                <span class="text-gray-600">Regular</span>
-              </div>
-              <div class="flex items-center">
-                <div class="w-3 h-3 bg-red-400 rounded-full mr-2"></div>
-                <span class="text-gray-600">Expired</span>
-              </div>
-              <div class="flex items-center">
-                <div class="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
-                <span class="text-gray-600">No Data</span>
-              </div>
+          <div class="flex items-center gap-4 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 bg-green-500 rounded-full"></span>
+              <span class="text-gray-600">OT Eligible</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 bg-blue-500 rounded-full"></span>
+              <span class="text-gray-600">Regular</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+              <span class="text-gray-600">Expired</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 bg-gray-400 rounded-full"></span>
+              <span class="text-gray-600">No Data</span>
             </div>
           </div>
         </div>
 
         <!-- Records Per Page Selector -->
-        <div class="bg-gray-50 rounded-t-lg border border-gray-200 px-6 py-4 border-b-0">
-          <div class="flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              <span class="font-medium"><?= $total_records ?></span> total time logs found
-            </div>
-            <div class="flex items-center space-x-3">
-              <label for="per_page" class="text-sm font-medium text-gray-700">Show:</label>
-              <select id="per_page" onchange="changePerPage(this.value)" 
-                      class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-                <option value="5" <?= $records_per_page == 5 ? 'selected' : '' ?>>5 per page</option>
-                <option value="10" <?= $records_per_page == 10 ? 'selected' : '' ?>>10 per page</option>
-                <option value="20" <?= $records_per_page == 20 ? 'selected' : '' ?>>20 per page</option>
-                <option value="50" <?= $records_per_page == 50 ? 'selected' : '' ?>>50 per page</option>
-              </select>
-            </div>
+        <div class="bg-gray-50 border border-gray-200 rounded-t-lg px-4 py-3 flex items-center justify-between">
+          <div class="text-sm text-gray-600">
+            <span class="font-medium text-gray-900"><?= $total_records ?></span> entries
+          </div>
+          <div class="flex items-center gap-2">
+            <label for="per_page" class="text-sm text-gray-600">Show</label>
+            <select id="per_page" onchange="changePerPage(this.value)" 
+                    class="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              <option value="5" <?= $records_per_page == 5 ? 'selected' : '' ?>>5</option>
+              <option value="10" <?= $records_per_page == 10 ? 'selected' : '' ?>>10</option>
+              <option value="20" <?= $records_per_page == 20 ? 'selected' : '' ?>>20</option>
+              <option value="50" <?= $records_per_page == 50 ? 'selected' : '' ?>>50</option>
+            </select>
           </div>
         </div>
 
-        <!-- Enhanced Table with Better Responsiveness -->
-        <div class="bg-white rounded-b-lg border border-gray-200 shadow-sm border-t-0">
+        <!-- Modern Table -->
+        <div class="border border-gray-200 rounded-b-lg overflow-hidden">
           <div class="overflow-x-auto">
-            <table class="min-w-full" id="timeLogsTable">
-              <thead class="bg-gray-50 border-b border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200" id="timeLogsTable">
+              <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <div class="flex items-center">
-                      <i class="fas fa-calendar-alt mr-2 text-emerald-500"></i>
-                      Date & Day
-                    </div>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date & Day
                   </th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <div class="flex items-center">
-                      <i class="fas fa-calendar-check mr-2 text-indigo-500"></i>
-                      Active Schedule
-                    </div>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Active Schedule
                   </th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <div class="flex items-center">
-                      <i class="fas fa-sign-in-alt mr-2 text-blue-500"></i>
-                      Time In
-                    </div>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Time In
                   </th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <div class="flex items-center">
-                      <i class="fas fa-sign-out-alt mr-2 text-orange-500"></i>
-                      Time Out
-                    </div>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Time Out
                   </th>
-                  <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <div class="flex items-center">
-                      <i class="fas fa-clock mr-2 text-purple-500"></i>
-                      Work Duration
-                    </div>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Work Duration
                   </th>
-                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <div class="flex items-center">
-                      <i class="fas fa-hourglass-half mr-2 text-amber-500"></i>
-                      OT Hours
-                    </div>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    OT Hours
                   </th>
-                  <th class="px-6 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <div class="flex items-center">
-                      <i class="fas fa-cog mr-2 text-gray-500"></i>
-                      Action
-                    </div>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Action
                   </th>
                 </tr>
               </thead>
@@ -1735,22 +1645,22 @@ button:hover {
   <div class="fixed inset-0 transition-opacity bg-black/40 backdrop-blur-sm" onclick="closeOvertimeModal()"></div>
 
   <!-- Modal content -->
-  <div class="inline-block w-full max-w-4xl px-0 pt-0 pb-0 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl shadow-2xl ring-1 ring-black/5 sm:my-8 sm:align-middle border border-slate-200 animate-fade-in-up">
+  <div class="inline-block w-full max-w-4xl px-0 pt-0 pb-0 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle border border-gray-200 animate-fade-in-up">
             
             <!-- Modal Header -->
-      <div class="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4">
+      <div class="bg-white border-b border-gray-200 px-6 py-4">
                 <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-            <div class="p-3 bg-white/30 rounded-xl mr-3 ring-2 ring-white/30 backdrop-blur-sm shadow-lg">
-                            <i class="fas fa-clock text-white text-xl drop-shadow-md"></i>
+                    <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-clock text-white"></i>
                         </div>
                         <div>
-                            <h3 class="text-xl font-black text-white drop-shadow-md">Submit Overtime Request</h3>
-                            <p class="text-green-100 text-sm font-medium drop-shadow-sm">Fill out the details for your overtime request</p>
+                            <h3 class="text-lg font-semibold text-gray-900">Submit Overtime Request</h3>
+                            <p class="text-sm text-gray-500 mt-0.5">Fill out the details for your request</p>
                         </div>
                     </div>
-          <button onclick="closeOvertimeModal()" class="p-2.5 text-white/90 hover:text-white rounded-xl hover:bg-white/30 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur-sm transform hover:scale-110">
-                        <i class="fas fa-times text-lg drop-shadow-md"></i>
+          <button onclick="closeOvertimeModal()" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
@@ -1766,114 +1676,75 @@ button:hover {
                     <input type="hidden" id="end_ot_time" name="end_ot_time">
                     
                     <!-- Information Grid -->
-          <div class="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-xl p-5 border border-slate-200/80 shadow-lg backdrop-blur-sm">
-                        <h4 class="text-base font-bold text-slate-800 mb-5 flex items-center">
-                            <div class="w-7 h-7 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center mr-2 shadow-md">
-                                <i class="fas fa-info-circle text-white text-sm"></i>
-                            </div>
+          <div class="bg-gray-50 rounded-lg p-5 border border-gray-200">
+                        <h4 class="text-sm font-semibold text-gray-900 mb-4">
                             Request Information
                         </h4>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                             <div class="space-y-2">
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Selectable OT Hours</label>
+                                <label class="block text-xs font-medium text-gray-700">Selectable OT Hours</label>
                                 <div class="relative">
-                                    <!-- Hidden input to store the selected value -->
                                     <input type="hidden" id="overtime_hours" name="overtime_hours" value="">
                                     
-                                    <!-- Enhanced Time Input Container -->
-                                    <div class="w-full pl-9 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus-within:ring-2 focus-within:ring-emerald-400/30 focus-within:border-emerald-400 transition-all duration-300 shadow-md hover:shadow-lg backdrop-blur-sm">
-                                        <div class="flex items-center justify-center space-x-4">
-                                            <!-- Hours Input -->
+                                    <div class="w-full px-3 py-2.5 border border-gray-300 rounded-md bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
+                                        <div class="flex items-center justify-center space-x-3">
                                             <div class="flex flex-col items-center">
-                                                <label class="text-xs font-medium text-slate-600 mb-1 uppercase tracking-wider">Hrs</label>
+                                                <label class="text-xs text-gray-500 mb-1">Hrs</label>
                                                 <input type="number" 
                                                        id="hours-input" 
                                                        min="0" 
                                                        max="99"
                                                        value="0"
-                                                       class="w-12 h-8 text-center border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-200 bg-slate-50/50 hover:bg-white shadow-sm">
+                                                       class="w-12 h-7 text-center border border-gray-300 rounded text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
                                             </div>
                                             
-                                            <div class="text-lg font-black text-slate-400 mt-4 animate-pulse">:</div>
+                                            <div class="text-lg font-medium text-gray-400 mt-4">:</div>
                                             
-                                            <!-- Minutes Input -->
                                             <div class="flex flex-col items-center">
-                                                <label class="text-xs font-medium text-slate-600 mb-1 uppercase tracking-wider">Min</label>
+                                                <label class="text-xs text-gray-500 mb-1">Min</label>
                                                 <input type="number" 
                                                        id="minutes-input" 
                                                        min="0" 
                                                        max="59"
                                                        step="1"
                                                        value="0"
-                                                       class="w-12 h-8 text-center border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-200 bg-slate-50/50 hover:bg-white shadow-sm">
+                                                       class="w-12 h-7 text-center border border-gray-300 rounded text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                        <div class="w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center shadow-md">
-                                            <i class="fas fa-hourglass-half text-white text-xs"></i>
-                                        </div>
-                                    </div>
                                 </div>
-                                <div id="ot-range-info" class="text-xs text-slate-600 truncate font-medium"></div>
-                                <div id="ot-validation-info" class="text-xs text-emerald-600 truncate font-medium"></div>
-                            </div>                            <div class="space-y-2">
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Max OT Available</label>
-                <div class="relative">
-                  <input type="text" id="display_max_ot_hours" 
-                       class="w-full pl-10 pr-4 py-3 border-2 border-emerald-200/60 rounded-xl bg-gradient-to-r from-emerald-50/80 to-green-50/60 font-bold text-center text-emerald-800 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm shadow-lg backdrop-blur-sm"
-                       readonly>
-                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                        <div class="w-6 h-6 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg flex items-center justify-center shadow-md">
-                                            <i class="fas fa-clock text-white text-xs"></i>
-                                        </div>
-                                    </div>
-                                </div>
+                                <div id="ot-range-info" class="text-xs text-gray-600"></div>
+                                <div id="ot-validation-info" class="text-xs text-green-600"></div>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-xs font-medium text-gray-700">Max OT Available</label>
+                                <input type="text" id="display_max_ot_hours" 
+                                       class="w-full px-3 py-2.5 border border-gray-300 rounded-md bg-gray-50 font-medium text-center text-gray-900 focus:outline-none text-sm"
+                                       readonly>
                             </div>
                             
                             <div class="space-y-2">
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Start OT</label>
-                <div class="relative">
-                  <input type="text" id="display_start_ot" 
-                       class="w-full pl-10 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm"
-                       readonly>
-                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                        <div class="w-6 h-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md">
-                                            <i class="fas fa-play text-white text-xs"></i>
-                                        </div>
-                                    </div>
-                                </div>
+                                <label class="block text-xs font-medium text-gray-700">Start OT</label>
+                                <input type="text" id="display_start_ot" 
+                                       class="w-full px-3 py-2.5 border border-gray-300 rounded-md bg-white focus:outline-none text-sm font-medium text-gray-900"
+                                       readonly>
                             </div>
                             
                             <div class="space-y-2">
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">End OT</label>
-                <div class="relative">
-                  <input type="text" id="display_end_ot" 
-                       class="w-full pl-10 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm"
-                       readonly>
-                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                        <div class="w-6 h-6 bg-gradient-to-br from-red-500 to-rose-600 rounded-lg flex items-center justify-center shadow-md">
-                                            <i class="fas fa-stop text-white text-xs"></i>
-                                        </div>
-                                    </div>
-                                </div>
+                                <label class="block text-xs font-medium text-gray-700">End OT</label>
+                                <input type="text" id="display_end_ot" 
+                                       class="w-full px-3 py-2.5 border border-gray-300 rounded-md bg-white focus:outline-none text-sm font-medium text-gray-900"
+                                       readonly>
                             </div>
                         </div>
                         
-                        <div class="grid grid-cols-1 gap-4 mt-5">
+                        <div class="grid grid-cols-1 gap-4 mt-4">
                             <div class="space-y-2">
-                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">Date</label>
-                                <div class="relative">
-           <input type="text" id="selected_date" name="selected_date" 
-             class="w-full pl-10 pr-4 py-3 border-2 border-slate-200/60 rounded-xl bg-white/90 focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm"
-             readonly>
-                                    <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                        <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
-                                            <i class="fas fa-calendar text-white text-xs"></i>
-                                        </div>
-                                    </div>
-                                </div>
+                                <label class="block text-xs font-medium text-gray-700">Date</label>
+                                <input type="text" id="selected_date" name="selected_date" 
+                                       class="w-full px-3 py-2.5 border border-gray-300 rounded-md bg-white focus:outline-none text-sm font-medium text-gray-900"
+                                       readonly>
                             </div>
 
                             <!-- Hidden Time In and Time Out fields for form submission -->
@@ -1885,73 +1756,53 @@ button:hover {
                     </div>
 
                     <!-- OT Type and Attachment -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div class="space-y-2">
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                                Overtime Type <span class="text-red-500 text-sm">*</span>
+                            <label class="block text-xs font-medium text-gray-700">
+                                Overtime Type <span class="text-red-500">*</span>
                             </label>
-                            <div class="relative">
-                <select name="ot_type" id="ot_type" required
-                    class="w-full pl-10 pr-10 py-3 border-2 border-slate-200/60 rounded-xl focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 appearance-none bg-white/90 text-sm font-medium text-slate-800 shadow-lg backdrop-blur-sm hover:shadow-xl">
-                                    <option value="">Select OT Type</option>
-                                    <option value="Regular OT">Regular OT</option>
-                                    <option value="Special Holiday OT">Special Holiday OT</option>
-                                    <option value="Regular Holiday OT">Regular Holiday OT</option>
-                                    <option value="Restday OT">Restday OT</option>
-                                </select>
-                                <div class="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                    <div class="w-6 h-6 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
-                                        <i class="fas fa-briefcase text-white text-xs"></i>
-                                    </div>
-                                </div>
-                <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <div class="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center">
-                        <i class="fas fa-chevron-down text-slate-500 text-xs"></i>
-                    </div>
-                </div>
-                            </div>
+                            <select name="ot_type" id="ot_type" required
+                                    class="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white text-sm font-medium text-gray-900">
+                                <option value="">Select OT Type</option>
+                                <option value="Regular OT">Regular OT</option>
+                                <option value="Special Holiday OT">Special Holiday OT</option>
+                                <option value="Regular Holiday OT">Regular Holiday OT</option>
+                                <option value="Restday OT">Restday OT</option>
+                            </select>
                         </div>
 
                         <div class="space-y-2">
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                                Supporting Document <span class="text-red-500 text-sm">*</span>
+                            <label class="block text-xs font-medium text-gray-700">
+                                Supporting Document <span class="text-red-500">*</span>
                             </label>
-                            <div class="relative">
-            <input type="file" 
-                                       name="attachment" 
-                                       id="attachment" 
-                                       accept=".pdf,.jpg,.jpeg,.png"
-                                       required
-              class="w-full px-4 py-3 border-2 border-slate-200/60 rounded-xl focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-emerald-50 file:to-green-50 file:text-emerald-700 hover:file:from-emerald-100 hover:file:to-green-100 text-sm shadow-lg backdrop-blur-sm bg-white/90">
-                            </div>
-                            <p class="text-xs text-slate-600 font-medium">PDF, JPG, PNG (Max 5MB)</p>
+                            <input type="file" 
+                                   name="attachment" 
+                                   id="attachment" 
+                                   accept=".pdf,.jpg,.jpeg,.png"
+                                   required
+                                   class="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-4 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 text-sm bg-white">
+                            <p class="text-xs text-gray-500 mt-1">PDF, JPG, PNG (Max 5MB)</p>
                         </div>
                     </div>
 
                     <!-- Reason -->
                     <div class="space-y-2">
-                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                            Reason for Overtime <span class="text-red-500 text-sm">*</span>
+                        <label class="block text-xs font-medium text-gray-700">
+                            Reason for Overtime <span class="text-red-500">*</span>
                         </label>
-            <textarea name="reason" id="reason" rows="4" required
-                  class="w-full px-4 py-3 border-2 border-slate-200/60 rounded-xl focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-all duration-300 resize-none shadow-lg placeholder:text-slate-400 text-sm font-medium bg-white/90 backdrop-blur-sm hover:shadow-xl"
+                        <textarea name="reason" id="reason" rows="4" required
+                                  class="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none placeholder:text-gray-400 text-sm bg-white"
                                   placeholder="Provide detailed explanation for OT work (indicate if with or without break)"></textarea>
                     </div>
 
                     <!-- Submit Buttons -->
-          <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t-2 border-slate-200/80">
+                    <div class="flex flex-col sm:flex-row gap-3 pt-5 border-t border-gray-200">
                         <button type="button" onclick="closeOvertimeModal()" 
-                class="flex-1 px-6 py-3 border-2 border-slate-200/60 rounded-xl text-slate-700 font-bold bg-white/90 hover:bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-slate-300/50 focus:border-slate-400 transition-all duration-300 text-sm flex items-center justify-center shadow-lg backdrop-blur-sm hover:shadow-xl transform hover:scale-[1.02]">
-                            <div class="w-5 h-5 bg-slate-200 rounded-lg flex items-center justify-center mr-2">
-                                <i class="fas fa-times text-slate-600 text-xs"></i>
-                            </div>
+                                class="flex-1 px-4 py-2.5 border border-gray-300 rounded-md text-gray-700 font-medium bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors text-sm">
                             Cancel
                         </button>
                         <button type="submit" 
-                class="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 hover:from-emerald-700 hover:via-green-700 hover:to-teal-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-400/50 text-sm flex items-center justify-center shadow-lg backdrop-blur-sm">
-                            <div class="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center mr-2">
-                                <i class="fas fa-paper-plane text-white text-xs"></i>
-                            </div>
+                                class="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                             Submit Request
                         </button>
                     </div>

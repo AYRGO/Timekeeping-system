@@ -10,137 +10,149 @@ function getMonthsNav_schedule($year, $month) {
 }
 
 function getScheduleCell_admin($pdo, $employee_id, $date, $scheduleOptions) {
-    $cell = [
-        'date'=>$date, 
-        'employee_id'=>$employee_id, 
-        'base_schedule'=>null, 
-        'actual_schedule'=>null, 
-        'is_rest_day'=>0, 
-        'is_holiday'=>0, 
-        'has_override'=>0, 
-        'override_status'=>null, 
-        'schedule_color'=>'#9ca3af', 
-        'override_data'=>null, 
-        'source'=>'none'
-    ];
-
-    // PRIORITY 1: Check for daily override in employee_daily_schedules
-    $dailyStmt = $pdo->prepare("SELECT * FROM employee_daily_schedules WHERE employee_id = ? AND schedule_date = ? LIMIT 1");
-    $dailyStmt->execute([$employee_id, $date]);
-    $dailyOverride = $dailyStmt->fetch(PDO::FETCH_ASSOC);
+    // Query the pre-computed cache table - SIMPLE & FAST!
+    $stmt = $pdo->prepare("
+        SELECT 
+            schedule_date,
+            employee_id,
+            work_schedule_id,
+            is_rest_day,
+            is_holiday,
+            schedule_name,
+            time_in,
+            time_out,
+            holiday_name,
+            source,
+            source_id
+        FROM employee_daily_schedule_cache
+        WHERE employee_id = ? AND schedule_date = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $date]);
+    $cache = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    if ($dailyOverride) {
-        $cell['has_override'] = 1;
-        $cell['override_status'] = 'approved';
-        $cell['override_data'] = $dailyOverride;
-        $cell['source'] = 'daily_override';
+    // If found in cache, return formatted data
+    if ($cache) {
+        $cell = [
+            'date' => $date,
+            'employee_id' => $employee_id,
+            'actual_schedule' => null,
+            'is_rest_day' => $cache['is_rest_day'],
+            'is_holiday' => $cache['is_holiday'],
+            'source' => $cache['source'],
+            'schedule_color' => getScheduleColor_admin($cache['source'], $cache['is_rest_day'], $cache['is_holiday']),
+            'override_data' => ($cache['source'] === 'admin_override' || $cache['source'] === 'approved_request') ? ['id' => $cache['source_id']] : null
+        ];
         
-        if ($dailyOverride['is_rest_day']) {
-            $cell['is_rest_day'] = 1;
-            $cell['schedule_color'] = '#ef4444'; // Red for OFF day
-            $cell['actual_schedule'] = null;
-        } elseif ($dailyOverride['actual_schedule_id']) {
-            $schedStmt = $pdo->prepare("SELECT * FROM work_schedules WHERE id = ?");
-            $schedStmt->execute([$dailyOverride['actual_schedule_id']]);
-            $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
-            if ($sched) {
-                $cell['actual_schedule'] = $sched;
-                $cell['schedule_color'] = '#10b981'; // Green for daily override
-            }
+        // Add schedule details if not a rest day
+        if ($cache['work_schedule_id']) {
+            $cell['actual_schedule'] = [
+                'id' => $cache['work_schedule_id'],
+                'name' => $cache['schedule_name'],
+                'time_in' => $cache['time_in'],
+                'time_out' => $cache['time_out']
+            ];
         }
-        return $cell; // Return early - highest priority
+        
+        // Add holiday details if holiday
+        if ($cache['is_holiday']) {
+            $cell['holiday'] = ['holiday_name' => $cache['holiday_name']];
+        }
+        
+        return $cell;
     }
-
-    // PRIORITY 2: Check for rotating schedule in employee_rotating_schedules
-    $rotatingStmt = $pdo->prepare("SELECT * FROM employee_rotating_schedules WHERE employee_id = ? AND start_date <= ? AND (end_date IS NULL OR end_date >= ?) ORDER BY start_date DESC LIMIT 1");
-    $rotatingStmt->execute([$employee_id, $date, $date]);
-    $rotating = $rotatingStmt->fetch(PDO::FETCH_ASSOC);
     
-    if ($rotating) {
-        // Calculate which day of the cycle we're on
-        $cycleStart = strtotime($rotating['cycle_start_date']);
-        $currentDate = strtotime($date);
-        $daysDiff = floor(($currentDate - $cycleStart) / 86400);
-        
-        // Get pattern details
-        $patternStmt = $pdo->prepare("SELECT * FROM rotating_schedule_patterns WHERE id = ?");
-        $patternStmt->execute([$rotating['pattern_id']]);
-        $pattern = $patternStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($pattern) {
-            $cycleLength = $pattern['cycle_length'];
-            $dayInCycle = ($daysDiff % $cycleLength) + 1; // 1-indexed
-            
-            // Get the schedule for this day in the cycle
-            $dayStmt = $pdo->prepare("SELECT * FROM rotating_schedule_pattern_days WHERE pattern_id = ? AND day_number = ?");
-            $dayStmt->execute([$pattern['id'], $dayInCycle]);
-            $patternDay = $dayStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($patternDay) {
-                $cell['source'] = 'rotating_schedule';
-                if ($patternDay['is_rest_day']) {
-                    $cell['is_rest_day'] = 1;
-                    $cell['schedule_color'] = '#f3f4f6'; // Light gray
-                } elseif ($patternDay['work_schedule_id']) {
-                    $schedStmt = $pdo->prepare("SELECT * FROM work_schedules WHERE id = ?");
-                    $schedStmt->execute([$patternDay['work_schedule_id']]);
-                    $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
-                    if ($sched) {
-                        $cell['actual_schedule'] = $sched;
-                        $cell['schedule_color'] = '#8b5cf6'; // Purple for rotating
-                    }
-                }
-                return $cell;
-            }
-        }
-    }
-
-    // PRIORITY 3: Check for weekly default in employee_default_schedules (using day_of_week structure)
-    $dayOfWeek = date('w', strtotime($date)); // 0=Sunday, 1=Monday, ..., 6=Saturday
-    $weeklyStmt = $pdo->prepare("SELECT work_schedule_id, is_rest_day FROM employee_default_schedules WHERE employee_id = ? AND day_of_week = ? AND effective_from <= ? AND (effective_until IS NULL OR effective_until >= ?) LIMIT 1");
+    // Fallback for past/present/future dates: Check employee_default_schedules
+    $dayOfWeek = date('w', strtotime($date)); // 0=Sunday, 6=Saturday
+    $weeklyStmt = $pdo->prepare("
+        SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
+        FROM employee_default_schedules edd
+        LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+        WHERE edd.employee_id = ? 
+          AND edd.day_of_week = ? 
+          AND edd.effective_from <= ? 
+          AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+        LIMIT 1
+    ");
     $weeklyStmt->execute([$employee_id, $dayOfWeek, $date, $date]);
     $weekly = $weeklyStmt->fetch(PDO::FETCH_ASSOC);
     
     if ($weekly) {
         if ($weekly['is_rest_day']) {
-            $cell['is_rest_day'] = 1;
-            $cell['schedule_color'] = '#f3f4f6'; // Light gray for rest day
-            $cell['source'] = 'weekly_default';
+            return [
+                'date' => $date,
+                'employee_id' => $employee_id,
+                'actual_schedule' => null,
+                'is_rest_day' => 1,
+                'is_holiday' => 0,
+                'source' => 'weekly_default',
+                'schedule_color' => '#f3f4f6',
+                'override_data' => null
+            ];
         } elseif ($weekly['work_schedule_id']) {
-            $schedStmt = $pdo->prepare("SELECT * FROM work_schedules WHERE id = ?");
-            $schedStmt->execute([$weekly['work_schedule_id']]);
-            $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
-            if ($sched) {
-                $cell['actual_schedule'] = $sched;
-                $cell['schedule_color'] = '#3b82f6'; // Blue for weekly default
-                $cell['source'] = 'weekly_default';
-            }
+            return [
+                'date' => $date,
+                'employee_id' => $employee_id,
+                'actual_schedule' => [
+                    'id' => $weekly['work_schedule_id'],
+                    'name' => $weekly['name'],
+                    'time_in' => $weekly['time_in'],
+                    'time_out' => $weekly['time_out']
+                ],
+                'is_rest_day' => 0,
+                'is_holiday' => 0,
+                'source' => 'weekly_default',
+                'schedule_color' => '#3b82f6',
+                'override_data' => null
+            ];
         }
-        return $cell;
     }
-
-    // PRIORITY 4: Check for holiday
-    $hstmt = $pdo->prepare("SELECT * FROM company_holidays WHERE DATE(holiday_date) = DATE(?) OR (is_recurring=1 AND DATE_FORMAT(holiday_date, '%m-%d') = DATE_FORMAT(?, '%m-%d')) LIMIT 1");
-    $hstmt->execute([$date, $date]);
-    $holiday = $hstmt->fetch(PDO::FETCH_ASSOC);
-    if ($holiday) {
-        $cell['is_holiday'] = 1;
-        $cell['holiday'] = $holiday;
-        $cell['schedule_color'] = '#fbbf24'; // Yellow for holidays
-        $cell['is_rest_day'] = 1;
-        $cell['source'] = 'holiday';
-        return $cell;
-    }
-
-    // PRIORITY 5: Check weekend (fallback)
-    $dayOfWeek = date('w', strtotime($date));
+    
+    // Final fallback: Check if weekend
     if ($dayOfWeek == 0 || $dayOfWeek == 6) {
-        $cell['is_rest_day'] = 1;
-        $cell['schedule_color'] = '#f3f4f6'; // Light gray for weekends
-        $cell['source'] = 'weekend';
+        return [
+            'date' => $date,
+            'employee_id' => $employee_id,
+            'actual_schedule' => null,
+            'is_rest_day' => 1,
+            'is_holiday' => 0,
+            'source' => 'weekend',
+            'schedule_color' => '#f3f4f6',
+            'override_data' => null
+        ];
     }
+    
+    // Absolute fallback: return empty/rest day
+    return [
+        'date' => $date,
+        'employee_id' => $employee_id,
+        'actual_schedule' => null,
+        'is_rest_day' => 1,
+        'is_holiday' => 0,
+        'source' => 'none',
+        'schedule_color' => '#f3f4f6',
+        'override_data' => null
+    ];
+}
 
-    return $cell;
+// Helper function to get color based on source
+function getScheduleColor_admin($source, $is_rest_day, $is_holiday) {
+    if ($is_holiday) {
+        return '#fbbf24'; // Yellow for holidays
+    }
+    
+    switch ($source) {
+        case 'approved_request':
+            return '#8b5cf6'; // Purple for approved change requests
+        case 'admin_override':
+            return '#10b981'; // Green for admin overrides
+        case 'weekly_default':
+            return $is_rest_day ? '#f3f4f6' : '#3b82f6'; // Light gray or blue
+        case 'weekend':
+            return '#f3f4f6'; // Light gray
+        default:
+            return '#9ca3af'; // Gray for no data
+    }
 }
 
 function getTimeLogStatus_admin($pdo, $employee_id, $date, $scheduleOptions) {
@@ -217,6 +229,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'add_override') {
         $schedule_employee_id = (int)$_POST['employee_id'];
         $schedule_date = $_POST['schedule_date'];
+        
+        // Prevent overrides for past dates
+        if ($schedule_date < date('Y-m-d')) {
+            echo "<script>alert('Cannot create override for past dates. Please select today or a future date.'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
+            exit;
+        }
+        
         $override_schedule_input = $_POST['override_schedule_id'] ?? '';
         $reason = $_POST['reason'] ?? '';
         $override_type = $_POST['override_type'] ?? 'schedule_change';
@@ -298,8 +317,8 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
             <!-- Legend -->
             <div class="mb-4 p-3 bg-gray-50 rounded text-xs">
                 <strong>Legend:</strong>
+                <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-purple-500 rounded mr-1"></span>Approved Request</span>
                 <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-green-500 rounded mr-1"></span>Daily Override</span>
-                <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-purple-500 rounded mr-1"></span>Rotating Schedule</span>
                 <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-blue-500 rounded mr-1"></span>Weekly Default</span>
                 <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-yellow-500 rounded mr-1"></span>Holiday</span>
                 <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-red-500 rounded mr-1"></span>OFF/Rest</span>
@@ -325,9 +344,10 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                             $cell = getScheduleCell_admin($pdo, $emp_id, $date, $scheduleOptions);
                             $dayNum = date('j', strtotime($date));
                             $isToday = ($date === date('Y-m-d'));
+                            $isPast = ($date < date('Y-m-d'));
                             ?>
-                            <div class="border p-2 min-h-[80px] cursor-pointer hover:bg-gray-50 transition relative" 
-                                 onclick="openOverride_admin('<?= $date ?>')"
+                            <div class="border p-2 min-h-[80px] <?= $isPast ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:bg-gray-50' ?> transition relative" 
+                                 <?= $isPast ? '' : "onclick=\"openOverride_admin('$date')\"" ?>
                                  style="background-color: <?= $cell['schedule_color'] ?>22;">
                                 
                                 <div class="flex justify-between items-start mb-1">
@@ -338,6 +358,7 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                                         <span class="text-xs px-1 rounded" style="background-color: <?= $cell['schedule_color'] ?>; color: white;">
                                             <?php
                                             switch($cell['source']) {
+                                                case 'approved_change_request': echo 'A'; break;
                                                 case 'daily_override': echo 'D'; break;
                                                 case 'rotating_schedule': echo 'R'; break;
                                                 case 'weekly_default': echo 'W'; break;

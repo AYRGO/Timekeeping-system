@@ -8,7 +8,7 @@ include('../config/db.php');
 $view = isset($_GET['view']) ? $_GET['view'] : 'current';
 $isHistoryView = ($view === 'history');
 
-$pageTitle = $isHistoryView ? 'Schedule Changes History' : 'Schedule Change Requests';
+$pageTitle = $isHistoryView ? 'Schedule Changes & Day Off History' : 'Schedule Change & Day Off Requests';
 
 // Fetch schedule change requests with employee names, attachments, and current schedule
 if ($isHistoryView) {
@@ -16,7 +16,7 @@ if ($isHistoryView) {
     $stmt = $pdo->query("
         SELECT psr.id, psr.reason, psr.status, psr.start_date, psr.end_date, psr.created_at,
                psr.work_schedule_id, psr.current_work_schedule_id, psr.attachment_scr, psr.explanation,
-               psr.created_at as approved_at, psr.employee_id,
+               psr.created_at as approved_at, psr.employee_id, psr.is_rest_day,
                e.fname, e.lname,
                ws.time_in, ws.time_out
         FROM post_schedule_change_requests psr
@@ -29,7 +29,7 @@ if ($isHistoryView) {
     $stmt = $pdo->query("
         SELECT sr.id, sr.reason, sr.status, sr.start_date, sr.end_date, sr.created_at,
                sr.work_schedule_id, sr.current_work_schedule_id, sr.attachment_scr, sr.explanation,
-               sr.employee_id,
+               sr.employee_id, sr.is_rest_day,
                e.fname, e.lname,
                ws.time_in, ws.time_out
         FROM schedule_change_requests sr
@@ -195,11 +195,19 @@ function getCurrentScheduleForEmployee($employee_id, $pdo) {
                             <?php if (!empty($schedule_requests)): ?>
                                 <?php foreach ($schedule_requests as $sr): ?>
                                     <?php
+                                    // Check if this is a rest day request
+                                    $isRestDay = (empty($sr['work_schedule_id']) || ($sr['is_rest_day'] ?? 0) == 1);
+                                    
                                     // Get requested schedule time
-                                    $requested_shift = getScheduleTime($sr['work_schedule_id']);
-                                    if ($requested_shift === 'N/A' && $sr['time_in'] && $sr['time_out']) {
-                                        $requested_shift = date('g:i A', strtotime($sr['time_in'])) . ' – ' . date('g:i A', strtotime($sr['time_out']));
+                                    if ($isRestDay) {
+                                        $requested_shift = 'Day Off';
+                                    } else {
+                                        $requested_shift = getScheduleTime($sr['work_schedule_id']);
+                                        if ($requested_shift === 'N/A' && $sr['time_in'] && $sr['time_out']) {
+                                            $requested_shift = date('g:i A', strtotime($sr['time_in'])) . ' – ' . date('g:i A', strtotime($sr['time_out']));
+                                        }
                                     }
+                                    
                                     // Get current schedule from tracker logic
                                     $current_sched = getCurrentScheduleForEmployee($sr['employee_id'], $pdo);
                                     // Calculate period duration
@@ -227,10 +235,20 @@ function getCurrentScheduleForEmployee($employee_id, $pdo) {
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 text-sm text-gray-900">
-                                            <div class="flex flex-col">
-                                                <span class="font-medium text-green-600">Schedule <?= $sr['work_schedule_id'] ?>:</span>
-                                                <span class="text-sm"><?= $requested_shift ?></span>
-                                            </div>
+                                            <?php if ($isRestDay): ?>
+                                                <div class="flex flex-col">
+                                                    <div class="flex items-center gap-2">
+                                                        <i class="fas fa-bed text-red-600"></i>
+                                                        <span class="font-medium text-red-600">Day Off</span>
+                                                    </div>
+                                                    <span class="text-xs text-gray-500 mt-1">Rest day request</span>
+                                                </div>
+                                            <?php else: ?>
+                                                <div class="flex flex-col">
+                                                    <span class="font-medium text-green-600">Schedule <?= $sr['work_schedule_id'] ?>:</span>
+                                                    <span class="text-sm"><?= $requested_shift ?></span>
+                                                </div>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="px-6 py-4 text-sm text-gray-900">
                                             <div class="flex flex-col">
@@ -311,7 +329,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo) {
                                 <tr>
                                     <td colspan="<?= $isHistoryView ? '9' : '10' ?>" class="text-center text-sm py-8 text-gray-500">
                                         <i class="fas fa-calendar-times text-4xl text-gray-300 mb-2"></i>
-                                        <div><?= $isHistoryView ? 'No processed schedule changes found.' : 'No schedule change requests found.' ?></div>
+                                        <div><?= $isHistoryView ? 'No processed schedule changes or day off requests found.' : 'No schedule change or day off requests found.' ?></div>
                                     </td>
                                 </tr>
                             <?php endif; ?>

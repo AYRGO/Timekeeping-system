@@ -210,7 +210,7 @@ foreach ($leave_results as $leave) {
 // --- Schedule Requests (from both tables) ---
 $schedule_stmt = $pdo->prepare("
     SELECT scr.id, scr.work_schedule_id, scr.status, scr.start_date, scr.end_date, scr.created_at, scr.notified, scr.explanation, scr.reason,
-           scr.current_work_schedule_id, scr.attachment_scr, 'pending' as source_table,
+           scr.current_work_schedule_id, scr.attachment_scr, scr.is_rest_day, 'pending' as source_table,
            current_ws.time_in as current_time_in, current_ws.time_out as current_time_out,
            new_ws.time_in as requested_time_in, new_ws.time_out as requested_time_out
     FROM schedule_change_requests scr
@@ -219,7 +219,7 @@ $schedule_stmt = $pdo->prepare("
     WHERE scr.employee_id = ?
     UNION ALL
     SELECT pscr.id, pscr.work_schedule_id, pscr.status, pscr.start_date, pscr.end_date, pscr.created_at, pscr.notified, pscr.explanation, pscr.reason,
-           pscr.current_work_schedule_id, pscr.attachment_scr, 'approved' as source_table,
+           pscr.current_work_schedule_id, pscr.attachment_scr, pscr.is_rest_day, 'approved' as source_table,
            current_ws2.time_in as current_time_in, current_ws2.time_out as current_time_out,
            new_ws2.time_in as requested_time_in, new_ws2.time_out as requested_time_out
     FROM post_schedule_change_requests pscr
@@ -235,7 +235,12 @@ $schedule_results = $schedule_stmt->fetchAll(PDO::FETCH_ASSOC);
 foreach ($schedule_results as $sched) {
     $status = ucfirst($sched['status']);
     $range = date('F j', strtotime($sched['start_date'])) . ' to ' . date('F j', strtotime($sched['end_date']));
-    $message = "Schedule change request for ($range) was <strong>$status</strong>.";
+    
+    // Check if this is a rest day request
+    $isRestDay = (empty($sched['work_schedule_id']) || ($sched['is_rest_day'] ?? 0) == 1);
+    $requestType = $isRestDay ? 'Day off request' : 'Schedule change request';
+    
+    $message = "{$requestType} for ($range) was <strong>$status</strong>.";
 
     if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
         $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($sched['explanation']) . "</span>";
@@ -255,6 +260,7 @@ foreach ($schedule_results as $sched) {
         'requested_time_out' => $sched['requested_time_out'],
         'attachment_scr' => $sched['attachment_scr'] ?? '',
         'work_schedule_id' => $sched['work_schedule_id'],
+        'is_rest_day' => $sched['is_rest_day'] ?? 0,
         'request_id' => $sched['id'],
         'table_name' => 'schedule_change_requests',
         'source_table' => $sched['source_table']
@@ -262,21 +268,33 @@ foreach ($schedule_results as $sched) {
 
     // Send email notifications for both pending and post table entries that haven't been notified
     if (in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified']) {
-        $subject = "Schedule Change Request {$status}";
-        $body = "<p>Hi {$employee['fname']},<br>Your schedule change request for <strong>$range</strong> was <strong>$status</strong>.</p>";
+        $emailSubject = $isRestDay ? "Day Off Request {$status}" : "Schedule Change Request {$status}";
+        $subject = $emailSubject;
+        
+        $requestTypeText = $isRestDay ? 'day off request' : 'schedule change request';
+        $body = "<p>Hi {$employee['fname']},<br>Your {$requestTypeText} for <strong>$range</strong> was <strong>$status</strong>.</p>";
         if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
             $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($sched['explanation'])) . "</p>";
         }
         // Enhanced email body with complete schedule information
         $current_schedule = ($sched['current_time_in'] && $sched['current_time_out']) ? 
             date('g:i A', strtotime($sched['current_time_in'])) . ' - ' . date('g:i A', strtotime($sched['current_time_out'])) : 'Not specified';
-        $requested_schedule = ($sched['requested_time_in'] && $sched['requested_time_out']) ? 
-            date('g:i A', strtotime($sched['requested_time_in'])) . ' - ' . date('g:i A', strtotime($sched['requested_time_out'])) : 'Not specified';
+        
+        // For rest days, show "Day Off" instead of schedule times
+        if ($isRestDay) {
+            $requested_schedule = 'Day Off';
+        } else {
+            $requested_schedule = ($sched['requested_time_in'] && $sched['requested_time_out']) ? 
+                date('g:i A', strtotime($sched['requested_time_in'])) . ' - ' . date('g:i A', strtotime($sched['requested_time_out'])) : 'Not specified';
+        }
             
+        $emailIcon = $isRestDay ? '🛏️' : '🕒';
+        $emailTitle = $isRestDay ? 'Day Off Request' : 'Schedule Change Request';
+        
         $enhanced_body = "
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
             <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>🕒 Schedule Change Request {$status}</h2>
+                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>{$emailIcon} {$emailTitle} {$status}</h2>
                 
                 <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
                     <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
@@ -284,8 +302,11 @@ foreach ($schedule_results as $sched) {
                     <p><strong>Date Range:</strong> $range</p>
                     <p><strong>Request ID:</strong> #{$sched['id']}</p>
                     <p><strong>Submitted:</strong> " . date('F j, Y g:i A', strtotime($sched['created_at'])) . "</p>
-                </div>
-                
+                </div>";
+        
+        // Only show schedule details if it's NOT a rest day
+        if (!$isRestDay) {
+            $enhanced_body .= "
                 <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
                     <h3 style='color: #1e40af; margin: 0 0 15px 0;'>📅 Schedule Details</h3>
                     <div style='display: flex; justify-content: space-between; margin-bottom: 10px;'>
@@ -298,7 +319,17 @@ foreach ($schedule_results as $sched) {
                             <span style='background: #dcfce7; padding: 5px 10px; border-radius: 5px; color: #166534;'>$requested_schedule</span>
                         </div>
                     </div>
-                </div>
+                </div>";
+        } else {
+            // For rest days, show a special message
+            $enhanced_body .= "
+                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ef4444;'>
+                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>🛏️ Day Off Request</h3>
+                    <p style='color: #374151;'>You requested a day off from <strong>$range</strong>.</p>
+                </div>";
+        }
+        
+        $enhanced_body .= "
                 
                 <div style='background: " . (strtolower($sched['status']) === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . (strtolower($sched['status']) === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
                     <h3 style='color: " . (strtolower($sched['status']) === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . (strtolower($sched['status']) === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>

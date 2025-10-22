@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Schedule System Setup</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; background: #f5f5f5; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1 { color: #2196F3; margin-top: 0; }
+        h2 { color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; }
+        .step { background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #2196F3; }
+        .step h3 { margin-top: 0; color: #1976D2; }
+        .btn { display: inline-block; padding: 12px 24px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px; margin-right: 10px; margin-top: 10px; font-weight: bold; }
+        .btn:hover { background: #45a049; }
+        .btn-blue { background: #2196F3; }
+        .btn-blue:hover { background: #0b7dda; }
+        .btn-orange { background: #FF9800; }
+        .btn-orange:hover { background: #e68900; }
+        .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; }
+        .success { background: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0; }
+        ul { line-height: 1.8; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>📅 Daily Schedule Cache System Setup</h1>
+        <p><strong>Problem:</strong> Calendars showing "No schedule" for all dates</p>
+        <p><strong>Solution:</strong> Create pre-computed schedule cache for past, present, and future dates</p>
+        
+        <div class="warning">
+            <strong>⚠️ Important:</strong> Run these steps in order. Each step depends on the previous one.
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📋 Setup Steps</h2>
+        
+        <div class="step">
+            <h3>Step 1: Setup Weekly Default Schedules</h3>
+            <p>Creates recurring Mon-Fri work schedules for all employees based on their <code>official_sched</code> field.</p>
+            <ul>
+                <li>Sets Mon-Fri to employee's assigned work schedule</li>
+                <li>Sets Sat-Sun as rest days</li>
+                <li>Stores in <code>employee_default_schedules</code> table</li>
+            </ul>
+            <a href="setup_default_schedules.php" class="btn">🚀 Run Step 1</a>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Create Cache System</h3>
+            <p>Creates the cache table, stored procedures, triggers, and populates all schedule data.</p>
+            <ul>
+                <li>Creates <code>employee_daily_schedule_cache</code> table</li>
+                <li>Creates stored procedures for population</li>
+                <li>Creates triggers for auto-updates</li>
+                <li>Populates 6 months back to 12 months forward</li>
+                <li>Sets up daily maintenance event</li>
+            </ul>
+            <a href="run_cache_setup.php" class="btn btn-blue">🔧 Run Step 2</a>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Verify Setup</h3>
+            <p>Check that everything is working correctly.</p>
+            <ul>
+                <li>View schedule data for employees</li>
+                <li>See cache statistics</li>
+                <li>Test priority system</li>
+                <li>View sample schedule data</li>
+            </ul>
+            <a href="check_schedule_data.php" class="btn btn-orange">📊 Check Data</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📖 Documentation</h2>
+        <ul>
+            <li><strong>Complete Guide:</strong> <a href="DAILY_SCHEDULE_CACHE_GUIDE.md" target="_blank">DAILY_SCHEDULE_CACHE_GUIDE.md</a></li>
+            <li><strong>SQL Script:</strong> <code>create_daily_schedule_cache.sql</code></li>
+            <li><strong>PHP Functions:</strong> <code>schedule_cache_functions.php</code></li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>✅ After Setup</h2>
+        <div class="success">
+            <strong>What You'll Have:</strong>
+            <ul>
+                <li>✅ Pre-computed schedules for every employee for every date</li>
+                <li>✅ Fast, simple queries (just SELECT from one table)</li>
+                <li>✅ Auto-updating cache when schedules change</li>
+                <li>✅ Calendars showing past, present, and future schedules</li>
+                <li>✅ Daily maintenance to keep future dates populated</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🎯 Quick Access</h2>
+        <a href="employee-edit.php?id=1" class="btn" target="_blank">👤 View Employee</a>
+        <a href="index.php" class="btn btn-blue" target="_blank">🏠 Home</a>
+    </div>
+
+    <div class="card" style="background: #f8f9fa; border-left: 4px solid #6c757d;">
+        <h2>💡 How It Works</h2>
+        <p><strong>Old System:</strong> Complex priority-based lookups every time calendar loads</p>
+        <p><strong>New System:</strong> One simple query to pre-computed cache table</p>
+        
+        <p><strong>Schedule Priority (automatic):</strong></p>
+        <ol>
+            <li>Approved schedule change requests</li>
+            <li>Admin daily overrides</li>
+            <li>Weekly default schedule</li>
+            <li>Company holidays</li>
+            <li>Weekend fallback</li>
+        </ol>
+        
+        <p><strong>Example Query:</strong></p>
+        <pre style="background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow: auto;">SELECT schedule_name, time_in, time_out, is_rest_day, is_holiday
+FROM employee_daily_schedule_cache
+WHERE employee_id = 1 AND schedule_date = '2025-10-22';</pre>
+    </div>
+</body>
+</html>

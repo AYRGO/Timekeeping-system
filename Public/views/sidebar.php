@@ -83,13 +83,13 @@ try {
             <!-- Management Section -->
             <div class="space-y-2">
                 <h3 class="text-xs uppercase text-gray-400 tracking-wider font-semibold px-3 mb-3">Management</h3>
-<a href="employee_list.php" 
-   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'employee_list.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800 hover:shadow-md' ?>">
-    <div class="w-8 h-8 rounded-lg bg-transparent flex items-center justify-center mr-3 group-hover:bg-gray-700 group-hover:bg-opacity-30 transition-all">
-        <i class="fas fa-users text-gray-400 text-sm"></i>
-    </div>
-    <span class="font-medium">Employee Directory</span>
-</a>
+                <a href="employee_list.php" 
+                   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'employee_list.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800 hover:shadow-md' ?>">
+                    <div class="w-8 h-8 rounded-lg bg-gray-700 bg-opacity-30 flex items-center justify-center mr-3 group-hover:bg-opacity-50 transition-all">
+                        <i class="fas fa-users text-gray-300 text-sm"></i>
+                    </div>
+                    <span class="font-medium">Employee Directory</span>
+                </a>
             </div>
 
             <!-- Pending Approvals Section -->

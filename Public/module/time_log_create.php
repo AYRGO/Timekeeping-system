@@ -293,17 +293,28 @@ if (isset($_POST['submit_schedule_change'])) {
     $reason = trim($_POST['reason'] ?? '');
     $date_range = trim($_POST['date_range'] ?? '');
 
-    if (!$employee_id || !$work_schedule_id || !is_numeric($work_schedule_id)) {
+    // Determine if this is a rest day request (empty work_schedule_id)
+    $is_rest_day = empty($work_schedule_id);
+
+    if (!$employee_id) {
         header("Location: time_log_create.php?schedule_change=invalid_data");
         exit;
     }
 
-    // Optional: Validate work_schedule_id exists
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM work_schedules WHERE id = ?");
-    $stmt->execute([$work_schedule_id]);
-    if ($stmt->fetchColumn() == 0) {
-        header("Location: time_log_create.php?schedule_change=invalid_schedule_id");
+    // If NOT a rest day, validate work_schedule_id exists
+    if (!$is_rest_day && !is_numeric($work_schedule_id)) {
+        header("Location: time_log_create.php?schedule_change=invalid_data");
         exit;
+    }
+
+    // If NOT a rest day, validate schedule exists in database
+    if (!$is_rest_day) {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM work_schedules WHERE id = ?");
+        $stmt->execute([$work_schedule_id]);
+        if ($stmt->fetchColumn() == 0) {
+            header("Location: time_log_create.php?schedule_change=invalid_schedule_id");
+            exit;
+        }
     }
 
     // Get current real-time schedule ID
@@ -332,14 +343,38 @@ if (isset($_POST['submit_schedule_change'])) {
     }
 
     // Determine start and end date
+    // Flatpickr sends dates in Y-m-d format by default
+    if (empty($date_range)) {
+        header("Location: time_log_create.php?schedule_change=no_date");
+        exit;
+    }
+    
     if (strpos($date_range, ' to ') !== false) {
         [$start_date_raw, $end_date_raw] = explode(' to ', $date_range);
     } else {
         $start_date_raw = $end_date_raw = $date_range;
     }
-
-    $start_date = date('Y-m-d', strtotime($start_date_raw));
-    $end_date = date('Y-m-d', strtotime($end_date_raw));
+    
+    // Trim any whitespace
+    $start_date_raw = trim($start_date_raw);
+    $end_date_raw = trim($end_date_raw);
+    
+    // Validate dates are in Y-m-d format already (from flatpickr)
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date_raw)) {
+        $start_date = $start_date_raw;
+    } else {
+        // Fallback to strtotime if not in expected format
+        $timestamp = strtotime($start_date_raw);
+        $start_date = ($timestamp !== false) ? date('Y-m-d', $timestamp) : date('Y-m-d');
+    }
+    
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date_raw)) {
+        $end_date = $end_date_raw;
+    } else {
+        // Fallback to strtotime if not in expected format
+        $timestamp = strtotime($end_date_raw);
+        $end_date = ($timestamp !== false) ? date('Y-m-d', $timestamp) : date('Y-m-d');
+    }
 
     // Handle attachment (optional)
     $attachmentPath = null;
@@ -366,21 +401,28 @@ if (isset($_POST['submit_schedule_change'])) {
     }
 
     // Save request with current_work_schedule_id
+    // If rest day, work_schedule_id will be NULL
     $stmt = $pdo->prepare("INSERT INTO schedule_change_requests 
-        (employee_id, work_schedule_id, current_work_schedule_id, reason, status, start_date, end_date, created_at, attachment_scr)
-        VALUES (?, ?, ?, ?, 'pending', ?, ?, NOW(), ?)");
+        (employee_id, work_schedule_id, current_work_schedule_id, reason, status, start_date, end_date, created_at, attachment_scr, is_rest_day)
+        VALUES (?, ?, ?, ?, 'pending', ?, ?, NOW(), ?, ?)");
     
     $stmt->execute([
         $employee_id,
-        $work_schedule_id,
+        $is_rest_day ? null : $work_schedule_id, // NULL if rest day
         $current_real_schedule_id, // Current schedule being used
         $reason,
         $start_date,
         $end_date,
-        $attachmentPath
+        $attachmentPath,
+        $is_rest_day ? 1 : 0 // Flag for rest day
     ]);
 
-    header("Location: time_log_create.php?schedule_change=success");
+    // Redirect with appropriate message
+    if ($is_rest_day) {
+        header("Location: time_log_create.php?rest_day=success");
+    } else {
+        header("Location: time_log_create.php?schedule_change=success");
+    }
     exit;
 }
 
@@ -1121,6 +1163,9 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         schedule_change: {
             success: "Schedule change request submitted successfully!"
+        },
+        rest_day: {
+            success: "Day off request submitted successfully!"
         },
         overtime: {
             success: "Overtime request submitted successfully!",

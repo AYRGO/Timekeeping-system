@@ -26,7 +26,7 @@
 
       <!-- Modal Form Content -->
       <div class="p-8 overflow-y-auto flex-1">
-        <form method="POST" enctype="multipart/form-data" id="scheduleChangeForm"
+        <form method="POST" action="time_log_create.php" enctype="multipart/form-data" id="scheduleChangeForm">
           <?= csrf_token_field() ?>
           <input type="hidden" name="submit_schedule_change" value="1">
 
@@ -37,8 +37,8 @@
             </label>
             <div class="relative">
               <input type="text" name="date_range" id="date_range" placeholder="Select date range"
-                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white" required>
-              <i class="fas fa-calendar absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white flatpickr-input" required>
+              <i class="fas fa-calendar absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
             </div>
           </div>
 
@@ -49,11 +49,11 @@
             </label>
             
             <!-- Hidden input to store selected schedule ID -->
-            <input type="hidden" name="work_schedule_id" id="work_schedule_id" required>
+            <input type="hidden" name="work_schedule_id" id="work_schedule_id">
             
             <!-- Search/Select Input -->
             <div class="relative mb-3">
-              <input type="text" id="scheduleSearch" placeholder="Type time to search (e.g., 7, 8:00, 3 pm)..."
+              <input type="text" id="scheduleSearch" placeholder="Type time to search or select rest day..."
                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white pr-10"
                      autocomplete="off">
               <i class="fas fa-search absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm"></i>
@@ -77,6 +77,39 @@
             
             <!-- Schedule Grid (Hidden by default, shows on search) -->
             <div id="scheduleGrid" class="hidden border border-gray-200 rounded-lg bg-white max-h-[400px] overflow-y-auto">
+              
+              <!-- REST DAY OPTION (Always at top) -->
+              <div class="schedule-category border-b-2 border-gray-300">
+                <div class="px-4 py-2 bg-red-50 border-b border-red-200">
+                  <div class="flex items-center gap-2">
+                    <i class="fas fa-calendar-times text-red-500 text-xs"></i>
+                    <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Rest Day Request</span>
+                  </div>
+                </div>
+                <div class="schedule-list">
+                  <div class="schedule-card rest-day-card border-b border-gray-100 px-4 py-3 cursor-pointer hover:bg-red-50 transition-colors"
+                       data-schedule-id="rest_day"
+                       data-schedule-name="Rest Day / Day Off"
+                       data-schedule-time="No Work Hours"
+                       onclick="selectSchedule(this)">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-3 flex-1">
+                        <div class="w-8 h-8 bg-red-100 rounded flex items-center justify-center flex-shrink-0">
+                          <i class="fas fa-bed text-red-600 text-xs"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                          <div class="font-medium text-gray-900 text-sm">Rest Day / Day Off</div>
+                          <div class="text-gray-500 text-xs">Request a day off from work</div>
+                        </div>
+                      </div>
+                      <div class="schedule-check hidden">
+                        <i class="fas fa-check-circle text-green-500 text-lg"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
               <?php 
               // Categorize schedules by time
               $day_shifts = [];
@@ -187,6 +220,7 @@
             <div>
               <label for="reason" class="block text-sm font-semibold text-gray-700 mb-2">
                 Reason for Change
+                <span class="text-red-500 ml-1">*</span>
               </label>
               <textarea name="reason" id="reason" rows="4" placeholder="Provide details about your schedule change request..."
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white resize-none" required></textarea>
@@ -199,10 +233,10 @@
             <div>
               <label class="block text-sm font-semibold text-gray-700 mb-2">
                 Supporting Document
-                <span class="text-xs font-normal text-gray-500 ml-1">(Optional)</span>
+                <span class="text-red-500 ml-1">*</span>
               </label>
               <input type="file" name="attachment_scr" id="fileInput" accept=".pdf,.jpg,.jpeg,.png"
-                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:cursor-pointer">
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:cursor-pointer" required>
               <p class="text-xs text-gray-500 mt-1.5">
                 PDF, JPG, JPEG, PNG (Max 10MB)
               </p>
@@ -272,9 +306,18 @@
     background-color: #f9fafb;
 }
 
+.schedule-change-modal-container .schedule-card.rest-day-card:hover {
+    background-color: #fef2f2;
+}
+
 .schedule-change-modal-container .schedule-card.selected {
     background-color: #f0fdf4;
     border-left: 3px solid #22c55e;
+}
+
+.schedule-change-modal-container .schedule-card.rest-day-card.selected {
+    background-color: #fef2f2;
+    border-left: 3px solid #ef4444;
 }
 
 .schedule-change-modal-container .schedule-card.selected .schedule-check {
@@ -330,23 +373,32 @@ function openScheduleChangeModal(date) {
     modal.style.display = 'block';
     document.body.style.overflow = 'hidden'; // Prevent background scrolling
     
-    // If a date was provided, set it in the date range field
-    if (date) {
-        setTimeout(function() {
-            const dateRangeField = document.getElementById('date_range');
-            if (dateRangeField) {
-                // Set the date range to just the selected date
-                dateRangeField.value = date + ' - ' + date;
-            }
-        }, 100);
-    }
-    
-    // Reset form
+    // Reset form first
     document.getElementById('scheduleChangeForm').reset();
     // Clear any error states
     document.querySelectorAll('.border-red-400').forEach(field => {
         field.classList.remove('border-red-400');
     });
+    
+    // If a date was provided, set it in the date range field
+    if (date) {
+        setTimeout(function() {
+            const dateRangeField = document.getElementById('date_range');
+            if (dateRangeField && window.dateRangePicker) {
+                // Set the date using flatpickr's setDate method
+                const dateObj = new Date(date);
+                window.dateRangePicker.setDate([dateObj, dateObj], true);
+                
+                // Also set the input value directly as fallback
+                dateRangeField.value = date + ' to ' + date;
+                
+                console.log('📅 Pre-filled date range:', dateRangeField.value);
+            } else if (dateRangeField) {
+                // Fallback if flatpickr not initialized yet
+                dateRangeField.value = date + ' to ' + date;
+            }
+        }, 150);
+    }
 }
 
 function closeScheduleChangeModal() {
@@ -359,27 +411,84 @@ function closeScheduleChangeModal() {
 document.getElementById('scheduleChangeForm').addEventListener('submit', function(e) {
     const requiredFields = this.querySelectorAll('[required]');
     let isValid = true;
+    let firstInvalidField = null;
+    
+    // Check if schedule is selected (either a work schedule or rest day)
+    const scheduleSearch = document.getElementById('scheduleSearch');
+    if (!scheduleSearch.value.trim()) {
+        scheduleSearch.classList.add('border-red-400');
+        isValid = false;
+        if (!firstInvalidField) firstInvalidField = scheduleSearch;
+        alert('Please select a work schedule or rest day.');
+    }
     
     requiredFields.forEach(field => {
-        if (!field.value.trim()) {
-            field.classList.add('border-red-400');
-            isValid = false;
-            
-            field.addEventListener('input', function() {
-                this.classList.remove('border-red-400');
-            }, { once: true });
+        // Special handling for file input
+        if (field.type === 'file') {
+            if (!field.files || field.files.length === 0) {
+                field.classList.add('border-red-400');
+                isValid = false;
+                if (!firstInvalidField) firstInvalidField = field;
+                
+                field.addEventListener('change', function() {
+                    if (this.files && this.files.length > 0) {
+                        this.classList.remove('border-red-400');
+                    }
+                }, { once: true });
+            }
+        } else {
+            // Regular field validation
+            if (!field.value.trim()) {
+                field.classList.add('border-red-400');
+                isValid = false;
+                if (!firstInvalidField) firstInvalidField = field;
+                
+                field.addEventListener('input', function() {
+                    this.classList.remove('border-red-400');
+                }, { once: true });
+            }
         }
     });
     
     if (!isValid) {
         e.preventDefault();
-        this.querySelector('.border-red-400')?.focus();
         
-        // Scroll to first error within modal
-        this.querySelector('.border-red-400')?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
+        // Show alert for missing fields
+        if (!alert.shown) {
+            alert('Please fill in all required fields including the supporting document.');
+        }
+        
+        // Focus and scroll to first error
+        if (firstInvalidField) {
+            firstInvalidField.focus();
+            firstInvalidField.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        }
+    } else {
+        // Log form data before submission for debugging
+        const dateRange = document.getElementById('date_range').value;
+        const workScheduleId = document.getElementById('work_schedule_id').value;
+        const fileInput = document.getElementById('fileInput');
+        const hasFile = fileInput.files && fileInput.files.length > 0;
+        
+        console.log('📝 Form submission data:', {
+            date_range: dateRange,
+            work_schedule_id: workScheduleId || 'REST_DAY',
+            date_range_format: dateRange ? 'valid' : 'EMPTY!',
+            has_attachment: hasFile,
+            attachment_name: hasFile ? fileInput.files[0].name : 'none',
+            is_rest_day: !workScheduleId
         });
+        
+        if (!dateRange || dateRange.trim() === '') {
+            console.error('❌ Date range is empty! This will cause Jan 1, 1970 issue.');
+            alert('Please select a date range before submitting.');
+            e.preventDefault();
+            document.getElementById('date_range').focus();
+            document.getElementById('date_range').classList.add('border-red-400');
+        }
     }
 });
 
@@ -420,17 +529,31 @@ function selectSchedule(cardElement) {
     const scheduleName = cardElement.getAttribute('data-schedule-name');
     const scheduleTime = cardElement.getAttribute('data-schedule-time');
     
-    document.getElementById('work_schedule_id').value = scheduleId;
+    // Handle rest day selection
+    if (scheduleId === 'rest_day') {
+        document.getElementById('work_schedule_id').value = ''; // Empty value for rest day
+        document.getElementById('selectedScheduleText').textContent = '🛌 ' + scheduleName;
+        document.getElementById('scheduleSearch').value = scheduleName;
+    } else {
+        document.getElementById('work_schedule_id').value = scheduleId;
+        
+        // Check if schedule name is same as time (no custom name)
+        if (scheduleName === scheduleTime) {
+            // Only show once
+            document.getElementById('selectedScheduleText').textContent = scheduleTime;
+            document.getElementById('scheduleSearch').value = scheduleTime;
+        } else {
+            // Show custom name + time
+            document.getElementById('selectedScheduleText').textContent = scheduleName + ' • ' + scheduleTime;
+            document.getElementById('scheduleSearch').value = scheduleName + ' (' + scheduleTime + ')';
+        }
+    }
     
     // Show selected schedule display
     document.getElementById('selectedScheduleDisplay').classList.remove('hidden');
-    document.getElementById('selectedScheduleText').textContent = scheduleName + ' • ' + scheduleTime;
     
     // Hide the grid after selection
     document.getElementById('scheduleGrid').classList.add('hidden');
-    
-    // Clear search input
-    document.getElementById('scheduleSearch').value = scheduleName + ' (' + scheduleTime + ')';
     
     // Remove any validation error
     document.getElementById('scheduleSearch').classList.remove('border-red-400');
@@ -458,6 +581,57 @@ function clearScheduleSelection() {
     document.getElementById('scheduleSearch').focus();
 }
  
+// Initialize flatpickr for schedule change date range
+if (typeof flatpickr !== 'undefined') {
+    const dateRangeInput = document.getElementById('date_range');
+    
+    const fp = flatpickr("#date_range", {
+        mode: "range",
+        dateFormat: "Y-m-d",
+        minDate: "today",
+        altInput: false, // Changed to false - use single input with readable format
+        onChange: function(selectedDates, dateStr, instance) {
+            console.log('📅 Flatpickr date selected:', dateStr);
+            console.log('📅 Selected dates array:', selectedDates);
+            console.log('📅 Input value:', document.getElementById('date_range').value);
+            
+            // Manually format for display but keep Y-m-d for submission
+            if (selectedDates.length === 2) {
+                const startDate = selectedDates[0];
+                const endDate = selectedDates[1];
+                
+                // Format as YYYY-MM-DD for backend
+                const startFormatted = startDate.getFullYear() + '-' + 
+                    String(startDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(startDate.getDate()).padStart(2, '0');
+                const endFormatted = endDate.getFullYear() + '-' + 
+                    String(endDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(endDate.getDate()).padStart(2, '0');
+                
+                // Set the value in Y-m-d format
+                dateRangeInput.value = startFormatted + ' to ' + endFormatted;
+                
+                console.log('✅ Date range set to:', dateRangeInput.value);
+            } else if (selectedDates.length === 1) {
+                const startDate = selectedDates[0];
+                const startFormatted = startDate.getFullYear() + '-' + 
+                    String(startDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(startDate.getDate()).padStart(2, '0');
+                dateRangeInput.value = startFormatted;
+                console.log('✅ Single date set to:', dateRangeInput.value);
+            }
+        },
+        onReady: function(selectedDates, dateStr, instance) {
+            console.log('📅 Flatpickr initialized successfully');
+        }
+    });
+    
+    // Store flatpickr instance globally for debugging
+    window.dateRangePicker = fp;
+} else {
+    console.warn('⚠️ Flatpickr is not loaded! Date picker will not work properly.');
+}
+
 // Search functionality - shows dropdown on type
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('scheduleSearch');
@@ -498,18 +672,38 @@ document.addEventListener('DOMContentLoaded', function() {
             
             let hasVisibleResults = false;
             
-            // Filter cards - search by time numbers only
+            // Filter cards - search by time numbers AND schedule name
             cards.forEach(card => {
+                const scheduleName = card.getAttribute('data-schedule-name').toLowerCase();
                 const time = card.getAttribute('data-schedule-time').toLowerCase();
-                // Remove all non-numeric characters except colon for better matching
-                const timeNumbers = time.replace(/[^0-9:]/g, '');
                 
-                // Check if search term appears in the time (including formatted and raw numbers)
-                if (time.includes(searchTerm) || timeNumbers.includes(searchTerm)) {
-                    card.style.display = '';
-                    hasVisibleResults = true;
+                // Check if it's the rest day card
+                const isRestDay = card.classList.contains('rest-day-card');
+                
+                if (isRestDay) {
+                    // For rest day, search in name only (rest, day, off)
+                    if (scheduleName.includes(searchTerm) || 
+                        'rest'.includes(searchTerm) || 
+                        'off'.includes(searchTerm) || 
+                        'day off'.includes(searchTerm)) {
+                        card.style.display = '';
+                        hasVisibleResults = true;
+                    } else {
+                        card.style.display = 'none';
+                    }
                 } else {
-                    card.style.display = 'none';
+                    // For regular schedules, search by time numbers
+                    const timeNumbers = time.replace(/[^0-9:]/g, '');
+                    
+                    // Check if search term appears in the time or name (including formatted and raw numbers)
+                    if (time.includes(searchTerm) || 
+                        timeNumbers.includes(searchTerm) || 
+                        scheduleName.includes(searchTerm)) {
+                        card.style.display = '';
+                        hasVisibleResults = true;
+                    } else {
+                        card.style.display = 'none';
+                    }
                 }
             });
             

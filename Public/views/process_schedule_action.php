@@ -49,10 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
             $stmt = $pdo->prepare("
                 INSERT INTO post_schedule_change_requests 
                 (employee_id, reason, status, start_date, end_date, work_schedule_id, 
-                 current_work_schedule_id, attachment_scr, explanation, created_at, notified) 
+                 current_work_schedule_id, attachment_scr, explanation, is_rest_day, created_at, notified) 
                 VALUES 
                 (:employee_id, :reason, :status, :start_date, :end_date, :work_schedule_id, 
-                 :current_work_schedule_id, :attachment_scr, :explanation, :created_at, :notified)
+                 :current_work_schedule_id, :attachment_scr, :explanation, :is_rest_day, :created_at, :notified)
             ");
             
             $stmt->execute([
@@ -65,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
                 'current_work_schedule_id' => $request_data['current_work_schedule_id'],
                 'attachment_scr' => $request_data['attachment_scr'],
                 'explanation' => $request_data['explanation'] ?? null,
+                'is_rest_day' => isset($request_data['is_rest_day']) ? intval($request_data['is_rest_day']) : (empty($request_data['work_schedule_id']) ? 1 : 0),
                 'created_at' => $request_data['created_at'],
                 'notified' => $request_data['notified'] ?? 0
             ]);
@@ -72,6 +73,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
             // Delete from schedule_change_requests table
             $stmt = $pdo->prepare("DELETE FROM schedule_change_requests WHERE id = :id");
             $stmt->execute(['id' => $request_id]);
+
+            // AUTO-UPDATE: Sync approved changes to employee_daily_schedules for calendar display
+            if ($action === 'approve') {
+                $post_request_id = $pdo->lastInsertId();
+                
+                // Determine rest day status
+                $is_rest_day = empty($request_data['work_schedule_id']) ? 1 : 0;
+                
+                // Loop through date range and update employee_daily_schedules
+                $current_date = new DateTime($request_data['start_date']);
+                $end_date = new DateTime($request_data['end_date']);
+                
+                while ($current_date <= $end_date) {
+                    $date_str = $current_date->format('Y-m-d');
+                    
+                    // Check if entry exists
+                    $checkStmt = $pdo->prepare("
+                        SELECT id FROM employee_daily_schedules 
+                        WHERE employee_id = ? AND schedule_date = ?
+                    ");
+                    $checkStmt->execute([$request_data['employee_id'], $date_str]);
+                    $exists = $checkStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($exists) {
+                        // Update existing entry
+                        $updateStmt = $pdo->prepare("
+                            UPDATE employee_daily_schedules 
+                            SET actual_schedule_id = ?, 
+                                is_rest_day = ?,
+                                has_override = 1,
+                                override_status = 'approved',
+                                override_reason = ?,
+                                updated_at = NOW()
+                            WHERE id = ?
+                        ");
+                        $updateStmt->execute([
+                            $is_rest_day ? null : $request_data['work_schedule_id'],
+                            $is_rest_day,
+                            $request_data['reason'],
+                            $exists['id']
+                        ]);
+                    } else {
+                        // Insert new entry
+                        $insertStmt = $pdo->prepare("
+                            INSERT INTO employee_daily_schedules 
+                            (employee_id, schedule_date, actual_schedule_id, is_rest_day, has_override, override_status, override_reason, created_at)
+                            VALUES (?, ?, ?, ?, 1, 'approved', ?, NOW())
+                        ");
+                        $insertStmt->execute([
+                            $request_data['employee_id'],
+                            $date_str,
+                            $is_rest_day ? null : $request_data['work_schedule_id'],
+                            $is_rest_day,
+                            $request_data['reason']
+                        ]);
+                    }
+                    
+                    $current_date->modify('+1 day');
+                }
+            }
 
             $pdo->commit();
 

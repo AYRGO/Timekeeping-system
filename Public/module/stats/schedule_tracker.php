@@ -47,19 +47,29 @@ $schedule_times = [
 
 $today = date('Y-m-d');
 
-// Get current active approved schedule from post_schedule_change_requests
+// PRIORITY 1: Check for daily override in employee_daily_schedules (same as calendar)
 $stmt = $pdo->prepare("
-    SELECT work_schedule_id, status, start_date, end_date 
-    FROM post_schedule_change_requests 
-    WHERE employee_id = ? AND status = 'Approved' 
-    AND ? BETWEEN start_date AND end_date 
-    ORDER BY created_at DESC 
+    SELECT actual_schedule_id, is_rest_day
+    FROM employee_daily_schedules 
+    WHERE employee_id = ? AND schedule_date = ? 
     LIMIT 1
 ");
 $stmt->execute([$employee_id, $today]);
-$currentActiveSchedule = $stmt->fetch(PDO::FETCH_ASSOC);
+$dailyOverride = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Get latest schedule request from schedule_change_requests (for pending status)
+// PRIORITY 2: Check for weekly default in employee_default_schedules
+$dayOfWeek = date('w', strtotime($today)); // 0=Sunday, 1=Monday, ..., 6=Saturday
+$stmt = $pdo->prepare("
+    SELECT work_schedule_id, is_rest_day 
+    FROM employee_default_schedules 
+    WHERE employee_id = ? AND day_of_week = ? 
+    AND effective_from <= ? AND (effective_until IS NULL OR effective_until >= ?) 
+    LIMIT 1
+");
+$stmt->execute([$employee_id, $dayOfWeek, $today, $today]);
+$weeklyDefault = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Get latest schedule request from schedule_change_requests (for pending status indicator)
 $stmt = $pdo->prepare("
     SELECT * FROM schedule_change_requests 
     WHERE employee_id = ? 
@@ -69,50 +79,58 @@ $stmt = $pdo->prepare("
 $stmt->execute([$employee_id]);
 $latestRequest = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Determine what schedule to use based on current situation
-if ($currentActiveSchedule) {
-    // There's an active approved schedule - use it
-    $current_real_schedule_id = $currentActiveSchedule['work_schedule_id'] ?? $default_schedule_id;
-    $schedule_id_to_use = $current_real_schedule_id;
-    
-    // Check if latest request is pending (while current approved is still active)
-    if ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') {
-        $schedule_status = "pending";
-        $status_text = "New Schedule Pending";
+// Determine what schedule to use based on calendar priority (matching schedule_content.php)
+if ($dailyOverride) {
+    // Daily override exists (from approved schedule change request)
+    if ($dailyOverride['is_rest_day']) {
+        $schedule_id_to_use = null; // Rest day
+        $current_real_schedule_id = null;
+        $schedule_status = "rest_day";
+        $status_text = "Rest Day (From Request)";
     } else {
+        $current_real_schedule_id = $dailyOverride['actual_schedule_id'] ?? $default_schedule_id;
+        $schedule_id_to_use = $current_real_schedule_id;
         $schedule_status = "approved";
-        $status_text = "Changed Schedule (Active: " . date('M d', strtotime($currentActiveSchedule['start_date'])) . " - " . date('M d', strtotime($currentActiveSchedule['end_date'])) . ")";
+        $status_text = "Active Schedule Override";
+    }
+} elseif ($weeklyDefault) {
+    // Weekly default schedule
+    if ($weeklyDefault['is_rest_day']) {
+        $schedule_id_to_use = null;
+        $current_real_schedule_id = null;
+        $schedule_status = "rest_day";
+        $status_text = "Rest Day (Weekly Default)";
+    } else {
+        $current_real_schedule_id = $weeklyDefault['work_schedule_id'] ?? $default_schedule_id;
+        $schedule_id_to_use = $current_real_schedule_id;
+        $schedule_status = "weekly_default";
+        $status_text = "Weekly Default Schedule";
     }
 } else {
-    // No currently active approved schedule
+    // Fallback to employee's official schedule
     $current_real_schedule_id = $default_schedule_id;
     $schedule_id_to_use = $default_schedule_id;
-    
-    // Check latest request status
-    if ($latestRequest) {
-        $status = strtolower(trim($latestRequest['status']));
-        
-        if ($status === 'pending') {
-            $schedule_status = "pending";
-            $status_text = "Schedule Change Pending ";
-        } elseif (in_array($status, ['declined', 'rejected'])) {
-            $schedule_status = "declined";
-            $status_text = "Request Declined";
-        } else {
-            $schedule_status = "baseline";
-            $status_text = "Official Schedule (ID: {$default_schedule_id})";
-        }
-    } else {
-        $schedule_status = "baseline";
-        $status_text = "Official Schedule";
-    }
+    $schedule_status = "baseline";
+    $status_text = "Official Schedule";
 }
 
-// Final schedule - convert to display format
-$sched_time_in_24h = $schedule_times[$schedule_id_to_use]['in'] ?? '07:00:00';
-$sched_time_out_24h = $schedule_times[$schedule_id_to_use]['out'] ?? '16:00:00';
-$sched_time_in  = date('h:i A', strtotime($sched_time_in_24h));
-$sched_time_out = date('h:i A', strtotime($sched_time_out_24h));
+// Check if there's a pending request (overlay indicator)
+if ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') {
+    $schedule_status = "pending";
+    $status_text = "Schedule Change Pending";
+}
+
+// Final schedule - convert to display format (handle rest days)
+if ($schedule_id_to_use === null) {
+    // Rest day
+    $sched_time_in = 'REST';
+    $sched_time_out = 'DAY';
+} else {
+    $sched_time_in_24h = $schedule_times[$schedule_id_to_use]['in'] ?? '07:00:00';
+    $sched_time_out_24h = $schedule_times[$schedule_id_to_use]['out'] ?? '16:00:00';
+    $sched_time_in  = date('h:i A', strtotime($sched_time_in_24h));
+    $sched_time_out = date('h:i A', strtotime($sched_time_out_24h));
+}
 
 // Determine UI badge color
 $color = match ($schedule_status) {
@@ -131,11 +149,12 @@ $_SESSION['current_schedule'] = [
     'time_out'    => $sched_time_out,
     'status'      => $schedule_status,
     'status_text' => $status_text,
-    'has_active_approved' => $currentActiveSchedule ? true : false,
+    'has_daily_override' => $dailyOverride ? true : false,
+    'has_weekly_default' => $weeklyDefault ? true : false,
     'has_pending_request' => ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') ? true : false,
 ];
 
-// Function to get current real-time schedule ID (updated to use post_schedule_change_requests)
+// Function to get current real-time schedule ID (updated to check employee_daily_schedules first)
 function getCurrentRealScheduleId($employee_id, $pdo) {
     // Get employee's default schedule
     $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
@@ -145,19 +164,38 @@ function getCurrentRealScheduleId($employee_id, $pdo) {
     
     $today = date('Y-m-d');
     
-    // Check for active approved schedule changes from post_schedule_change_requests
+    // PRIORITY 1: Check employee_daily_schedules (matches calendar logic)
     $stmt = $pdo->prepare("
-        SELECT work_schedule_id, status, start_date, end_date 
-        FROM post_schedule_change_requests 
-        WHERE employee_id = ? AND status = 'Approved' 
-        AND ? BETWEEN start_date AND end_date 
-        ORDER BY created_at DESC 
+        SELECT actual_schedule_id, is_rest_day 
+        FROM employee_daily_schedules 
+        WHERE employee_id = ? AND schedule_date = ? 
         LIMIT 1
     ");
     $stmt->execute([$employee_id, $today]);
-    $activeRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+    $dailySchedule = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    return $activeRequest ? ($activeRequest['work_schedule_id'] ?? $default_schedule_id) : $default_schedule_id;
+    if ($dailySchedule) {
+        return $dailySchedule['is_rest_day'] ? null : ($dailySchedule['actual_schedule_id'] ?? $default_schedule_id);
+    }
+    
+    // PRIORITY 2: Check weekly default
+    $dayOfWeek = date('w', strtotime($today));
+    $stmt = $pdo->prepare("
+        SELECT work_schedule_id, is_rest_day 
+        FROM employee_default_schedules 
+        WHERE employee_id = ? AND day_of_week = ? 
+        AND effective_from <= ? AND (effective_until IS NULL OR effective_until >= ?) 
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $dayOfWeek, $today, $today]);
+    $weeklySchedule = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($weeklySchedule) {
+        return $weeklySchedule['is_rest_day'] ? null : ($weeklySchedule['work_schedule_id'] ?? $default_schedule_id);
+    }
+    
+    // PRIORITY 3: Return default
+    return $default_schedule_id;
 }
 ?>
 
@@ -166,14 +204,20 @@ function getCurrentRealScheduleId($employee_id, $pdo) {
     <div class="flex justify-between items-center">
         <div>
             <p class="text-gray-500">Schedule Today</p>
-            <p class="text-2xl font-bold text-gray-900" style="font-family: 'Inter', sans-serif;">
-                <?= htmlspecialchars($sched_time_in) ?> - <?= htmlspecialchars($sched_time_out) ?>
-            </p>
+            <?php if ($schedule_id_to_use === null): ?>
+                <p class="text-2xl font-bold text-gray-900" style="font-family: 'Inter', sans-serif;">
+                    REST DAY
+                </p>
+            <?php else: ?>
+                <p class="text-2xl font-bold text-gray-900" style="font-family: 'Inter', sans-serif;">
+                    <?= htmlspecialchars($sched_time_in) ?> - <?= htmlspecialchars($sched_time_out) ?>
+                </p>
+            <?php endif; ?>
             <!-- Enhanced debug info -->
             <!-- Debug info removed as requested -->
         </div>
         <div class="w-12 h-12 rounded-full bg-<?= $color ?>-100 flex items-center justify-center">
-            <?php if ($currentActiveSchedule): ?>
+            <?php if ($dailyOverride): ?>
                 <i class="fas fa-exchange-alt text-xl text-<?= $color ?>-600"></i>
             <?php else: ?>
                 <i class="fas fa-calendar-day text-xl text-<?= $color ?>-600"></i>

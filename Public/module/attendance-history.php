@@ -7,62 +7,8 @@ include('../config/db.php');
 
 $employee_id = $_SESSION['employee']['id'] ?? null;
 
-// Fetch employee's default schedule from employees table
-$empStmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
-$empStmt->execute([$employee_id]);
-$employee = $empStmt->fetch(PDO::FETCH_ASSOC);
-$default_schedule_id = $employee['official_sched'] ?? 4;
-
-// Fetch all approved schedule changes from post_schedule_change_requests
-$scheduleChangesStmt = $pdo->prepare("
-    SELECT work_schedule_id, start_date, end_date 
-    FROM post_schedule_change_requests 
-    WHERE employee_id = ? AND status = 'Approved' 
-    ORDER BY created_at DESC
-");
-$scheduleChangesStmt->execute([$employee_id]);
-$approvedScheduleChanges = $scheduleChangesStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Store latest approved schedule change in session for future use
-$scheduleRequestStmt = $pdo->prepare("SELECT * FROM schedule_change_requests WHERE employee_id = ? AND status = 'approved' ORDER BY created_at DESC LIMIT 1");
-$scheduleRequestStmt->execute([$employee_id]);
-$latestScheduleRequest = $scheduleRequestStmt->fetch(PDO::FETCH_ASSOC);
-
-if ($latestScheduleRequest) {
-    $_SESSION['schedule_request'] = [
-        'start_date' => $latestScheduleRequest['start_date'],
-        'end_date' => $latestScheduleRequest['end_date'],
-        'work_schedule_id' => $latestScheduleRequest['work_schedule_id'],
-        'status' => $latestScheduleRequest['status']
-    ];
-}
-
-$schedule_times = [
-        1 => ['in' => '06:30:00', 'out' => '15:30:00'],
-        2 => ['in' => '08:00:00', 'out' => '19:00:00'],
-        3 => ['in' => '07:30:00', 'out' => '16:30:00'],
-        4 => ['in' => '07:00:00', 'out' => '16:00:00'],
-        5 => ['in' => '08:00:00', 'out' => '17:00:00'],
-        6 => ['in' => '09:00:00', 'out' => '18:00:00'],
-        7 => ['in' => '10:00:00', 'out' => '19:00:00'],
-        8 => ['in' => '06:00:00', 'out' => '15:00:00'],
-        9 => ['in' => '08:00:00', 'out' => '16:30:00'],
-        10 => ['in' => '07:40:00', 'out' => '16:40:00'],
-        11 => ['in' => '06:30:00', 'out' => '15:00:00'],
-        12 => ['in' => '06:30:00', 'out' => '17:30:00'],
-        13 => ['in' => '07:00:00', 'out' => '18:00:00'],
-        14 => ['in' => '06:00:00', 'out' => '17:00:00'],
-        15 => ['in' => '06:00:00', 'out' => '16:00:00'],
-        16 => ['in' => '08:30:00', 'out' => '16:30:00'],
-        17 => ['in' => '06:00:00', 'out' => '12:00:00'],
-        18 => ['in' => '06:00:00', 'out' => '14:30:00'],
-        19 => ['in' => '19:00:00', 'out' => '3:00:00'],
-        20 => ['in' => '19:00:00', 'out' => '4:30:00'],
-        21 => ['in' => '17:00:00', 'out' => '2:00:00'],
-        22 => ['in' => '17:30:00', 'out' => '2:00:00'],
-
-
-];
+// Removed: Fetching employee's default schedule and hardcoded schedule_times array
+// Now using employee_daily_schedule_cache for all schedule lookups
 
 // Fetch all logs for July 1, 2025 onwards - Updated to include status and log_out_date columns
 $allLogsStmt = $pdo->prepare("
@@ -264,28 +210,65 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 
                             $log = $logMap[$logDate] ?? null;
 
-                            // Updated schedule logic - check post_schedule_change_requests
-                            $schedule_id_to_use = $default_schedule_id;
+                            // Fetch schedule from employee_daily_schedule_cache
+                            $scheduleStmt = $pdo->prepare("
+                                SELECT time_in, time_out, schedule_name, source, is_rest_day
+                                FROM employee_daily_schedule_cache
+                                WHERE employee_id = ? AND schedule_date = ?
+                                LIMIT 1
+                            ");
+                            $scheduleStmt->execute([$employee_id, $logDate]);
+                            $scheduleCache = $scheduleStmt->fetch(PDO::FETCH_ASSOC);
                             
-                            // Check if there's an approved schedule change for this date
-                            foreach ($approvedScheduleChanges as $scheduleChange) {
-                                if ($logDate >= $scheduleChange['start_date'] && $logDate <= $scheduleChange['end_date']) {
-                                    $schedule_id_to_use = $scheduleChange['work_schedule_id'];
-                                    break; // Use the first matching (most recent) schedule change
+                            // Check if this is a rest day/off day
+                            $isRestDay = false;
+                            if ($scheduleCache) {
+                                $isRestDay = ($scheduleCache['is_rest_day'] == 1);
+                            }
+                            
+                            if ($scheduleCache && $scheduleCache['time_in'] && $scheduleCache['time_out']) {
+                                // Found in cache
+                                $schedule_in_24h = $scheduleCache['time_in'];
+                                $schedule_out_24h = $scheduleCache['time_out'];
+                            } else {
+                                // Fallback: Check employee_default_schedules
+                                $dayOfWeek = date('w', strtotime($logDate));
+                                $fallbackStmt = $pdo->prepare("
+                                    SELECT edd.work_schedule_id, edd.is_rest_day, ws.time_in, ws.time_out
+                                    FROM employee_default_schedules edd
+                                    LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+                                    WHERE edd.employee_id = ? 
+                                      AND edd.day_of_week = ? 
+                                      AND edd.effective_from <= ? 
+                                      AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+                                    LIMIT 1
+                                ");
+                                $fallbackStmt->execute([$employee_id, $dayOfWeek, $logDate, $logDate]);
+                                $fallback = $fallbackStmt->fetch(PDO::FETCH_ASSOC);
+                                
+                                if ($fallback) {
+                                    $isRestDay = ($fallback['is_rest_day'] == 1);
+                                    if ($fallback['time_in'] && $fallback['time_out']) {
+                                        $schedule_in_24h = $fallback['time_in'];
+                                        $schedule_out_24h = $fallback['time_out'];
+                                    } else {
+                                        // Final fallback: default times
+                                        $schedule_in_24h = '07:00:00';
+                                        $schedule_out_24h = '16:00:00';
+                                    }
+                                } else {
+                                    // Check if weekend
+                                    if ($dayOfWeek == 0 || $dayOfWeek == 6) {
+                                        $isRestDay = true;
+                                    }
+                                    // Final fallback: default times
+                                    $schedule_in_24h = '07:00:00';
+                                    $schedule_out_24h = '16:00:00';
                                 }
                             }
-
-                            if (isset($schedule_times[$schedule_id_to_use])) {
-                                $schedule_in_24h = $schedule_times[$schedule_id_to_use]['in'];
-                                $schedule_out_24h = $schedule_times[$schedule_id_to_use]['out'];
-                                $schedule_in = date('h:i A', strtotime($schedule_in_24h));
-                                $schedule_out = date('h:i A', strtotime($schedule_out_24h));
-                            } else {
-                                $schedule_in_24h = '07:00:00';
-                                $schedule_out_24h = '16:00:00';
-                                $schedule_in = '07:00 AM';
-                                $schedule_out = '04:00 PM';
-                            }
+                            
+                            $schedule_in = date('h:i A', strtotime($schedule_in_24h));
+                            $schedule_out = date('h:i A', strtotime($schedule_out_24h));
 
                             // Handle times - Updated to consider status and log_out_date
                             $isApproved = isset($log) && strtolower($log['request_status'] ?? '') === 'approved';
@@ -392,6 +375,19 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 // Employee is on approved leave
                                 $status = 'On Leave';
                                 $badgeClass = 'bg-purple-100 text-purple-800';
+                            } elseif ($isRestDay && !$timeIn) {
+                                // Rest day/Off day with no time in (not working)
+                                $status = 'Off';
+                                $badgeClass = 'bg-gray-100 text-gray-600';
+                            } elseif ($isRestDay && $timeIn) {
+                                // Rest day but employee worked (rest day work)
+                                if (!$timeOut || $timeOut === 'INC' || $isAutoIncomplete) {
+                                    $status = 'Rest Day Work (INC)';
+                                    $badgeClass = 'bg-blue-100 text-blue-800';
+                                } else {
+                                    $status = 'Rest Day Work';
+                                    $badgeClass = 'bg-blue-100 text-blue-800';
+                                }
                             } elseif ($isAutoIncomplete || !$timeOut || $timeOut === 'INC') {
                                 // Missing time out or auto-marked incomplete
                                 $status = 'Incomplete';
