@@ -265,6 +265,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         echo "<script>alert('Schedule override created successfully!'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
         exit;
     }
+    
+    if ($_POST['action'] === 'delete_override') {
+        $schedule_employee_id = (int)$_POST['employee_id'];
+        $schedule_date = $_POST['schedule_date'];
+        
+        // Prevent deletion of past overrides
+        if ($schedule_date < date('Y-m-d')) {
+            echo "<script>alert('Cannot delete override for past dates.'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
+            exit;
+        }
+        
+        // Delete the override from employee_daily_schedules
+        $stmt = $pdo->prepare("DELETE FROM employee_daily_schedules WHERE employee_id = ? AND schedule_date = ?");
+        $stmt->execute([$schedule_employee_id, $schedule_date]);
+        
+        // Add to audit trail
+        $pdo->prepare("INSERT INTO schedule_override_history (employee_id, schedule_date, new_schedule_id, override_reason, applied_by, applied_at) VALUES (?, ?, NULL, 'Override cancelled by admin', ?, NOW())")
+            ->execute([$schedule_employee_id, $schedule_date, $_SESSION['user_id'] ?? null]);
+        
+        echo "<script>alert('Schedule override cancelled successfully!'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
+        exit;
+    }
 }
 
 // UI Setup
@@ -457,13 +479,20 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                             <div class="bg-white border rounded p-2 text-xs">
                                 <div class="flex justify-between items-start mb-1">
                                     <span class="font-semibold"><?= date('M d, Y', strtotime($po['schedule_date'])) ?></span>
-                                    <?php if ($po['is_rest_day']): ?>
-                                        <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded">OFF</span>
-                                    <?php else: ?>
-                                        <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded">
-                                            <?= htmlspecialchars($po['schedule_name']) ?>
-                                        </span>
-                                    <?php endif; ?>
+                                    <div class="flex items-center gap-1">
+                                        <?php if ($po['is_rest_day']): ?>
+                                            <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded">OFF</span>
+                                        <?php else: ?>
+                                            <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded">
+                                                <?= htmlspecialchars($po['schedule_name']) ?>
+                                            </span>
+                                        <?php endif; ?>
+                                        <button onclick="deleteOverride('<?= $po['schedule_date'] ?>', '<?= date('M d, Y', strtotime($po['schedule_date'])) ?>')" 
+                                                class="text-red-600 hover:text-red-800 ml-1" 
+                                                title="Cancel Override">
+                                            <i class="fas fa-times-circle"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <?php if (!$po['is_rest_day'] && $po['time_in']): ?>
                                     <div class="text-gray-600">
@@ -494,6 +523,20 @@ function openOverride_admin(date) {
         input.value = date;
         input.scrollIntoView({behavior:'smooth', block:'center'});
         input.focus();
+    }
+}
+
+function deleteOverride(date, displayDate) {
+    if (confirm('Are you sure you want to cancel the schedule override for ' + displayDate + '?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.innerHTML = `
+            <input type="hidden" name="action" value="delete_override">
+            <input type="hidden" name="employee_id" value="<?= $emp_id ?>">
+            <input type="hidden" name="schedule_date" value="${date}">
+        `;
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 </script>

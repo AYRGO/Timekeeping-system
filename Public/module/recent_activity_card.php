@@ -155,9 +155,13 @@ function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) 
             $created = date('M j, Y', strtotime($activity['created_at']));
             $msg = strip_tags($activity['message']);
 
-            // Detect type
-            preg_match('/\b(Leave|Schedule|Time|Overtime)\b/i', $msg, $typeMatch);
-            $type = $typeMatch[0] ?? 'Request';
+            // Detect type - check for day off/rest day first
+            if (preg_match('/\b(day\s*off|rest\s*day|off\s*day)\b/i', $msg)) {
+                $type = 'Day Off';
+            } else {
+                preg_match('/\b(Leave|Schedule|Time|Overtime)\b/i', $msg, $typeMatch);
+                $type = $typeMatch[0] ?? 'Request';
+            }
 
             // For Leave requests, fetch status directly from post_leave_requests table column 'status'
             if ($type === 'Leave' && isset($activity['leave_status'])) {
@@ -452,6 +456,35 @@ function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) 
                             'explanation' => $activity['explanation'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'work_schedule_id' => $activity['work_schedule_id'] ?? '',
+                            'attachment_scr' => $activity['attachment_scr'] ?? '',
+                            'table_name' => $activity['table_name'] ?? '',
+                            'source_table' => $activity['source_table'] ?? ''
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
+                                class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
+                            View Details
+                        </button>
+                    <?php } elseif ($type === 'Day Off') { ?>
+                        <?php
+                            // Get ACTUAL current schedule from calendar for Day Off requests
+                            $actualCurrentSchedule = getActualCurrentScheduleFromCalendar($pdo, $employee_id);
+                            $currentTimeIn = $actualCurrentSchedule['is_rest_day'] ? 'REST DAY' : $actualCurrentSchedule['time_in'];
+                            $currentTimeOut = $actualCurrentSchedule['is_rest_day'] ? '' : $actualCurrentSchedule['time_out'];
+                        ?>
+                        <button onclick="showActivityDetails('Day Off Request', `<?= htmlspecialchars(json_encode([
+                            'type' => 'Day Off Request',
+                            'status' => $status,
+                            'date' => $created,
+                            'current_time_in' => $currentTimeIn,
+                            'current_time_out' => $currentTimeOut,
+                            'requested_time_in' => !empty($activity['requested_time_in']) ? date('g:i A', strtotime($activity['requested_time_in'])) : '',
+                            'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
+                            'start_date' => !empty($activity['start_date']) ? date('M j, Y', strtotime($activity['start_date'])) : '',
+                            'end_date' => !empty($activity['end_date']) ? date('M j, Y', strtotime($activity['end_date'])) : '',
+                            'reason' => $activity['reason'] ?? '',
+                            'explanation' => $activity['explanation'] ?? '',
+                            'request_id' => $activity['request_id'] ?? '',
+                            'work_schedule_id' => $activity['work_schedule_id'] ?? '',
+                            'is_rest_day' => $activity['is_rest_day'] ?? 1,
                             'attachment_scr' => $activity['attachment_scr'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
@@ -929,6 +962,60 @@ function showActivityDetails(title, dataJson) {
             }
 
             // Attachment section for schedule change requests
+            content += createAttachmentSection(data.attachment_scr, data.request_id, data.table_name, data.status);
+        } else if (data.type.includes('Day Off')) {
+            // Day Off request - show schedule change to OFF/Rest Day
+            content += `<div class="border border-gray-200 rounded-lg p-5 bg-gradient-to-r from-gray-50 to-gray-100">`;
+            
+            // Header
+            content += `
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-bed text-gray-600 text-lg mr-2"></i>
+                    <h4 class="text-lg font-semibold text-gray-800">Day Off Request Details</h4>
+                </div>
+            `;
+            
+            // Show current schedule to Day Off change
+            content += `
+                <div class="flex items-center justify-between gap-4 mb-4">
+                    <div class="flex-1 bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-clock text-blue-600 mr-2"></i>
+                            <h5 class="font-semibold text-blue-800 text-sm">Current Schedule</h5>
+                        </div>
+                        <p class="text-xl font-bold text-blue-900">
+                            ${data.current_time_in || data.requested_time_in || '—'} - ${data.current_time_out || data.requested_time_out || '—'}
+                        </p>
+                    </div>
+                    
+                    <div class="flex items-center justify-center px-3">
+                        <i class="fas fa-arrow-right text-gray-400 text-2xl"></i>
+                    </div>
+                    
+                    <div class="flex-1 bg-gray-50 border-2 border-gray-400 rounded-lg p-4">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-bed text-gray-600 mr-2"></i>
+                            <h5 class="font-semibold text-gray-800 text-sm">Requested</h5>
+                        </div>
+                        <p class="text-xl font-bold text-gray-700">
+                            OFF / Rest Day
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            content += `</div>`; // Close gradient container
+            
+            // Show date range if available
+            if (data.start_date || data.end_date) {
+                const formattedStartDate = data.start_date ? new Date(data.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+                const formattedEndDate = data.end_date ? new Date(data.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+                
+                const dateRange = formattedStartDate === formattedEndDate ? formattedStartDate : `${formattedStartDate} to ${formattedEndDate}`;
+                content += createInfoBlock('Effective Date(s)', dateRange, 'fa-calendar-alt', 'font-semibold', 'bg-gray-50');
+            }
+
+            // Attachment section for day off requests (uses same structure as schedule changes)
             content += createAttachmentSection(data.attachment_scr, data.request_id, data.table_name, data.status);
         } else if (data.type.includes('Overtime')) {
             // Always show OT Date section 

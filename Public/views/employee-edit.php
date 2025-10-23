@@ -413,7 +413,21 @@ uasort($sortedScheduleOptions, function($a, $b) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
   <style>
-
+    /* Hide all tab content by default */
+    .tab-content {
+      display: none;
+    }
+    
+    /* Show active tab content */
+    .tab-content.active {
+      display: block;
+    }
+    
+    /* Active tab button styles */
+    .tab-button.active {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+    }
   </style>
 </head>
 <body class="bg-gray-100">
@@ -482,14 +496,23 @@ uasort($sortedScheduleOptions, function($a, $b) {
             
             <!-- Tabs Navigation -->
             <div class="flex overflow-x-auto border-b border-gray-200 mb-6">
+                <!-- Schedule Management Group -->
                 <button onclick="openTab(event, 'current-schedule')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition active" id="default-tab">
                     <i class="fas fa-calendar-check mr-2"></i>Current Schedule
                 </button>
-                <button onclick="openTab(event, 'profile')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
-                    <i class="fas fa-user mr-2"></i>Profile
-                </button>
                 <button onclick="openTab(event, 'weekly-schedule')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
                     <i class="fas fa-calendar-week mr-2"></i>Weekly Schedule
+                </button>
+                <button onclick="openTab(event, 'manage-schedules')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
+                    <i class="fas fa-cog mr-2"></i>Manage Schedules (<?= count($allSchedules) ?>)
+                </button>
+                
+                <!-- Divider -->
+                <div class="border-r border-gray-300 mx-2"></div>
+                
+                <!-- Employee Info & Records Group -->
+                <button onclick="openTab(event, 'profile')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
+                    <i class="fas fa-user mr-2"></i>Profile
                 </button>
                 <button onclick="openTab(event, 'checklist')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
                     <i class="fas fa-tasks mr-2"></i>201 Checklist
@@ -497,6 +520,11 @@ uasort($sortedScheduleOptions, function($a, $b) {
                 <button onclick="openTab(event, 'leave-credits')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
                     <i class="fas fa-calendar-alt mr-2"></i>Leave Credits
                 </button>
+                
+                <!-- Divider -->
+                <div class="border-r border-gray-300 mx-2"></div>
+                
+                <!-- Requests & Approvals Group -->
                 <button onclick="openTab(event, 'leave-requests')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
                     <i class="fas fa-plane mr-2"></i>Leave Requests (<?= count($leaveRequests) ?>)
                 </button>
@@ -508,9 +536,6 @@ uasort($sortedScheduleOptions, function($a, $b) {
                 </button>
                 <button onclick="openTab(event, 'time-adjustments')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
                     <i class="fas fa-history mr-2"></i>Time Adjustments (<?= count($timeAdjustmentRequests) ?>)
-                </button>
-                <button onclick="openTab(event, 'manage-schedules')" class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300 transition">
-                    <i class="fas fa-cog mr-2"></i>Manage Schedules (<?= count($allSchedules) ?>)
                 </button>
             </div>
             
@@ -636,29 +661,195 @@ uasort($sortedScheduleOptions, function($a, $b) {
                     // Get all work schedules
                     $allSchedules = $pdo->query("SELECT id, name, time_in, time_out FROM work_schedules ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
                     ?>
-                    <form method="post" class="space-y-4">
+                    <form method="post" class="space-y-4" id="weeklyScheduleForm">
                         <input type="hidden" name="action" value="update_weekly_schedule">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        <!-- Hidden fields for schedule IDs -->
                         <?php foreach($days as $d): ?>
-                            <div>
+                            <input type="hidden" name="weekly_sched[<?= $d ?>]" id="schedule_id_<?= $d ?>" value="<?= $weekly[$d] ?? '' ?>">
+                        <?php endforeach; ?>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <?php foreach($days as $d): 
+                            // Get current schedule details
+                            $currentSchedule = null;
+                            if (isset($weekly[$d]) && $weekly[$d]) {
+                                foreach($allSchedules as $sched) {
+                                    if ($sched['id'] == $weekly[$d]) {
+                                        $currentSchedule = $sched;
+                                        break;
+                                    }
+                                }
+                            }
+                            $currentValue = $currentSchedule ? htmlspecialchars($currentSchedule['name']) . ' (' . date('g:i A', strtotime($currentSchedule['time_in'])) . ' - ' . date('g:i A', strtotime($currentSchedule['time_out'])) . ')' : '';
+                        ?>
+                            <div class="schedule-input-wrapper">
                                 <label class="block text-sm font-medium text-gray-700 mb-1"><?= $d ?></label>
-                                <select name="weekly_sched[<?= $d ?>]" class="w-full p-2 border rounded">
-                                    <option value="">-- OFF / Rest Day --</option>
-                                    <?php foreach($allSchedules as $sched): ?>
-                                        <option value="<?= $sched['id'] ?>" <?= (isset($weekly[$d]) && $weekly[$d] == $sched['id']) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($sched['name']) ?> (<?= date('g:i A', strtotime($sched['time_in'])) ?> - <?= date('g:i A', strtotime($sched['time_out'])) ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
+                                <input type="text" 
+                                       class="schedule-autocomplete w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                       data-day="<?= $d ?>"
+                                       value="<?= $currentValue ?>"
+                                       placeholder="Type schedule name or time, or 'OFF' for rest day"
+                                       autocomplete="off">
+                                <div class="autocomplete-dropdown hidden absolute z-10 w-full bg-white border border-gray-300 rounded-b-lg shadow-lg max-h-60 overflow-y-auto"></div>
                             </div>
                         <?php endforeach; ?>
                         </div>
+                        
                         <div class="flex justify-end mt-6">
                             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition">
                                 <i class="fas fa-save mr-2"></i>Update Weekly Schedule
                             </button>
                         </div>
                     </form>
+                    
+                    <!-- JavaScript for Autocomplete -->
+                    <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Schedule data for autocomplete
+                        const schedules = <?= json_encode(array_map(function($s) {
+                            return [
+                                'id' => $s['id'],
+                                'name' => $s['name'],
+                                'time_in' => date('g:i A', strtotime($s['time_in'])),
+                                'time_out' => date('g:i A', strtotime($s['time_out'])),
+                                'display' => $s['name'] . ' (' . date('g:i A', strtotime($s['time_in'])) . ' - ' . date('g:i A', strtotime($s['time_out'])) . ')'
+                            ];
+                        }, $allSchedules)) ?>;
+                        
+                        // Add OFF option
+                        schedules.unshift({
+                            id: '',
+                            name: 'OFF',
+                            display: 'OFF / Rest Day',
+                            isOff: true
+                        });
+                        
+                        // Setup autocomplete for each input
+                        document.querySelectorAll('.schedule-autocomplete').forEach(input => {
+                            const day = input.dataset.day;
+                            const dropdown = input.nextElementSibling;
+                            const hiddenInput = document.getElementById('schedule_id_' + day);
+                            
+                            // Show dropdown on focus
+                            input.addEventListener('focus', function() {
+                                showAllOptions(input, dropdown, schedules, hiddenInput, day);
+                            });
+                            
+                            // Filter on input
+                            input.addEventListener('input', function() {
+                                const query = this.value.toLowerCase().trim();
+                                
+                                if (query === '') {
+                                    showAllOptions(input, dropdown, schedules, hiddenInput, day);
+                                    return;
+                                }
+                                
+                                // Filter schedules
+                                const filtered = schedules.filter(s => 
+                                    s.name.toLowerCase().includes(query) ||
+                                    s.display.toLowerCase().includes(query) ||
+                                    (s.time_in && s.time_in.toLowerCase().includes(query)) ||
+                                    (s.time_out && s.time_out.toLowerCase().includes(query))
+                                );
+                                
+                                showFilteredOptions(input, dropdown, filtered, hiddenInput, day);
+                            });
+                            
+                            // Hide dropdown on blur (with delay for click)
+                            input.addEventListener('blur', function() {
+                                setTimeout(() => {
+                                    dropdown.classList.add('hidden');
+                                }, 200);
+                            });
+                        });
+                        
+                        function showAllOptions(input, dropdown, schedules, hiddenInput, day) {
+                            dropdown.innerHTML = '';
+                            
+                            schedules.forEach(schedule => {
+                                const option = createOption(schedule, input, hiddenInput, dropdown, day);
+                                dropdown.appendChild(option);
+                            });
+                            
+                            dropdown.classList.remove('hidden');
+                        }
+                        
+                        function showFilteredOptions(input, dropdown, filtered, hiddenInput, day) {
+                            dropdown.innerHTML = '';
+                            
+                            if (filtered.length === 0) {
+                                dropdown.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">No schedules found</div>';
+                            } else {
+                                filtered.forEach(schedule => {
+                                    const option = createOption(schedule, input, hiddenInput, dropdown, day);
+                                    dropdown.appendChild(option);
+                                });
+                            }
+                            
+                            dropdown.classList.remove('hidden');
+                        }
+                        
+                        function createOption(schedule, input, hiddenInput, dropdown, day) {
+                            const div = document.createElement('div');
+                            div.className = 'p-3 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-b-0';
+                            
+                            if (schedule.isOff) {
+                                div.innerHTML = `
+                                    <div class="font-medium text-gray-700">
+                                        <i class="fas fa-ban text-red-500 mr-2"></i>
+                                        ${schedule.display}
+                                    </div>
+                                `;
+                            } else {
+                                div.innerHTML = `
+                                    <div class="font-medium text-gray-800">${schedule.name}</div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        <i class="far fa-clock mr-1"></i>
+                                        ${schedule.time_in} - ${schedule.time_out}
+                                    </div>
+                                `;
+                            }
+                            
+                            div.addEventListener('click', function() {
+                                input.value = schedule.display;
+                                hiddenInput.value = schedule.id;
+                                dropdown.classList.add('hidden');
+                                
+                                // Visual feedback
+                                input.classList.add('bg-green-50');
+                                setTimeout(() => {
+                                    input.classList.remove('bg-green-50');
+                                }, 300);
+                            });
+                            
+                            return div;
+                        }
+                        
+                        // Close all dropdowns when clicking outside
+                        document.addEventListener('click', function(e) {
+                            if (!e.target.closest('.schedule-input-wrapper')) {
+                                document.querySelectorAll('.autocomplete-dropdown').forEach(dd => {
+                                    dd.classList.add('hidden');
+                                });
+                            }
+                        });
+                    });
+                    </script>
+                    
+                    <style>
+                    .schedule-input-wrapper {
+                        position: relative;
+                    }
+                    
+                    .autocomplete-dropdown {
+                        margin-top: -1px;
+                    }
+                    
+                    .schedule-autocomplete:focus {
+                        outline: none;
+                    }
+                    </style>
                 </div>
             </div>
 
@@ -1035,7 +1226,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
             END SCHEDULE SUMMARY TAB */ ?>
 
             <!-- Current Schedule Tab - Calendar Scheduling System -->
-            <div id="current-schedule" class="tab-content active">
+            <div id="current-schedule" class="tab-content">
                 <?php include('../views/tabs/employee-calendar-tab.php'); ?>
             </div>
 

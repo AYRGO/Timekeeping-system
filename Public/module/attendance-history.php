@@ -210,31 +210,45 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 
                             $log = $logMap[$logDate] ?? null;
 
-                            // Fetch schedule from employee_daily_schedule_cache
-                            $scheduleStmt = $pdo->prepare("
-                                SELECT time_in, time_out, schedule_name, source, is_rest_day
+                            // Fetch schedule using the same logic as schedule_content.php calendar
+                            // Query the pre-computed cache table
+                            $cacheStmt = $pdo->prepare("
+                                SELECT 
+                                    schedule_date,
+                                    employee_id,
+                                    work_schedule_id,
+                                    is_rest_day,
+                                    is_holiday,
+                                    schedule_name,
+                                    time_in,
+                                    time_out,
+                                    holiday_name,
+                                    source
                                 FROM employee_daily_schedule_cache
                                 WHERE employee_id = ? AND schedule_date = ?
                                 LIMIT 1
                             ");
-                            $scheduleStmt->execute([$employee_id, $logDate]);
-                            $scheduleCache = $scheduleStmt->fetch(PDO::FETCH_ASSOC);
+                            $cacheStmt->execute([$employee_id, $logDate]);
+                            $scheduleCache = $cacheStmt->fetch(PDO::FETCH_ASSOC);
                             
-                            // Check if this is a rest day/off day
+                            // Initialize default values
                             $isRestDay = false;
+                            $schedule_in_24h = '07:00:00';
+                            $schedule_out_24h = '16:00:00';
+                            
+                            // If found in cache, use cache data
                             if ($scheduleCache) {
                                 $isRestDay = ($scheduleCache['is_rest_day'] == 1);
-                            }
-                            
-                            if ($scheduleCache && $scheduleCache['time_in'] && $scheduleCache['time_out']) {
-                                // Found in cache
-                                $schedule_in_24h = $scheduleCache['time_in'];
-                                $schedule_out_24h = $scheduleCache['time_out'];
+                                
+                                if ($scheduleCache['work_schedule_id'] && $scheduleCache['time_in'] && $scheduleCache['time_out']) {
+                                    $schedule_in_24h = $scheduleCache['time_in'];
+                                    $schedule_out_24h = $scheduleCache['time_out'];
+                                }
                             } else {
-                                // Fallback: Check employee_default_schedules
+                                // Fallback: Check employee_default_schedules (same as schedule_content.php)
                                 $dayOfWeek = date('w', strtotime($logDate));
-                                $fallbackStmt = $pdo->prepare("
-                                    SELECT edd.work_schedule_id, edd.is_rest_day, ws.time_in, ws.time_out
+                                $weeklyStmt = $pdo->prepare("
+                                    SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
                                     FROM employee_default_schedules edd
                                     LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
                                     WHERE edd.employee_id = ? 
@@ -243,27 +257,20 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                       AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
                                     LIMIT 1
                                 ");
-                                $fallbackStmt->execute([$employee_id, $dayOfWeek, $logDate, $logDate]);
-                                $fallback = $fallbackStmt->fetch(PDO::FETCH_ASSOC);
+                                $weeklyStmt->execute([$employee_id, $dayOfWeek, $logDate, $logDate]);
+                                $weekly = $weeklyStmt->fetch(PDO::FETCH_ASSOC);
                                 
-                                if ($fallback) {
-                                    $isRestDay = ($fallback['is_rest_day'] == 1);
-                                    if ($fallback['time_in'] && $fallback['time_out']) {
-                                        $schedule_in_24h = $fallback['time_in'];
-                                        $schedule_out_24h = $fallback['time_out'];
-                                    } else {
-                                        // Final fallback: default times
-                                        $schedule_in_24h = '07:00:00';
-                                        $schedule_out_24h = '16:00:00';
+                                if ($weekly) {
+                                    $isRestDay = ($weekly['is_rest_day'] == 1);
+                                    if ($weekly['work_schedule_id'] && $weekly['time_in'] && $weekly['time_out']) {
+                                        $schedule_in_24h = $weekly['time_in'];
+                                        $schedule_out_24h = $weekly['time_out'];
                                     }
                                 } else {
-                                    // Check if weekend
+                                    // Final fallback: Check if weekend
                                     if ($dayOfWeek == 0 || $dayOfWeek == 6) {
                                         $isRestDay = true;
                                     }
-                                    // Final fallback: default times
-                                    $schedule_in_24h = '07:00:00';
-                                    $schedule_out_24h = '16:00:00';
                                 }
                             }
                             

@@ -90,33 +90,195 @@ foreach ($scheduleChanges as $change) {
     $scheduleChangeMap[$change['employee_id']][] = $change;
 }
 
-// Define schedule times (same as attendance-history.php)
-$schedule_times = [
-    1 => ['in' => '06:30:00', 'out' => '15:30:00'],
-    2 => ['in' => '08:00:00', 'out' => '19:00:00'],
-    3 => ['in' => '07:30:00', 'out' => '16:30:00'],
-    4 => ['in' => '07:00:00', 'out' => '16:00:00'],
-    5 => ['in' => '08:00:00', 'out' => '17:00:00'],
-    6 => ['in' => '09:00:00', 'out' => '18:00:00'],
-    7 => ['in' => '10:00:00', 'out' => '19:00:00'],
-    8 => ['in' => '06:00:00', 'out' => '15:00:00'],
-    9 => ['in' => '08:00:00', 'out' => '16:30:00'],
-    10 => ['in' => '07:40:00', 'out' => '16:40:00'],
-    11 => ['in' => '06:30:00', 'out' => '15:00:00'],
-    12 => ['in' => '06:30:00', 'out' => '17:30:00'],
-    13 => ['in' => '07:00:00', 'out' => '18:00:00'],
-    14 => ['in' => '06:00:00', 'out' => '17:00:00'],
-    15 => ['in' => '06:00:00', 'out' => '16:00:00'],
-    16 => ['in' => '08:30:00', 'out' => '16:30:00'],
-    17 => ['in' => '06:00:00', 'out' => '12:00:00'],
-    18 => ['in' => '06:00:00', 'out' => '14:30:00'],
-    19 => ['in' => '19:00:00', 'out' => '03:00:00'],
-    20 => ['in' => '19:00:00', 'out' => '04:30:00'],
-    21 => ['in' => '17:00:00', 'out' => '02:00:00'],
-    22 => ['in' => '17:30:00', 'out' => '02:00:00'],
-];
+// Function to get employee's schedule for a specific date from cache (same as schedule_content.php)
+function getScheduleForDate($pdo, $employee_id, $date) {
+    // Query the pre-computed cache table
+    $stmt = $pdo->prepare("
+        SELECT 
+            schedule_date,
+            employee_id,
+            work_schedule_id,
+            is_rest_day,
+            is_holiday,
+            schedule_name,
+            time_in,
+            time_out,
+            holiday_name,
+            source
+        FROM employee_daily_schedule_cache
+        WHERE employee_id = ? AND schedule_date = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $date]);
+    $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // If found in cache, return formatted data
+    if ($cache) {
+        return [
+            'is_rest_day' => $cache['is_rest_day'],
+            'is_holiday' => $cache['is_holiday'],
+            'schedule_name' => $cache['schedule_name'],
+            'time_in' => $cache['time_in'],
+            'time_out' => $cache['time_out'],
+            'holiday_name' => $cache['holiday_name'] ?? null,
+            'source' => $cache['source']
+        ];
+    }
+    
+    // Fallback: Check employee_default_schedules (same logic as schedule_content.php)
+    $dayOfWeek = date('w', strtotime($date)); // 0=Sunday, 6=Saturday
+    $weeklyStmt = $pdo->prepare("
+        SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
+        FROM employee_default_schedules edd
+        LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+        WHERE edd.employee_id = ? 
+          AND edd.day_of_week = ? 
+          AND edd.effective_from <= ? 
+          AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+        LIMIT 1
+    ");
+    $weeklyStmt->execute([$employee_id, $dayOfWeek, $date, $date]);
+    $weekly = $weeklyStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($weekly) {
+        if ($weekly['is_rest_day']) {
+            return [
+                'is_rest_day' => 1,
+                'is_holiday' => 0,
+                'schedule_name' => 'OFF',
+                'time_in' => null,
+                'time_out' => null,
+                'source' => 'weekly_default'
+            ];
+        } elseif ($weekly['work_schedule_id']) {
+            return [
+                'is_rest_day' => 0,
+                'is_holiday' => 0,
+                'schedule_name' => $weekly['name'],
+                'time_in' => $weekly['time_in'],
+                'time_out' => $weekly['time_out'],
+                'source' => 'weekly_default'
+            ];
+        }
+    }
+    
+    // Final fallback: Check if weekend
+    if ($dayOfWeek == 0 || $dayOfWeek == 6) {
+        return [
+            'is_rest_day' => 1,
+            'is_holiday' => 0,
+            'schedule_name' => 'OFF',
+            'time_in' => null,
+            'time_out' => null,
+            'source' => 'weekend'
+        ];
+    }
+    
+    // Absolute fallback: return default schedule
+    return [
+        'is_rest_day' => 0,
+        'is_holiday' => 0,
+        'schedule_name' => 'Day shift',
+        'time_in' => '07:00:00',
+        'time_out' => '16:00:00',
+        'source' => 'default'
+    ];
+}
 
-
+// Function to build weekly schedule summary in format: "M-F; 7am-4pm | Sat-Sun; OFF"
+function getWeeklyScheduleSummary($pdo, $employee_id, $startDate) {
+    $days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    $dayAbbrev = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    // Get schedule for each day of the week
+    $weekSchedule = [];
+    $checkDate = new DateTime($startDate);
+    
+    // Start from Monday (or the nearest Monday before startDate)
+    $dayOfWeek = $checkDate->format('w'); // 0=Sunday, 6=Saturday
+    if ($dayOfWeek != 1) { // If not Monday
+        $daysToSubtract = ($dayOfWeek == 0) ? 6 : ($dayOfWeek - 1);
+        $checkDate->modify("-{$daysToSubtract} days");
+    }
+    
+    for ($i = 0; $i < 7; $i++) {
+        $date = $checkDate->format('Y-m-d');
+        $schedInfo = getScheduleForDate($pdo, $employee_id, $date);
+        
+        $dow = $checkDate->format('w'); // 0=Sunday, 6=Saturday
+        $weekSchedule[$dow] = $schedInfo;
+        
+        $checkDate->modify('+1 day');
+    }
+    
+    // Group consecutive days with same schedule
+    $groups = [];
+    $currentGroup = null;
+    
+    // Start from Monday (1) and go through Sunday (0 at the end)
+    $order = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
+    
+    foreach ($order as $dow) {
+        $sched = $weekSchedule[$dow];
+        
+        if ($sched['is_rest_day']) {
+            $schedKey = 'OFF';
+        } elseif ($sched['is_holiday']) {
+            $schedKey = 'HOLIDAY';
+        } else {
+            $schedKey = $sched['time_in'] . '-' . $sched['time_out'];
+        }
+        
+        if ($currentGroup === null || $currentGroup['key'] !== $schedKey) {
+            // Start new group
+            if ($currentGroup !== null) {
+                $groups[] = $currentGroup;
+            }
+            $currentGroup = [
+                'key' => $schedKey,
+                'start_dow' => $dow,
+                'end_dow' => $dow,
+                'schedule' => $sched
+            ];
+        } else {
+            // Extend current group
+            $currentGroup['end_dow'] = $dow;
+        }
+    }
+    
+    // Add last group
+    if ($currentGroup !== null) {
+        $groups[] = $currentGroup;
+    }
+    
+    // Format groups into display string
+    $parts = [];
+    foreach ($groups as $group) {
+        $startDow = $group['start_dow'];
+        $endDow = $group['end_dow'];
+        $sched = $group['schedule'];
+        
+        // Format day range
+        if ($startDow === $endDow) {
+            $dayRange = $dayAbbrev[$startDow];
+        } else {
+            $dayRange = $dayAbbrev[$startDow] . '-' . $dayAbbrev[$endDow];
+        }
+        
+        // Format time
+        if ($sched['is_rest_day']) {
+            $parts[] = $dayRange . '; OFF';
+        } elseif ($sched['is_holiday']) {
+            $parts[] = $dayRange . '; HOLIDAY';
+        } else {
+            $timeIn = date('ga', strtotime($sched['time_in'])); // 7am
+            $timeOut = date('ga', strtotime($sched['time_out'])); // 4pm
+            $parts[] = $dayRange . '; ' . $timeIn . '-' . $timeOut;
+        }
+    }
+    
+    return implode(' | ', $parts);
+}
 
 // Function to check if a date is within approved leave period
 function isOnApprovedLeave($checkDate, $approvedLeaves) {
@@ -163,12 +325,15 @@ foreach ($employees as $employee) {
     $employeeLeaves = $leaveMap[$employeeId] ?? [];
     $employeeScheduleChanges = $scheduleChangeMap[$employeeId] ?? [];
     
+    // Get weekly schedule summary in format: "M-F; 7am-4pm | Sat-Sun; OFF"
+    $scheduleDisplay = getWeeklyScheduleSummary($pdo, $employeeId, $start);
+    
     // Initialize employee data
     $attendanceData[$employeeId] = [
         'name' => $empName, // Now in 'Last, First' format
         'company' => $employee['company'],
         'position' => $employee['position'],
-        'schedule' => getScheduleDisplay($employee['official_sched'] ?? 4),
+        'schedule' => $scheduleDisplay,
         'days' => []
     ];
     
@@ -181,14 +346,8 @@ foreach ($employees as $employee) {
         $logDate = $startDate->format('Y-m-d');
         $dayOfWeek = $startDate->format('N'); // 1=Monday, 7=Sunday
         
-        // Get employee's schedule for this date
-        $schedule_id_to_use = $employee['official_sched'] ?? 4;
-        foreach ($employeeScheduleChanges as $scheduleChange) {
-            if ($logDate >= $scheduleChange['start_date'] && $logDate <= $scheduleChange['end_date']) {
-                $schedule_id_to_use = $scheduleChange['work_schedule_id'];
-                break;
-            }
-        }
+        // Get employee's schedule for this date from cache (same as schedule_content.php)
+        $scheduleInfo = getScheduleForDate($pdo, $employeeId, $logDate);
         
         // Check if this date is on approved leave
         $leaveType = isOnApprovedLeave($logDate, $employeeLeaves);
@@ -203,35 +362,35 @@ foreach ($employees as $employee) {
         }
         
         // Determine attendance status
-        $statusInfo = getAttendanceStatus($timeLog, $leaveType, $schedule_id_to_use, $dayOfWeek);
+        $statusInfo = getAttendanceStatus($timeLog, $leaveType, $scheduleInfo, $dayOfWeek);
         
         $attendanceData[$employeeId]['days'][$logDate] = [
-            'status' => $statusInfo['status'],
-            'details' => $statusInfo['details'],
+            'status' => $statusInfo['status'] ?? '',
+            'details' => $statusInfo['details'] ?? '',
             'day_of_week' => $dayOfWeek,
             'time_in' => $timeLog['time_in'] ?? null,
             'time_out' => $timeLog['time_out'] ?? null,
-            'leave_type' => $leaveType
+            'leave_type' => $leaveType,
+            'is_rest_day' => $scheduleInfo['is_rest_day'] ?? 0,
+            'is_holiday' => $scheduleInfo['is_holiday'] ?? 0
         ];
         
         $startDate->modify('+1 day');
     }
 }
 
-// Helper function to get schedule display
-function getScheduleDisplay($scheduleId) {
-    global $schedule_times;
-    if (isset($schedule_times[$scheduleId])) {
-        $in = date('h:i A', strtotime($schedule_times[$scheduleId]['in']));
-        $out = date('h:i A', strtotime($schedule_times[$scheduleId]['out']));
-        return "$in-$out";
-    }
-    return "07:00 AM-04:00 PM";
-}
-
 // Helper function to determine attendance status with late/undertime details
-function getAttendanceStatus($log, $leaveType, $scheduleId, $dayOfWeek) {
-    global $schedule_times;
+function getAttendanceStatus($log, $leaveType, $scheduleInfo, $dayOfWeek) {
+    // Safety check for scheduleInfo
+    if (!$scheduleInfo) {
+        $scheduleInfo = [
+            'is_rest_day' => 0,
+            'is_holiday' => 0,
+            'time_in' => '07:00:00',
+            'time_out' => '16:00:00',
+            'schedule_name' => 'Default'
+        ];
+    }
     
     // If on leave, return leave type
     if ($leaveType) {
@@ -248,21 +407,25 @@ function getAttendanceStatus($log, $leaveType, $scheduleId, $dayOfWeek) {
         }
     }
     
-    // If no time log exists at all, check if this should be a work day
-    if (!$log) {
-        // If the employee has a valid schedule, this should be a work day
-        // Only show OFF if they have no schedule or it's genuinely a non-work day
-        if (!isset($schedule_times[$scheduleId])) {
-            // No schedule defined - could be day off
-            if ($dayOfWeek == 6 || $dayOfWeek == 7) { // Saturday or Sunday
-                return ['status' => 'OFF', 'details' => ''];
-            } else {
-                return ['status' => '', 'details' => '']; // Weekday with no schedule = absent
-            }
-        } else {
-            // Has schedule but no time log = absent (not OFF)
-            return ['status' => '', 'details' => ''];
+    // If this is a holiday
+    if (isset($scheduleInfo['is_holiday']) && $scheduleInfo['is_holiday'] == 1) {
+        if ($log && $log['time_in']) {
+            return ['status' => 'P', 'details' => 'Holiday Work'];
         }
+        return ['status' => 'HOL', 'details' => $scheduleInfo['holiday_name'] ?? ''];
+    }
+    
+    // If this is a rest day/off day
+    if (isset($scheduleInfo['is_rest_day']) && $scheduleInfo['is_rest_day'] == 1) {
+        if ($log && $log['time_in']) {
+            return ['status' => 'P', 'details' => 'Rest Day Work'];
+        }
+        return ['status' => 'OFF', 'details' => ''];
+    }
+    
+    // If no time log exists at all and it's a work day
+    if (!$log) {
+        return ['status' => '', 'details' => ''];
     }
     
     // Check for incomplete shifts
@@ -273,8 +436,8 @@ function getAttendanceStatus($log, $leaveType, $scheduleId, $dayOfWeek) {
     
     // If both time in and out exist, check for tardiness/undertime
     if ($log['time_in'] && $log['time_out'] && $log['time_out'] !== 'INC') {
-        $scheduleIn = $schedule_times[$scheduleId]['in'] ?? '07:00:00';
-        $scheduleOut = $schedule_times[$scheduleId]['out'] ?? '16:00:00';
+        $scheduleIn = $scheduleInfo['time_in'] ?? '07:00:00';
+        $scheduleOut = $scheduleInfo['time_out'] ?? '16:00:00';
         
         $actualTimeIn = $log['time_in'];
         $actualTimeOut = $log['time_out'];

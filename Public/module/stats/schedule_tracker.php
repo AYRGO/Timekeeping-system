@@ -47,23 +47,70 @@ $schedule_times = [
 
 $today = date('Y-m-d');
 
-// PRIORITY 1: Check for daily override in employee_daily_schedules (same as calendar)
+// PRIORITY 0: Check post_schedule_change_requests for approved day off requests
 $stmt = $pdo->prepare("
-    SELECT actual_schedule_id, is_rest_day
-    FROM employee_daily_schedules 
-    WHERE employee_id = ? AND schedule_date = ? 
+    SELECT is_rest_day, start_date, end_date, work_schedule_id
+    FROM post_schedule_change_requests
+    WHERE employee_id = ? 
+      AND status = 'Approved'
+      AND is_rest_day = 1
+      AND ? BETWEEN start_date AND end_date
     LIMIT 1
 ");
 $stmt->execute([$employee_id, $today]);
-$dailyOverride = $stmt->fetch(PDO::FETCH_ASSOC);
+$approvedDayOff = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// PRIORITY 2: Check for weekly default in employee_default_schedules
+// If today is within an approved day off period, treat it as OFF
+if ($approvedDayOff) {
+    $schedule_id_to_use = null;
+    $current_real_schedule_id = null;
+    $schedule_status = "off";
+    $status_text = "Day Off (Approved)";
+    $sched_time_in = 'OFF';
+    $sched_time_out = '';
+    $color = 'gray';
+    
+    // Store in session and skip further checks
+    $_SESSION['current_schedule'] = [
+        'schedule_id' => $schedule_id_to_use,
+        'current_real_schedule_id' => $current_real_schedule_id,
+        'baseline_schedule_id' => $default_schedule_id,
+        'time_in'     => $sched_time_in,
+        'time_out'    => $sched_time_out,
+        'status'      => $schedule_status,
+        'status_text' => $status_text,
+        'has_daily_override' => false,
+        'has_weekly_default' => false,
+        'has_pending_request' => false,
+    ];
+} else {
+    // Continue with normal priority checks
+    
+    // PRIORITY 1: Check employee_daily_schedule_cache
+    $stmt = $pdo->prepare("
+        SELECT 
+            work_schedule_id,
+            is_rest_day,
+            is_holiday,
+            schedule_name,
+            time_in,
+            time_out,
+            source
+        FROM employee_daily_schedule_cache
+        WHERE employee_id = ? AND schedule_date = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $today]);
+    $cacheData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// FALLBACK: Check for weekly default in employee_default_schedules
 $dayOfWeek = date('w', strtotime($today)); // 0=Sunday, 1=Monday, ..., 6=Saturday
 $stmt = $pdo->prepare("
-    SELECT work_schedule_id, is_rest_day 
-    FROM employee_default_schedules 
-    WHERE employee_id = ? AND day_of_week = ? 
-    AND effective_from <= ? AND (effective_until IS NULL OR effective_until >= ?) 
+    SELECT edd.work_schedule_id, edd.is_rest_day, ws.time_in, ws.time_out, ws.name
+    FROM employee_default_schedules edd
+    LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+    WHERE edd.employee_id = ? AND edd.day_of_week = ? 
+    AND edd.effective_from <= ? AND (edd.effective_until IS NULL OR edd.effective_until >= ?) 
     LIMIT 1
 ");
 $stmt->execute([$employee_id, $dayOfWeek, $today, $today]);
@@ -79,80 +126,122 @@ $stmt = $pdo->prepare("
 $stmt->execute([$employee_id]);
 $latestRequest = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Determine what schedule to use based on calendar priority (matching schedule_content.php)
-if ($dailyOverride) {
-    // Daily override exists (from approved schedule change request)
-    if ($dailyOverride['is_rest_day']) {
-        $schedule_id_to_use = null; // Rest day
+// Determine what schedule to use based on cache or fallback
+if ($cacheData) {
+    // Data found in cache
+    if ($cacheData['is_rest_day']) {
+        $schedule_id_to_use = null;
         $current_real_schedule_id = null;
-        $schedule_status = "rest_day";
-        $status_text = "Rest Day (From Request)";
+        $schedule_status = "off";
+        $status_text = "Off";
+        $sched_time_in = 'OFF';
+        $sched_time_out = '';
+    } elseif ($cacheData['is_holiday']) {
+        $schedule_id_to_use = null;
+        $current_real_schedule_id = null;
+        $schedule_status = "holiday";
+        $status_text = "Holiday";
+        $sched_time_in = 'HOLIDAY';
+        $sched_time_out = '';
     } else {
-        $current_real_schedule_id = $dailyOverride['actual_schedule_id'] ?? $default_schedule_id;
+        $current_real_schedule_id = $cacheData['work_schedule_id'];
         $schedule_id_to_use = $current_real_schedule_id;
-        $schedule_status = "approved";
-        $status_text = "Active Schedule Override";
+        
+        // Determine status based on source
+        if ($cacheData['source'] === 'approved_request') {
+            $schedule_status = "approved";
+            $status_text = "Schedule Changed";
+        } elseif ($cacheData['source'] === 'admin_override') {
+            $schedule_status = "approved";
+            $status_text = "Admin Override";
+        } else {
+            $schedule_status = "weekly_default";
+            $status_text = "Active Schedule";
+        }
+        
+        // Use times from cache
+        $sched_time_in = date('h:i A', strtotime($cacheData['time_in']));
+        $sched_time_out = date('h:i A', strtotime($cacheData['time_out']));
     }
 } elseif ($weeklyDefault) {
-    // Weekly default schedule
+    // Fallback to weekly default
     if ($weeklyDefault['is_rest_day']) {
         $schedule_id_to_use = null;
         $current_real_schedule_id = null;
-        $schedule_status = "rest_day";
-        $status_text = "Rest Day (Weekly Default)";
+        $schedule_status = "off";
+        $status_text = "Off";
+        $sched_time_in = 'OFF';
+        $sched_time_out = '';
     } else {
         $current_real_schedule_id = $weeklyDefault['work_schedule_id'] ?? $default_schedule_id;
         $schedule_id_to_use = $current_real_schedule_id;
         $schedule_status = "weekly_default";
-        $status_text = "Weekly Default Schedule";
+        $status_text = "Active Schedule";
+        
+        // Use times from weekly default
+        if ($weeklyDefault['time_in'] && $weeklyDefault['time_out']) {
+            $sched_time_in = date('h:i A', strtotime($weeklyDefault['time_in']));
+            $sched_time_out = date('h:i A', strtotime($weeklyDefault['time_out']));
+        } else {
+            $sched_time_in_24h = $schedule_times[$schedule_id_to_use]['in'] ?? '07:00:00';
+            $sched_time_out_24h = $schedule_times[$schedule_id_to_use]['out'] ?? '16:00:00';
+            $sched_time_in = date('h:i A', strtotime($sched_time_in_24h));
+            $sched_time_out = date('h:i A', strtotime($sched_time_out_24h));
+        }
     }
 } else {
-    // Fallback to employee's official schedule
-    $current_real_schedule_id = $default_schedule_id;
-    $schedule_id_to_use = $default_schedule_id;
-    $schedule_status = "baseline";
-    $status_text = "Official Schedule";
+    // Check if weekend
+    if ($dayOfWeek == 0 || $dayOfWeek == 6) {
+        $schedule_id_to_use = null;
+        $current_real_schedule_id = null;
+        $schedule_status = "off";
+        $status_text = "Off";
+        $sched_time_in = 'OFF';
+        $sched_time_out = '';
+    } else {
+        // Final fallback to employee's official schedule
+        $current_real_schedule_id = $default_schedule_id;
+        $schedule_id_to_use = $default_schedule_id;
+        $schedule_status = "baseline";
+        $status_text = "Official Schedule";
+        
+        $sched_time_in_24h = $schedule_times[$schedule_id_to_use]['in'] ?? '07:00:00';
+        $sched_time_out_24h = $schedule_times[$schedule_id_to_use]['out'] ?? '16:00:00';
+        $sched_time_in = date('h:i A', strtotime($sched_time_in_24h));
+        $sched_time_out = date('h:i A', strtotime($sched_time_out_24h));
+    }
 }
 
-// Check if there's a pending request (overlay indicator)
-if ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') {
-    $schedule_status = "pending";
-    $status_text = "Schedule Change Pending";
-}
+    // Check if there's a pending request (overlay indicator)
+    if ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') {
+        $schedule_status = "pending";
+        $status_text = "Schedule Change Pending";
+    }
 
-// Final schedule - convert to display format (handle rest days)
-if ($schedule_id_to_use === null) {
-    // Rest day
-    $sched_time_in = 'REST';
-    $sched_time_out = 'DAY';
-} else {
-    $sched_time_in_24h = $schedule_times[$schedule_id_to_use]['in'] ?? '07:00:00';
-    $sched_time_out_24h = $schedule_times[$schedule_id_to_use]['out'] ?? '16:00:00';
-    $sched_time_in  = date('h:i A', strtotime($sched_time_in_24h));
-    $sched_time_out = date('h:i A', strtotime($sched_time_out_24h));
-}
+    // Determine UI badge color
+    $color = match ($schedule_status) {
+        'approved' => 'green',
+        'pending'  => 'yellow',
+        'declined' => 'red',
+        'off'      => 'gray',
+        'holiday'  => 'amber',
+        default    => 'blue',
+    };
 
-// Determine UI badge color
-$color = match ($schedule_status) {
-    'approved' => 'green',
-    'pending'  => 'yellow',
-    'declined' => 'red',
-    default    => 'blue',
-};
-
-// Store in session (including current real schedule ID)
-$_SESSION['current_schedule'] = [
-    'schedule_id' => $schedule_id_to_use,
-    'current_real_schedule_id' => $current_real_schedule_id,
-    'baseline_schedule_id' => $default_schedule_id,
-    'time_in'     => $sched_time_in,
-    'time_out'    => $sched_time_out,
-    'status'      => $schedule_status,
-    'status_text' => $status_text,
-    'has_daily_override' => $dailyOverride ? true : false,
-    'has_weekly_default' => $weeklyDefault ? true : false,
-    'has_pending_request' => ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') ? true : false,
-];
+    // Store in session (including current real schedule ID)
+    $_SESSION['current_schedule'] = [
+        'schedule_id' => $schedule_id_to_use,
+        'current_real_schedule_id' => $current_real_schedule_id,
+        'baseline_schedule_id' => $default_schedule_id,
+        'time_in'     => $sched_time_in,
+        'time_out'    => $sched_time_out,
+        'status'      => $schedule_status,
+        'status_text' => $status_text,
+        'has_daily_override' => ($cacheData && $cacheData['source'] === 'admin_override') ? true : false,
+        'has_weekly_default' => $weeklyDefault ? true : false,
+        'has_pending_request' => ($latestRequest && strtolower(trim($latestRequest['status'])) === 'pending') ? true : false,
+    ];
+} // Close the else block from approved day off check
 
 // Function to get current real-time schedule ID (updated to check employee_daily_schedules first)
 function getCurrentRealScheduleId($employee_id, $pdo) {
@@ -204,7 +293,15 @@ function getCurrentRealScheduleId($employee_id, $pdo) {
     <div class="flex justify-between items-center">
         <div>
             <p class="text-gray-500">Schedule Today</p>
-            <?php if ($schedule_id_to_use === null): ?>
+            <?php if ($schedule_status === 'off'): ?>
+                <p class="text-2xl font-bold text-gray-600" style="font-family: 'Inter', sans-serif;">
+                    OFF
+                </p>
+            <?php elseif ($schedule_status === 'holiday'): ?>
+                <p class="text-2xl font-bold text-amber-600" style="font-family: 'Inter', sans-serif;">
+                    HOLIDAY
+                </p>
+            <?php elseif ($schedule_id_to_use === null): ?>
                 <p class="text-2xl font-bold text-gray-900" style="font-family: 'Inter', sans-serif;">
                     REST DAY
                 </p>
@@ -217,7 +314,11 @@ function getCurrentRealScheduleId($employee_id, $pdo) {
             <!-- Debug info removed as requested -->
         </div>
         <div class="w-12 h-12 rounded-full bg-<?= $color ?>-100 flex items-center justify-center">
-            <?php if ($dailyOverride): ?>
+            <?php if ($schedule_status === 'off'): ?>
+                <i class="fas fa-bed text-xl text-<?= $color ?>-600"></i>
+            <?php elseif ($schedule_status === 'holiday'): ?>
+                <i class="fas fa-star text-xl text-<?= $color ?>-600"></i>
+            <?php elseif ($schedule_status === 'approved'): ?>
                 <i class="fas fa-exchange-alt text-xl text-<?= $color ?>-600"></i>
             <?php else: ?>
                 <i class="fas fa-calendar-day text-xl text-<?= $color ?>-600"></i>
