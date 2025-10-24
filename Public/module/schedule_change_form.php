@@ -30,15 +30,31 @@
           <?= csrf_token_field() ?>
           <input type="hidden" name="submit_schedule_change" value="1">
 
-          <!-- Row 1: Date Range (Full Width) -->
+          <!-- Row 1: Single Date -->
           <div class="mb-6">
-            <label for="date_range" class="block text-sm font-semibold text-gray-700 mb-2">
-              Effective Date Range
+            <label for="schedule_date" class="block text-sm font-semibold text-gray-700 mb-2">
+              Select Date
             </label>
             <div class="relative">
-              <input type="text" name="date_range" id="date_range" placeholder="Select date range"
-                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white flatpickr-input" required>
+              <input type="date" name="date_range" id="schedule_date" placeholder="Select date"
+                     min="<?= date('Y-m-d') ?>"
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white" required>
               <i class="fas fa-calendar absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+            </div>
+            
+            <!-- Current Schedule Display -->
+            <div id="currentScheduleDisplay" class="hidden mt-3">
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-start gap-3">
+                  <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-600 text-lg"></i>
+                  </div>
+                  <div class="flex-1">
+                    <div class="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-1">Current Schedule</div>
+                    <div id="currentScheduleText" class="text-sm text-blue-900 font-medium"></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -64,8 +80,11 @@
               <div class="px-4 py-2 bg-green-50 border-l-4 border-green-500 rounded">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2 flex-1">
-                    <i class="fas fa-check-circle text-green-600 text-sm"></i>
-                    <span class="text-sm font-medium text-gray-700" id="selectedScheduleText"></span>
+                    <i class="fas fa-arrow-right text-green-600 text-sm"></i>
+                    <div class="flex-1">
+                      <div class="text-xs font-semibold text-green-800 uppercase tracking-wide">New Schedule</div>
+                      <span class="text-sm font-medium text-green-900" id="selectedScheduleText"></span>
+                    </div>
                   </div>
                   <button type="button" onclick="clearScheduleSelection()" 
                           class="text-gray-400 hover:text-red-500 text-sm transition-colors">
@@ -380,24 +399,16 @@ function openScheduleChangeModal(date) {
         field.classList.remove('border-red-400');
     });
     
-    // If a date was provided, set it in the date range field
+    // If a date was provided, set it in the date field
     if (date) {
-        setTimeout(function() {
-            const dateRangeField = document.getElementById('date_range');
-            if (dateRangeField && window.dateRangePicker) {
-                // Set the date using flatpickr's setDate method
-                const dateObj = new Date(date);
-                window.dateRangePicker.setDate([dateObj, dateObj], true);
-                
-                // Also set the input value directly as fallback
-                dateRangeField.value = date + ' to ' + date;
-                
-                console.log('📅 Pre-filled date range:', dateRangeField.value);
-            } else if (dateRangeField) {
-                // Fallback if flatpickr not initialized yet
-                dateRangeField.value = date + ' to ' + date;
-            }
-        }, 150);
+        const dateField = document.getElementById('schedule_date');
+        if (dateField) {
+            dateField.value = date;
+            console.log('📅 Pre-filled date:', dateField.value);
+            
+            // Fetch and display current schedule for this date
+            setTimeout(() => fetchCurrentSchedule(date), 100);
+        }
     }
 }
 
@@ -468,26 +479,26 @@ document.getElementById('scheduleChangeForm').addEventListener('submit', functio
         }
     } else {
         // Log form data before submission for debugging
-        const dateRange = document.getElementById('date_range').value;
+        const scheduleDate = document.getElementById('schedule_date').value;
         const workScheduleId = document.getElementById('work_schedule_id').value;
         const fileInput = document.getElementById('fileInput');
         const hasFile = fileInput.files && fileInput.files.length > 0;
         
         console.log('📝 Form submission data:', {
-            date_range: dateRange,
+            schedule_date: scheduleDate,
             work_schedule_id: workScheduleId || 'REST_DAY',
-            date_range_format: dateRange ? 'valid' : 'EMPTY!',
+            date_format: scheduleDate ? 'valid' : 'EMPTY!',
             has_attachment: hasFile,
             attachment_name: hasFile ? fileInput.files[0].name : 'none',
             is_rest_day: !workScheduleId
         });
         
-        if (!dateRange || dateRange.trim() === '') {
-            console.error('❌ Date range is empty! This will cause Jan 1, 1970 issue.');
-            alert('Please select a date range before submitting.');
+        if (!scheduleDate || scheduleDate.trim() === '') {
+            console.error('❌ Date is empty!');
+            alert('Please select a date before submitting.');
             e.preventDefault();
-            document.getElementById('date_range').focus();
-            document.getElementById('date_range').classList.add('border-red-400');
+            document.getElementById('schedule_date').focus();
+            document.getElementById('schedule_date').classList.add('border-red-400');
         }
     }
 });
@@ -581,56 +592,97 @@ function clearScheduleSelection() {
     document.getElementById('scheduleSearch').focus();
 }
  
-// Initialize flatpickr for schedule change date range
-if (typeof flatpickr !== 'undefined') {
-    const dateRangeInput = document.getElementById('date_range');
+// Function to fetch and display current schedule for a date
+function fetchCurrentSchedule(date) {
+    console.log('🔍 fetchCurrentSchedule called with date:', date);
     
-    const fp = flatpickr("#date_range", {
-        mode: "range",
-        dateFormat: "Y-m-d",
-        minDate: "today",
-        altInput: false, // Changed to false - use single input with readable format
-        onChange: function(selectedDates, dateStr, instance) {
-            console.log('📅 Flatpickr date selected:', dateStr);
-            console.log('📅 Selected dates array:', selectedDates);
-            console.log('📅 Input value:', document.getElementById('date_range').value);
-            
-            // Manually format for display but keep Y-m-d for submission
-            if (selectedDates.length === 2) {
-                const startDate = selectedDates[0];
-                const endDate = selectedDates[1];
-                
-                // Format as YYYY-MM-DD for backend
-                const startFormatted = startDate.getFullYear() + '-' + 
-                    String(startDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                    String(startDate.getDate()).padStart(2, '0');
-                const endFormatted = endDate.getFullYear() + '-' + 
-                    String(endDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                    String(endDate.getDate()).padStart(2, '0');
-                
-                // Set the value in Y-m-d format
-                dateRangeInput.value = startFormatted + ' to ' + endFormatted;
-                
-                console.log('✅ Date range set to:', dateRangeInput.value);
-            } else if (selectedDates.length === 1) {
-                const startDate = selectedDates[0];
-                const startFormatted = startDate.getFullYear() + '-' + 
-                    String(startDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                    String(startDate.getDate()).padStart(2, '0');
-                dateRangeInput.value = startFormatted;
-                console.log('✅ Single date set to:', dateRangeInput.value);
-            }
+    if (!date) {
+        console.log('❌ No date provided, hiding display');
+        document.getElementById('currentScheduleDisplay').classList.add('hidden');
+        return;
+    }
+    
+    // Show loading state
+    console.log('⏳ Showing loading state...');
+    document.getElementById('currentScheduleDisplay').classList.remove('hidden');
+    document.getElementById('currentScheduleText').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading current schedule...';
+    
+    // Fetch schedule from backend
+    console.log('📡 Fetching from: ../controller/ajax_get_schedule_for_date.php');
+    fetch('../controller/ajax_get_schedule_for_date.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
         },
-        onReady: function(selectedDates, dateStr, instance) {
-            console.log('📅 Flatpickr initialized successfully');
+        body: 'date=' + encodeURIComponent(date)
+    })
+    .then(response => {
+        console.log('📥 Response received:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error('HTTP error! status: ' + response.status);
         }
+        return response.json();
+    })
+    .then(data => {
+        console.log('✅ Data received:', data);
+        
+        if (data.success && data.has_schedule) {
+            document.getElementById('currentScheduleText').textContent = data.display;
+            document.getElementById('currentScheduleDisplay').classList.remove('hidden');
+            console.log('✅ Current schedule displayed:', data.display);
+        } else if (data.success) {
+            document.getElementById('currentScheduleText').textContent = data.display || 'No schedule set';
+            document.getElementById('currentScheduleDisplay').classList.remove('hidden');
+            console.log('ℹ️ No schedule found:', data.display);
+        } else {
+            console.error('❌ Error from server:', data.error);
+            document.getElementById('currentScheduleText').textContent = 'Error loading schedule: ' + (data.error || 'Unknown error');
+            document.getElementById('currentScheduleDisplay').classList.remove('hidden');
+        }
+    })
+    .catch(error => {
+        console.error('❌ Network error:', error);
+        document.getElementById('currentScheduleText').textContent = 'Failed to load current schedule. Please try again.';
+        document.getElementById('currentScheduleDisplay').classList.remove('hidden');
     });
-    
-    // Store flatpickr instance globally for debugging
-    window.dateRangePicker = fp;
-} else {
-    console.warn('⚠️ Flatpickr is not loaded! Date picker will not work properly.');
 }
+
+// Add event listener for date changes - fetch current schedule when date is selected
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Schedule change form initialized');
+    
+    const dateField = document.getElementById('schedule_date');
+    
+    if (dateField) {
+        console.log('✅ Date field found');
+        
+        // Add change event listener
+        dateField.addEventListener('change', function() {
+            const selectedDate = this.value;
+            console.log('📅 Date changed to:', selectedDate);
+            
+            if (selectedDate) {
+                // Fetch and display current schedule for this date
+                fetchCurrentSchedule(selectedDate);
+            } else {
+                // Hide current schedule if no date selected
+                document.getElementById('currentScheduleDisplay').classList.add('hidden');
+            }
+        });
+        
+        // Also add input event for better responsiveness
+        dateField.addEventListener('input', function() {
+            const selectedDate = this.value;
+            console.log('📅 Date input:', selectedDate);
+            
+            if (selectedDate) {
+                fetchCurrentSchedule(selectedDate);
+            }
+        });
+    } else {
+        console.error('❌ Date field not found!');
+    }
+});
 
 // Search functionality - shows dropdown on type
 document.addEventListener('DOMContentLoaded', function() {

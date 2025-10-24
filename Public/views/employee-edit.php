@@ -207,6 +207,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
+        // Rebuild cache for this employee (next 6 months)
+        $startDate = date('Y-m-d');
+        $endDate = date('Y-m-d', strtotime('+6 months'));
+        
+        // Delete existing cache entries for this date range
+        $pdo->prepare("DELETE FROM employee_daily_schedule_cache WHERE employee_id = ? AND schedule_date BETWEEN ? AND ?")
+            ->execute([$employeeId, $startDate, $endDate]);
+        
+        // Rebuild cache day by day
+        $currentDate = $startDate;
+        while ($currentDate <= $endDate) {
+            $dayOfWeek = date('w', strtotime($currentDate)); // 0 (Sunday) to 6 (Saturday)
+            
+            // Get default schedule for this day of week
+            $schedStmt = $pdo->prepare("
+                SELECT eds.work_schedule_id, eds.is_rest_day, ws.name as schedule_name, ws.time_in, ws.time_out
+                FROM employee_default_schedules eds
+                LEFT JOIN work_schedules ws ON eds.work_schedule_id = ws.id
+                WHERE eds.employee_id = ? AND eds.day_of_week = ?
+            ");
+            $schedStmt->execute([$employeeId, $dayOfWeek]);
+            $defaultSched = $schedStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($defaultSched) {
+                // Insert cache entry
+                $cacheStmt = $pdo->prepare("
+                    INSERT INTO employee_daily_schedule_cache 
+                    (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'weekly_default', NULL, NOW())
+                ");
+                $cacheStmt->execute([
+                    $employeeId,
+                    $currentDate,
+                    $defaultSched['work_schedule_id'],
+                    $defaultSched['is_rest_day'],
+                    0, // is_holiday - set to 0 (no holiday checking)
+                    $defaultSched['schedule_name'],
+                    $defaultSched['time_in'],
+                    $defaultSched['time_out'],
+                    null // holiday_name
+                ]);
+            }
+            
+            $currentDate = date('Y-m-d', strtotime($currentDate . ' +1 day'));
+        }
+        
         // Note: schedule_override_history table uses different columns (schedule_date, original_schedule_id, new_schedule_id, override_reason, applied_by)
         // Skipping history logging for weekly schedule updates since it's for daily overrides
         
@@ -2082,8 +2128,27 @@ function openTab(evt, tabName) {
     evt.currentTarget.classList.add("active");
 }
 
-// Show default tab on page load
+// Show default tab on page load, or tab from URL hash
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if there's a hash in the URL
+    const hash = window.location.hash.substring(1); // Remove the # symbol
+    
+    if (hash) {
+        // Check if a tab with this ID exists
+        const tabElement = document.getElementById(hash);
+        if (tabElement && tabElement.classList.contains('tab-content')) {
+            // Find the corresponding tab button and click it
+            const tabButtons = document.querySelectorAll('.tab-button');
+            for (let button of tabButtons) {
+                if (button.getAttribute('onclick') && button.getAttribute('onclick').includes(`'${hash}'`)) {
+                    button.click();
+                    return;
+                }
+            }
+        }
+    }
+    
+    // Default: open the first tab
     document.getElementById('default-tab').click();
 });
 

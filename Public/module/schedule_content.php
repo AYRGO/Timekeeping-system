@@ -11,9 +11,10 @@ function getMonthsNav_schedule($year, $month) {
     return ['prev'=>$prev, 'next'=>$next];
 }
 
-// Get employee's schedule for a specific date - CACHE VERSION (FAST & SIMPLE)
+// Get employee's schedule for a specific date - FROM PERSONAL CALENDAR CACHE
+// This is the employee's ACTUAL calendar - showing approved requests, admin overrides, holidays, and defaults
 function getScheduleCell_schedule($pdo, $employee_id, $date) {
-    // Query the pre-computed cache table
+    // Query the pre-computed cache table - THIS IS THE EMPLOYEE'S PERSONAL CALENDAR DATA
     $stmt = $pdo->prepare("
         SELECT 
             schedule_date,

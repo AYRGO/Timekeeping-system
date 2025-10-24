@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
                 while ($current_date <= $end_date) {
                     $date_str = $current_date->format('Y-m-d');
                     
-                    // Check if entry exists
+                    // Check if entry exists in employee_daily_schedules
                     $checkStmt = $pdo->prepare("
                         SELECT id FROM employee_daily_schedules 
                         WHERE employee_id = ? AND schedule_date = ?
@@ -130,8 +130,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
                         ]);
                     }
                     
+                    // UPDATE CACHE: Update employee_daily_schedule_cache (used by calendar)
+                    // Get schedule details if not rest day
+                    $scheduleName = null;
+                    $timeIn = null;
+                    $timeOut = null;
+                    
+                    if (!$is_rest_day && $request_data['work_schedule_id']) {
+                        $schedStmt = $pdo->prepare("SELECT name, time_in, time_out FROM work_schedules WHERE id = ?");
+                        $schedStmt->execute([$request_data['work_schedule_id']]);
+                        $schedData = $schedStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($schedData) {
+                            $scheduleName = $schedData['name'];
+                            $timeIn = $schedData['time_in'];
+                            $timeOut = $schedData['time_out'];
+                        }
+                    }
+                    
+                    // Check if cache entry exists
+                    $cacheCheckStmt = $pdo->prepare("
+                        SELECT id FROM employee_daily_schedule_cache 
+                        WHERE employee_id = ? AND schedule_date = ?
+                    ");
+                    $cacheCheckStmt->execute([$request_data['employee_id'], $date_str]);
+                    $cacheExists = $cacheCheckStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($cacheExists) {
+                        // Update cache
+                        $cacheUpdateStmt = $pdo->prepare("
+                            UPDATE employee_daily_schedule_cache 
+                            SET work_schedule_id = ?,
+                                is_rest_day = ?,
+                                schedule_name = ?,
+                                time_in = ?,
+                                time_out = ?,
+                                source = 'approved_request',
+                                source_id = ?
+                            WHERE id = ?
+                        ");
+                        $cacheUpdateStmt->execute([
+                            $is_rest_day ? null : $request_data['work_schedule_id'],
+                            $is_rest_day,
+                            $scheduleName,
+                            $timeIn,
+                            $timeOut,
+                            $post_request_id,
+                            $cacheExists['id']
+                        ]);
+                    } else {
+                        // Insert into cache
+                        $cacheInsertStmt = $pdo->prepare("
+                            INSERT INTO employee_daily_schedule_cache 
+                            (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, 
+                             schedule_name, time_in, time_out, holiday_name, source, source_id, created_at)
+                            VALUES (?, ?, ?, ?, 0, ?, ?, ?, NULL, 'approved_request', ?, NOW())
+                        ");
+                        $cacheInsertStmt->execute([
+                            $request_data['employee_id'],
+                            $date_str,
+                            $is_rest_day ? null : $request_data['work_schedule_id'],
+                            $is_rest_day,
+                            $scheduleName,
+                            $timeIn,
+                            $timeOut,
+                            $post_request_id
+                        ]);
+                    }
+                    
                     $current_date->modify('+1 day');
                 }
+            }
+
+            // CLEANUP: If declined/rejected, remove any orphaned cache entries that reference this request
+            if ($action !== 'approve') {
+                // Delete cache entries that were created by this request (if it was previously approved)
+                $cleanupStmt = $pdo->prepare("
+                    DELETE FROM employee_daily_schedule_cache 
+                    WHERE employee_id = ? 
+                      AND schedule_date BETWEEN ? AND ? 
+                      AND source = 'approved_request'
+                      AND (source_id = ? OR source_id IS NULL OR source_id = 0)
+                ");
+                $cleanupStmt->execute([
+                    $request_data['employee_id'],
+                    $request_data['start_date'],
+                    $request_data['end_date'],
+                    $post_request_id
+                ]);
             }
 
             $pdo->commit();

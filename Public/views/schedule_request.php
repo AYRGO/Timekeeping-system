@@ -66,53 +66,83 @@ function getScheduleTime($schedule_id) {
     }
 }
 
-// Helper: Get current schedule for an employee (same logic as schedule_tracker.php)
-function getCurrentScheduleForEmployee($employee_id, $pdo) {
-    // Hardcoded schedule times
-    $schedule_times = [
-        1 => ['in' => '06:30:00', 'out' => '15:30:00'],
-        2 => ['in' => '08:00:00', 'out' => '19:00:00'],
-        3 => ['in' => '07:30:00', 'out' => '16:30:00'],
-        4 => ['in' => '07:00:00', 'out' => '16:00:00'],
-        5 => ['in' => '08:00:00', 'out' => '17:00:00'],
-        6 => ['in' => '09:00:00', 'out' => '18:00:00'],
-        7 => ['in' => '10:00:00', 'out' => '19:00:00'],
-        8 => ['in' => '06:00:00', 'out' => '15:00:00'],
-        9 => ['in' => '08:00:00', 'out' => '16:30:00'],
-        10 => ['in' => '07:40:00', 'out' => '16:40:00'],
-        11 => ['in' => '06:30:00', 'out' => '15:00:00'],
-            12 => ['in' => '06:30:00', 'out' => '17:30:00'],
-    13 => ['in' => '07:00:00', 'out' => '18:00:00'],
-    14 => ['in' => '06:00:00', 'out' => '17:00:00'],
-    15 => ['in' => '06:00:00', 'out' => '16:00:00'],
-    16 => ['in' => '08:30:00', 'out' => '16:30:00'],
-    17 => ['in' => '06:00:00', 'out' => '12:00:00'],
-    18 => ['in' => '06:00:00', 'out' => '14:30:00'],
-
-    ];
-    $today = date('Y-m-d');
+// Helper: Get current schedule for an employee from the cache (what calendar displays)
+function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
+    if (!$date) $date = date('Y-m-d');
     
-    // Get official_sched
-    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
-    $stmt->execute([$employee_id]);
-    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-    $default_schedule_id = $employee['official_sched'] ?? 4;
-    // Check for active approved schedule
+    // PRIORITY 1: Check employee_daily_schedule_cache (what the calendar displays)
     $stmt = $pdo->prepare("
-        SELECT work_schedule_id, start_date, end_date
-        FROM post_schedule_change_requests
-        WHERE employee_id = ? AND status = 'Approved'
-        AND ? BETWEEN start_date AND end_date
-        ORDER BY created_at DESC
+        SELECT work_schedule_id, is_rest_day, schedule_name, time_in, time_out
+        FROM employee_daily_schedule_cache 
+        WHERE employee_id = ? AND schedule_date = ? 
         LIMIT 1
     ");
-    $stmt->execute([$employee_id, $today]);
-    $active = $stmt->fetch(PDO::FETCH_ASSOC);
-    $schedule_id = $active ? ($active['work_schedule_id'] ?? $default_schedule_id) : $default_schedule_id;
-    $sched = $schedule_times[$schedule_id] ?? ['in' => '07:00:00', 'out' => '16:00:00'];
+    $stmt->execute([$employee_id, $date]);
+    $cachedSchedule = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($cachedSchedule) {
+        if ($cachedSchedule['is_rest_day']) {
+            return [
+                'id' => null,
+                'display' => 'OFF'
+            ];
+        }
+        if ($cachedSchedule['time_in'] && $cachedSchedule['time_out']) {
+            return [
+                'id' => $cachedSchedule['work_schedule_id'],
+                'display' => date('g:i A', strtotime($cachedSchedule['time_in'])) . ' – ' . date('g:i A', strtotime($cachedSchedule['time_out']))
+            ];
+        }
+    }
+    
+    // FALLBACK: Check employee_default_schedules (weekly default)
+    $dayOfWeek = date('w', strtotime($date));
+    $stmt = $pdo->prepare("
+        SELECT eds.work_schedule_id, eds.is_rest_day, ws.time_in, ws.time_out
+        FROM employee_default_schedules eds
+        LEFT JOIN work_schedules ws ON eds.work_schedule_id = ws.id
+        WHERE eds.employee_id = ? AND eds.day_of_week = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $dayOfWeek]);
+    $weeklySchedule = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($weeklySchedule) {
+        if ($weeklySchedule['is_rest_day']) {
+            return [
+                'id' => null,
+                'display' => 'OFF'
+            ];
+        }
+        if ($weeklySchedule['time_in'] && $weeklySchedule['time_out']) {
+            return [
+                'id' => $weeklySchedule['work_schedule_id'],
+                'display' => date('g:i A', strtotime($weeklySchedule['time_in'])) . ' – ' . date('g:i A', strtotime($weeklySchedule['time_out']))
+            ];
+        }
+    }
+    
+    // LAST RESORT: Fall back to employee's official schedule
+    $empStmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+    $empStmt->execute([$employee_id]);
+    $emp = $empStmt->fetch(PDO::FETCH_ASSOC);
+    $officialSchedId = $emp['official_sched'] ?? 4;
+    
+    $schedStmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
+    $schedStmt->execute([$officialSchedId]);
+    $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($sched) {
+        return [
+            'id' => $officialSchedId,
+            'display' => date('g:i A', strtotime($sched['time_in'])) . ' – ' . date('g:i A', strtotime($sched['time_out']))
+        ];
+    }
+    
+    // Ultimate fallback
     return [
-        'id' => $schedule_id,
-        'display' => date('g:i A', strtotime($sched['in'])) . ' – ' . date('g:i A', strtotime($sched['out']))
+        'id' => 4,
+        'display' => '7:00 AM – 4:00 PM'
     ];
 }
 ?>
@@ -208,8 +238,8 @@ function getCurrentScheduleForEmployee($employee_id, $pdo) {
                                         }
                                     }
                                     
-                                    // Get current schedule from tracker logic
-                                    $current_sched = getCurrentScheduleForEmployee($sr['employee_id'], $pdo);
+                                    // Get current schedule from cache for the start date of the request
+                                    $current_sched = getCurrentScheduleForEmployee($sr['employee_id'], $pdo, $sr['start_date']);
                                     // Calculate period duration
                                     $start = new DateTime($sr['start_date']);
                                     $end = new DateTime($sr['end_date']);

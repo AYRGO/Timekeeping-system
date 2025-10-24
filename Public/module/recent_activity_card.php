@@ -24,62 +24,52 @@ $recentActivities = array_slice($filteredActivities, 0, 10);
 function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) {
     if (!$date) $date = date('Y-m-d');
     
-    // PRIORITY 1: Check employee_daily_schedules (daily override)
+    // PRIORITY 1: Check employee_daily_schedule_cache (what the calendar actually displays)
     try {
         $stmt = $pdo->prepare("
-            SELECT actual_schedule_id, is_rest_day
-            FROM employee_daily_schedules 
+            SELECT work_schedule_id, is_rest_day, schedule_name, time_in, time_out
+            FROM employee_daily_schedule_cache 
             WHERE employee_id = ? AND schedule_date = ? 
             LIMIT 1
         ");
         $stmt->execute([$employee_id, $date]);
-        $dailySchedule = $stmt->fetch(PDO::FETCH_ASSOC);
+        $cachedSchedule = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($dailySchedule) {
-            if ($dailySchedule['is_rest_day']) {
+        if ($cachedSchedule) {
+            if ($cachedSchedule['is_rest_day']) {
                 return ['is_rest_day' => true];
             }
-            if ($dailySchedule['actual_schedule_id']) {
-                $schedStmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
-                $schedStmt->execute([$dailySchedule['actual_schedule_id']]);
-                $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
-                if ($sched) {
-                    return [
-                        'time_in' => date('g:i A', strtotime($sched['time_in'])),
-                        'time_out' => date('g:i A', strtotime($sched['time_out'])),
-                        'is_rest_day' => false
-                    ];
-                }
+            if ($cachedSchedule['time_in'] && $cachedSchedule['time_out']) {
+                return [
+                    'time_in' => date('g:i A', strtotime($cachedSchedule['time_in'])),
+                    'time_out' => date('g:i A', strtotime($cachedSchedule['time_out'])),
+                    'is_rest_day' => false
+                ];
             }
         }
         
-        // PRIORITY 2: Check employee_default_schedules (weekly default)
+        // FALLBACK: Check employee_default_schedules (weekly default)
         $dayOfWeek = date('w', strtotime($date));
         $stmt = $pdo->prepare("
-            SELECT work_schedule_id, is_rest_day 
-            FROM employee_default_schedules 
-            WHERE employee_id = ? AND day_of_week = ? 
-            AND effective_from <= ? AND (effective_until IS NULL OR effective_until >= ?) 
+            SELECT eds.work_schedule_id, eds.is_rest_day, ws.time_in, ws.time_out
+            FROM employee_default_schedules eds
+            LEFT JOIN work_schedules ws ON eds.work_schedule_id = ws.id
+            WHERE eds.employee_id = ? AND eds.day_of_week = ?
             LIMIT 1
         ");
-        $stmt->execute([$employee_id, $dayOfWeek, $date, $date]);
+        $stmt->execute([$employee_id, $dayOfWeek]);
         $weeklySchedule = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($weeklySchedule) {
             if ($weeklySchedule['is_rest_day']) {
                 return ['is_rest_day' => true];
             }
-            if ($weeklySchedule['work_schedule_id']) {
-                $schedStmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
-                $schedStmt->execute([$weeklySchedule['work_schedule_id']]);
-                $sched = $schedStmt->fetch(PDO::FETCH_ASSOC);
-                if ($sched) {
-                    return [
-                        'time_in' => date('g:i A', strtotime($sched['time_in'])),
-                        'time_out' => date('g:i A', strtotime($sched['time_out'])),
-                        'is_rest_day' => false
-                    ];
-                }
+            if ($weeklySchedule['time_in'] && $weeklySchedule['time_out']) {
+                return [
+                    'time_in' => date('g:i A', strtotime($weeklySchedule['time_in'])),
+                    'time_out' => date('g:i A', strtotime($weeklySchedule['time_out'])),
+                    'is_rest_day' => false
+                ];
             }
         }
         

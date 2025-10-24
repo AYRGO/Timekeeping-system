@@ -1,4 +1,20 @@
 <?php
+/**
+ * PAYROLL ATTENDANCE REPORT GENERATOR
+ * 
+ * IMPORTANT: This report fetches schedules from employee_daily_schedule_cache
+ * This is the SAME SOURCE as the employee's personal calendar view.
+ * 
+ * What employees see in their calendar = What shows up in this payroll report
+ * 
+ * The cache includes:
+ * - Weekly default schedules
+ * - Approved schedule change requests
+ * - Admin overrides
+ * - Holidays
+ * - Rest days
+ */
+
 require '../../vendor/autoload.php';
 require '../config/db.php';
 
@@ -90,9 +106,11 @@ foreach ($scheduleChanges as $change) {
     $scheduleChangeMap[$change['employee_id']][] = $change;
 }
 
-// Function to get employee's schedule for a specific date from cache (same as schedule_content.php)
+// Function to get employee's schedule for a specific date from PERSONAL CALENDAR CACHE
+// This uses employee_daily_schedule_cache - THE EXACT SAME SOURCE as the employee's personal calendar
+// This ensures payroll report shows EXACTLY what the employee sees in their calendar
 function getScheduleForDate($pdo, $employee_id, $date) {
-    // Query the pre-computed cache table
+    // Query the pre-computed cache table - THIS IS THE EMPLOYEE'S PERSONAL CALENDAR DATA
     $stmt = $pdo->prepare("
         SELECT 
             schedule_date,
@@ -346,7 +364,8 @@ foreach ($employees as $employee) {
         $logDate = $startDate->format('Y-m-d');
         $dayOfWeek = $startDate->format('N'); // 1=Monday, 7=Sunday
         
-        // Get employee's schedule for this date from cache (same as schedule_content.php)
+        // Get employee's schedule from THEIR PERSONAL CALENDAR (employee_daily_schedule_cache)
+        // This is the EXACT SAME data the employee sees in their own calendar view
         $scheduleInfo = getScheduleForDate($pdo, $employeeId, $logDate);
         
         // Check if this date is on approved leave
@@ -700,7 +719,7 @@ foreach ($legendItems as $i => $legend) {
 
 // Set much wider column widths for spacious layout
 $sheet->getColumnDimension('A')->setWidth(50); // Employee Name - much wider
-$sheet->getColumnDimension('B')->setWidth(28); // Schedule - much wider
+$sheet->getColumnDimension('B')->setWidth(50); // Schedule - much wider for long schedule formats
 
 // Set date columns to much wider width for better calendar view
 $colIndex = 3; // Start with column C (after A=Name, B=Schedule)

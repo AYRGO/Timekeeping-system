@@ -249,14 +249,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $is_rest_day = 0;
         }
         
-        // Use employee_daily_schedules table (advanced calendar system)
-        // First delete any existing override for this date
+        // ADMIN OVERRIDE: Delete any existing schedule for this date (from ANY source)
+        // Delete from employee_daily_schedules
         $pdo->prepare("DELETE FROM employee_daily_schedules WHERE employee_id = ? AND schedule_date = ?")
             ->execute([$schedule_employee_id, $schedule_date]);
         
-        // Insert new daily override
+        // DELETE FROM CACHE - this removes approved requests, weekly defaults, rotating schedules, etc.
+        $pdo->prepare("DELETE FROM employee_daily_schedule_cache WHERE employee_id = ? AND schedule_date = ?")
+            ->execute([$schedule_employee_id, $schedule_date]);
+        
+        // Insert new daily override to employee_daily_schedules
         $stmt = $pdo->prepare("INSERT INTO employee_daily_schedules (employee_id, schedule_date, actual_schedule_id, is_rest_day, notes, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
         $stmt->execute([$schedule_employee_id, $schedule_date, $actual_schedule_id, $is_rest_day, $reason]);
+        
+        // INSERT INTO CACHE - this is what the calendar displays
+        if ($is_rest_day) {
+            // Rest day override
+            $pdo->prepare("INSERT INTO employee_daily_schedule_cache 
+                (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at, updated_at) 
+                VALUES (?, ?, NULL, 1, 0, NULL, NULL, NULL, NULL, 'admin_override', NULL, NOW(), NOW())")
+                ->execute([$schedule_employee_id, $schedule_date]);
+        } else {
+            // Fetch schedule details for cache
+            $schedStmt = $pdo->prepare("SELECT id, name, time_in, time_out FROM work_schedules WHERE id = ?");
+            $schedStmt->execute([$actual_schedule_id]);
+            $schedDetails = $schedStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($schedDetails) {
+                $pdo->prepare("INSERT INTO employee_daily_schedule_cache 
+                    (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at, updated_at) 
+                    VALUES (?, ?, ?, 0, 0, ?, ?, ?, NULL, 'admin_override', NULL, NOW(), NOW())")
+                    ->execute([
+                        $schedule_employee_id, 
+                        $schedule_date, 
+                        $schedDetails['id'],
+                        $schedDetails['name'],
+                        $schedDetails['time_in'],
+                        $schedDetails['time_out']
+                    ]);
+            }
+        }
         
         // Add to audit trail (schedule_override_history uses: employee_id, schedule_date, original_schedule_id, new_schedule_id, override_reason, applied_by, applied_at)
         $pdo->prepare("INSERT INTO schedule_override_history (employee_id, schedule_date, new_schedule_id, override_reason, applied_by, applied_at) VALUES (?, ?, ?, ?, ?, NOW())")
@@ -280,11 +312,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $stmt = $pdo->prepare("DELETE FROM employee_daily_schedules WHERE employee_id = ? AND schedule_date = ?");
         $stmt->execute([$schedule_employee_id, $schedule_date]);
         
+        // DELETE FROM CACHE - Remove admin override
+        $pdo->prepare("DELETE FROM employee_daily_schedule_cache WHERE employee_id = ? AND schedule_date = ? AND source = 'admin_override'")
+            ->execute([$schedule_employee_id, $schedule_date]);
+        
+        // REBUILD CACHE FROM DEFAULT SCHEDULE
+        $dayOfWeek = date('w', strtotime($schedule_date));
+        $weeklyStmt = $pdo->prepare("
+            SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
+            FROM employee_default_schedules edd
+            LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+            WHERE edd.employee_id = ? AND edd.day_of_week = ?
+        ");
+        $weeklyStmt->execute([$schedule_employee_id, $dayOfWeek]);
+        $weekly = $weeklyStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($weekly) {
+            if ($weekly['is_rest_day']) {
+                $pdo->prepare("INSERT INTO employee_daily_schedule_cache 
+                    (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at, updated_at) 
+                    VALUES (?, ?, NULL, 1, 0, NULL, NULL, NULL, NULL, 'weekly_default', NULL, NOW(), NOW())")
+                    ->execute([$schedule_employee_id, $schedule_date]);
+            } else {
+                $pdo->prepare("INSERT INTO employee_daily_schedule_cache 
+                    (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at, updated_at) 
+                    VALUES (?, ?, ?, 0, 0, ?, ?, ?, NULL, 'weekly_default', NULL, NOW(), NOW())")
+                    ->execute([
+                        $schedule_employee_id, 
+                        $schedule_date, 
+                        $weekly['work_schedule_id'],
+                        $weekly['name'],
+                        $weekly['time_in'],
+                        $weekly['time_out']
+                    ]);
+            }
+        }
+        
         // Add to audit trail
         $pdo->prepare("INSERT INTO schedule_override_history (employee_id, schedule_date, new_schedule_id, override_reason, applied_by, applied_at) VALUES (?, ?, NULL, 'Override cancelled by admin', ?, NOW())")
             ->execute([$schedule_employee_id, $schedule_date, $_SESSION['user_id'] ?? null]);
         
-        echo "<script>alert('Schedule override cancelled successfully!'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
+        // Return success for AJAX request
+        echo json_encode(['success' => true]);
         exit;
     }
 }
@@ -336,16 +405,6 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                 </a>
             </div>
 
-            <!-- Legend -->
-            <div class="mb-4 p-3 bg-gray-50 rounded text-xs">
-                <strong>Legend:</strong>
-                <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-purple-500 rounded mr-1"></span>Approved Request</span>
-                <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-green-500 rounded mr-1"></span>Daily Override</span>
-                <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-blue-500 rounded mr-1"></span>Weekly Default</span>
-                <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-yellow-500 rounded mr-1"></span>Holiday</span>
-                <span class="inline-block ml-3"><span class="inline-block w-3 h-3 bg-red-500 rounded mr-1"></span>OFF/Rest</span>
-            </div>
-
             <!-- Calendar Grid -->
             <div class="border rounded overflow-hidden">
                 <div class="grid grid-cols-7 bg-gray-100 text-center font-semibold text-sm">
@@ -395,7 +454,7 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                                     <?php if ($cell['is_holiday']): ?>
                                         <div class="font-semibold text-yellow-700"><?= htmlspecialchars(substr($cell['holiday']['holiday_name'], 0, 15)) ?></div>
                                     <?php elseif ($cell['is_rest_day']): ?>
-                                        <div class="text-gray-500 font-medium">OFF</div>
+                                        <!-- Rest day - no label needed, gray background indicates off status -->
                                     <?php elseif ($cell['actual_schedule']): ?>
                                         <div class="font-medium"><?= htmlspecialchars($cell['actual_schedule']['name']) ?></div>
                                         <div class="text-gray-600">
@@ -433,6 +492,7 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                 <form method="post" class="space-y-3">
                     <input type="hidden" name="action" value="add_override">
                     <input type="hidden" name="employee_id" value="<?= $emp_id ?>">
+                    <input type="hidden" name="reason" value="">
                     
                     <div>
                         <label class="block text-xs font-medium mb-1">Date</label>
@@ -453,13 +513,6 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                         </select>
                     </div>
                     
-                    <div>
-                        <label class="block text-xs font-medium mb-1">Reason / Notes</label>
-                        <textarea name="reason" rows="2" 
-                                  class="w-full text-sm p-2 border rounded focus:ring-2 focus:ring-blue-500" 
-                                  placeholder="Optional notes..."></textarea>
-                    </div>
-                    
                     <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition text-sm">
                         <i class="fas fa-save mr-2"></i>Add Override
                     </button>
@@ -476,37 +529,28 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                 <?php if ($pendingOverrides): ?>
                     <div class="space-y-2 max-h-96 overflow-y-auto">
                         <?php foreach($pendingOverrides as $po): ?>
-                            <div class="bg-white border rounded p-2 text-xs">
+                            <div class="bg-white border rounded p-3 text-xs shadow-sm">
                                 <div class="flex justify-between items-start mb-1">
-                                    <span class="font-semibold"><?= date('M d, Y', strtotime($po['schedule_date'])) ?></span>
-                                    <div class="flex items-center gap-1">
-                                        <?php if ($po['is_rest_day']): ?>
-                                            <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded">OFF</span>
-                                        <?php else: ?>
-                                            <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded">
-                                                <?= htmlspecialchars($po['schedule_name']) ?>
-                                            </span>
-                                        <?php endif; ?>
-                                        <button onclick="deleteOverride('<?= $po['schedule_date'] ?>', '<?= date('M d, Y', strtotime($po['schedule_date'])) ?>')" 
-                                                class="text-red-600 hover:text-red-800 ml-1" 
-                                                title="Cancel Override">
-                                            <i class="fas fa-times-circle"></i>
-                                        </button>
-                                    </div>
+                                    <span class="font-semibold text-gray-700"><?= date('M d, Y', strtotime($po['schedule_date'])) ?></span>
+                                    <?php if ($po['is_rest_day']): ?>
+                                        <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium">OFF</span>
+                                    <?php else: ?>
+                                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
+                                            <?= htmlspecialchars($po['schedule_name']) ?>
+                                        </span>
+                                    <?php endif; ?>
                                 </div>
                                 <?php if (!$po['is_rest_day'] && $po['time_in']): ?>
-                                    <div class="text-gray-600">
+                                    <div class="text-gray-600 mt-1">
+                                        <i class="fas fa-clock text-gray-400 mr-1"></i>
                                         <?= date('g:i A', strtotime($po['time_in'])) ?> - <?= date('g:i A', strtotime($po['time_out'])) ?>
                                     </div>
-                                <?php endif; ?>
-                                <?php if ($po['notes']): ?>
-                                    <div class="text-gray-500 mt-1 italic"><?= htmlspecialchars(substr($po['notes'], 0, 50)) ?></div>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
                 <?php else: ?>
-                    <div class="text-xs text-gray-500 text-center py-4">
+                    <div class="text-xs text-gray-500 text-center py-4 bg-gray-50 rounded">
                         <i class="fas fa-info-circle mr-1"></i>
                         No upcoming overrides
                     </div>
@@ -528,15 +572,35 @@ function openOverride_admin(date) {
 
 function deleteOverride(date, displayDate) {
     if (confirm('Are you sure you want to cancel the schedule override for ' + displayDate + '?')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.innerHTML = `
-            <input type="hidden" name="action" value="delete_override">
-            <input type="hidden" name="employee_id" value="<?= $emp_id ?>">
-            <input type="hidden" name="schedule_date" value="${date}">
-        `;
-        document.body.appendChild(form);
-        form.submit();
+        // Show loading indicator
+        const btn = event.target.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Canceling...';
+        
+        // Use AJAX for faster response
+        fetch('employee-edit.php?id=<?= $employeeId ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                'action': 'delete_override',
+                'employee_id': '<?= $emp_id ?>',
+                'schedule_date': date
+            })
+        })
+        .then(response => response.text())
+        .then(() => {
+            // Just reload the page quickly without alert
+            window.location.reload();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+            alert('Failed to cancel override. Please try again.');
+        });
     }
 }
 </script>
