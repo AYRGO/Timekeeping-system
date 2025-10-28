@@ -272,16 +272,6 @@ try {
                     <i class="fas fa-chevron-right"></i>
                 </a>
             </div>
-            <div class="flex items-center gap-2 text-sm text-gray-600">
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-gray-200">
-                    <span class="w-3 h-3 rounded-full bg-blue-500"></span>
-                    <span>Regular</span>
-                </div>
-                <div class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-gray-200">
-                    <span class="w-3 h-3 rounded-full bg-amber-500"></span>
-                    <span>Changed</span>
-                </div>
-            </div>
         </div>
     </div>
 

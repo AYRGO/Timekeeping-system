@@ -317,29 +317,48 @@ if (isset($_POST['submit_schedule_change'])) {
         }
     }
 
-    // Get current real-time schedule ID
-    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
-    $stmt->execute([$employee_id]);
-    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-    $default_schedule_id = $employee['official_sched'] ?? 4;
-    
+    // Get current ACTUAL schedule ID from calendar (not just official schedule)
+    // This ensures we capture the real schedule at the time of request
     $today = date('Y-m-d');
-    $current_real_schedule_id = $default_schedule_id;
+    $current_real_schedule_id = null;
     
-    // Check for active approved schedule changes
-    $stmt = $pdo->prepare("
-        SELECT work_schedule_id, status, start_date, end_date 
-        FROM schedule_change_requests 
-        WHERE employee_id = ? AND status = 'approved' 
-        AND ? BETWEEN start_date AND end_date 
-        ORDER BY created_at DESC 
+    // PRIORITY 1: Check employee_daily_schedule_cache (actual calendar schedule)
+    $cacheStmt = $pdo->prepare("
+        SELECT work_schedule_id 
+        FROM employee_daily_schedule_cache 
+        WHERE employee_id = ? AND schedule_date = ?
         LIMIT 1
     ");
-    $stmt->execute([$employee_id, $today]);
-    $activeRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+    $cacheStmt->execute([$employee_id, $today]);
+    $cacheSchedule = $cacheStmt->fetch(PDO::FETCH_ASSOC);
     
-    if ($activeRequest) {
-        $current_real_schedule_id = $activeRequest['work_schedule_id'] ?? $default_schedule_id;
+    if ($cacheSchedule && $cacheSchedule['work_schedule_id']) {
+        $current_real_schedule_id = $cacheSchedule['work_schedule_id'];
+    }
+    
+    // PRIORITY 2: Check employee_default_schedules (weekly default)
+    if (!$current_real_schedule_id) {
+        $dayOfWeek = date('w', strtotime($today));
+        $defaultStmt = $pdo->prepare("
+            SELECT work_schedule_id 
+            FROM employee_default_schedules 
+            WHERE employee_id = ? AND day_of_week = ?
+            LIMIT 1
+        ");
+        $defaultStmt->execute([$employee_id, $dayOfWeek]);
+        $defaultSchedule = $defaultStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($defaultSchedule && $defaultSchedule['work_schedule_id']) {
+            $current_real_schedule_id = $defaultSchedule['work_schedule_id'];
+        }
+    }
+    
+    // PRIORITY 3: Fallback to official schedule
+    if (!$current_real_schedule_id) {
+        $empStmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+        $empStmt->execute([$employee_id]);
+        $employee = $empStmt->fetch(PDO::FETCH_ASSOC);
+        $current_real_schedule_id = $employee['official_sched'] ?? 4;
     }
 
     // Determine start and end date

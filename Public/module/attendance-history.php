@@ -456,9 +456,11 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                         <i class="fas fa-moon mr-1"></i>Night Shift
                                     </div>
                                 <?php endif; ?>
-                                <div class="text-xs text-gray-400 mt-1">
-                                    Sched: <?= $schedule_in ?>
-                                </div>
+                                <?php if ($status !== 'Off'): ?>
+                                    <div class="text-xs text-gray-400 mt-1">
+                                        Sched: <?= $schedule_in ?>
+                                    </div>
+                                <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500">
                                 <?php if ($isAutoIncomplete): ?>
@@ -498,9 +500,11 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 <?php else: ?>
                                     <span class="text-gray-400">-</span>
                                 <?php endif; ?>
-                                <div class="text-xs text-gray-400 mt-1">
-                                    Sched: <?= $schedule_out ?>
-                                </div>
+                                <?php if ($status !== 'Off'): ?>
+                                    <div class="text-xs text-gray-400 mt-1">
+                                        Sched: <?= $schedule_out ?>
+                                    </div>
+                                <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500">
                                 <?php if ($isAutoIncomplete): ?>

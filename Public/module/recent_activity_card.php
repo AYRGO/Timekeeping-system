@@ -21,11 +21,12 @@ $filteredActivities = array_filter($unique_notifications, function ($activity) u
 $recentActivities = array_slice($filteredActivities, 0, 10);
 
 // Helper function to get ACTUAL current schedule from calendar (matches schedule_content.php logic)
-function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) {
-    if (!$date) $date = date('Y-m-d');
-    
-    // PRIORITY 1: Check employee_daily_schedule_cache (what the calendar actually displays)
-    try {
+if (!function_exists('getActualCurrentScheduleFromCalendar')) {
+    function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) {
+        if (!$date) $date = date('Y-m-d');
+        
+        // PRIORITY 1: Check employee_daily_schedule_cache (what the calendar actually displays)
+        try {
         $stmt = $pdo->prepare("
             SELECT work_schedule_id, is_rest_day, schedule_name, time_in, time_out
             FROM employee_daily_schedule_cache 
@@ -94,6 +95,7 @@ function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) 
     }
     
     return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => false];
+    }
 }
 ?>
 
@@ -427,10 +429,18 @@ function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) 
                         </button>
                     <?php } elseif ($type === 'Schedule') { ?>
                         <?php
-                            // Get ACTUAL current schedule from calendar, not the stored one from request
-                            $actualCurrentSchedule = getActualCurrentScheduleFromCalendar($pdo, $employee_id);
-                            $currentTimeIn = $actualCurrentSchedule['is_rest_day'] ? 'REST DAY' : $actualCurrentSchedule['time_in'];
-                            $currentTimeOut = $actualCurrentSchedule['is_rest_day'] ? '' : $actualCurrentSchedule['time_out'];
+                            // Use the current schedule from the notification data (historical reference)
+                            // Do NOT fetch live schedule - we want to preserve what it was at the time of request
+                            $currentTimeIn = $activity['current_time_in'] ?? '';
+                            $currentTimeOut = $activity['current_time_out'] ?? '';
+                            
+                            // Format if they're in 24-hour format
+                            if ($currentTimeIn && strpos($currentTimeIn, ':') !== false && strpos($currentTimeIn, 'AM') === false && strpos($currentTimeIn, 'PM') === false) {
+                                $currentTimeIn = date('g:i A', strtotime($currentTimeIn));
+                            }
+                            if ($currentTimeOut && strpos($currentTimeOut, ':') !== false && strpos($currentTimeOut, 'AM') === false && strpos($currentTimeOut, 'PM') === false) {
+                                $currentTimeOut = date('g:i A', strtotime($currentTimeOut));
+                            }
                         ?>
                         <button onclick="showActivityDetails('Schedule Change', `<?= htmlspecialchars(json_encode([
                             'type' => 'Schedule Change',
@@ -455,10 +465,18 @@ function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) 
                         </button>
                     <?php } elseif ($type === 'Day Off') { ?>
                         <?php
-                            // Get ACTUAL current schedule from calendar for Day Off requests
-                            $actualCurrentSchedule = getActualCurrentScheduleFromCalendar($pdo, $employee_id);
-                            $currentTimeIn = $actualCurrentSchedule['is_rest_day'] ? 'REST DAY' : $actualCurrentSchedule['time_in'];
-                            $currentTimeOut = $actualCurrentSchedule['is_rest_day'] ? '' : $actualCurrentSchedule['time_out'];
+                            // Use the current schedule from the notification data (historical reference)
+                            // For day off requests, we want to show what schedule they had before requesting day off
+                            $currentTimeIn = $activity['current_time_in'] ?? '';
+                            $currentTimeOut = $activity['current_time_out'] ?? '';
+                            
+                            // Format if they're in 24-hour format
+                            if ($currentTimeIn && strpos($currentTimeIn, ':') !== false && strpos($currentTimeIn, 'AM') === false && strpos($currentTimeIn, 'PM') === false) {
+                                $currentTimeIn = date('g:i A', strtotime($currentTimeIn));
+                            }
+                            if ($currentTimeOut && strpos($currentTimeOut, ':') !== false && strpos($currentTimeOut, 'AM') === false && strpos($currentTimeOut, 'PM') === false) {
+                                $currentTimeOut = date('g:i A', strtotime($currentTimeOut));
+                            }
                         ?>
                         <button onclick="showActivityDetails('Day Off Request', `<?= htmlspecialchars(json_encode([
                             'type' => 'Day Off Request',
@@ -842,12 +860,17 @@ function showActivityDetails(title, dataJson) {
                     `;
                 } else {
                     // Non-editable version for approved/declined requests
+                    // Use "Former Schedule" label for approved/declined to show historical context
+                    const scheduleLabel = (data.status && (data.status.toLowerCase() === 'approved' || data.status.toLowerCase() === 'declined')) 
+                        ? 'Former Schedule' 
+                        : 'Current Schedule';
+                    
                     content += `
                         <div class="flex items-center justify-between gap-4">
                             <div class="flex-1 bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
                                 <div class="flex items-center mb-2">
                                     <i class="fas fa-clock text-blue-600 mr-2"></i>
-                                    <h5 class="font-semibold text-blue-800 text-sm">Current Schedule</h5>
+                                    <h5 class="font-semibold text-blue-800 text-sm">${scheduleLabel}</h5>
                                 </div>
                                 <p class="text-xl font-bold text-blue-900">
                                     ${data.current_time_in} - ${data.current_time_out}
@@ -966,12 +989,17 @@ function showActivityDetails(title, dataJson) {
             `;
             
             // Show current schedule to Day Off change
+            // Use "Former Schedule" label for approved/declined to show historical context
+            const dayOffScheduleLabel = (data.status && (data.status.toLowerCase() === 'approved' || data.status.toLowerCase() === 'declined')) 
+                ? 'Former Schedule' 
+                : 'Current Schedule';
+            
             content += `
                 <div class="flex items-center justify-between gap-4 mb-4">
                     <div class="flex-1 bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
                         <div class="flex items-center mb-2">
                             <i class="fas fa-clock text-blue-600 mr-2"></i>
-                            <h5 class="font-semibold text-blue-800 text-sm">Current Schedule</h5>
+                            <h5 class="font-semibold text-blue-800 text-sm">${dayOffScheduleLabel}</h5>
                         </div>
                         <p class="text-xl font-bold text-blue-900">
                             ${data.current_time_in || data.requested_time_in || '—'} - ${data.current_time_out || data.requested_time_out || '—'}

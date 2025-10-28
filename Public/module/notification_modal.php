@@ -12,6 +12,100 @@ include('../config/db.php');
 $current_user_id = $_SESSION['employee']['id'] ?? null;
 $notifications = [];
 
+// Helper function to get ACTUAL current schedule from calendar (matches schedule_content.php logic)
+function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) {
+    if (!$date) $date = date('Y-m-d');
+    
+    // PRIORITY 1: Check employee_daily_schedule_cache (what the calendar actually displays)
+    try {
+        $stmt = $pdo->prepare("
+            SELECT work_schedule_id, is_rest_day, schedule_name, time_in, time_out
+            FROM employee_daily_schedule_cache 
+            WHERE employee_id = ? AND schedule_date = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$employee_id, $date]);
+        $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($cache) {
+            if ($cache['is_rest_day'] == 1) {
+                return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
+            }
+            if ($cache['time_in'] && $cache['time_out']) {
+                return [
+                    'time_in' => date('g:i A', strtotime($cache['time_in'])),
+                    'time_out' => date('g:i A', strtotime($cache['time_out'])),
+                    'is_rest_day' => false
+                ];
+            }
+        }
+    } catch (Exception $e) {
+        error_log("Cache lookup failed: " . $e->getMessage());
+    }
+    
+    // PRIORITY 2: Check employee_default_schedules
+    try {
+        $dayOfWeek = date('w', strtotime($date));
+        $stmt = $pdo->prepare("
+            SELECT edd.work_schedule_id, edd.is_rest_day, ws.time_in, ws.time_out
+            FROM employee_default_schedules edd
+            LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+            WHERE edd.employee_id = ? 
+              AND edd.day_of_week = ? 
+              AND edd.effective_from <= ? 
+              AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+            LIMIT 1
+        ");
+        $stmt->execute([$employee_id, $dayOfWeek, $date, $date]);
+        $weekly = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($weekly) {
+            if ($weekly['is_rest_day'] == 1 || !$weekly['work_schedule_id']) {
+                return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
+            }
+            if ($weekly['time_in'] && $weekly['time_out']) {
+                return [
+                    'time_in' => date('g:i A', strtotime($weekly['time_in'])),
+                    'time_out' => date('g:i A', strtotime($weekly['time_out'])),
+                    'is_rest_day' => false
+                ];
+            }
+        }
+    } catch (Exception $e) {
+        error_log("Weekly schedule lookup failed: " . $e->getMessage());
+    }
+    
+    // PRIORITY 3: Check if weekend (Saturday or Sunday)
+    $dayOfWeek = date('w', strtotime($date));
+    if ($dayOfWeek == 0 || $dayOfWeek == 6) {
+        return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
+    }
+    
+    // PRIORITY 4: Fall back to employee's official schedule
+    try {
+        $stmt = $pdo->prepare("
+            SELECT e.official_sched, ws.time_in, ws.time_out
+            FROM employees e
+            LEFT JOIN work_schedules ws ON e.official_sched = ws.id
+            WHERE e.id = ?
+        ");
+        $stmt->execute([$employee_id]);
+        $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($employee && $employee['time_in'] && $employee['time_out']) {
+            return [
+                'time_in' => date('g:i A', strtotime($employee['time_in'])),
+                'time_out' => date('g:i A', strtotime($employee['time_out'])),
+                'is_rest_day' => false
+            ];
+        }
+    } catch (Exception $e) {
+        error_log("Official schedule lookup failed: " . $e->getMessage());
+    }
+    
+    return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => false];
+}
+
 function sendEmail($to, $name, $subject, $body) {
     $mail = new PHPMailer(true);
     try {
@@ -210,8 +304,8 @@ foreach ($leave_results as $leave) {
 // --- Schedule Requests (from both tables) ---
 $schedule_stmt = $pdo->prepare("
     SELECT scr.id, scr.work_schedule_id, scr.status, scr.start_date, scr.end_date, scr.created_at, scr.notified, scr.explanation, scr.reason,
-           scr.current_work_schedule_id, scr.attachment_scr, scr.is_rest_day, 'pending' as source_table,
-           current_ws.time_in as current_time_in, current_ws.time_out as current_time_out,
+           scr.current_work_schedule_id, scr.attachment_scr, scr.is_rest_day, 'pending' as source_table, scr.employee_id,
+           current_ws.time_in as stored_current_time_in, current_ws.time_out as stored_current_time_out,
            new_ws.time_in as requested_time_in, new_ws.time_out as requested_time_out
     FROM schedule_change_requests scr
     LEFT JOIN work_schedules current_ws ON scr.current_work_schedule_id = current_ws.id
@@ -219,8 +313,8 @@ $schedule_stmt = $pdo->prepare("
     WHERE scr.employee_id = ?
     UNION ALL
     SELECT pscr.id, pscr.work_schedule_id, pscr.status, pscr.start_date, pscr.end_date, pscr.created_at, pscr.notified, pscr.explanation, pscr.reason,
-           pscr.current_work_schedule_id, pscr.attachment_scr, pscr.is_rest_day, 'approved' as source_table,
-           current_ws2.time_in as current_time_in, current_ws2.time_out as current_time_out,
+           pscr.current_work_schedule_id, pscr.attachment_scr, pscr.is_rest_day, 'approved' as source_table, pscr.employee_id,
+           current_ws2.time_in as stored_current_time_in, current_ws2.time_out as stored_current_time_out,
            new_ws2.time_in as requested_time_in, new_ws2.time_out as requested_time_out
     FROM post_schedule_change_requests pscr
     LEFT JOIN work_schedules current_ws2 ON pscr.current_work_schedule_id = current_ws2.id
@@ -246,6 +340,21 @@ foreach ($schedule_results as $sched) {
         $message .= "<br><span class='text-sm text-red-600'>Explanation: " . htmlspecialchars($sched['explanation']) . "</span>";
     }
 
+    // IMPORTANT: For APPROVED/DECLINED requests (history), ALWAYS use stored current_work_schedule_id
+    // This preserves historical reference of what the schedule was BEFORE the change
+    // Only fetch live schedule for PENDING requests
+    $currentTimeIn = $sched['stored_current_time_in'];
+    $currentTimeOut = $sched['stored_current_time_out'];
+    
+    if (strtolower($sched['status']) === 'pending') {
+        // For pending requests, fetch the ACTUAL current schedule from calendar
+        $actualCurrentSchedule = getActualCurrentScheduleFromCalendar($pdo, $sched['employee_id'], $sched['start_date']);
+        
+        // Use actual current schedule if available, otherwise fall back to stored values
+        $currentTimeIn = $actualCurrentSchedule['time_in'] ?? $currentTimeIn;
+        $currentTimeOut = $actualCurrentSchedule['time_out'] ?? $currentTimeOut;
+    }
+
     $notifications[] = [
         'message' => $message,
         'created_at' => $sched['created_at'],
@@ -254,8 +363,8 @@ foreach ($schedule_results as $sched) {
         'reason' => $sched['reason'] ?? '',
         'start_date' => $sched['start_date'],
         'end_date' => $sched['end_date'],
-        'current_time_in' => $sched['current_time_in'],
-        'current_time_out' => $sched['current_time_out'],
+        'current_time_in' => $currentTimeIn,
+        'current_time_out' => $currentTimeOut,
         'requested_time_in' => $sched['requested_time_in'],
         'requested_time_out' => $sched['requested_time_out'],
         'attachment_scr' => $sched['attachment_scr'] ?? '',
@@ -277,8 +386,8 @@ foreach ($schedule_results as $sched) {
             $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($sched['explanation'])) . "</p>";
         }
         // Enhanced email body with complete schedule information
-        $current_schedule = ($sched['current_time_in'] && $sched['current_time_out']) ? 
-            date('g:i A', strtotime($sched['current_time_in'])) . ' - ' . date('g:i A', strtotime($sched['current_time_out'])) : 'Not specified';
+        $current_schedule = ($currentTimeIn && $currentTimeOut) ? 
+            date('g:i A', strtotime($currentTimeIn)) . ' - ' . date('g:i A', strtotime($currentTimeOut)) : 'Not specified';
         
         // For rest days, show "Day Off" instead of schedule times
         if ($isRestDay) {
