@@ -391,8 +391,6 @@ function toggleLeaveHistory() {
     }
 }
 
-
-
 // Add ripple effect to buttons
 document.querySelectorAll('button, a').forEach(button => {
     button.addEventListener('click', function(e) {

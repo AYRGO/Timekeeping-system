@@ -278,6 +278,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
                 $existing_log = ['time_in' => null, 'time_out' => null];
             }
 
+            // Determine which time to save based on adjustment_type
+            $adjustment_type = $form_data['adjustment_type'] ?? 'both';
+            $requested_time_in = null;
+            $requested_time_out = null;
+            
+            if ($adjustment_type === 'time_in') {
+                // Only adjusting time in - use requested time in, keep existing time out
+                $requested_time_in = $form_data['requested_time_in'] ?: null;
+                $requested_time_out = $existing_log['time_out']; // Retain existing time out
+            } elseif ($adjustment_type === 'time_out') {
+                // Only adjusting time out - keep existing time in, use requested time out
+                $requested_time_in = $existing_log['time_in']; // Retain existing time in
+                $requested_time_out = $form_data['requested_time_out'] ?: null;
+            } else {
+                // Adjusting both times
+                $requested_time_in = $form_data['requested_time_in'] ?: null;
+                $requested_time_out = $form_data['requested_time_out'] ?: null;
+            }
+
             $insert = $pdo->prepare("
                 INSERT INTO time_adjustment_requests 
                 (employee_id, log_date, current_time_in, current_time_out, requested_time_in, requested_time_out, reason, attachment) 
@@ -289,8 +308,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
                 'log_date' => $form_data['log_date'],
                 'current_time_in' => $existing_log['time_in'],
                 'current_time_out' => $existing_log['time_out'],
-                'requested_time_in' => $form_data['requested_time_in'] ?: null,
-                'requested_time_out' => $form_data['requested_time_out'] ?: null,
+                'requested_time_in' => $requested_time_in,
+                'requested_time_out' => $requested_time_out,
                 'reason' => $form_data['reason'],
                 'attachment' => $form_data['attachment']
             ]);
@@ -925,6 +944,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
                     <div class="step-title">📋 Review & Submit</div>
                     <div class="step-description">Review your request details before submitting</div>
                     
+                    <?php
+                    // Get existing log data for preview
+                    $preview_log = null;
+                    if (!empty($_SESSION['adjustment_form']['log_date'])) {
+                        $preview_stmt = $pdo->prepare("SELECT time_in, time_out FROM time_logs WHERE employee_id = :id AND log_date = :date");
+                        $preview_stmt->execute(['id' => $employee_id, 'date' => $_SESSION['adjustment_form']['log_date']]);
+                        $preview_log = $preview_stmt->fetch();
+                    }
+                    $adjustment_type = $_SESSION['adjustment_form']['adjustment_type'] ?? 'both';
+                    ?>
+                    
                     <div class="summary-item">
                         <div class="summary-label">Selected Date:</div>
                         <div class="summary-value">
@@ -937,20 +967,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_human'])) {
                     </div>
                     
                     <div class="summary-item">
+                        <div class="summary-label">Adjustment Type:</div>
+                        <div class="summary-value">
+                            <?php 
+                            $type_labels = [
+                                'time_in' => '🕐 Time In Only',
+                                'time_out' => '🕑 Time Out Only',
+                                'both' => '🕐🕑 Both Times'
+                            ];
+                            echo $type_labels[$adjustment_type] ?? 'Not specified';
+                            ?>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-item">
                         <div class="summary-label">Requested Time In:</div>
                         <div class="summary-value">
-                            <?= !empty($_SESSION['adjustment_form']['requested_time_in']) ? 
-                                (new DateTime($_SESSION['adjustment_form']['requested_time_in']))->format('g:i A') : 
-                                'Not specified' ?>
+                            <?php if ($adjustment_type === 'time_out'): ?>
+                                <span style="color: #6c757d;">
+                                    <?= $preview_log && $preview_log['time_in'] ? 
+                                        (new DateTime($preview_log['time_in']))->format('g:i A') : 'No IN' ?> 
+                                    <em style="font-size: 12px;">(Keeping existing)</em>
+                                </span>
+                            <?php else: ?>
+                                <?= !empty($_SESSION['adjustment_form']['requested_time_in']) ? 
+                                    '<strong style="color: #28a745;">' . (new DateTime($_SESSION['adjustment_form']['requested_time_in']))->format('g:i A') . ' ✏️</strong>' : 
+                                    'Not specified' ?>
+                            <?php endif; ?>
                         </div>
                     </div>
                     
                     <div class="summary-item">
                         <div class="summary-label">Requested Time Out:</div>
                         <div class="summary-value">
-                            <?= !empty($_SESSION['adjustment_form']['requested_time_out']) ? 
-                                (new DateTime($_SESSION['adjustment_form']['requested_time_out']))->format('g:i A') : 
-                                'Not specified' ?>
+                            <?php if ($adjustment_type === 'time_in'): ?>
+                                <span style="color: #6c757d;">
+                                    <?= $preview_log && $preview_log['time_out'] ? 
+                                        (new DateTime($preview_log['time_out']))->format('g:i A') : 'No OUT' ?> 
+                                    <em style="font-size: 12px;">(Keeping existing)</em>
+                                </span>
+                            <?php else: ?>
+                                <?= !empty($_SESSION['adjustment_form']['requested_time_out']) ? 
+                                    '<strong style="color: #28a745;">' . (new DateTime($_SESSION['adjustment_form']['requested_time_out']))->format('g:i A') . ' ✏️</strong>' : 
+                                    'Not specified' ?>
+                            <?php endif; ?>
                         </div>
                     </div>
                     
