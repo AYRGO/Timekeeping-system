@@ -2358,9 +2358,8 @@ function generateAMPMOptions(selectedTime) {
 function generateScheduleOptions(requestedTimeIn, requestedTimeOut, currentScheduleId = null) {
     console.log('generateScheduleOptions called with:', requestedTimeIn, requestedTimeOut, 'currentScheduleId:', currentScheduleId);
     
-    // Use dynamic work schedules from database
-    const allowedIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-    const schedules = workSchedules.filter(ws => allowedIds.includes(parseInt(ws.id)));
+    // Use ALL work schedules from database (no filtering by ID)
+    const schedules = [...workSchedules]; // Create a copy to avoid modifying original
     
     // Sort schedules by time_in ascending (matching schedule_change_form.php)
     schedules.sort((a, b) => {
@@ -2372,42 +2371,82 @@ function generateScheduleOptions(requestedTimeIn, requestedTimeOut, currentSched
     // Convert requested times to compare format
     const requestedSchedule = `${requestedTimeIn} - ${requestedTimeOut}`;
     console.log('Looking for schedule match:', requestedSchedule);
+    console.log('Available schedules:', schedules.length);
     
     let options = '<option value="" disabled>Choose work hours</option>';
+    let foundMatch = false;
     
     schedules.forEach(schedule => {
+        // Skip schedules with invalid time data
+        if (!schedule.time_in || !schedule.time_out) {
+            console.warn('⚠️ Skipping schedule with missing time data:', schedule);
+            return; // Skip this iteration
+        }
+        
         // Convert 24-hour to 12-hour format for display (matching schedule_change_form.php format)
         const timeInDisplay = formatTime12Hour(schedule.time_in);
         const timeOutDisplay = formatTime12Hour(schedule.time_out);
+        
+        // Skip if formatting failed
+        if (timeInDisplay === 'N/A' || timeOutDisplay === 'N/A') {
+            console.warn('⚠️ Skipping schedule with invalid time format:', schedule);
+            return; // Skip this iteration
+        }
+        
         const scheduleDisplay = `${timeInDisplay} - ${timeOutDisplay}`;
         
         // Check if this matches the requested schedule OR if this is the current schedule ID
         let isSelected = false;
         if (currentScheduleId && schedule.id == currentScheduleId) {
             isSelected = true;
+            foundMatch = true;
+            console.log('✅ Matched by schedule ID:', schedule.id, scheduleDisplay);
         } else if (scheduleDisplay === requestedSchedule) {
             isSelected = true;
+            foundMatch = true;
+            console.log('✅ Matched by time display:', scheduleDisplay);
         }
         
         const selectedAttr = isSelected ? 'selected' : '';
         
-        if (isSelected) {
-            console.log('Schedule option selected:', scheduleDisplay, 'ID:', schedule.id);
-        }
-        
         options += `<option value="${schedule.id}" data-schedule="${scheduleDisplay}" ${selectedAttr}>${scheduleDisplay}</option>`;
     });
+    
+    // Debug: Log if requested schedule was not found
+    if (!foundMatch && currentScheduleId) {
+        console.warn('⚠️ Requested schedule not found in available schedules!');
+        console.warn('Looking for: ID=' + currentScheduleId + ', Time=' + requestedSchedule);
+        console.warn('Available schedule IDs:', schedules.map(s => s.id));
+    }
     
     return options;
 }
 
 // Helper function to convert 24-hour time to 12-hour format
 function formatTime12Hour(time24) {
-    const [hours, minutes] = time24.split(':');
-    const hour12 = parseInt(hours);
-    const ampm = hour12 >= 12 ? 'PM' : 'AM';
-    const displayHour = hour12 === 0 ? 12 : (hour12 > 12 ? hour12 - 12 : hour12);
-    return `${displayHour}:${minutes} ${ampm}`;
+    // Handle null, undefined, or empty values
+    if (!time24 || time24 === null || time24 === undefined || time24.trim() === '') {
+        console.warn('⚠️ formatTime12Hour received invalid time:', time24);
+        return 'N/A';
+    }
+    
+    try {
+        const [hours, minutes] = time24.split(':');
+        
+        // Validate that we have valid hours and minutes
+        if (!hours || !minutes) {
+            console.warn('⚠️ Invalid time format:', time24);
+            return 'N/A';
+        }
+        
+        const hour12 = parseInt(hours);
+        const ampm = hour12 >= 12 ? 'PM' : 'AM';
+        const displayHour = hour12 === 0 ? 12 : (hour12 > 12 ? hour12 - 12 : hour12);
+        return `${displayHour}:${minutes} ${ampm}`;
+    } catch (error) {
+        console.error('❌ Error formatting time:', time24, error);
+        return 'N/A';
+    }
 }
 
 function updateTimeDisplay(requestId, timeType) {

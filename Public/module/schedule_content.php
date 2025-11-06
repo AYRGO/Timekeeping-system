@@ -193,26 +193,26 @@ try {
 }
 ?>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200">
+<div class="bg-white rounded-2xl shadow-lg border border-gray-100">
     <!-- Modern Header Section -->
-    <div class="px-8 py-6 border-b border-gray-200">
+    <div class="px-8 py-7 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
         <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center shadow-sm">
-                    <i class="fas fa-calendar-check text-white text-xl"></i>
+            <div class="flex items-center gap-5">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <i class="fas fa-calendar-check text-white text-2xl"></i>
                 </div>
                 <div>
-                    <h2 class="text-2xl font-bold text-gray-900">Schedule Management</h2>
-                    <p class="text-sm text-gray-500 mt-0.5">View and manage your work schedule</p>
+                    <h2 class="text-3xl font-bold text-gray-900 tracking-tight">Schedule Management</h2>
+                    <p class="text-sm text-gray-600 mt-1">View and manage your work schedule</p>
                 </div>
             </div>
             <div class="flex items-center gap-3">
                 <button onclick="window.location.href='?ym=<?= date('Y-n') ?>#scheduleView'"
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                    <i class="fas fa-calendar-day mr-2 text-gray-500"></i>Today
+                        class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow">
+                    <i class="fas fa-calendar-day mr-2 text-gray-400"></i>Today
                 </button>
                 <button onclick="openScheduleChangeModal()"
-                        class="px-5 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+                        class="px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40">
                     <i class="fas fa-plus mr-2"></i>New Request
                 </button>
             </div>
@@ -225,20 +225,52 @@ try {
     if (isset($_GET['schedule'])) {
         $schedule_msg = $_GET['schedule'];
         if ($schedule_msg === 'success') {
-            echo '<div class="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
-                <i class="fas fa-check-circle mr-2"></i>Schedule change request submitted successfully! Please wait for approval.
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 text-green-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Schedule change request submitted successfully!</p>
+                        <p class="text-sm text-green-700 mt-0.5">Please wait for approval.</p>
+                    </div>
+                </div>
             </div>';
         } elseif ($schedule_msg === 'error') {
-            echo '<div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-                <i class="fas fa-exclamation-triangle mr-2"></i>Error submitting schedule request. Please try again.
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-circle text-red-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Error submitting schedule request</p>
+                        <p class="text-sm text-red-700 mt-0.5">Please try again.</p>
+                    </div>
+                </div>
             </div>';
         } elseif ($schedule_msg === 'invalid_input') {
-            echo '<div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-                <i class="fas fa-exclamation-triangle mr-2"></i>Please fill in all required fields.
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Invalid input</p>
+                        <p class="text-sm text-red-700 mt-0.5">Please fill in all required fields.</p>
+                    </div>
+                </div>
             </div>';
         } elseif ($schedule_msg === 'past_date') {
-            echo '<div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
-                <i class="fas fa-exclamation-triangle mr-2"></i>Cannot request schedule changes for past dates.
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Invalid date</p>
+                        <p class="text-sm text-red-700 mt-0.5">Cannot request schedule changes for past dates.</p>
+                    </div>
+                </div>
             </div>';
         }
     }
@@ -247,28 +279,36 @@ try {
     if (isset($_GET['rest_day'])) {
         $rest_day_msg = $_GET['rest_day'];
         if ($rest_day_msg === 'success') {
-            echo '<div class="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
-                <i class="fas fa-check-circle mr-2"></i>Day off request submitted successfully! Please wait for approval.
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 text-green-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Day off request submitted successfully!</p>
+                        <p class="text-sm text-green-700 mt-0.5">Please wait for approval.</p>
+                    </div>
+                </div>
             </div>';
         }
     }
     ?>
 
     <!-- Calendar Navigation -->
-    <div class="px-8 py-4 border-b border-gray-200 bg-gray-50">
+    <div class="px-8 py-5 border-b border-gray-100 bg-white">
         <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-4">
                 <a href="?ym=<?= h_schedule($nav_schedule['prev']) ?>#scheduleView" 
                    onclick="showSection('scheduleView')"
-                   class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white border border-transparent hover:border-gray-200 text-gray-600 hover:text-gray-900 transition-all shadow-sm hover:shadow">
+                   class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow">
                     <i class="fas fa-chevron-left"></i>
                 </a>
-                <h3 class="text-xl font-semibold text-gray-800 min-w-[180px] text-center">
+                <h3 class="text-2xl font-bold text-gray-900 min-w-[200px] text-center tracking-tight">
                     <?= date('F Y', strtotime("$year_schedule-$month_schedule-01")) ?>
                 </h3>
                 <a href="?ym=<?= h_schedule($nav_schedule['next']) ?>#scheduleView" 
                    onclick="showSection('scheduleView')"
-                   class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white border border-transparent hover:border-gray-200 text-gray-600 hover:text-gray-900 transition-all shadow-sm hover:shadow">
+                   class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow">
                     <i class="fas fa-chevron-right"></i>
                 </a>
             </div>
@@ -279,13 +319,13 @@ try {
     <div class="bg-white">
 
             <!-- Calendar Grid -->
-            <div class="grid grid-cols-7 gap-0 border-l border-t border-gray-200">
+            <div class="grid grid-cols-7 gap-0 border-l border-t border-gray-100">
                 <!-- Weekday Headers -->
                 <?php $weekdays_schedule = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; 
                       foreach($weekdays_schedule as $idx => $wd): 
                         $isWeekend = ($idx == 0 || $idx == 6);
                 ?>
-                    <div class="text-center py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50 border-r border-b border-gray-200">
+                    <div class="text-center py-4 text-xs font-bold text-gray-500 uppercase tracking-widest bg-gray-50/80 border-r border-b border-gray-100">
                         <?= $wd ?>
                     </div>
                 <?php endforeach; ?>
@@ -294,52 +334,52 @@ try {
                 <?php foreach($matrix_schedule as $week): ?>
                     <?php foreach($week as $cellDate): ?>
                         <?php if (!$cellDate): ?>
-                            <div class="min-h-[140px] bg-gray-50/30 border-r border-b border-gray-200"></div>
+                            <div class="min-h-[140px] bg-gray-50/30 border-r border-b border-gray-100"></div>
                         <?php else: 
                               $cell = getScheduleCell_schedule($pdo, $employee_id, $cellDate);
                               $isToday = $cellDate === date('Y-m-d');
                               $isPast = $cellDate < date('Y-m-d');
                               
-                              // Clean, minimal styling like Monday.com
-                              $bgClass = 'bg-white hover:bg-gray-50';
-                              $borderClass = 'border-r border-b border-gray-200';
+                              // Clean, minimal styling
+                              $bgClass = 'bg-white hover:bg-gray-50/50';
+                              $borderClass = 'border-r border-b border-gray-100';
                               
                               if ($isToday) {
-                                  $bgClass = 'bg-blue-50 border-l-4 border-l-blue-500';
-                                  $borderClass = 'border-r border-b border-blue-200';
+                                  $bgClass = 'bg-blue-50/50 border-l-4 border-l-blue-500';
+                                  $borderClass = 'border-r border-b border-blue-100';
                               }
                               
                               if ($isPast) {
-                                  $bgClass .= ' opacity-50';
+                                  $bgClass .= ' opacity-60';
                               }
                         ?>
-                            <div class="min-h-[140px] p-3 <?= $bgClass ?> <?= $borderClass ?> transition-colors <?= !$isPast ? 'cursor-pointer' : '' ?>"
+                            <div class="min-h-[140px] p-4 <?= $bgClass ?> <?= $borderClass ?> transition-all duration-200 <?= !$isPast ? 'cursor-pointer' : '' ?>"
                                  <?= !$isPast ? "onclick=\"openScheduleChangeModal('$cellDate')\"" : '' ?>>
                               
                               <!-- Date Number -->
                               <div class="flex items-center justify-between mb-3">
-                                <div class="w-8 h-8 flex items-center justify-center <?= $isToday ? 'bg-blue-600 text-white rounded-full' : '' ?>">
-                                  <span class="text-base font-semibold <?= $isToday ? '' : 'text-gray-700' ?>"><?= date('j', strtotime($cellDate)) ?></span>
+                                <div class="flex items-center justify-center <?= $isToday ? 'w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-full shadow-lg shadow-blue-500/30' : 'w-8 h-8' ?>">
+                                  <span class="text-base font-bold <?= $isToday ? '' : 'text-gray-700' ?>"><?= date('j', strtotime($cellDate)) ?></span>
                                 </div>
                                 
                                 <?php if ($cell['source'] === 'approved_change_request'): ?>
-                                  <span class="text-xs text-amber-600 font-bold uppercase">Schedule Changed</span>
+                                  <span class="text-xs text-amber-600 font-extrabold uppercase tracking-wider">Changed</span>
                                 <?php elseif ($cell['is_holiday']): ?>
-                                  <i class="fas fa-star text-amber-500 text-sm"></i>
+                                  <i class="fas fa-star text-amber-400 text-sm"></i>
                                 <?php endif; ?>
                               </div>
 
                               <!-- Schedule Card (if exists) -->
                               <?php if ($cell['is_rest_day'] || $cell['is_holiday']): ?>
-                                <div class="p-3 rounded-lg <?= $cell['is_holiday'] ? 'bg-amber-50 border border-amber-300' : 'bg-slate-50 border border-slate-300' ?>">
-                                  <div class="flex items-center gap-2.5 mb-1">
-                                    <div class="w-1.5 h-10 rounded-full <?= $cell['is_holiday'] ? 'bg-amber-500' : 'bg-slate-400' ?>"></div>
+                                <div class="p-3.5 rounded-xl <?= $cell['is_holiday'] ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200' : 'bg-gradient-to-br from-slate-50 to-gray-100 border-2 border-slate-200' ?> shadow-sm">
+                                  <div class="flex items-center gap-3 mb-1">
+                                    <div class="w-1.5 h-12 rounded-full <?= $cell['is_holiday'] ? 'bg-gradient-to-b from-amber-400 to-amber-600' : 'bg-gradient-to-b from-slate-400 to-slate-600' ?>"></div>
                                     <div class="flex-1 min-w-0">
-                                      <div class="text-sm font-semibold <?= $cell['is_holiday'] ? 'text-amber-800' : 'text-slate-700' ?> uppercase tracking-wide">
+                                      <div class="text-sm font-bold <?= $cell['is_holiday'] ? 'text-amber-900' : 'text-slate-800' ?> uppercase tracking-wide">
                                         <?= $cell['is_holiday'] ? 'HOLIDAY' : 'REST DAY' ?>
                                       </div>
                                       <?php if ($cell['is_holiday'] && isset($cell['holiday'])): ?>
-                                        <div class="text-sm text-amber-700 truncate mt-1">
+                                        <div class="text-sm text-amber-700 font-medium truncate mt-1">
                                           <?= h_schedule($cell['holiday']['holiday_name']) ?>
                                         </div>
                                       <?php endif; ?>
@@ -362,23 +402,23 @@ try {
                                       $cardColor = 'blue';
                                   }
                                 ?>
-                                <div class="p-3 rounded-lg bg-<?= $cardColor ?>-50 border border-<?= $cardColor ?>-200 hover:shadow-md transition-shadow">
-                                  <div class="flex items-start gap-2.5">
-                                    <div class="w-1.5 h-full rounded-full bg-<?= $cardColor ?>-500"></div>
+                                <div class="p-3.5 rounded-xl bg-gradient-to-br from-<?= $cardColor ?>-50 to-<?= $cardColor ?>-100/50 border-2 border-<?= $cardColor ?>-200 hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
+                                  <div class="flex items-start gap-3">
+                                    <div class="w-1.5 h-full rounded-full bg-gradient-to-b from-<?= $cardColor ?>-400 to-<?= $cardColor ?>-600"></div>
                                     <div class="flex-1 min-w-0">
                                       <?php if ($badgeText): ?>
-                                        <div class="text-xs font-bold text-<?= $cardColor ?>-600 uppercase tracking-wide mb-1">
+                                        <div class="text-xs font-extrabold text-<?= $cardColor ?>-600 uppercase tracking-wider mb-1.5">
                                           <?= $badgeText ?>
                                         </div>
                                       <?php endif; ?>
                                       <?php if (!empty($cell['actual_schedule']['name'])): ?>
-                                        <div class="text-sm font-semibold text-gray-800 truncate mb-2">
+                                        <div class="text-sm font-bold text-gray-900 truncate mb-2.5">
                                           <?= h_schedule($cell['actual_schedule']['name']) ?>
                                         </div>
                                       <?php endif; ?>
-                                      <div class="flex items-center gap-1.5">
-                                        <i class="fas fa-clock text-<?= $cardColor ?>-500 text-xs"></i>
-                                        <span class="font-bold text-sm text-<?= $cardColor ?>-700">
+                                      <div class="flex items-center gap-2">
+                                        <i class="fas fa-clock text-<?= $cardColor ?>-600 text-xs"></i>
+                                        <span class="font-bold text-sm text-<?= $cardColor ?>-800">
                                           <?= date('g:i A', strtotime($cell['actual_schedule']['time_in'])) ?> - <?= date('g:i A', strtotime($cell['actual_schedule']['time_out'])) ?>
                                         </span>
                                       </div>
@@ -386,7 +426,7 @@ try {
                                   </div>
                                 </div>
                               <?php else: ?>
-                                <div class="text-sm text-gray-400 italic">
+                                <div class="text-sm text-gray-400 italic font-medium">
                                   No schedule
                                 </div>
                               <?php endif; ?>
@@ -398,20 +438,26 @@ try {
     </div>
 
     <!-- Footer -->
-    <div class="px-8 py-4 border-t border-gray-200 bg-gray-50">
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-600">
-            <div class="flex items-center gap-2">
-                <i class="fas fa-info-circle text-gray-400"></i>
-                <span>Click on any date to request a schedule change</span>
+    <div class="px-8 py-5 border-t border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-600">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <i class="fas fa-info-circle text-blue-600 text-sm"></i>
+                </div>
+                <span class="font-medium">Click on any future date to request a schedule change</span>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-5">
                 <div class="flex items-center gap-2">
-                    <i class="fas fa-calendar-check text-blue-500"></i>
-                    <span><?= count(array_filter($matrix_schedule, function($week) { return array_filter($week); })) * 7 ?> days in view</span>
+                    <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span class="text-xs font-medium text-gray-500">Work Day</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <i class="fas fa-clock text-gray-400"></i>
-                    <span>Updated <?= date('M d, Y') ?></span>
+                    <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+                    <span class="text-xs font-medium text-gray-500">Holiday</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-slate-400"></div>
+                    <span class="text-xs font-medium text-gray-500">Rest Day</span>
                 </div>
             </div>
         </div>
@@ -419,31 +465,34 @@ try {
 </div>
 
 <!-- Schedule Request Modal -->
-<div id="scheduleRequestModal" class="fixed inset-0 bg-black bg-opacity-50 z-50" style="display: none;">
+<div id="scheduleRequestModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" style="display: none;">
     <div class="flex items-center justify-center min-h-screen px-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold">Request Schedule Change</h3>
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md transform transition-all">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h3 class="text-2xl font-bold text-gray-900">Request Schedule Change</h3>
+                    <p class="text-sm text-gray-500 mt-1">Submit a request for schedule modification</p>
+                </div>
                 <button onclick="closeScheduleRequestModal()"
-                        class="text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-times"></i>
+                        class="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
 
-            <form method="post" action="time_log_create.php" class="space-y-4">
+            <form method="post" action="time_log_create.php" class="space-y-5">
                 <input type="hidden" name="action" value="schedule_request">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Date</label>
                     <input type="date" name="schedule_date" id="modal_schedule_date_schedule" required 
                            min="<?= date('Y-m-d') ?>"
-                           class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Request Type</label>
-                    <select name="request_type" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Request Type</label>
+                    <select name="request_type" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
                         <option value="schedule_change">Schedule Change</option>
                         <option value="rest_day">Rest Day Request</option>
                         <option value="overtime">Overtime Request</option>
@@ -451,8 +500,8 @@ try {
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">New Schedule (leave blank for rest day)</label>
-                    <select name="new_schedule_id" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">New Schedule <span class="text-gray-400 font-normal">(optional for rest day)</span></label>
+                    <select name="new_schedule_id" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
                         <option value="">-- Rest Day --</option>
                         <?php foreach($workSchedules_schedule as $ws): ?>
                             <option value="<?= $ws['id'] ?>">
@@ -464,17 +513,17 @@ try {
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-                    <textarea name="reason" rows="3" required placeholder="Please explain why you need this schedule change..."
-                              class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"></textarea>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Reason</label>
+                    <textarea name="reason" rows="4" required placeholder="Please explain why you need this schedule change..."
+                              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none"></textarea>
                 </div>
 
-                <div class="flex gap-3">
+                <div class="flex gap-3 pt-2">
                     <button type="button" onclick="closeScheduleRequestModal()"
-                            class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            class="flex-1 px-5 py-3 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200">
                         Cancel
                     </button>
-                    <button type="submit" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    <button type="submit" class="flex-1 px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-200">
                         Submit Request
                     </button>
                 </div>
@@ -532,7 +581,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-/* Full-screen Monday.com-inspired calendar - SCOPED TO SCHEDULE VIEW ONLY */
+/* Modern minimalist calendar - SCOPED TO SCHEDULE VIEW ONLY */
 
 /* Remove default margins and ensure full width - ONLY for schedule view */
 #scheduleView {
@@ -543,37 +592,47 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* Calendar takes full viewport - ONLY inside schedule view */
 #scheduleView .grid.grid-cols-7 {
-    min-height: calc(100vh - 200px);
+    min-height: calc(100vh - 220px);
 }
 
-/* Subtle hover effect on calendar cells - ONLY inside schedule view */
-#scheduleView .min-h-\[160px\]:hover {
+/* Refined hover effect on calendar cells - ONLY inside schedule view */
+#scheduleView .min-h-\[140px\]:hover {
     background-color: #f9fafb !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Today's date circle - ONLY inside schedule view */
-#scheduleView .bg-green-600.rounded-full {
-    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+/* Today's date styling with glow effect - ONLY inside schedule view */
+#scheduleView .bg-gradient-to-br.from-blue-600 {
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    animation: pulse-blue 2s ease-in-out infinite;
 }
 
-/* Schedule card hover effect - ONLY inside schedule view */
-#scheduleView .rounded-lg.hover\:shadow-md {
-    transition: all 0.2s ease;
+@keyframes pulse-blue {
+    0%, 100% {
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.5);
+    }
 }
 
-#scheduleView .rounded-lg.hover\:shadow-md:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    transform: translateY(-1px);
+/* Schedule card enhanced hover effect - ONLY inside schedule view */
+#scheduleView .hover\:shadow-lg:hover {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
 }
 
-/* Smooth transitions - ONLY inside schedule view */
+/* Smooth transitions for all elements - ONLY inside schedule view */
 #scheduleView * {
-    transition-property: background-color, border-color, color, fill, stroke;
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 150ms;
+    transition-duration: 200ms;
 }
 
-/* Clean borders - ONLY inside schedule view */
+/* Refined border colors - ONLY inside schedule view */
+#scheduleView .border-gray-100 {
+    border-color: #f3f4f6;
+}
+
 #scheduleView .border-gray-200 {
     border-color: #e5e7eb;
 }
@@ -584,26 +643,86 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 /* Vertical accent line in schedule cards - ONLY inside schedule view */
-#scheduleView .w-1.h-10,
-#scheduleView .w-1.h-full {
+#scheduleView .w-1\.5 {
     flex-shrink: 0;
 }
 
-/* Text truncation - ONLY inside schedule view */
+/* Text truncation with ellipsis - ONLY inside schedule view */
 #scheduleView .truncate {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* Button hover states - ONLY inside schedule view */
+/* Button hover states with scale - ONLY inside schedule view */
 #scheduleView button:hover,
 #scheduleView a:hover {
     transform: translateY(0);
 }
 
+#scheduleView button:active,
+#scheduleView a:active {
+    transform: scale(0.98);
+}
+
+/* Modal backdrop animation */
+#scheduleRequestModal {
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Modal content animation */
+#scheduleRequestModal > div > div {
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Focus states for form inputs */
+#scheduleView input:focus,
+#scheduleView select:focus,
+#scheduleView textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Gradient enhancements */
+#scheduleView .bg-gradient-to-r,
+#scheduleView .bg-gradient-to-br,
+#scheduleView .bg-gradient-to-b {
+    background-size: 200% 200%;
+}
+
 /* Ensure cells grow to fill space evenly - ONLY inside schedule view */
-#scheduleView .min-h-\[160px\] {
+#scheduleView .min-h-\[140px\] {
     flex: 1;
+}
+
+/* Legend dots styling */
+#scheduleView .w-2.h-2.rounded-full {
+    box-shadow: 0 0 0 3px currentColor;
+    opacity: 0.2;
+}
+
+/* Weekday header styling */
+#scheduleView .tracking-widest {
+    letter-spacing: 0.15em;
 }
 </style>

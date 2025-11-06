@@ -1934,13 +1934,13 @@ uasort($sortedScheduleOptions, function($a, $b) {
                             </div>
                             
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Time In <span class="text-red-500">*</span></label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Start Shift <span class="text-red-500">*</span></label>
                                 <input type="time" name="time_in" required
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
                             </div>
                             
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Time Out <span class="text-red-500">*</span></label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">End Shift <span class="text-red-500">*</span></label>
                                 <input type="time" name="time_out" required
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
                             </div>
@@ -1965,8 +1965,8 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time In</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time Out</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Start Shift</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">End Shift</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
                                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Employees Using</th>
                                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>

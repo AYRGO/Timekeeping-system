@@ -30,6 +30,28 @@ $pendingSchedules = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests W
 $pendingOT = $pdo->query("SELECT COUNT(*) FROM overtime_requests WHERE status = 'Pending'")->fetchColumn();
 $pendingTimeAdjustments = $pdo->query("SELECT COUNT(*) FROM time_adjustment_requests WHERE status = 'pending'")->fetchColumn();
 
+// Get auto-accrual status
+$autoAccrualEnabled = false;
+$accrualMode = 'production'; // Default mode
+try {
+    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'auto_accrual_enabled'");
+    $stmt->execute();
+    $autoAccrualStatus = $stmt->fetchColumn();
+    $autoAccrualEnabled = ($autoAccrualStatus === '1' || $autoAccrualStatus === 1);
+    
+    // Get accrual mode (testing or production)
+    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'accrual_mode'");
+    $stmt->execute();
+    $modeResult = $stmt->fetchColumn();
+    if ($modeResult) {
+        $accrualMode = $modeResult;
+    }
+} catch (Exception $e) {
+    // If table doesn't exist, assume disabled
+    $autoAccrualEnabled = false;
+    $accrualMode = 'production';
+}
+
 // Get recent activity from post tables
 $recentActivity = [];
 
@@ -294,6 +316,111 @@ for ($i = 5; $i >= 0; $i--) {
                         </div>";
                     }
                     ?>
+                </div>
+
+                <!-- Auto-Accrual Section - Clean & Modern -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-indigo-100 p-3 rounded-lg">
+                                <i class="fas fa-magic text-indigo-600 text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900">Automatic Leave Accrual</h3>
+                                <p class="text-sm text-gray-500">
+                                    <?= $accrualMode === 'testing' ? 'Testing mode - Every 10 seconds' : 'Production mode - Monthly processing' ?>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Toggle Switch -->
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm font-medium <?= $autoAccrualEnabled ? 'text-green-600' : 'text-gray-500' ?>">
+                                <?= $autoAccrualEnabled ? 'ON' : 'OFF' ?>
+                            </span>
+                            <button 
+                                id="accrualToggle"
+                                onclick="toggleAutoAccrual()"
+                                class="relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 <?= $autoAccrualEnabled ? 'bg-green-500' : 'bg-gray-300' ?>"
+                            >
+                                <span class="inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform <?= $autoAccrualEnabled ? 'translate-x-7' : 'translate-x-1' ?>"></span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Message -->
+                    <div id="accrualStatusMessage" class="hidden mb-4"></div>
+                    
+                    <!-- Mode Selector (only show when enabled) -->
+                    <?php if ($autoAccrualEnabled): ?>
+                    <div class="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between gap-4 flex-wrap">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-cog text-gray-600"></i>
+                                <span class="text-sm font-medium text-gray-700">Mode:</span>
+                                <span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-semibold">
+                                    <?= strtoupper($accrualMode) ?>
+                                </span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button 
+                                    onclick="switchAccrualMode('testing')"
+                                    class="px-4 py-2 rounded-lg text-sm font-medium transition-all <?= $accrualMode === 'testing' ? 'bg-orange-500 text-white shadow-md' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50' ?>"
+                                >
+                                    <i class="fas fa-flask mr-1"></i>Testing (10s)
+                                </button>
+                                <button 
+                                    onclick="switchAccrualMode('production')"
+                                    class="px-4 py-2 rounded-lg text-sm font-medium transition-all <?= $accrualMode === 'production' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50' ?>"
+                                >
+                                    <i class="fas fa-rocket mr-1"></i>Production
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Info Box -->
+                    <div class="<?= $autoAccrualEnabled ? ($accrualMode === 'testing' ? 'bg-orange-50 border-orange-200' : 'bg-green-50 border-green-200') : 'bg-gray-50 border-gray-200' ?> border rounded-lg p-4">
+                        <div class="flex items-start gap-3">
+                            <i class="fas <?= $autoAccrualEnabled ? ($accrualMode === 'testing' ? 'fa-flask text-orange-600' : 'fa-check-circle text-green-600') : 'fa-info-circle text-gray-600' ?> mt-0.5"></i>
+                            <div class="flex-1 text-sm">
+                                <?php if (!$autoAccrualEnabled): ?>
+                                    <p class="font-medium text-gray-900 mb-1">Manual Mode</p>
+                                    <p class="text-gray-600">
+                                        Process leave accruals manually each month via 
+                                        <a href="../module/leave_accrual_manager.php" class="text-indigo-600 underline hover:text-indigo-700">Leave Accrual Manager</a>
+                                    </p>
+                                <?php elseif ($accrualMode === 'testing'): ?>
+                                    <p class="font-bold text-orange-900 mb-2">⚠️ Testing Mode - Every 10 Seconds</p>
+                                    <p class="text-orange-800 mb-2">
+                                        Leave credits are automatically processed every 10 seconds while this page is open.<br>
+                                        <strong>Sick Leave:</strong> 0.42 days/cycle | <strong>Vacation Leave:</strong> 1.25 days/cycle
+                                    </p>
+                                    <p class="bg-orange-100 border border-orange-300 rounded px-3 py-2 text-orange-900 font-medium">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                                        Switch to Production before going live!
+                                    </p>
+                                <?php else: ?>
+                                    <p class="font-bold text-green-900 mb-2">✅ Production Mode - Automatic</p>
+                                    <p class="text-green-800 mb-2">
+                                        System checks hourly and processes leave credits on the last day of each month.<br>
+                                        <strong>Sick Leave:</strong> 0.42 days/month | <strong>Vacation Leave:</strong> 1.25 days/month
+                                    </p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-lg text-xs font-medium">
+                                            <span class="w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
+                                            Active
+                                        </span>
+                                        <span class="text-xs text-green-700">
+                                            <i class="fas fa-clock mr-1"></i>Next check: Every hour
+                                        </span>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Charts Section -->
@@ -606,6 +733,227 @@ for ($i = 5; $i >= 0; $i--) {
                 }
             }
         });
+        
+        // Auto-Accrual Toggle Function
+        function toggleAutoAccrual() {
+            const toggle = document.getElementById('accrualToggle');
+            const statusMessage = document.getElementById('accrualStatusMessage');
+            const currentState = toggle.classList.contains('bg-green-500');
+            const newState = !currentState;
+            
+            // Show loading state
+            statusMessage.className = 'p-4 rounded-lg mb-4 bg-blue-50 border border-blue-200 text-blue-900';
+            statusMessage.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span class="font-medium">Processing...</span>
+                </div>
+            `;
+            statusMessage.classList.remove('hidden');
+            
+            // Make API call
+            fetch('../module/toggle_auto_accrual.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    enable: newState
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    statusMessage.className = 'p-4 rounded-lg mb-4 bg-green-50 border border-green-200 text-green-900';
+                    statusMessage.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="font-medium">${data.message}</span>
+                        </div>
+                    `;
+                    
+                    // Reload page after 1 second
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    // Show error message
+                    statusMessage.className = 'p-4 rounded-lg mb-4 bg-red-50 border border-red-200 text-red-900';
+                    statusMessage.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <span class="font-medium">${data.error || 'Failed to toggle'}</span>
+                        </div>
+                    `;
+                    
+                    setTimeout(() => {
+                        statusMessage.classList.add('hidden');
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusMessage.className = 'p-4 rounded-lg mb-4 bg-red-50 border border-red-200 text-red-900';
+                statusMessage.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span class="font-medium">Network error. Please try again.</span>
+                    </div>
+                `;
+                
+                setTimeout(() => {
+                    statusMessage.classList.add('hidden');
+                }, 3000);
+            });
+        }
+        
+        // Switch Accrual Mode Function
+        function switchAccrualMode(mode) {
+            const statusMessage = document.getElementById('accrualStatusMessage');
+            const modeLabel = mode === 'testing' ? 'Testing (10s)' : 'Production';
+            
+            // Show loading state
+            statusMessage.className = 'p-4 rounded-lg mb-4 bg-blue-50 border border-blue-200 text-blue-900';
+            statusMessage.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-sync-alt fa-spin"></i>
+                    <span class="font-medium">Switching to ${modeLabel} mode...</span>
+                </div>
+            `;
+            statusMessage.classList.remove('hidden');
+            
+            // Make API call
+            fetch('../module/toggle_accrual_mode.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    mode: mode
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    const bgColor = mode === 'testing' ? 'bg-orange-50 border-orange-200 text-orange-900' : 'bg-blue-50 border-blue-200 text-blue-900';
+                    statusMessage.className = `p-4 rounded-lg mb-4 ${bgColor}`;
+                    statusMessage.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-check-circle"></i>
+                            <span class="font-medium">Switched to ${modeLabel} mode!</span>
+                        </div>
+                    `;
+                    
+                    // Reload page after 1 second
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    // Show error message
+                    statusMessage.className = 'p-4 rounded-lg mb-4 bg-red-50 border border-red-200 text-red-900';
+                    statusMessage.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <span class="font-medium">${data.error || 'Failed to switch mode'}</span>
+                        </div>
+                    `;
+                    
+                    setTimeout(() => {
+                        statusMessage.classList.add('hidden');
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusMessage.className = 'p-4 rounded-lg mb-4 bg-red-50 border border-red-200 text-red-900';
+                statusMessage.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span class="font-medium">Network error. Please try again.</span>
+                    </div>
+                `;
+                
+                setTimeout(() => {
+                    statusMessage.classList.add('hidden');
+                }, 3000);
+            });
+        }
+        
+        // Auto-Accrual Background Processor
+        // This runs automatically when auto-accrual is enabled
+        const autoAccrualEnabled = <?= $autoAccrualEnabled ? 'true' : 'false' ?>;
+        const accrualMode = '<?= $accrualMode ?>';
+        
+        if (autoAccrualEnabled) {
+            console.log('🔄 Auto-Accrual is ENABLED - Mode:', accrualMode);
+            
+            // Function to check and process accruals
+            function processAutoAccrual() {
+                fetch('../module/process_auto_accrual.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.processed > 0) {
+                            console.log('✅ Accrual Processed:', data);
+                            console.log(`   📊 Employees: ${data.processed}/${data.total_employees}`);
+                            console.log(`   📅 Reason: ${data.reason}`);
+                            console.log(`   ⏰ Time: ${data.timestamp}`);
+                            
+                            // Show notification for successful processing
+                            const statusMessage = document.getElementById('accrualStatusMessage');
+                            if (statusMessage) {
+                                statusMessage.className = 'p-3 rounded-lg mb-4 bg-green-50 border border-green-200 text-green-800';
+                                statusMessage.innerHTML = `
+                                    <div class="flex items-center">
+                                        <i class="fas fa-check-circle mr-2"></i>
+                                        <div>
+                                            <strong>Accrual Processed!</strong><br>
+                                            <span class="text-xs">${data.processed} employees processed at ${data.timestamp}</span>
+                                        </div>
+                                    </div>
+                                `;
+                                statusMessage.classList.remove('hidden');
+                                
+                                // Auto-hide after 10 seconds
+                                setTimeout(() => {
+                                    statusMessage.classList.add('hidden');
+                                }, 10000);
+                            }
+                        } else {
+                            console.log('ℹ️ Accrual Check:', data.message, '- Status:', data.status);
+                        }
+                    } else {
+                        console.error('❌ Accrual Error:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Network Error:', error);
+                });
+            }
+            
+            // Initial check on page load
+            processAutoAccrual();
+            
+            // Set up interval based on mode
+            if (accrualMode === 'testing') {
+                // Testing mode - check every 10 seconds
+                console.log('🧪 Testing Mode - Checking every 10 seconds');
+                setInterval(processAutoAccrual, 10000);
+            } else {
+                // Production mode - check every hour (3600000 ms)
+                console.log('🚀 Production Mode - Checking every hour');
+                setInterval(processAutoAccrual, 3600000);
+            }
+        } else {
+            console.log('⭕ Auto-Accrual is DISABLED');
+        }
     </script>
 
 </body>

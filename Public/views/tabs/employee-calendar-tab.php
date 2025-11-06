@@ -379,46 +379,62 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!-- Current Schedule Tab Content -->
-<div class="bg-white rounded-lg shadow-md p-6">
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h2 class="text-xl font-semibold text-gray-800">Employee Schedule Calendar</h2>
-            <p class="text-sm text-gray-500">View and manage <?= htmlspecialchars($employee['fname'] . ' ' . $employee['lname']) ?>'s schedule</p>
+<div class="bg-gradient-to-br from-gray-50 to-white rounded-xl shadow-sm border border-gray-100 p-8">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8 pb-6 border-b border-gray-200">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-calendar-alt text-white text-xl"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Schedule Calendar</h2>
+                <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($employee['fname'] . ' ' . $employee['lname']) ?></p>
+            </div>
         </div>
         <div class="text-right">
-            <p class="text-sm text-gray-500">Current Month</p>
-            <p class="font-semibold text-lg"><?= date('F Y', strtotime("$year-$month-01")) ?></p>
+            <div class="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm">
+                <i class="fas fa-calendar text-gray-400"></i>
+                <span class="font-semibold text-gray-800"><?= date('F Y', strtotime("$year-$month-01")) ?></span>
+            </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Calendar -->
-        <div class="lg:col-span-2 bg-white rounded shadow p-4">
+    <div class="grid grid-cols-1 xl:grid-cols-4 gap-8">
+        <!-- Calendar Section -->
+        <div class="xl:col-span-3">
             <!-- Month Navigation -->
-            <div class="flex justify-between items-center mb-4">
-                <a href="?id=<?= $employeeId ?>&ym=<?= $nav['prev'] ?>#current-schedule" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded transition">
-                    <i class="fas fa-chevron-left"></i> Previous
+            <div class="flex items-center justify-between mb-6">
+                <a href="?id=<?= $employeeId ?>&ym=<?= $nav['prev'] ?>#current-schedule" 
+                   class="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-700 shadow-sm">
+                    <i class="fas fa-chevron-left text-xs"></i>
+                    <span>Previous</span>
                 </a>
-                <h3 class="text-lg font-bold"><?= date('F Y', strtotime("$year-$month-01")) ?></h3>
-                <a href="?id=<?= $employeeId ?>&ym=<?= $nav['next'] ?>#current-schedule" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded transition">
-                    Next <i class="fas fa-chevron-right"></i>
+                
+                <h3 class="text-lg font-bold text-gray-800"><?= date('F Y', strtotime("$year-$month-01")) ?></h3>
+                
+                <a href="?id=<?= $employeeId ?>&ym=<?= $nav['next'] ?>#current-schedule" 
+                   class="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-700 shadow-sm">
+                    <span>Next</span>
+                    <i class="fas fa-chevron-right text-xs"></i>
                 </a>
             </div>
 
             <!-- Calendar Grid -->
-            <div class="border rounded overflow-hidden">
-                <div class="grid grid-cols-7 bg-gray-100 text-center font-semibold text-sm">
-                    <div class="p-2 border">Sun</div>
-                    <div class="p-2 border">Mon</div>
-                    <div class="p-2 border">Tue</div>
-                    <div class="p-2 border">Wed</div>
-                    <div class="p-2 border">Thu</div>
-                    <div class="p-2 border">Fri</div>
-                    <div class="p-2 border">Sat</div>
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <!-- Weekday Headers -->
+                <div class="grid grid-cols-7 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                    <div class="py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">Sun</div>
+                    <div class="py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">Mon</div>
+                    <div class="py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">Tue</div>
+                    <div class="py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">Wed</div>
+                    <div class="py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">Thu</div>
+                    <div class="py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">Fri</div>
+                    <div class="py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">Sat</div>
                 </div>
 
+                <!-- Calendar Days -->
                 <?php foreach($matrix as $week): ?>
-                <div class="grid grid-cols-7">
+                <div class="grid grid-cols-7 border-b border-gray-100 last:border-b-0">
                     <?php foreach($week as $date): ?>
                         <?php if ($date): ?>
                             <?php 
@@ -426,54 +442,79 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                             $dayNum = date('j', strtotime($date));
                             $isToday = ($date === date('Y-m-d'));
                             $isPast = ($date < date('Y-m-d'));
+                            $isWeekend = (date('w', strtotime($date)) == 0 || date('w', strtotime($date)) == 6);
                             ?>
-                            <div class="border p-2 min-h-[80px] <?= $isPast ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:bg-gray-50' ?> transition relative" 
-                                 <?= $isPast ? '' : "onclick=\"openOverride_admin('$date')\"" ?>
-                                 style="background-color: <?= $cell['schedule_color'] ?>22;">
+                            <div class="border-r border-gray-100 last:border-r-0 p-3 min-h-[100px] relative group transition-all <?= $isPast ? 'bg-gray-50/50' : 'hover:bg-blue-50/30 cursor-pointer' ?>" 
+                                 <?= $isPast ? '' : "onclick=\"openOverride_admin('$date')\"" ?>>
                                 
-                                <div class="flex justify-between items-start mb-1">
-                                    <span class="text-sm font-semibold <?= $isToday ? 'bg-blue-600 text-white px-2 rounded-full' : '' ?>">
-                                        <?= $dayNum ?>
-                                    </span>
-                                    <?php if ($cell['source'] !== 'none' && $cell['source'] !== 'weekend'): ?>
-                                        <span class="text-xs px-1 rounded" style="background-color: <?= $cell['schedule_color'] ?>; color: white;">
-                                            <?php
-                                            switch($cell['source']) {
-                                                case 'approved_change_request': echo 'A'; break;
-                                                case 'daily_override': echo 'D'; break;
-                                                case 'rotating_schedule': echo 'R'; break;
-                                                case 'weekly_default': echo 'W'; break;
-                                                case 'holiday': echo 'H'; break;
-                                            }
-                                            ?>
+                                <!-- Date Number -->
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="relative">
+                                        <?php if ($isToday): ?>
+                                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs font-bold shadow-md">
+                                                <?= $dayNum ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-sm font-semibold text-gray-700">
+                                                <?= $dayNum ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <!-- Source Badge -->
+                                    <?php if ($cell['source'] === 'admin_override'): ?>
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 border border-green-200">
+                                            <i class="fas fa-user-shield mr-1"></i>ADMIN
+                                        </span>
+                                    <?php elseif ($cell['source'] === 'approved_request'): ?>
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                            <i class="fas fa-check-circle mr-1"></i>REQ
                                         </span>
                                     <?php endif; ?>
                                 </div>
 
-                                <div class="text-xs">
+                                <!-- Schedule Info -->
+                                <div class="space-y-1">
                                     <?php if ($cell['is_holiday']): ?>
-                                        <div class="font-semibold text-yellow-700"><?= htmlspecialchars(substr($cell['holiday']['holiday_name'], 0, 15)) ?></div>
+                                        <div class="flex items-start gap-1.5 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                            <i class="fas fa-star text-yellow-500 text-xs mt-0.5"></i>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="text-xs font-semibold text-yellow-800 truncate">
+                                                    <?= htmlspecialchars($cell['holiday']['holiday_name']) ?>
+                                                </div>
+                                            </div>
+                                        </div>
                                     <?php elseif ($cell['is_rest_day']): ?>
-                                        <!-- Rest day - no label needed, gray background indicates off status -->
+                                        <div class="flex items-center gap-1.5 p-2 bg-gray-100 border border-gray-200 rounded-lg">
+                                            <i class="fas fa-moon text-gray-400 text-xs"></i>
+                                            <span class="text-xs font-medium text-gray-500">Rest Day</span>
+                                        </div>
                                     <?php elseif ($cell['actual_schedule']): ?>
-                                        <div class="font-medium"><?= htmlspecialchars($cell['actual_schedule']['name']) ?></div>
-                                        <div class="text-gray-600">
-                                            <?= date('g:iA', strtotime($cell['actual_schedule']['time_in'])) ?> - 
-                                            <?= date('g:iA', strtotime($cell['actual_schedule']['time_out'])) ?>
+                                        <div class="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                            <div class="text-xs font-semibold text-blue-900 mb-1 truncate">
+                                                <?= htmlspecialchars($cell['actual_schedule']['name']) ?>
+                                            </div>
+                                            <div class="flex items-center gap-1 text-[11px] text-blue-700">
+                                                <i class="fas fa-clock text-blue-400"></i>
+                                                <span><?= date('g:i A', strtotime($cell['actual_schedule']['time_in'])) ?></span>
+                                                <span class="text-blue-300">-</span>
+                                                <span><?= date('g:i A', strtotime($cell['actual_schedule']['time_out'])) ?></span>
+                                            </div>
                                         </div>
                                     <?php else: ?>
-                                        <div class="text-gray-400">No schedule</div>
+                                        <div class="p-2 bg-gray-50 border border-gray-200 rounded-lg">
+                                            <span class="text-xs text-gray-400 italic">No schedule</span>
+                                        </div>
                                     <?php endif; ?>
                                 </div>
 
-                                <?php if ($cell['override_data']): ?>
-                                    <div class="absolute top-1 right-1">
-                                        <i class="fas fa-edit text-green-600 text-xs"></i>
-                                    </div>
+                                <!-- Hover Effect -->
+                                <?php if (!$isPast): ?>
+                                <div class="absolute inset-0 bg-blue-500 opacity-0 group-hover:opacity-5 pointer-events-none transition-opacity rounded"></div>
                                 <?php endif; ?>
                             </div>
                         <?php else: ?>
-                            <div class="border p-2 bg-gray-50"></div>
+                            <div class="border-r border-gray-100 last:border-r-0 p-3 bg-gray-50/30"></div>
                         <?php endif; ?>
                     <?php endforeach; ?>
                 </div>
@@ -482,91 +523,171 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <!-- Sidebar -->
-        <div class="bg-gray-50 rounded shadow p-4">
-            <!-- Add Override Form -->
-            <div class="mb-6">
-                <h3 class="font-semibold mb-3 flex items-center">
-                    <i class="fas fa-plus-circle text-blue-600 mr-2"></i>
-                    Add Schedule Override
-                </h3>
-                <form method="post" class="space-y-3">
+        <div class="xl:col-span-1 space-y-6">
+            <!-- Add Override Card -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-4">
+                    <h3 class="font-semibold text-white flex items-center gap-2">
+                        <i class="fas fa-calendar-plus"></i>
+                        <span>Add Override</span>
+                    </h3>
+                </div>
+                
+                <form method="post" class="p-5 space-y-4">
                     <input type="hidden" name="action" value="add_override">
                     <input type="hidden" name="employee_id" value="<?= $emp_id ?>">
-                    <input type="hidden" name="reason" value="">
+                    <input type="hidden" name="reason" value="Admin override">
                     
                     <div>
-                        <label class="block text-xs font-medium mb-1">Date</label>
+                        <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Date</label>
                         <input type="date" id="override_date" name="schedule_date" required 
-                               class="w-full text-sm p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                               min="<?= date('Y-m-d') ?>"
+                               class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
                     </div>
                     
                     <div>
-                        <label class="block text-xs font-medium mb-1">Schedule</label>
-                        <select name="override_schedule_id" class="w-full text-sm p-2 border rounded focus:ring-2 focus:ring-blue-500">
-                            <option value="OFF">-- OFF / Rest Day --</option>
-                            <?php foreach($workSchedules_cal as $ws): ?>
+                        <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Schedule</label>
+                        <select name="override_schedule_id" class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white">
+                            <option value="">-- OFF / Rest Day --</option>
+                            <?php 
+                            // Sort schedules by time_in
+                            usort($workSchedules_cal, function($a, $b) {
+                                return strtotime($a['time_in']) - strtotime($b['time_in']);
+                            });
+                            foreach($workSchedules_cal as $ws): 
+                            ?>
                                 <option value="<?= $ws['id'] ?>">
-                                    <?= htmlspecialchars($ws['name']) ?> 
-                                    (<?= date('g:i A', strtotime($ws['time_in'])) ?> - <?= date('g:i A', strtotime($ws['time_out'])) ?>)
+                                    <?= date('g:i A', strtotime($ws['time_in'])) ?> - <?= date('g:i A', strtotime($ws['time_out'])) ?>
+                                    <?= !empty($ws['name']) ? ' (' . htmlspecialchars($ws['name']) . ')' : '' ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition text-sm">
-                        <i class="fas fa-save mr-2"></i>Add Override
+                    <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-3 px-4 rounded-lg transition-all font-medium text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                        <i class="fas fa-save mr-2"></i>Create Override
                     </button>
                 </form>
             </div>
 
-            <!-- Upcoming Overrides -->
-            <div>
-                <h3 class="font-semibold mb-3 flex items-center">
-                    <i class="fas fa-calendar-alt text-purple-600 mr-2"></i>
-                    Upcoming Overrides
-                </h3>
+            <!-- Upcoming Overrides Card -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-5 py-4">
+                    <h3 class="font-semibold text-white flex items-center gap-2">
+                        <i class="fas fa-list-check"></i>
+                        <span>Upcoming Overrides</span>
+                    </h3>
+                </div>
                 
-                <?php if ($pendingOverrides): ?>
-                    <div class="space-y-2 max-h-96 overflow-y-auto">
-                        <?php foreach($pendingOverrides as $po): ?>
-                            <div class="bg-white border rounded p-3 text-xs shadow-sm">
-                                <div class="flex justify-between items-start mb-1">
-                                    <span class="font-semibold text-gray-700"><?= date('M d, Y', strtotime($po['schedule_date'])) ?></span>
-                                    <?php if ($po['is_rest_day']): ?>
-                                        <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium">OFF</span>
-                                    <?php else: ?>
-                                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
-                                            <?= htmlspecialchars($po['schedule_name']) ?>
-                                        </span>
+                <div class="p-5">
+                    <?php if ($pendingOverrides): ?>
+                        <div class="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                            <?php foreach($pendingOverrides as $po): ?>
+                                <div class="group relative bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-md transition-all">
+                                    <div class="flex items-start justify-between gap-2 mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                                                <i class="fas fa-calendar-day text-blue-600 text-xs"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-xs font-bold text-gray-800">
+                                                    <?= date('M d, Y', strtotime($po['schedule_date'])) ?>
+                                                </div>
+                                                <div class="text-[10px] text-gray-500">
+                                                    <?= date('l', strtotime($po['schedule_date'])) ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <?php if ($po['is_rest_day']): ?>
+                                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                                                <i class="fas fa-moon"></i>OFF
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
+                                                <i class="fas fa-briefcase"></i>WORK
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <?php if (!$po['is_rest_day'] && $po['time_in']): ?>
+                                        <div class="flex items-center gap-2 p-2 bg-white border border-gray-200 rounded text-xs">
+                                            <i class="fas fa-clock text-gray-400"></i>
+                                            <span class="font-semibold text-gray-700">
+                                                <?= date('g:i A', strtotime($po['time_in'])) ?>
+                                            </span>
+                                            <span class="text-gray-300">→</span>
+                                            <span class="font-semibold text-gray-700">
+                                                <?= date('g:i A', strtotime($po['time_out'])) ?>
+                                            </span>
+                                        </div>
+                                        <?php if ($po['schedule_name']): ?>
+                                            <div class="mt-1 text-[10px] text-gray-500 truncate">
+                                                <?= htmlspecialchars($po['schedule_name']) ?>
+                                            </div>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </div>
-                                <?php if (!$po['is_rest_day'] && $po['time_in']): ?>
-                                    <div class="text-gray-600 mt-1">
-                                        <i class="fas fa-clock text-gray-400 mr-1"></i>
-                                        <?= date('g:i A', strtotime($po['time_in'])) ?> - <?= date('g:i A', strtotime($po['time_out'])) ?>
-                                    </div>
-                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="text-center py-8">
+                            <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+                                <i class="fas fa-calendar-check text-gray-400 text-2xl"></i>
                             </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="text-xs text-gray-500 text-center py-4 bg-gray-50 rounded">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        No upcoming overrides
-                    </div>
-                <?php endif; ?>
+                            <p class="text-xs text-gray-500 font-medium">No upcoming overrides</p>
+                            <p class="text-[10px] text-gray-400 mt-1">Click a date to add one</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Smooth transitions */
+* {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+</style>
 
 <script>
 function openOverride_admin(date) {
     const input = document.getElementById('override_date');
     if (input) {
         input.value = date;
-        input.scrollIntoView({behavior:'smooth', block:'center'});
-        input.focus();
+        // Smooth scroll to form
+        input.closest('form').scrollIntoView({behavior: 'smooth', block: 'center'});
+        // Focus and highlight
+        setTimeout(() => {
+            input.focus();
+            input.classList.add('ring-2', 'ring-blue-400');
+            setTimeout(() => {
+                input.classList.remove('ring-2', 'ring-blue-400');
+            }, 1000);
+        }, 500);
     }
 }
 
