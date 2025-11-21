@@ -91,11 +91,11 @@ try {
         'vacation' => 1.25
     ];
     
-    // Get all active employees
-    $stmt = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active'");
+    // Get all active employees with Regular employment type ONLY
+    $stmt = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name, Emp_Type FROM employees WHERE status = 'active' AND Emp_Type = 'Regular'");
     $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    logMessage("Found " . count($employees) . " active employees");
+    logMessage("Found " . count($employees) . " active Regular employees");
     
     $processedCount = 0;
     $errorCount = 0;

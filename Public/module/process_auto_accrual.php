@@ -9,9 +9,9 @@
 session_start();
 include('../config/db.php');
 
-// Check if user is admin
-if (!isset($_SESSION['employee']) || $_SESSION['employee']['role'] !== 'internal') {
-    die(json_encode(['success' => false, 'error' => 'Unauthorized']));
+// Allow any logged-in user to trigger auto-accrual (it runs in background)
+if (!isset($_SESSION['employee']['id'])) {
+    die(json_encode(['success' => false, 'error' => 'Not logged in']));
 }
 
 header('Content-Type: application/json');
@@ -94,13 +94,14 @@ try {
     
     // 3. Process the accrual
     $currentYear = (int)date('Y');
-    $leaveRates = [
-        'sick' => 0.42,
-        'vacation' => 1.25
-    ];
     
-    // Get all active employees
-    $stmt = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active'");
+    // ACCRUAL POLICY:
+    // - OLD_REGULAR (hired before Jan 1, 2026): Gets BOTH SL (0.42/month) + VL (1.25/month) - legacy policy
+    // - REGULAR (regularized after Jan 1, 2026): Gets ONLY VL (1.25/month) - already got 5-day SL upon regularization
+    // - PROBATIONARY: No automatic accrual
+    
+    // Get all active employees with Regular or Old_Regular employment type
+    $stmt = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name, Emp_Type FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular')");
     $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $processedCount = 0;
@@ -109,6 +110,23 @@ try {
     foreach ($employees as $employee) {
         try {
             $employee_id = $employee['id'];
+            $empType = $employee['Emp_Type'];
+            
+            // Determine leave rates based on employment type
+            $leaveRates = [];
+            
+            if ($empType === 'Old_Regular') {
+                // Old employees get BOTH SL and VL monthly
+                $leaveRates = [
+                    'sick' => 0.42,      // 5 days / 12 months
+                    'vacation' => 1.25   // 15 days / 12 months
+                ];
+            } elseif ($empType === 'Regular') {
+                // New employees get ONLY VL monthly (SL was one-time upon regularization)
+                $leaveRates = [
+                    'vacation' => 1.25
+                ];
+            }
             
             foreach ($leaveRates as $leaveType => $monthlyIncrement) {
                 // Check existing record

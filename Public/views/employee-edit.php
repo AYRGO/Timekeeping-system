@@ -72,11 +72,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $position = $_POST['position'] ?? '';
         $status = $_POST['status'] ?? '';
         $company = $_POST['company'] ?? '';
+        $empType = $_POST['emp_type'] ?? 'Probationary';
+        
+        // Get previous Emp_Type to detect regularization
+        $stmt = $pdo->prepare("SELECT Emp_Type FROM employees WHERE id = ?");
+        $stmt->execute([$employeeId]);
+        $previousEmpType = $stmt->fetchColumn();
+        
+        $wasRegularized = ($previousEmpType === 'Probationary' && $empType === 'Regular');
 
         if ($fname && $lname && $email) {
-            $stmt = $pdo->prepare("UPDATE employees SET fname = ?, lname = ?, email = ?, contact = ?, position = ?, status = ?, company = ? WHERE id = ?");
-            $stmt->execute([$fname, $lname, $email, $contact, $position, $status, $company, $employeeId]);
-            echo "<script>alert('Employee updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+            $stmt = $pdo->prepare("UPDATE employees SET fname = ?, lname = ?, email = ?, contact = ?, position = ?, status = ?, company = ?, Emp_Type = ? WHERE id = ?");
+            $stmt->execute([$fname, $lname, $email, $contact, $position, $status, $company, $empType, $employeeId]);
+            
+            // If employee was just regularized, grant 5-day SL credit
+            if ($wasRegularized) {
+                // Call the SL credit processor
+                $currentYear = (int)date('Y');
+                $slCredit = 5.00;
+                
+                // Check if SL record exists
+                $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'sick' AND year = ?");
+                $stmt->execute([$employeeId, $currentYear]);
+                $existing = $stmt->fetch();
+                
+                if ($existing) {
+                    $newBalance = floatval($existing['balance']) + $slCredit;
+                    if ($newBalance > 15.00) $newBalance = 15.00;
+                    
+                    $stmt = $pdo->prepare("UPDATE leave_credits SET balance = ?, monthly_increment = 0, updated_at = NOW() WHERE id = ?");
+                    $stmt->execute([$newBalance, $existing['id']]);
+                } else {
+                    $stmt = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, carry_over, year, monthly_increment, updated_at) VALUES (?, 'sick', ?, NULL, ?, 0, NOW())");
+                    $stmt->execute([$employeeId, $slCredit, $currentYear]);
+                }
+                
+                echo "<script>alert('Employee regularized successfully! 5 days Sick Leave credit granted.'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+            } else {
+                echo "<script>alert('Employee updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+            }
             exit;
         } else {
             echo "<script>alert('Please fill in all required fields.');</script>";
@@ -507,11 +541,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 <h1 class="text-2xl font-bold text-gray-800"><?= htmlspecialchars($employee['fname'] . ' ' . $employee['lname']) ?></h1>
                                 <p class="text-gray-600"><?= htmlspecialchars($employee['position']) ?></p>
                             </div>
-                            <div class="flex gap-2">
-                                <button onclick="toggleEditMode()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-                                    <i class="fas fa-edit mr-2"></i>Edit Profile
-                                </button>
-                            </div>
+                            <!-- Edit Profile button removed from header - use the one in Profile tab instead -->
                         </div>
                         
                         <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -625,10 +655,31 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 </span>
                             </p>
                         </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Employment Type</p>
+                            <p class="font-medium">
+                                <?php 
+                                $empType = $employee['Emp_Type'] ?? 'Probationary';
+                                $colorClass = 'text-orange-600';
+                                $displayText = $empType;
+                                
+                                if ($empType === 'Regular') {
+                                    $colorClass = 'text-blue-600 font-semibold';
+                                    $displayText = 'Regular (New Policy)';
+                                } elseif ($empType === 'Old_Regular') {
+                                    $colorClass = 'text-green-600 font-semibold';
+                                    $displayText = 'Old Regular (Legacy)';
+                                }
+                                ?>
+                                <span class="<?= $colorClass ?>">
+                                    <?= htmlspecialchars($displayText) ?>
+                                </span>
+                            </p>
+                        </div>
                     </div>
 
                     <!-- Edit Form (Initially Hidden) -->
-                    <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 hidden" id="editForm">
+                    <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6" id="editForm" style="display: none;">
                         <input type="hidden" name="update_profile" value="1">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">First Name</label>
@@ -667,10 +718,21 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 <option value="Inactive" <?= $employee['status'] === 'Inactive' ? 'selected' : '' ?>>Inactive</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Employment Type 
+                                <span class="text-xs text-gray-500">(Regular = VL only | Old Regular = SL+VL)</span>
+                            </label>
+                            <select id="empTypeSelect" name="emp_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="Probationary" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Probationary' ? 'selected' : '' ?>>Probationary</option>
+                                <option value="Regular" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Regular' ? 'selected' : '' ?>>Regular (New Policy - VL Only)</option>
+                                <option value="Old_Regular" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Old_Regular' ? 'selected' : '' ?>>Old Regular (Legacy - SL + VL)</option>
+                            </select>
+                        </div>
 
                         <div class="md:col-span-2 flex justify-between items-center pt-4">
                             <button type="button" onclick="toggleEditMode()" class="text-sm text-gray-600 hover:underline">Cancel</button>
-                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition">
+                            <button type="submit" id="updateProfileBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition">
                                 <i class="fas fa-save mr-2"></i>Update Profile
                             </button>
                         </div>
@@ -678,7 +740,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
 
                     <!-- Edit Button -->
                     <div class="mt-6 flex justify-end" id="editButton">
-                        <button onclick="toggleEditMode()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition">
+                        <button type="button" onclick="event.stopPropagation(); toggleEditMode();" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition">
                             <i class="fas fa-edit mr-2"></i>Edit Profile
                         </button>
                     </div>
@@ -2095,14 +2157,93 @@ function toggleEditMode() {
     const editButton = document.getElementById('editButton');
     const displayInfo = document.getElementById('displayInfo');
 
-    if (editForm.classList.contains('hidden')) {
-        editForm.classList.remove('hidden');
+    if (editForm.style.display === 'none' || editForm.style.display === '') {
+        editForm.style.display = 'grid';
         editButton.classList.add('hidden');
         displayInfo.classList.add('hidden');
+        
+        // Initialize employment type change confirmation
+        initializeEmpTypeConfirmation();
     } else {
-        editForm.classList.add('hidden');
+        editForm.style.display = 'none';
         editButton.classList.remove('hidden');
         displayInfo.classList.remove('hidden');
+    }
+}
+
+// Track original employment type value
+let originalEmpType = '';
+
+function initializeEmpTypeConfirmation() {
+    const empTypeSelect = document.getElementById('empTypeSelect');
+    const editForm = document.getElementById('editForm');
+    
+    if (empTypeSelect) {
+        // Store original value when form opens
+        originalEmpType = empTypeSelect.value;
+        
+        // Remove any existing listeners
+        const newSelect = empTypeSelect.cloneNode(true);
+        empTypeSelect.parentNode.replaceChild(newSelect, empTypeSelect);
+        
+        // Add change event listener
+        document.getElementById('empTypeSelect').addEventListener('change', function(e) {
+            const newValue = this.value;
+            
+            // Only show confirmation when changing FROM Probationary TO Regular (NEW policy employees)
+            if (originalEmpType === 'Probationary' && newValue === 'Regular') {
+                const confirmed = confirm(
+                    '⚠️ REGULARIZATION CONFIRMATION (NEW POLICY)\n\n' +
+                    'You are about to regularize this employee under the NEW policy.\n\n' +
+                    '✅ This will automatically grant 5 days Sick Leave (SL) ONE-TIME\n' +
+                    '✅ Employee will start accruing 1.25 days Vacation Leave (VL) monthly\n' +
+                    '❌ NO monthly SL accrual (new policy)\n\n' +
+                    'Do you want to proceed with regularization?'
+                );
+                
+                if (!confirmed) {
+                    // Revert to original value if not confirmed
+                    this.value = originalEmpType;
+                }
+            } else if (originalEmpType === 'Probationary' && newValue === 'Old_Regular') {
+                const confirmed = confirm(
+                    '⚠️ OLD REGULAR CLASSIFICATION\n\n' +
+                    'You are setting this employee as "Old Regular" (Legacy Policy).\n\n' +
+                    '✅ Employee will accrue 0.42 days Sick Leave monthly\n' +
+                    '✅ Employee will accrue 1.25 days Vacation Leave monthly\n' +
+                    '⚠️ This should ONLY be used for employees hired before Jan 1, 2026\n\n' +
+                    'Do you want to proceed?'
+                );
+                
+                if (!confirmed) {
+                    // Revert to original value if not confirmed
+                    this.value = originalEmpType;
+                }
+            }
+        });
+    }
+    
+    // Add form submit confirmation for employment type changes
+    if (editForm && !editForm.hasAttribute('data-listener-added')) {
+        editForm.setAttribute('data-listener-added', 'true');
+        editForm.addEventListener('submit', function(e) {
+            const empTypeSelect = document.getElementById('empTypeSelect');
+            if (empTypeSelect && originalEmpType === 'Probationary' && empTypeSelect.value === 'Regular') {
+                const confirmed = confirm(
+                    '🎯 FINAL CONFIRMATION\n\n' +
+                    'Employee Name: <?= htmlspecialchars($employee["fname"] . " " . $employee["lname"]) ?>\n' +
+                    'Action: Probationary → Regular\n\n' +
+                    '✅ 5 days Sick Leave will be granted immediately\n' +
+                    '✅ Monthly VL accrual (1.25 days) will begin\n\n' +
+                    'Click OK to confirm regularization.'
+                );
+                
+                if (!confirmed) {
+                    e.preventDefault();
+                    return false;
+                }
+            }
+        });
     }
 }
 

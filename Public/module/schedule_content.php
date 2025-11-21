@@ -236,6 +236,18 @@ try {
                     </div>
                 </div>
             </div>';
+        } elseif ($schedule_msg === 'monthly_success') {
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 text-green-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-check-circle text-green-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Monthly schedule request submitted successfully!</p>
+                        <p class="text-sm text-green-700 mt-0.5">Your weekly schedule for the entire month has been submitted for approval.</p>
+                    </div>
+                </div>
+            </div>';
         } elseif ($schedule_msg === 'error') {
             echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
                 <div class="flex items-center">
@@ -287,6 +299,60 @@ try {
                     <div class="ml-3">
                         <p class="font-medium">Day off request submitted successfully!</p>
                         <p class="text-sm text-green-700 mt-0.5">Please wait for approval.</p>
+                    </div>
+                </div>
+            </div>';
+        }
+    }
+    
+    // Display schedule switch messages
+    if (isset($_GET['schedule_switch'])) {
+        $switch_msg = $_GET['schedule_switch'];
+        if ($switch_msg === 'success') {
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-500 text-purple-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-check-circle text-purple-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Schedule switch request submitted successfully!</p>
+                        <p class="text-sm text-purple-700 mt-0.5">Your request to swap schedules between two dates has been submitted for approval.</p>
+                    </div>
+                </div>
+            </div>';
+        } elseif ($switch_msg === 'missing_dates' || $switch_msg === 'same_dates' || $switch_msg === 'past_dates') {
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Invalid dates</p>
+                        <p class="text-sm text-red-700 mt-0.5">Please select two different future dates to switch.</p>
+                    </div>
+                </div>
+            </div>';
+        } elseif ($switch_msg === 'no_reason') {
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Missing reason</p>
+                        <p class="text-sm text-red-700 mt-0.5">Please provide a reason for the schedule switch.</p>
+                    </div>
+                </div>
+            </div>';
+        } elseif ($switch_msg === 'error') {
+            echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-circle text-red-500 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">Error submitting request</p>
+                        <p class="text-sm text-red-700 mt-0.5">Please try again.</p>
                     </div>
                 </div>
             </div>';
@@ -353,8 +419,9 @@ try {
                                   $bgClass .= ' opacity-60';
                               }
                         ?>
-                            <div class="min-h-[140px] p-4 <?= $bgClass ?> <?= $borderClass ?> transition-all duration-200 <?= !$isPast ? 'cursor-pointer' : '' ?>"
-                                 <?= !$isPast ? "onclick=\"openScheduleChangeModal('$cellDate')\"" : '' ?>>
+                            <div class="min-h-[140px] p-4 <?= $bgClass ?> <?= $borderClass ?> transition-all duration-200 relative group cursor-pointer" 
+                                 data-date="<?= $cellDate ?>"
+                                 onclick="<?= !$isPast ? 'handleDateClick(\'' . $cellDate . '\')' : '' ?>">
                               
                               <!-- Date Number -->
                               <div class="flex items-center justify-between mb-3">
@@ -368,6 +435,22 @@ try {
                                   <i class="fas fa-star text-amber-400 text-sm"></i>
                                 <?php endif; ?>
                               </div>
+                              
+                              <!-- Quick Action Buttons (Shown on Hover for Future Dates) -->
+                              <?php if (!$isPast && !$cell['is_holiday']): ?>
+                              <div class="absolute top-2 right-2 hidden group-hover:flex gap-1 z-10">
+                                <button onclick="event.stopPropagation(); openScheduleSwitchModal('<?= $cellDate ?>')" 
+                                        class="p-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-lg transition-all duration-200 text-xs"
+                                        title="Switch with another date">
+                                    <i class="fas fa-exchange-alt"></i>
+                                </button>
+                                <button onclick="event.stopPropagation(); openScheduleChangeModal('<?= $cellDate ?>')" 
+                                        class="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-lg transition-all duration-200 text-xs"
+                                        title="Change schedule">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                              </div>
+                              <?php endif; ?>
 
                               <!-- Schedule Card (if exists) -->
                               <?php if ($cell['is_rest_day'] || $cell['is_holiday']): ?>
@@ -464,7 +547,122 @@ try {
     </div>
 </div>
 
-<!-- Schedule Request Modal -->
+<!-- Schedule Switch Modal -->
+<div id="scheduleSwitchModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" style="display: none;">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg transform transition-all">
+            <!-- Header -->
+            <div class="flex items-center gap-3 mb-6 pb-6 border-b border-gray-200">
+                <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                    <i class="fas fa-exchange-alt text-purple-600 text-xl"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-2xl font-bold text-gray-900">Switch Schedules</h3>
+                    <p class="text-sm text-gray-500 mt-0.5">Swap schedules between two dates</p>
+                </div>
+                <button onclick="closeScheduleSwitchModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <form method="post" action="time_log_create.php" enctype="multipart/form-data" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                <input type="hidden" name="submit_schedule_switch" value="1">
+                <input type="hidden" name="source_date" id="switch_source_date">
+                
+                <!-- Date A -->
+                <div class="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center flex-shrink-0">
+                            <span class="text-white font-bold">A</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-xs font-semibold text-purple-900 uppercase tracking-wide mb-1">Date A</div>
+                            <div id="source_date_display" class="text-base font-bold text-purple-900"></div>
+                        </div>
+                    </div>
+                    <div id="source_schedule_display" class="text-sm text-purple-700 pl-13"></div>
+                </div>
+
+                <!-- Swap Arrow -->
+                <div class="flex justify-center -my-2">
+                    <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                        <i class="fas fa-arrows-alt-v text-gray-400"></i>
+                    </div>
+                </div>
+
+                <!-- Date B -->
+                <div class="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+                            <span class="text-white font-bold">B</span>
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-xs font-semibold text-blue-900 uppercase tracking-wide mb-1 block">
+                                Date B <span class="text-red-500">*</span>
+                            </label>
+                            <input type="date" name="target_date" id="target_date" required 
+                                   min="<?= date('Y-m-d') ?>"
+                                   class="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm font-medium">
+                        </div>
+                    </div>
+                    <div id="target_schedule_display" class="text-sm text-blue-700 pl-13 hidden"></div>
+                </div>
+
+                <!-- Preview -->
+                <div id="switch_preview" class="hidden bg-green-50 border-2 border-green-200 rounded-xl p-4">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-check-circle text-green-600 text-lg mt-0.5"></i>
+                        <div class="flex-1 text-sm">
+                            <div class="font-semibold text-green-900 mb-1">Ready to switch:</div>
+                            <div class="text-green-700">
+                                <span id="preview_source" class="font-medium"></span>
+                                <i class="fas fa-exchange-alt mx-2 text-green-500"></i>
+                                <span id="preview_target" class="font-medium"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reason -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Reason <span class="text-red-500">*</span>
+                    </label>
+                    <textarea name="reason" id="switch_reason" rows="3" required 
+                              placeholder="Why do you need to switch these schedules?"
+                              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none text-sm"></textarea>
+                </div>
+
+                <!-- Attachment -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        Supporting Document <span class="text-red-500">*</span>
+                    </label>
+                    <input type="file" name="attachment_scr" id="switch_attachment" accept=".pdf,.jpg,.jpeg,.png" required
+                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm
+                                  file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium 
+                                  file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 file:cursor-pointer">
+                    <p class="text-xs text-gray-500 mt-1.5">PDF, JPG, JPEG, PNG (Max 10MB)</p>
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeScheduleSwitchModal()"
+                            class="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 px-4 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 shadow-lg shadow-purple-500/30 hover:shadow-xl transition-all">
+                        <i class="fas fa-paper-plane mr-2"></i>Submit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Schedule Request Modal (Original) -->
 <div id="scheduleRequestModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" style="display: none;">
     <div class="flex items-center justify-center min-h-screen px-4">
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md transform transition-all">
@@ -479,7 +677,7 @@ try {
                 </button>
             </div>
 
-            <form method="post" action="time_log_create.php" class="space-y-5">
+            <form method="post" action="../views/time_log_create.php" class="space-y-5">
                 <input type="hidden" name="action" value="schedule_request">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
                 
@@ -533,6 +731,246 @@ try {
 </div>
 
 <script>
+// Schedule Switch Modal Functions
+let sourceDateData = {};
+let isSelectingTargetDate = false;
+let switchSourceDate = null;
+
+function openScheduleSwitchModal(date) {
+    console.log('🔄 Opening schedule switch modal for date:', date);
+    
+    // Enter date selection mode
+    isSelectingTargetDate = true;
+    switchSourceDate = date;
+    
+    // Highlight the source date
+    highlightCalendarDate(date, 'source');
+    
+    // Show instruction overlay
+    showDateSelectionOverlay('Click another date to switch with ' + formatDate(date).split(',')[0]);
+}
+
+function highlightCalendarDate(date, type) {
+    // Remove previous highlights
+    document.querySelectorAll('.calendar-date-highlight').forEach(el => {
+        el.classList.remove('calendar-date-highlight', 'source-highlight', 'target-highlight');
+    });
+    
+    // Find and highlight the date cell
+    const dateCell = document.querySelector(`[data-date="${date}"]`);
+    if (dateCell) {
+        dateCell.classList.add('calendar-date-highlight');
+        dateCell.classList.add(type === 'source' ? 'source-highlight' : 'target-highlight');
+    }
+}
+
+function showDateSelectionOverlay(message) {
+    // Remove existing overlay if any
+    const existingOverlay = document.getElementById('dateSelectionOverlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+    
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'dateSelectionOverlay';
+    overlay.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 z-40 bg-purple-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce-in';
+    overlay.innerHTML = `
+        <i class="fas fa-hand-pointer text-2xl"></i>
+        <div>
+            <div class="font-bold">${message}</div>
+            <div class="text-sm text-purple-200">or press ESC to cancel</div>
+        </div>
+        <button onclick="cancelDateSelection()" class="ml-3 w-8 h-8 flex items-center justify-center rounded-lg bg-purple-700 hover:bg-purple-800 transition-colors">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function cancelDateSelection() {
+    isSelectingTargetDate = false;
+    switchSourceDate = null;
+    
+    // Remove highlights
+    document.querySelectorAll('.calendar-date-highlight').forEach(el => {
+        el.classList.remove('calendar-date-highlight', 'source-highlight', 'target-highlight');
+    });
+    
+    // Remove overlay
+    const overlay = document.getElementById('dateSelectionOverlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+function handleDateClick(targetDate) {
+    if (!isSelectingTargetDate || !switchSourceDate) {
+        return;
+    }
+    
+    // Validate: can't select the same date
+    if (targetDate === switchSourceDate) {
+        alert('⚠️ Please select a different date to switch with!');
+        return;
+    }
+    
+    // Validate: must be future date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(targetDate + 'T00:00:00');
+    
+    if (selectedDate < today) {
+        alert('⚠️ Cannot select a past date!');
+        return;
+    }
+    
+    // Highlight target date
+    highlightCalendarDate(targetDate, 'target');
+    
+    // Cancel selection mode
+    isSelectingTargetDate = false;
+    
+    // Remove overlay
+    const overlay = document.getElementById('dateSelectionOverlay');
+    if (overlay) {
+        overlay.remove();
+    }
+    
+    // Open modal with both dates filled
+    openScheduleSwitchModalWithDates(switchSourceDate, targetDate);
+}
+
+function openScheduleSwitchModalWithDates(sourceDate, targetDate) {
+    console.log('🔄 Opening schedule switch modal with dates:', sourceDate, targetDate);
+    
+    const modal = document.getElementById('scheduleSwitchModal');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    
+    // Set source date
+    document.getElementById('switch_source_date').value = sourceDate;
+    document.getElementById('source_date_display').textContent = formatDate(sourceDate);
+    
+    // Set target date
+    document.getElementById('target_date').value = targetDate;
+    
+    // Fetch schedules for both dates
+    fetchScheduleForSwitch(sourceDate, 'source');
+    fetchScheduleForSwitch(targetDate, 'target');
+    
+    // Clear form fields
+    document.getElementById('switch_reason').value = '';
+    document.getElementById('switch_attachment').value = '';
+}
+
+function closeScheduleSwitchModal() {
+    const modal = document.getElementById('scheduleSwitchModal');
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+    sourceDateData = {};
+    
+    // Clear highlights
+    document.querySelectorAll('.calendar-date-highlight').forEach(el => {
+        el.classList.remove('calendar-date-highlight', 'source-highlight', 'target-highlight');
+    });
+    
+    // Cancel any active date selection
+    cancelDateSelection();
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString + 'T00:00:00');
+    return date.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+}
+
+function fetchScheduleForSwitch(date, type) {
+    fetch('../controller/ajax_get_schedule_for_date.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'date=' + encodeURIComponent(date)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const displayText = data.display || 'No schedule set';
+            
+            if (type === 'source') {
+                sourceDateData = { date: date, schedule: displayText };
+                document.getElementById('source_schedule_display').textContent = '📅 ' + displayText;
+            } else if (type === 'target') {
+                document.getElementById('target_schedule_display').textContent = '📅 ' + displayText;
+                document.getElementById('target_schedule_display').classList.remove('hidden');
+                
+                // Show preview
+                updateSwitchPreview(date, displayText);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching schedule:', error);
+    });
+}
+
+function updateSwitchPreview(targetDate, targetSchedule) {
+    const preview = document.getElementById('switch_preview');
+    const sourceDate = document.getElementById('switch_source_date').value;
+    
+    document.getElementById('preview_source').textContent = 
+        formatDate(sourceDate).split(',')[0] + ': ' + (sourceDateData.schedule || 'Loading...');
+    document.getElementById('preview_target').textContent = 
+        formatDate(targetDate).split(',')[0] + ': ' + targetSchedule;
+    
+    preview.classList.remove('hidden');
+}
+
+// Target date change listener
+document.addEventListener('DOMContentLoaded', function() {
+    const targetDateInput = document.getElementById('target_date');
+    if (targetDateInput) {
+        targetDateInput.addEventListener('change', function() {
+            const targetDate = this.value;
+            if (targetDate) {
+                fetchScheduleForSwitch(targetDate, 'target');
+            } else {
+                document.getElementById('target_schedule_display').classList.add('hidden');
+                document.getElementById('switch_preview').classList.add('hidden');
+            }
+        });
+    }
+    
+    // Close modal when clicking outside
+    document.getElementById('scheduleSwitchModal')?.addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeScheduleSwitchModal();
+        }
+    });
+    
+    // Close with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            // Cancel date selection mode if active
+            if (isSelectingTargetDate) {
+                cancelDateSelection();
+                return;
+            }
+            
+            // Close switch modal if open
+            const switchModal = document.getElementById('scheduleSwitchModal');
+            if (switchModal && switchModal.style.display === 'block') {
+                closeScheduleSwitchModal();
+            }
+        }
+    });
+});
+
 // Schedule content JavaScript functions are now handled by the modal in schedule_change_form.php
 // The openScheduleChangeModal() function is defined in the schedule_change_form.php file
 
@@ -542,7 +980,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('scheduleView')) {
         console.log('📅 Schedule view loaded - checking for approved schedule changes to process...');
         
-        // Call the processor
+        // Process single-day schedule changes
         fetch('../controller/ajax_process_schedules.php', {
             method: 'POST',
             headers: {
@@ -553,24 +991,47 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                console.log('✅ Schedule processor:', data.message);
+                console.log('✅ Single-day schedule processor:', data.message);
                 if (data.processed > 0) {
                     console.log(`   Processed: ${data.processed}/${data.total_found} request(s)`);
+                }
+                if (data.errors && data.errors.length > 0) {
+                    console.warn('⚠️ Some errors occurred:', data.errors);
+                }
+            } else {
+                console.error('❌ Error processing single-day schedules:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Network error:', error);
+        });
+        
+        // Process monthly schedule changes
+        fetch('../controller/ajax_process_monthly_schedules.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('✅ Monthly schedule processor:', data.message);
+                if (data.processed > 0) {
+                    console.log(`   Processed: ${data.processed}/${data.total} monthly request(s)`);
                     
                     // Reload the calendar to show updated schedules
                     setTimeout(() => {
                         console.log('🔄 Reloading calendar to show updated schedules...');
                         window.location.reload();
                     }, 1000);
-                } else {
-                    console.log('   No new approved requests to process');
                 }
-                
                 if (data.errors && data.errors.length > 0) {
                     console.warn('⚠️ Some errors occurred:', data.errors);
                 }
             } else {
-                console.error('❌ Error processing schedules:', data.message);
+                console.error('❌ Error processing monthly schedules:', data.message);
             }
         })
         .catch(error => {
@@ -724,5 +1185,55 @@ document.addEventListener('DOMContentLoaded', function() {
 /* Weekday header styling */
 #scheduleView .tracking-widest {
     letter-spacing: 0.15em;
+}
+
+/* Calendar date highlighting for switch mode */
+.calendar-date-highlight {
+    position: relative;
+    animation: pulse-highlight 1.5s ease-in-out infinite;
+}
+
+.source-highlight {
+    box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.5) !important;
+    background-color: rgba(147, 51, 234, 0.1) !important;
+}
+
+.target-highlight {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5) !important;
+    background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+@keyframes pulse-highlight {
+    0%, 100% {
+        box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(147, 51, 234, 0.3);
+    }
+}
+
+/* Date selection mode cursor */
+#scheduleView .cursor-pointer:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Overlay animation */
+@keyframes bounce-in {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    60% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(5px);
+    }
+    100% {
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.animate-bounce-in {
+    animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 </style>
