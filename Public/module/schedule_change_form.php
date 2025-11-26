@@ -309,12 +309,12 @@
                   ['key' => 'wednesday', 'label' => 'Wednesday', 'icon' => 'fa-briefcase', 'color' => 'blue'],
                   ['key' => 'thursday', 'label' => 'Thursday', 'icon' => 'fa-briefcase', 'color' => 'blue'],
                   ['key' => 'friday', 'label' => 'Friday', 'icon' => 'fa-briefcase', 'color' => 'blue'],
-                  ['key' => 'saturday', 'label' => 'Saturday', 'icon' => 'fa-moon', 'color' => 'red']
+                  ['key' => 'saturday', 'label' => 'Saturday', 'icon' => 'fa-moon', 'color' => 'indigo']
                 ];
                 
                 foreach ($weekDays as $day): 
                 ?>
-                <div class="day-schedule-row border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-all">
+                <div class="day-schedule-row border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-all bg-white">
                   <div class="flex items-start gap-4">
                     <div class="flex items-center gap-3 w-32 flex-shrink-0 mt-2">
                       <i class="fas <?= $day['icon'] ?> text-<?= $day['color'] ?>-500 text-sm"></i>

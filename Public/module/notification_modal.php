@@ -902,6 +902,115 @@ foreach ($ot_results as $ot) {
     }
 }
 
+// --- Schedule Switch Requests ---
+$switch_stmt = $pdo->prepare("
+    SELECT id, source_date, target_date, reason, attachment_path, status, created_at, processed_at, admin_notes
+    FROM schedule_switch_requests 
+    WHERE employee_id = ?
+    ORDER BY created_at DESC
+");
+$switch_stmt->execute([$current_user_id]);
+$switch_requests = $switch_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($switch_requests as $switch) {
+    $status = ucfirst(strtolower($switch['status']));
+    $source_date = date('F j, Y', strtotime($switch['source_date']));
+    $target_date = date('F j, Y', strtotime($switch['target_date']));
+    
+    // Get schedule details for both dates
+    $source_schedule = getActualCurrentScheduleFromCalendar($pdo, $current_user_id, $switch['source_date']);
+    $target_schedule = getActualCurrentScheduleFromCalendar($pdo, $current_user_id, $switch['target_date']);
+    
+    $notifications[] = [
+        'message' => "Schedule switch request from <strong>{$source_date}</strong> to <strong>{$target_date}</strong> was <strong>{$status}</strong>.",
+        'created_at' => $switch['created_at'],
+        'type' => 'Schedule Switch Request',
+        'status' => $switch['status'],
+        'source_date' => $switch['source_date'],
+        'target_date' => $switch['target_date'],
+        'source_schedule_in' => $source_schedule['time_in'],
+        'source_schedule_out' => $source_schedule['time_out'],
+        'target_schedule_in' => $target_schedule['time_in'],
+        'target_schedule_out' => $target_schedule['time_out'],
+        'reason' => $switch['reason'],
+        'attachment_scr' => $switch['attachment_path'] ?? '',
+        'explanation' => $switch['admin_notes'] ?? '',
+        'processed_at' => $switch['processed_at'],
+        'request_id' => $switch['id'],
+        'table_name' => 'schedule_switch_requests',
+        'source_table' => 'schedule_switch_requests'
+    ];
+}
+
+// --- Monthly Schedule Requests ---
+$monthly_stmt = $pdo->prepare("
+    SELECT id, year, month, 
+           sunday_schedule_id, sunday_is_rest_day,
+           monday_schedule_id, monday_is_rest_day,
+           tuesday_schedule_id, tuesday_is_rest_day,
+           wednesday_schedule_id, wednesday_is_rest_day,
+           thursday_schedule_id, thursday_is_rest_day,
+           friday_schedule_id, friday_is_rest_day,
+           saturday_schedule_id, saturday_is_rest_day,
+           reason, attachment_path, status, created_at, processed_at, admin_notes
+    FROM month_weekly_schedule 
+    WHERE employee_id = ?
+    ORDER BY created_at DESC
+");
+$monthly_stmt->execute([$current_user_id]);
+$monthly_requests = $monthly_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($monthly_requests as $monthly) {
+    $status = ucfirst(strtolower($monthly['status']));
+    $month_name = date('F Y', strtotime("{$monthly['year']}-{$monthly['month']}-01"));
+    
+    // Get schedule details for each day
+    $weekly_schedules = [];
+    $days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    
+    foreach ($days as $day) {
+        $schedule_id = $monthly["{$day}_schedule_id"];
+        $is_rest_day = $monthly["{$day}_is_rest_day"];
+        
+        if ($is_rest_day == 1 || empty($schedule_id)) {
+            $weekly_schedules[$day] = ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
+        } else {
+            // Get schedule from work_schedules table
+            $sched_stmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
+            $sched_stmt->execute([$schedule_id]);
+            $sched = $sched_stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($sched) {
+                $weekly_schedules[$day] = [
+                    'time_in' => date('g:i A', strtotime($sched['time_in'])),
+                    'time_out' => date('g:i A', strtotime($sched['time_out'])),
+                    'is_rest_day' => false
+                ];
+            } else {
+                $weekly_schedules[$day] = ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
+            }
+        }
+    }
+    
+    $notifications[] = [
+        'message' => "Monthly schedule request for <strong>{$month_name}</strong> was <strong>{$status}</strong>.",
+        'created_at' => $monthly['created_at'],
+        'type' => 'Monthly Schedule Request',
+        'status' => $monthly['status'],
+        'year' => $monthly['year'],
+        'month' => $monthly['month'],
+        'month_name' => $month_name,
+        'weekly_schedules' => $weekly_schedules,
+        'reason' => $monthly['reason'],
+        'attachment_scr' => $monthly['attachment_path'] ?? '',
+        'explanation' => $monthly['admin_notes'] ?? '',
+        'processed_at' => $monthly['processed_at'],
+        'request_id' => $monthly['id'],
+        'table_name' => 'month_weekly_schedule',
+        'source_table' => 'month_weekly_schedule'
+    ];
+}
+
 
     // Sort all notifications by newest first
     usort($notifications, function ($a, $b) {

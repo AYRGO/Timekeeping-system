@@ -147,8 +147,12 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
             $created = date('M j, Y', strtotime($activity['created_at']));
             $msg = strip_tags($activity['message']);
 
-            // Detect type - check for day off/rest day first
-            if (preg_match('/\b(day\s*off|rest\s*day|off\s*day)\b/i', $msg)) {
+            // Detect type - check for schedule switch first, then monthly schedule, then day off/rest day
+            if (isset($activity['type']) && $activity['type'] === 'Schedule Switch Request') {
+                $type = 'Schedule Switch';
+            } elseif (isset($activity['type']) && $activity['type'] === 'Monthly Schedule Request') {
+                $type = 'Monthly Schedule';
+            } elseif (preg_match('/\b(day\s*off|rest\s*day|off\s*day)\b/i', $msg)) {
                 $type = 'Day Off';
             } else {
                 preg_match('/\b(Leave|Schedule|Time|Overtime)\b/i', $msg, $typeMatch);
@@ -205,6 +209,14 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                 } else {
                     $status = 'Pending';
                 }
+            }
+            // For Schedule Switch requests
+            elseif ($type === 'Schedule Switch' && isset($activity['status'])) {
+                $status = ucfirst(strtolower($activity['status']));
+            }
+            // For Monthly Schedule requests
+            elseif ($type === 'Monthly Schedule' && isset($activity['status'])) {
+                $status = ucfirst(strtolower($activity['status']));
             }
             // For Schedule requests, use status from DB
             elseif ($type === 'Schedule' && isset($activity['status'])) {
@@ -326,6 +338,46 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                 if (!empty($activity['ot_reason'])) {
                     $sentence .= "\nReason: " . htmlspecialchars($activity['ot_reason']);
                 }
+            } elseif ($type === 'Schedule Switch') {
+                $sentence .= "Schedule switch request was $status.";
+                
+                // Add dates
+                if (!empty($activity['source_date']) && !empty($activity['target_date'])) {
+                    $sourceDateFormatted = date('M j, Y', strtotime($activity['source_date']));
+                    $targetDateFormatted = date('M j, Y', strtotime($activity['target_date']));
+                    $sentence .= "\nSwitch: $sourceDateFormatted ↔ $targetDateFormatted";
+                }
+                
+                // Add schedule times if available
+                if (!empty($activity['source_schedule_in']) && !empty($activity['target_schedule_in'])) {
+                    $sentence .= "\nDate A: {$activity['source_schedule_in']} - {$activity['source_schedule_out']}";
+                    $sentence .= "\nDate B: {$activity['target_schedule_in']} - {$activity['target_schedule_out']}";
+                }
+                
+                if (!empty($activity['reason'])) {
+                    $sentence .= "\nReason: " . htmlspecialchars($activity['reason']);
+                }
+                
+                // Add admin explanation if declined
+                if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected']) && !empty($activity['explanation'])) {
+                    $sentence .= "\nAdmin Notes: " . htmlspecialchars($activity['explanation']);
+                }
+            } elseif ($type === 'Monthly Schedule') {
+                $sentence .= "Monthly schedule request was $status.";
+                
+                // Add month
+                if (!empty($activity['month_name'])) {
+                    $sentence .= "\nMonth: {$activity['month_name']}";
+                }
+                
+                if (!empty($activity['reason'])) {
+                    $sentence .= "\nReason: " . htmlspecialchars($activity['reason']);
+                }
+                
+                // Add admin explanation if declined
+                if (in_array(strtolower($status), ['declined', 'cancelled', 'rejected']) && !empty($activity['explanation'])) {
+                    $sentence .= "\nAdmin Notes: " . htmlspecialchars($activity['explanation']);
+                }
             } else {
                 $sentence .= "$type request was $status.";
             }
@@ -349,6 +401,10 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                                 ?>
                             <?php elseif ($type === 'Time'): ?>
                                 Time Adjustment Request
+                            <?php elseif ($type === 'Schedule Switch'): ?>
+                                Schedule Switch Request
+                            <?php elseif ($type === 'Monthly Schedule'): ?>
+                                Monthly Schedule Request
                             <?php else: ?>
                                 <?= $type ?> Request
                             <?php endif; ?>
@@ -459,6 +515,48 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'attachment_scr' => $activity['attachment_scr'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
+                                class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
+                            View Details
+                        </button>
+                    <?php } elseif ($type === 'Schedule Switch') { ?>
+                        <button onclick="showActivityDetails('Schedule Switch Request', `<?= htmlspecialchars(json_encode([
+                            'type' => 'Schedule Switch Request',
+                            'status' => $status,
+                            'date' => $created,
+                            'source_date' => !empty($activity['source_date']) ? date('M j, Y', strtotime($activity['source_date'])) : '',
+                            'target_date' => !empty($activity['target_date']) ? date('M j, Y', strtotime($activity['target_date'])) : '',
+                            'source_schedule_in' => $activity['source_schedule_in'] ?? '',
+                            'source_schedule_out' => $activity['source_schedule_out'] ?? '',
+                            'target_schedule_in' => $activity['target_schedule_in'] ?? '',
+                            'target_schedule_out' => $activity['target_schedule_out'] ?? '',
+                            'reason' => $activity['reason'] ?? '',
+                            'explanation' => $activity['explanation'] ?? '',
+                            'attachment_scr' => $activity['attachment_scr'] ?? '',
+                            'request_id' => $activity['request_id'] ?? '',
+                            'table_name' => $activity['table_name'] ?? '',
+                            'source_table' => $activity['source_table'] ?? '',
+                            'processed_at' => !empty($activity['processed_at']) ? date('M j, Y g:i A', strtotime($activity['processed_at'])) : ''
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
+                                class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
+                            View Details
+                        </button>
+                    <?php } elseif ($type === 'Monthly Schedule') { ?>
+                        <button onclick="showActivityDetails('Monthly Schedule Request', `<?= htmlspecialchars(json_encode([
+                            'type' => 'Monthly Schedule Request',
+                            'status' => $status,
+                            'date' => $created,
+                            'month_name' => $activity['month_name'] ?? '',
+                            'year' => $activity['year'] ?? '',
+                            'month' => $activity['month'] ?? '',
+                            'weekly_schedules' => $activity['weekly_schedules'] ?? [],
+                            'reason' => $activity['reason'] ?? '',
+                            'explanation' => $activity['explanation'] ?? '',
+                            'attachment_scr' => $activity['attachment_scr'] ?? '',
+                            'request_id' => $activity['request_id'] ?? '',
+                            'table_name' => $activity['table_name'] ?? '',
+                            'source_table' => $activity['source_table'] ?? '',
+                            'processed_at' => !empty($activity['processed_at']) ? date('M j, Y g:i A', strtotime($activity['processed_at'])) : ''
                         ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
@@ -805,6 +903,142 @@ function showActivityDetails(title, dataJson) {
             
             // Attachment section for leave requests
             content += createAttachmentSection(data.attachment_lr, data.request_id, data.table_name, data.status);
+        } else if (data.type.includes('Monthly Schedule')) {
+            // Monthly Schedule request - minimal modern design
+            console.log('📅 Monthly Schedule Data:', data);
+            
+            // Header with month badge
+            content += `
+                <div class="mb-4">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-lg font-semibold text-gray-800 flex items-center">
+                            <i class="fas fa-calendar-week text-blue-600 mr-2"></i>
+                            Monthly Schedule
+                        </h4>
+                        ${data.month_name ? `<span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">${data.month_name}</span>` : ''}
+                    </div>
+                </div>
+            `;
+            
+            // Weekly schedule - clean card layout
+            if (data.weekly_schedules) {
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                const dayLabels = {
+                    'monday': 'Mon',
+                    'tuesday': 'Tue',
+                    'wednesday': 'Wed',
+                    'thursday': 'Thu',
+                    'friday': 'Fri',
+                    'saturday': 'Sat',
+                    'sunday': 'Sun'
+                };
+                
+                content += `
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-4">
+                        <div class="grid grid-cols-7 divide-x divide-gray-200">
+                `;
+                
+                days.forEach(day => {
+                    const schedule = data.weekly_schedules[day];
+                    const dayLabel = dayLabels[day];
+                    const isRestDay = schedule && schedule.is_rest_day;
+                    const timeIn = schedule ? (schedule.time_in || '—') : '—';
+                    const timeOut = schedule ? (schedule.time_out || '—') : '—';
+                    
+                    const isWeekend = day === 'saturday' || day === 'sunday';
+                    const bgColor = isRestDay ? 'bg-gray-50' : (isWeekend ? 'bg-blue-50' : 'bg-white');
+                    const textColor = isRestDay ? 'text-gray-400' : 'text-gray-700';
+                    
+                    content += `
+                        <div class="${bgColor} p-3 text-center transition-all hover:shadow-sm">
+                            <div class="text-xs font-semibold ${textColor} mb-2">${dayLabel}</div>
+                            <div class="text-xs ${textColor} space-y-1">
+                                ${isRestDay ? 
+                                    '<div class="text-gray-400 font-medium">—</div>' : 
+                                    '<div class="font-medium">' + timeIn + '</div><div class="text-gray-400">to</div><div class="font-medium">' + timeOut + '</div>'
+                                }
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                content += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show processed date if available
+            if (data.processed_at) {
+                content += `
+                    <div class="text-sm text-gray-500 mb-3">
+                        <i class="fas fa-check-circle mr-1"></i>
+                        Processed: ${data.processed_at}
+                    </div>
+                `;
+            }
+
+            // Attachment section for monthly schedule requests
+            content += createAttachmentSection(data.attachment_scr, data.request_id, data.table_name, data.status);
+        } else if (data.type.includes('Schedule Switch')) {
+            // Schedule Switch request - minimal modern design
+            console.log('📊 Schedule Switch Data:', data);
+            
+            // Header
+            content += `
+                <div class="mb-4">
+                    <h4 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-exchange-alt text-purple-600 mr-2"></i>
+                        Schedule Switch
+                    </h4>
+                    <p class="text-sm text-gray-500 mt-1">Swap schedules between two dates</p>
+                </div>
+            `;
+            
+            // Date swap - clean minimal design
+            content += `
+                <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-4">
+                    <div class="grid grid-cols-3 divide-x divide-gray-200">
+                        <!-- Date A -->
+                        <div class="p-4 hover:bg-gray-50 transition-colors">
+                            <div class="flex items-center mb-2">
+                                <span class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-2">A</span>
+                                <span class="text-xs text-gray-500 font-medium">From</span>
+                            </div>
+                            <div class="text-sm font-semibold text-gray-800 mb-1">${data.source_date || 'N/A'}</div>
+                            <div class="text-xs text-gray-600">${data.source_schedule_in || '—'} - ${data.source_schedule_out || '—'}</div>
+                        </div>
+                        
+                        <!-- Swap Icon -->
+                        <div class="p-4 flex items-center justify-center bg-gray-50">
+                            <i class="fas fa-exchange-alt text-gray-400 text-xl"></i>
+                        </div>
+                        
+                        <!-- Date B -->
+                        <div class="p-4 hover:bg-gray-50 transition-colors">
+                            <div class="flex items-center mb-2">
+                                <span class="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-2">B</span>
+                                <span class="text-xs text-gray-500 font-medium">To</span>
+                            </div>
+                            <div class="text-sm font-semibold text-gray-800 mb-1">${data.target_date || 'N/A'}</div>
+                            <div class="text-xs text-gray-600">${data.target_schedule_in || '—'} - ${data.target_schedule_out || '—'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Show processed date if available
+            if (data.processed_at) {
+                content += `
+                    <div class="text-sm text-gray-500 mb-3">
+                        <i class="fas fa-check-circle mr-1"></i>
+                        Processed: ${data.processed_at}
+                    </div>
+                `;
+            }
+
+            // Attachment section for schedule switch requests
+            content += createAttachmentSection(data.attachment_scr, data.request_id, data.table_name, data.status);
         } else if (data.type.includes('Schedule')) {
             // Full width horizontal container for schedule change
             content += `<div class="border border-gray-200 rounded-lg p-5 bg-gradient-to-r from-blue-50 to-green-50">`;
@@ -1437,41 +1671,35 @@ function createAttachmentSection(attachmentScr, requestId, tableName, status) {
         }
         
         attachmentContent = `
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div class="flex items-start justify-between">
-                    <div class="flex items-start space-x-3 flex-1 min-w-0">
-                        <div class="flex-shrink-0">
-                            <i class="fas ${fileIcon} text-blue-600 text-lg mt-1"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="font-medium text-blue-900 break-words text-sm leading-tight">${fileName}</p>
-                            <p class="text-xs text-blue-600 mt-1">Supporting Document</p>
-                        </div>
+            <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-2.5 mt-3">
+                <div class="flex items-center space-x-2 flex-1 min-w-0">
+                    <i class="fas ${fileIcon} text-blue-600 text-sm"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs text-gray-700 truncate font-medium">${fileName}</p>
                     </div>
-                    <div class="flex flex-col gap-2 ml-3">
-                        <button onclick="viewAttachment('${attachmentScr}', '${fileName}', event)" 
-                                class="inline-flex items-center px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors whitespace-nowrap">
-                            <i class="fas fa-eye mr-1"></i>View
-                        </button>
-                        ${isPending ? `
-                        <button onclick="showAttachmentUpload(${requestId}, '${tableName}')" 
-                                class="inline-flex items-center px-3 py-1.5 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors whitespace-nowrap">
-                            <i class="fas fa-exchange-alt mr-1"></i>Replace
-                        </button>
-                        ` : ''}
-                    </div>
+                </div>
+                <div class="flex gap-1 ml-2">
+                    <button onclick="viewAttachment('${attachmentScr}', '${fileName}', event)" 
+                            class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    ${isPending ? `
+                    <button onclick="showAttachmentUpload(${requestId}, '${tableName}')" 
+                            class="px-2 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                    ` : ''}
                 </div>
             </div>
         `;
     } else {
         attachmentContent = `
-            <div class="p-4 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
-                <i class="fas fa-paperclip text-gray-400 text-xl mb-2"></i>
-                <p class="text-sm">No attachment found</p>
+            <div class="text-center text-gray-400 border border-dashed border-gray-300 rounded-lg p-2 mt-3">
+                <p class="text-xs">No attachment</p>
                 ${isPending && requestId ? `
                 <button onclick="showAttachmentUpload('${requestId}', '${tableName}')" 
-                        class="mt-2 inline-flex items-center px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                    <i class="fas fa-upload mr-1"></i>Add Attachment
+                        class="mt-1 text-xs text-blue-600 hover:text-blue-700">
+                    <i class="fas fa-upload mr-1"></i>Add
                 </button>
                 ` : ''}
             </div>
@@ -1479,33 +1707,32 @@ function createAttachmentSection(attachmentScr, requestId, tableName, status) {
     }
     
     return `
-        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-4" data-attachment-section="${requestId}" data-persist="true">
-            <div class="mb-3">
-                <h5 class="font-semibold text-gray-800 flex items-center">
-                    <i class="fas fa-paperclip text-gray-600 mr-2"></i>
-                    Supporting Document
-                </h5>
+        <div class="border-t border-gray-200 pt-3 mt-3" data-attachment-section="${requestId}" data-persist="true">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-medium text-gray-600 flex items-center">
+                    <i class="fas fa-paperclip text-gray-400 mr-1 text-xs"></i>
+                    Attachment
+                </span>
             </div>
             ${attachmentContent}
             
             <!-- File upload section (hidden by default) -->
             ${isPending && requestId ? `
-            <div id="upload-section-${requestId}" class="hidden mt-3 p-3 bg-white border border-gray-200 rounded-lg">
-                <div class="mb-3">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Select New Attachment</label>
+            <div id="upload-section-${requestId}" class="hidden mt-2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                <div class="mb-2">
                     <input type="file" id="attachment-input-${requestId}" 
                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                           class="w-full p-2 border border-gray-300 rounded-lg text-sm file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
-                    <p class="text-xs text-gray-500 mt-1 break-words">Accepted formats: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Max 10MB)</p>
+                           class="w-full text-xs border border-gray-300 rounded p-1.5 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                    <p class="text-xs text-gray-400 mt-1">Max 10MB</p>
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <div class="flex gap-1.5">
                     <button onclick="uploadAttachment('${requestId}', '${tableName}')" 
-                            class="inline-flex items-center px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                            class="px-2.5 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700">
                         <i class="fas fa-upload mr-1"></i>Upload
                     </button>
                     <button onclick="hideAttachmentUpload('${requestId}')" 
-                            class="inline-flex items-center px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
-                        <i class="fas fa-times mr-1"></i>Cancel
+                            class="px-2.5 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600">
+                        Cancel
                     </button>
                 </div>
             </div>

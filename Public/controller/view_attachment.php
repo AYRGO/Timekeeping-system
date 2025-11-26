@@ -39,6 +39,18 @@ elseif (preg_match('/^attach_/', basename($attachmentPath)) || preg_match('/uplo
     $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
     $possiblePaths[] = '../uploads/time_adjustment_attachments/' . basename($attachmentPath);
 }
+// Check if it's a schedule switch attachment (starts with switch_)
+elseif (preg_match('/^switch_/', basename($attachmentPath)) || preg_match('/schedule_switch/', $attachmentPath)) {
+    $possiblePaths[] = '../uploads/schedule_switch/' . basename($attachmentPath);
+    $possiblePaths[] = '../' . $attachmentPath;  // For paths like uploads/schedule_switch/switch_...
+    $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
+}
+// Check if it's a monthly schedule attachment (starts with monthly_)
+elseif (preg_match('/^monthly_/', basename($attachmentPath)) || preg_match('/monthly_schedule/', $attachmentPath)) {
+    $possiblePaths[] = '../uploads/monthly_schedule/' . basename($attachmentPath);
+    $possiblePaths[] = '../' . $attachmentPath;  // For paths like uploads/monthly_schedule/monthly_...
+    $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
+}
 // Schedule attachments or default
 else {
     $possiblePaths[] = '../uploads/schedule_attachments/' . basename($attachmentPath);
