@@ -10,7 +10,10 @@ if (class_exists('EnvLoader')) {
 
 // Database configuration from environment variables
 $host = EnvLoader::get('DB_HOST', 'localhost');
-$dbname = EnvLoader::get('DB_NAME', 'u816220874_calendartype');
+// Auto-detect environment: use different database for local vs production
+$isLocal = ($_SERVER['SERVER_NAME'] === 'localhost' || $_SERVER['SERVER_ADDR'] === '127.0.0.1' || strpos($_SERVER['SERVER_NAME'], 'localhost') !== false);
+$defaultDbName = $isLocal ? 'rss' : 'u816220874_calendartype';
+$dbname = EnvLoader::get('DB_NAME', $defaultDbName);
 $username = EnvLoader::get('DB_USER', 'root');
 $password = EnvLoader::get('DB_PASS', '');
 
