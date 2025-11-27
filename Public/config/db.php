@@ -9,13 +9,24 @@ if (class_exists('EnvLoader')) {
 }
 
 // Database configuration from environment variables
-$host = EnvLoader::get('DB_HOST', 'localhost');
 // Auto-detect environment: use different database for local vs production
-$isLocal = ($_SERVER['SERVER_NAME'] === 'localhost' || $_SERVER['SERVER_ADDR'] === '127.0.0.1' || strpos($_SERVER['SERVER_NAME'], 'localhost') !== false);
-$defaultDbName = $isLocal ? 'rss' : 'u816220874_calendartype';
-$dbname = EnvLoader::get('DB_NAME', $defaultDbName);
-$username = EnvLoader::get('DB_USER', 'root');
-$password = EnvLoader::get('DB_PASS', '');
+$isLocal = ($_SERVER['SERVER_NAME'] === 'localhost' || 
+            $_SERVER['SERVER_ADDR'] === '127.0.0.1' || 
+            strpos($_SERVER['SERVER_NAME'], 'localhost') !== false);
+
+if ($isLocal) {
+    // Local XAMPP settings
+    $host = EnvLoader::get('DB_HOST', 'localhost');
+    $dbname = EnvLoader::get('DB_NAME', 'rss');
+    $username = EnvLoader::get('DB_USER', 'root');
+    $password = EnvLoader::get('DB_PASS', '');
+} else {
+    // Hostinger production settings
+    $host = EnvLoader::get('DB_HOST', 'localhost');
+    $dbname = EnvLoader::get('DB_NAME', 'u816220874_calendartype');
+    $username = EnvLoader::get('DB_USER', 'u816220874_calendartype');
+    $password = EnvLoader::get('DB_PASS', 'Gr33n$$wRf');
+}
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
