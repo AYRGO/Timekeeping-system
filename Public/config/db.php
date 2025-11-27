@@ -10,7 +10,7 @@ if (class_exists('EnvLoader')) {
 
 // Database configuration from environment variables
 $host = EnvLoader::get('DB_HOST', 'localhost');
-$dbname = EnvLoader::get('DB_NAME', 'rss');  // Temporary fallback until env is working
+$dbname = EnvLoader::get('DB_NAME', 'u816220874_calendartype');
 $username = EnvLoader::get('DB_USER', 'root');
 $password = EnvLoader::get('DB_PASS', '');
 
