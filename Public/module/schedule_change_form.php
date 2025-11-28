@@ -177,7 +177,7 @@
               $evening_shifts = [];
               
               foreach ($work_schedules as $ws) {
-                  $time_in_hour = (int)date("H", strtotime($ws['time_in']));
+                  $time_in_hour = !empty($ws['time_in']) ? (int)date("H", strtotime($ws['time_in'])) : 0;
                   
                   if ($time_in_hour >= 5 && $time_in_hour < 12) {
                       $day_shifts[] = $ws;
@@ -192,7 +192,9 @@
               function renderScheduleCards($schedules, $category_color) {
                   foreach ($schedules as $ws) {
                       $name = !empty($ws['name']) ? htmlspecialchars($ws['name']) : '';
-                      $time_display = date("g:i A", strtotime($ws['time_in'])) . ' - ' . date("g:i A", strtotime($ws['time_out']));
+                      $timeIn = !empty($ws['time_in']) ? $ws['time_in'] : '00:00:00';
+                      $timeOut = !empty($ws['time_out']) ? $ws['time_out'] : '00:00:00';
+                      $time_display = date("g:i A", strtotime($timeIn)) . ' - ' . date("g:i A", strtotime($timeOut));
                       
                       // Use time as display name if no custom name exists
                       $display_name = !empty($name) ? $name : $time_display;
