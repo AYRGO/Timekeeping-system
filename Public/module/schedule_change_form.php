@@ -374,7 +374,9 @@
                           $schedStmt = $pdo->query("SELECT id, name, time_in, time_out FROM work_schedules ORDER BY time_in");
                           while ($sched = $schedStmt->fetch(PDO::FETCH_ASSOC)) {
                             $name = !empty($sched['name']) ? htmlspecialchars($sched['name']) : '';
-                            $timeDisplay = date('g:i A', strtotime($sched['time_in'])) . ' - ' . date('g:i A', strtotime($sched['time_out']));
+                            $timeIn = !empty($sched['time_in']) ? $sched['time_in'] : '00:00:00';
+                            $timeOut = !empty($sched['time_out']) ? $sched['time_out'] : '00:00:00';
+                            $timeDisplay = date('g:i A', strtotime($timeIn)) . ' - ' . date('g:i A', strtotime($timeOut));
                             $displayName = !empty($name) ? $name : $timeDisplay;
                             ?>
                             <div class="schedule-option border-b border-gray-100 px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors"
