@@ -27,16 +27,16 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Server-side mobile block (user agent + screen width cookie)
-function isMobileDevice() {
-    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    return preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i', $ua);
-}
+// Server-side mobile block removed - Allow all devices
+// function isMobileDevice() {
+//     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+//     return preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i', $ua);
+// }
 
-$screenWidth = $_COOKIE['screen_width'] ?? 1200;
-if (isMobileDevice() || $screenWidth < 1024) {
-    die("<h2 style='text-align:center; padding-top:60px;'>Access denied on mobile devices.<br>Please use a desktop or laptop computer.</h2>");
-}
+// $screenWidth = $_COOKIE['screen_width'] ?? 1200;
+// if (isMobileDevice() || $screenWidth < 1024) {
+//     die("<h2 style='text-align:center; padding-top:60px;'>Access denied on mobile devices.<br>Please use a desktop or laptop computer.</h2>");
+// }
 
 // Brute-force protection
 $max_attempts = 5;
