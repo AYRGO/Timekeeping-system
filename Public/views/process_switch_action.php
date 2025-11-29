@@ -76,14 +76,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     if (!$request_id || !$action) {
         error_log("ERROR: Missing request_id or action - Redirecting");
-        header('Location: schedule_request.php?view=switch&error=' . urlencode('Invalid request.'));
+        header('Location: schedule_request.php?view=swap&error=' . urlencode('Invalid request.'));
         exit();
     }
 
     error_log("=== ATTEMPTING TO FETCH REQUEST FROM DATABASE ===");
     
     try {
-        // Get the switch request details
+        // Get the swap request details
         $stmt = $pdo->prepare("
             SELECT employee_id, source_date, target_date, status 
             FROM schedule_switch_requests 
@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         if (!$request) {
             error_log("ERROR: Request not found in database");
-            header('Location: schedule_request.php?view=switch&error=' . urlencode('Request not found.'));
+            header('Location: schedule_request.php?view=swap&error=' . urlencode('Request not found.'));
             exit();
         }
 
@@ -104,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         if (strtolower($request['status']) !== 'pending') {
             error_log("ERROR: Request status is not pending, it is: " . $request['status']);
-            header('Location: schedule_request.php?view=switch&error=' . urlencode('Request has already been processed.'));
+            header('Location: schedule_request.php?view=swap&error=' . urlencode('Request has already been processed.'));
             exit();
         }
 
@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         if ($action === 'approve') {
             // Log approval attempt
-            error_log("=== SWITCH APPROVAL START ===");
+            error_log("=== SWAP APPROVAL START ===");
             error_log("Request ID: $request_id");
             error_log("Employee ID: $employee_id");
             error_log("Source Date: $source_date");
@@ -139,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             if (!$sourceSchedule || !$targetSchedule) {
                 error_log("ERROR: Schedule not found - Source: " . ($sourceSchedule ? 'found' : 'NOT FOUND') . ", Target: " . ($targetSchedule ? 'found' : 'NOT FOUND'));
-                header('Location: schedule_request.php?view=switch&error=' . urlencode('One or both schedules not found in cache.'));
+                header('Location: schedule_request.php?view=swap&error=' . urlencode('One or both schedules not found in cache.'));
                 exit();
             }
 
@@ -193,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 error_log("Updated request status: " . ($result3 ? "SUCCESS" : "FAILED") . " - Rows affected: " . $statusStmt->rowCount());
 
                 $pdo->commit();
-                error_log("=== SWITCH APPROVAL COMPLETE - TRANSACTION COMMITTED ===");
+                error_log("=== SWAP APPROVAL COMPLETE - TRANSACTION COMMITTED ===");
 
                 // Send email notification
                 try {
@@ -202,17 +202,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $employee = $empStmt->fetch(PDO::FETCH_ASSOC);
                     
                     if ($employee && !empty($employee['personal_email'])) {
-                        $subject = "Schedule Switch Request Approved";
+                        $subject = "Schedule Swap Request Approved";
                         $source_formatted = date('F j, Y', strtotime($source_date));
                         $target_formatted = date('F j, Y', strtotime($target_date));
                         
                         $body = "
                         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
                             <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>Schedule Switch Request Approved</h2>
+                                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>Schedule Swap Request Approved</h2>
                                 
                                 <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                                    <h3 style='color: #374151; margin: 0 0 10px 0;'>🔄 Switch Details</h3>
+                                    <h3 style='color: #374151; margin: 0 0 10px 0;'>🔄 Swap Details</h3>
                                     <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
                                     <p><strong>Request ID:</strong> #{$request_id}</p>
                                 </div>
@@ -250,20 +250,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     error_log("Failed to send email: " . $e->getMessage());
                 }
 
-                header('Location: schedule_request.php?view=switch&message=' . urlencode('Schedule switch approved and applied successfully!'));
+                header('Location: schedule_request.php?view=swap&message=' . urlencode('Schedule swap approved and applied successfully!'));
                 exit();
 
             } catch (Exception $e) {
                 $pdo->rollBack();
-                error_log("ERROR during switch: " . $e->getMessage());
-                error_log("=== SWITCH APPROVAL FAILED - TRANSACTION ROLLED BACK ===");
-                header('Location: schedule_request.php?view=switch&error=' . urlencode('Error swapping schedules: ' . $e->getMessage()));
+                error_log("ERROR during swap: " . $e->getMessage());
+                error_log("=== SWAP APPROVAL FAILED - TRANSACTION ROLLED BACK ===");
+                header('Location: schedule_request.php?view=swap&error=' . urlencode('Error swapping schedules: ' . $e->getMessage()));
                 exit();
             }
 
         } elseif ($action === 'decline') {
             if (!$explanation) {
-                header('Location: schedule_request.php?view=switch&error=' . urlencode('Explanation is required for declining.'));
+                header('Location: schedule_request.php?view=swap&error=' . urlencode('Explanation is required for declining.'));
                 exit();
             }
 
@@ -285,17 +285,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $employee = $empStmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($employee && !empty($employee['personal_email'])) {
-                    $subject = "Schedule Switch Request Declined";
+                    $subject = "Schedule Swap Request Declined";
                     $source_formatted = date('F j, Y', strtotime($source_date));
                     $target_formatted = date('F j, Y', strtotime($target_date));
                     
                     $body = "
                     <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
                         <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                            <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>Schedule Switch Request Declined</h2>
+                            <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>Schedule Swap Request Declined</h2>
                             
                             <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                                <h3 style='color: #374151; margin: 0 0 10px 0;'>🔄 Switch Details</h3>
+                                <h3 style='color: #374151; margin: 0 0 10px 0;'>🔄 Swap Details</h3>
                                 <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
                                 <p><strong>Request ID:</strong> #{$request_id}</p>
                             </div>
@@ -328,21 +328,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 error_log("Failed to send email: " . $e->getMessage());
             }
 
-            header('Location: schedule_request.php?view=switch&message=' . urlencode('Schedule switch request declined.'));
+            header('Location: schedule_request.php?view=swap&message=' . urlencode('Schedule swap request declined.'));
             exit();
 
         } else {
-            header('Location: schedule_request.php?view=switch&error=' . urlencode('Invalid action.'));
+            header('Location: schedule_request.php?view=swap&error=' . urlencode('Invalid action.'));
             exit();
         }
 
     } catch (PDOException $e) {
-        header('Location: schedule_request.php?view=switch&error=' . urlencode('Database error: ' . $e->getMessage()));
+        header('Location: schedule_request.php?view=swap&error=' . urlencode('Database error: ' . $e->getMessage()));
         exit();
     }
 
 } else {
-    header('Location: schedule_request.php?view=switch');
+    header('Location: schedule_request.php?view=swap');
     exit();
 }
 ?>

@@ -16,10 +16,10 @@ echo "</pre>";
 
 echo "<h3>Test Checklist:</h3>";
 echo "<ul>";
-if (isset($_POST['submit_schedule_switch'])) {
-    echo "<li style='color: green;'>✅ submit_schedule_switch field found</li>";
+if (isset($_POST['submit_schedule_swap'])) {
+    echo "<li style='color: green;'>✅ submit_schedule_swap field found</li>";
 } else {
-    echo "<li style='color: red;'>❌ submit_schedule_switch field NOT found</li>";
+    echo "<li style='color: red;'>❌ submit_schedule_swap field NOT found</li>";
 }
 
 if (isset($_POST['source_date'])) {

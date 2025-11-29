@@ -1,6 +1,6 @@
 <?php
 // time_log_create.php
-// Handle schedule change requests - UPDATED FOR MONTHLY REQUESTS AND SCHEDULE SWITCH
+// Handle schedule change requests - UPDATED FOR MONTHLY REQUESTS AND SCHEDULE SWAP
 
 include('../config/db.php');
 include('../includes/session.php');
@@ -13,10 +13,10 @@ if (!$employee_id) {
     exit;
 }
 
-// Handle Schedule Switch Request (NEW)
-if (isset($_POST['submit_schedule_switch'])) {
+// Handle Schedule Swap Request (NEW)
+if (isset($_POST['submit_schedule_swap'])) {
     // Debug logging
-    error_log("=== SCHEDULE SWITCH REQUEST RECEIVED ===");
+    error_log("=== SCHEDULE SWAP REQUEST RECEIVED ===");
     error_log("POST data: " . print_r($_POST, true));
     error_log("FILES data: " . print_r($_FILES, true));
     error_log("Session employee_id: " . $employee_id);
@@ -30,24 +30,24 @@ if (isset($_POST['submit_schedule_switch'])) {
     // Validation
     if (empty($source_date) || empty($target_date)) {
         error_log("ERROR: Missing dates");
-        header("Location: employee_dashboard.php?schedule_switch=missing_dates#scheduleView");
+        header("Location: employee_dashboard.php?schedule_swap=missing_dates#scheduleView");
         exit;
     }
     
     if ($source_date === $target_date) {
-        header("Location: employee_dashboard.php?schedule_switch=same_dates#scheduleView");
+        header("Location: employee_dashboard.php?schedule_swap=same_dates#scheduleView");
         exit;
     }
     
     // Validate dates are not in the past
     $today = date('Y-m-d');
     if ($source_date < $today || $target_date < $today) {
-        header("Location: employee_dashboard.php?schedule_switch=past_dates#scheduleView");
+        header("Location: employee_dashboard.php?schedule_swap=past_dates#scheduleView");
         exit;
     }
     
     if (empty($reason)) {
-        header("Location: employee_dashboard.php?schedule_switch=no_reason#scheduleView");
+        header("Location: employee_dashboard.php?schedule_swap=no_reason#scheduleView");
         exit;
     }
     
@@ -63,7 +63,7 @@ if (isset($_POST['submit_schedule_switch'])) {
         $allowed_extensions = ['pdf', 'jpg', 'jpeg', 'png'];
         
         if (!in_array($file_extension, $allowed_extensions)) {
-            header("Location: employee_dashboard.php?schedule_switch=invalid_file#scheduleView");
+            header("Location: employee_dashboard.php?schedule_swap=invalid_file#scheduleView");
             exit;
         }
         
@@ -73,11 +73,11 @@ if (isset($_POST['submit_schedule_switch'])) {
         if (move_uploaded_file($_FILES['attachment_scr']['tmp_name'], $target_path)) {
             $attachment_path = $target_path;
         } else {
-            header("Location: employee_dashboard.php?schedule_switch=upload_failed#scheduleView");
+            header("Location: employee_dashboard.php?schedule_swap=upload_failed#scheduleView");
             exit;
         }
     } else {
-        header("Location: employee_dashboard.php?schedule_switch=no_attachment#scheduleView");
+        header("Location: employee_dashboard.php?schedule_swap=no_attachment#scheduleView");
         exit;
     }
     
@@ -102,12 +102,12 @@ if (isset($_POST['submit_schedule_switch'])) {
         $insert_id = $pdo->lastInsertId();
         error_log("SUCCESS: Inserted with ID: $insert_id");
         
-        header("Location: employee_dashboard.php?schedule_switch=success#scheduleView");
+        header("Location: employee_dashboard.php?schedule_swap=success#scheduleView");
         exit;
     } catch (PDOException $e) {
         error_log("DATABASE ERROR: " . $e->getMessage());
         error_log("SQL State: " . $e->getCode());
-        header("Location: employee_dashboard.php?schedule_switch=error#scheduleView");
+        header("Location: employee_dashboard.php?schedule_swap=error#scheduleView");
         exit;
     }
 }

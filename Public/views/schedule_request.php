@@ -4,13 +4,13 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
-// Check which view to display (current requests, monthly, history, or switch)
+// Check which view to display (current requests, monthly, history, or swap)
 $view = isset($_GET['view']) ? $_GET['view'] : 'current';
 $isHistoryView = ($view === 'history');
 $isMonthlyView = ($view === 'monthly');
-$isSwitchView = ($view === 'switch');
+$isSwapView = ($view === 'swap');
 
-$pageTitle = $isMonthlyView ? 'Monthly Schedule Requests' : ($isSwitchView ? 'Schedule Switch Requests' : ($isHistoryView ? 'Schedule Changes & Day Off History' : 'Schedule Change & Day Off Requests'));
+$pageTitle = $isMonthlyView ? 'Monthly Schedule Requests' : ($isSwapView ? 'Schedule Swap Requests' : ($isHistoryView ? 'Schedule Changes & Day Off History' : 'Schedule Change & Day Off Requests'));
 
 // Fetch schedule change requests with employee names, attachments, and current schedule
 if ($isMonthlyView) {
@@ -32,8 +32,8 @@ if ($isMonthlyView) {
         ORDER BY mws.created_at DESC
     ");
     $monthly_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} else if ($isSwitchView) {
-    // Fetch from schedule_switch_requests table (switch requests)
+} else if ($isSwapView) {
+    // Fetch from schedule_switch_requests table (swap requests)
     $stmt = $pdo->query("
         SELECT ssr.id, ssr.employee_id, ssr.source_date, ssr.target_date, 
                ssr.reason, ssr.attachment_path, ssr.status, ssr.created_at,
@@ -43,7 +43,7 @@ if ($isMonthlyView) {
         JOIN employees e ON ssr.employee_id = e.id
         ORDER BY ssr.created_at DESC
     ");
-    $switch_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $swap_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else if ($isHistoryView) {
     // Fetch from post_schedule_change_requests table (history)
     $stmt = $pdo->query("
@@ -85,7 +85,7 @@ $pendingMonthlyCount = $pdo->query("
     WHERE LOWER(status) = 'pending'
 ")->fetchColumn();
 
-$pendingSwitchCount = $pdo->query("
+$pendingSwapCount = $pdo->query("
     SELECT COUNT(*) FROM schedule_switch_requests 
     WHERE LOWER(status) = 'pending'
 ")->fetchColumn();
@@ -240,10 +240,10 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                         </div>
                         <div class="flex space-x-2">
                             <a href="?view=current" 
-                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= !$isHistoryView && !$isMonthlyView && !$isSwitchView ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= !$isHistoryView && !$isMonthlyView && !$isSwapView ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
                                 <i class="fas fa-clock mr-2"></i>Current Requests
                                 <?php if ($pendingCurrentCount > 0): ?>
-                                    <span class="ml-2 px-2 py-0.5 text-xs font-bold rounded-full <?= !$isHistoryView && !$isMonthlyView && !$isSwitchView ? 'bg-white text-blue-600' : 'bg-blue-600 text-white' ?>">
+                                    <span class="ml-2 px-2 py-0.5 text-xs font-bold rounded-full <?= !$isHistoryView && !$isMonthlyView && !$isSwapView ? 'bg-white text-blue-600' : 'bg-blue-600 text-white' ?>">
                                         <?= $pendingCurrentCount ?>
                                     </span>
                                 <?php endif; ?>
@@ -257,12 +257,12 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                     </span>
                                 <?php endif; ?>
                             </a>
-                            <a href="?view=switch" 
-                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= $isSwitchView ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
-                                <i class="fas fa-exchange-alt mr-2"></i>Switch Requests
-                                <?php if ($pendingSwitchCount > 0): ?>
-                                    <span class="ml-2 px-2 py-0.5 text-xs font-bold rounded-full <?= $isSwitchView ? 'bg-white text-purple-600' : 'bg-purple-600 text-white' ?>">
-                                        <?= $pendingSwitchCount ?>
+                            <a href="?view=swap" 
+                               class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= $isSwapView ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <i class="fas fa-exchange-alt mr-2"></i>Swap Requests
+                                <?php if ($pendingSwapCount > 0): ?>
+                                    <span class="ml-2 px-2 py-0.5 text-xs font-bold rounded-full <?= $isSwapView ? 'bg-white text-purple-600' : 'bg-purple-600 text-white' ?>">
+                                        <?= $pendingSwapCount ?>
                                     </span>
                                 <?php endif; ?>
                             </a>
@@ -555,8 +555,8 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                 </div>
                 <?php endif; ?>
 
-                <?php elseif ($isSwitchView): ?>
-                <!-- Schedule Switch Requests Table -->
+                <?php elseif ($isSwapView): ?>
+                <!-- Schedule Swap Requests Table -->
                 <div class="overflow-x-auto bg-white shadow rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
@@ -574,8 +574,8 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            <?php if (!empty($switch_requests)): ?>
-                                <?php foreach ($switch_requests as $swr): ?>
+                            <?php if (!empty($swap_requests)): ?>
+                                <?php foreach ($swap_requests as $swr): ?>
                                     <?php
                                     // Get schedules for both dates
                                     $scheduleA = getCurrentScheduleForEmployee($swr['employee_id'], $pdo, $swr['source_date']);
@@ -658,13 +658,13 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                                         <input type="hidden" name="request_id" value="<?= $swr['id'] ?>">
                                                         <input type="hidden" name="action" value="approve">
                                                         <button type="submit" 
-                                                                onclick="return confirm('Are you sure you want to approve this schedule switch? This will swap the schedules for both dates.')"
+                                                                onclick="return confirm('Are you sure you want to approve this schedule swap? This will swap the schedules for both dates.')"
                                                                 class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition-colors">
                                                             <i class="fas fa-check mr-1"></i>Approve
                                                         </button>
                                                     </form>
                                                     <button type="button"
-                                                            onclick="openDeclineSwitchModal(<?= $swr['id'] ?>)"
+                                                            onclick="openDeclineSwapModal(<?= $swr['id'] ?>)"
                                                             class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm transition-colors">
                                                         <i class="fas fa-times mr-1"></i>Decline
                                                     </button>
@@ -682,7 +682,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                 <tr>
                                     <td colspan="10" class="text-center text-sm py-8 text-gray-500">
                                         <i class="fas fa-exchange-alt text-4xl text-gray-300 mb-2"></i>
-                                        <div>No schedule switch requests found.</div>
+                                        <div>No schedule swap requests found.</div>
                                     </td>
                                 </tr>
                             <?php endif; ?>
@@ -690,15 +690,15 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                     </table>
                 </div>
 
-                <!-- Switch Summary Cards -->
-                <?php if (!empty($switch_requests)): ?>
+                <!-- Swap Summary Cards -->
+                <?php if (!empty($swap_requests)): ?>
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <?php
-                    $switchSummary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'cancelled' => 0];
-                    foreach ($switch_requests as $req) {
+                    $swapSummary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'cancelled' => 0];
+                    foreach ($swap_requests as $req) {
                         $status = strtolower($req['status']);
-                        if (isset($switchSummary[$status])) {
-                            $switchSummary[$status]++;
+                        if (isset($swapSummary[$status])) {
+                            $swapSummary[$status]++;
                         }
                     }
                     ?>
@@ -708,8 +708,8 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                 <i class="fas fa-list text-purple-600"></i>
                             </div>
                             <div class="ml-3">
-                                <p class="text-sm font-medium text-gray-500">Total Switch</p>
-                                <p class="text-lg font-semibold text-gray-900"><?= count($switch_requests) ?></p>
+                                <p class="text-sm font-medium text-gray-500">Total Swap</p>
+                                <p class="text-lg font-semibold text-gray-900"><?= count($swap_requests) ?></p>
                             </div>
                         </div>
                     </div>
@@ -720,7 +720,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                             </div>
                             <div class="ml-3">
                                 <p class="text-sm font-medium text-gray-500">Pending</p>
-                                <p class="text-lg font-semibold text-gray-900"><?= $switchSummary['pending'] ?></p>
+                                <p class="text-lg font-semibold text-gray-900"><?= $swapSummary['pending'] ?></p>
                             </div>
                         </div>
                     </div>
@@ -731,7 +731,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                             </div>
                             <div class="ml-3">
                                 <p class="text-sm font-medium text-gray-500">Approved</p>
-                                <p class="text-lg font-semibold text-gray-900"><?= $switchSummary['approved'] ?></p>
+                                <p class="text-lg font-semibold text-gray-900"><?= $swapSummary['approved'] ?></p>
                             </div>
                         </div>
                     </div>
@@ -742,7 +742,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                             </div>
                             <div class="ml-3">
                                 <p class="text-sm font-medium text-gray-500">Rejected</p>
-                                <p class="text-lg font-semibold text-gray-900"><?= $switchSummary['rejected'] + $switchSummary['cancelled'] ?></p>
+                                <p class="text-lg font-semibold text-gray-900"><?= $swapSummary['rejected'] + $swapSummary['cancelled'] ?></p>
                             </div>
                         </div>
                     </div>
@@ -1043,24 +1043,24 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
         </div>
     </div>
 
-    <!-- Decline Switch Modal -->
-    <div id="declineSwitchModal" class="fixed inset-0 bg-black bg-opacity-50 z-50" style="display: none;">
+    <!-- Decline Swap Modal -->
+    <div id="declineSwapModal" class="fixed inset-0 bg-black bg-opacity-50 z-50" style="display: none;">
         <div class="flex items-center justify-center min-h-screen px-4">
         <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
             <h2 class="text-xl font-bold mb-4 text-gray-800">
-                <i class="fas fa-times-circle text-red-600 mr-2"></i>Decline Schedule Switch Request
+                <i class="fas fa-times-circle text-red-600 mr-2"></i>Decline Schedule Swap Request
             </h2>
             <form method="POST" action="process_switch_action.php">
-                <input type="hidden" name="request_id" id="modalSwitchRequestId">
+                <input type="hidden" name="request_id" id="modalSwapRequestId">
                 <input type="hidden" name="action" value="decline">
 
-                <label for="switch_explanation" class="block text-sm font-medium text-gray-700 mb-1">Explanation:</label>
-                <textarea name="explanation" id="switch_explanation" rows="4"
+                <label for="swap_explanation" class="block text-sm font-medium text-gray-700 mb-1">Explanation:</label>
+                <textarea name="explanation" id="swap_explanation" rows="4"
                           class="w-full border rounded-md px-3 py-2 text-sm focus:ring focus:ring-red-200"
                           placeholder="Provide explanation for declining..." required></textarea>
 
                 <div class="mt-4 flex justify-end space-x-2">
-                    <button type="button" onclick="closeDeclineSwitchModal()"
+                    <button type="button" onclick="closeDeclineSwapModal()"
                             class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded text-sm">
                         Cancel
                     </button>
@@ -1097,15 +1097,15 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
             document.getElementById('declineMonthlyModal').style.display = 'none';
         }
 
-        function openDeclineSwitchModal(requestId) {
-            document.getElementById('modalSwitchRequestId').value = requestId;
-            document.getElementById('switch_explanation').value = '';
-            document.getElementById('declineSwitchModal').style.display = 'block';
-            console.log('Decline switch modal opened for requestId:', requestId);
+        function openDeclineSwapModal(requestId) {
+            document.getElementById('modalSwapRequestId').value = requestId;
+            document.getElementById('swap_explanation').value = '';
+            document.getElementById('declineSwapModal').style.display = 'block';
+            console.log('Decline swap modal opened for requestId:', requestId);
         }
 
-        function closeDeclineSwitchModal() {
-            document.getElementById('declineSwitchModal').style.display = 'none';
+        function closeDeclineSwapModal() {
+            document.getElementById('declineSwapModal').style.display = 'none';
         }
 
         // Optional: Prevent form submit if request_id is missing

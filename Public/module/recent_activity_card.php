@@ -147,9 +147,9 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
             $created = date('M j, Y', strtotime($activity['created_at']));
             $msg = strip_tags($activity['message']);
 
-            // Detect type - check for schedule switch first, then monthly schedule, then day off/rest day
-            if (isset($activity['type']) && $activity['type'] === 'Schedule Switch Request') {
-                $type = 'Schedule Switch';
+            // Detect type - check for schedule swap first, then monthly schedule, then day off/rest day
+            if (isset($activity['type']) && $activity['type'] === 'Schedule Swap Request') {
+                $type = 'Schedule Swap';
             } elseif (isset($activity['type']) && $activity['type'] === 'Monthly Schedule Request') {
                 $type = 'Monthly Schedule';
             } elseif (preg_match('/\b(day\s*off|rest\s*day|off\s*day)\b/i', $msg)) {
@@ -210,8 +210,8 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                     $status = 'Pending';
                 }
             }
-            // For Schedule Switch requests
-            elseif ($type === 'Schedule Switch' && isset($activity['status'])) {
+            // For Schedule Swap requests
+            elseif ($type === 'Schedule Swap' && isset($activity['status'])) {
                 $status = ucfirst(strtolower($activity['status']));
             }
             // For Monthly Schedule requests
@@ -338,8 +338,8 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                 if (!empty($activity['ot_reason'])) {
                     $sentence .= "\nReason: " . htmlspecialchars($activity['ot_reason']);
                 }
-            } elseif ($type === 'Schedule Switch') {
-                $sentence .= "Schedule switch request was $status.";
+            } elseif ($type === 'Schedule Swap') {
+                $sentence .= "Schedule swap request was $status.";
                 
                 // Add dates
                 if (!empty($activity['source_date']) && !empty($activity['target_date'])) {
@@ -401,8 +401,8 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                                 ?>
                             <?php elseif ($type === 'Time'): ?>
                                 Time Adjustment Request
-                            <?php elseif ($type === 'Schedule Switch'): ?>
-                                Schedule Switch Request
+                            <?php elseif ($type === 'Schedule Swap'): ?>
+                                Schedule Swap Request
                             <?php elseif ($type === 'Monthly Schedule'): ?>
                                 Monthly Schedule Request
                             <?php else: ?>
@@ -519,9 +519,9 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
                         </button>
-                    <?php } elseif ($type === 'Schedule Switch') { ?>
-                        <button onclick="showActivityDetails('Schedule Switch Request', `<?= htmlspecialchars(json_encode([
-                            'type' => 'Schedule Switch Request',
+                    <?php } elseif ($type === 'Schedule Swap') { ?>
+                        <button onclick="showActivityDetails('Schedule Swap Request', `<?= htmlspecialchars(json_encode([
+                            'type' => 'Schedule Swap Request',
                             'status' => $status,
                             'date' => $created,
                             'source_date' => !empty($activity['source_date']) ? date('M j, Y', strtotime($activity['source_date'])) : '',
@@ -980,16 +980,16 @@ function showActivityDetails(title, dataJson) {
 
             // Attachment section for monthly schedule requests
             content += createAttachmentSection(data.attachment_scr, data.request_id, data.table_name, data.status);
-        } else if (data.type.includes('Schedule Switch')) {
-            // Schedule Switch request - minimal modern design
-            console.log('📊 Schedule Switch Data:', data);
+        } else if (data.type.includes('Schedule Swap')) {
+            // Schedule Swap request - minimal modern design
+            console.log('📊 Schedule Swap Data:', data);
             
             // Header
             content += `
                 <div class="mb-4">
                     <h4 class="text-lg font-semibold text-gray-800 flex items-center">
                         <i class="fas fa-exchange-alt text-purple-600 mr-2"></i>
-                        Schedule Switch
+                        Schedule Swap
                     </h4>
                     <p class="text-sm text-gray-500 mt-1">Swap schedules between two dates</p>
                 </div>
@@ -1037,7 +1037,7 @@ function showActivityDetails(title, dataJson) {
                 `;
             }
 
-            // Attachment section for schedule switch requests
+            // Attachment section for schedule swap requests
             content += createAttachmentSection(data.attachment_scr, data.request_id, data.table_name, data.status);
         } else if (data.type.includes('Schedule')) {
             // Full width horizontal container for schedule change

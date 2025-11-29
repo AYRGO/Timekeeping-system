@@ -5,17 +5,17 @@ include('config/db.php');
 // Set a test employee ID
 $current_user_id = $_SESSION['employee']['id'] ?? 1009;
 
-echo "<h2>Testing Schedule Switch Notifications</h2>";
+echo "<h2>Testing Schedule Swap Notifications</h2>";
 echo "<p>Current User ID: $current_user_id</p>";
 
 // Check schedule_switch_requests table
-echo "<h3>Schedule Switch Requests in Database:</h3>";
+echo "<h3>Schedule Swap Requests in Database:</h3>";
 $stmt = $pdo->prepare("SELECT * FROM schedule_switch_requests WHERE employee_id = ? ORDER BY created_at DESC");
 $stmt->execute([$current_user_id]);
 $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 if (empty($requests)) {
-    echo "<p style='color: red;'>No schedule switch requests found for employee $current_user_id</p>";
+    echo "<p style='color: red;'>No schedule swap requests found for employee $current_user_id</p>";
 } else {
     echo "<p style='color: green;'>Found " . count($requests) . " request(s)</p>";
     echo "<pre>";
@@ -72,9 +72,9 @@ foreach ($requests as $switch) {
     $target_schedule = getActualCurrentScheduleFromCalendar($pdo, $current_user_id, $switch['target_date']);
     
     $notification = [
-        'message' => "Schedule switch request from <strong>{$source_date}</strong> to <strong>{$target_date}</strong> was <strong>{$status}</strong>.",
+        'message' => "Schedule swap request from <strong>{$source_date}</strong> to <strong>{$target_date}</strong> was <strong>{$status}</strong>.",
         'created_at' => $switch['created_at'],
-        'type' => 'Schedule Switch Request',
+        'type' => 'Schedule Swap Request',
         'status' => $switch['status'],
         'source_date' => $switch['source_date'],
         'target_date' => $switch['target_date'],
@@ -104,7 +104,7 @@ if (!empty($notifications)) {
     echo "<h4>JSON Encoded (as passed to modal):</h4>";
     $testNotif = $notifications[0];
     $jsonData = [
-        'type' => 'Schedule Switch Request',
+        'type' => 'Schedule Swap Request',
         'status' => ucfirst(strtolower($testNotif['status'])),
         'date' => date('M j, Y', strtotime($testNotif['created_at'])),
         'source_date' => !empty($testNotif['source_date']) ? date('M j, Y', strtotime($testNotif['source_date'])) : '',

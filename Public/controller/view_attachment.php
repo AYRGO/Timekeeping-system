@@ -39,7 +39,7 @@ elseif (preg_match('/^attach_/', basename($attachmentPath)) || preg_match('/uplo
     $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
     $possiblePaths[] = '../uploads/time_adjustment_attachments/' . basename($attachmentPath);
 }
-// Check if it's a schedule switch attachment (starts with switch_)
+// Check if it's a schedule swap attachment (starts with switch_)
 elseif (preg_match('/^switch_/', basename($attachmentPath)) || preg_match('/schedule_switch/', $attachmentPath)) {
     $possiblePaths[] = '../uploads/schedule_switch/' . basename($attachmentPath);
     $possiblePaths[] = '../' . $attachmentPath;  // For paths like uploads/schedule_switch/switch_...

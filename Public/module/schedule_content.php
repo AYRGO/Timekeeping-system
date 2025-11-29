@@ -305,22 +305,22 @@ try {
         }
     }
     
-    // Display schedule switch messages
-    if (isset($_GET['schedule_switch'])) {
-        $switch_msg = $_GET['schedule_switch'];
-        if ($switch_msg === 'success') {
+    // Display schedule swap messages
+    if (isset($_GET['schedule_swap'])) {
+        $swap_msg = $_GET['schedule_swap'];
+        if ($swap_msg === 'success') {
             echo '<div class="mx-8 mt-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-500 text-purple-800 px-5 py-4 rounded-r-xl shadow-sm">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
                         <i class="fas fa-check-circle text-purple-500 text-xl"></i>
                     </div>
                     <div class="ml-3">
-                        <p class="font-medium">Schedule switch request submitted successfully!</p>
+                        <p class="font-medium">Schedule swap request submitted successfully!</p>
                         <p class="text-sm text-purple-700 mt-0.5">Your request to swap schedules between two dates has been submitted for approval.</p>
                     </div>
                 </div>
             </div>';
-        } elseif ($switch_msg === 'missing_dates' || $switch_msg === 'same_dates' || $switch_msg === 'past_dates') {
+        } elseif ($swap_msg === 'missing_dates' || $swap_msg === 'same_dates' || $swap_msg === 'past_dates') {
             echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
@@ -328,11 +328,11 @@ try {
                     </div>
                     <div class="ml-3">
                         <p class="font-medium">Invalid dates</p>
-                        <p class="text-sm text-red-700 mt-0.5">Please select two different future dates to switch.</p>
+                        <p class="text-sm text-red-700 mt-0.5">Please select two different future dates to swap.</p>
                     </div>
                 </div>
             </div>';
-        } elseif ($switch_msg === 'no_reason') {
+        } elseif ($swap_msg === 'no_reason') {
             echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
@@ -340,11 +340,11 @@ try {
                     </div>
                     <div class="ml-3">
                         <p class="font-medium">Missing reason</p>
-                        <p class="text-sm text-red-700 mt-0.5">Please provide a reason for the schedule switch.</p>
+                        <p class="text-sm text-red-700 mt-0.5">Please provide a reason for the schedule swap.</p>
                     </div>
                 </div>
             </div>';
-        } elseif ($switch_msg === 'error') {
+        } elseif ($swap_msg === 'error') {
             echo '<div class="mx-8 mt-6 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-r-xl shadow-sm">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
@@ -439,9 +439,9 @@ try {
                               <!-- Quick Action Buttons (Shown on Hover for Future Dates) -->
                               <?php if (!$isPast && !$cell['is_holiday']): ?>
                               <div class="absolute top-2 right-2 hidden group-hover:flex gap-1 z-10">
-                                <button onclick="event.stopPropagation(); openScheduleSwitchModal('<?= $cellDate ?>')" 
+                                <button onclick="event.stopPropagation(); openScheduleSwapModal('<?= $cellDate ?>')" 
                                         class="p-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-lg transition-all duration-200 text-xs"
-                                        title="Switch with another date">
+                                        title="Swap with another date">
                                     <i class="fas fa-exchange-alt"></i>
                                 </button>
                                 <button onclick="event.stopPropagation(); openScheduleChangeModal('<?= $cellDate ?>')" 
@@ -547,8 +547,8 @@ try {
     </div>
 </div>
 
-<!-- Schedule Switch Modal -->
-<div id="scheduleSwitchModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" style="display: none;">
+<!-- Schedule Swap Modal -->
+<div id="scheduleSwapModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" style="display: none;">
     <div class="flex items-center justify-center min-h-screen px-4">
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg transform transition-all">
             <!-- Header -->
@@ -557,18 +557,18 @@ try {
                     <i class="fas fa-exchange-alt text-purple-600 text-xl"></i>
                 </div>
                 <div class="flex-1">
-                    <h3 class="text-2xl font-bold text-gray-900">Switch Schedules</h3>
+                    <h3 class="text-2xl font-bold text-gray-900">Swap Schedules</h3>
                     <p class="text-sm text-gray-500 mt-0.5">Swap schedules between two dates</p>
                 </div>
-                <button onclick="closeScheduleSwitchModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <button onclick="closeScheduleSwapModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
 
             <form method="post" action="time_log_create.php" enctype="multipart/form-data" class="space-y-4">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
-                <input type="hidden" name="submit_schedule_switch" value="1">
-                <input type="hidden" name="source_date" id="switch_source_date">
+                <input type="hidden" name="submit_schedule_swap" value="1">
+                <input type="hidden" name="source_date" id="swap_source_date">
                 
                 <!-- Date A -->
                 <div class="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
@@ -610,11 +610,11 @@ try {
                 </div>
 
                 <!-- Preview -->
-                <div id="switch_preview" class="hidden bg-green-50 border-2 border-green-200 rounded-xl p-4">
+                <div id="swap_preview" class="hidden bg-green-50 border-2 border-green-200 rounded-xl p-4">
                     <div class="flex items-start gap-3">
                         <i class="fas fa-check-circle text-green-600 text-lg mt-0.5"></i>
                         <div class="flex-1 text-sm">
-                            <div class="font-semibold text-green-900 mb-1">Ready to switch:</div>
+                            <div class="font-semibold text-green-900 mb-1">Ready to swap:</div>
                             <div class="text-green-700">
                                 <span id="preview_source" class="font-medium"></span>
                                 <i class="fas fa-exchange-alt mx-2 text-green-500"></i>
@@ -629,8 +629,8 @@ try {
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         Reason <span class="text-red-500">*</span>
                     </label>
-                    <textarea name="reason" id="switch_reason" rows="3" required 
-                              placeholder="Why do you need to switch these schedules?"
+                    <textarea name="reason" id="swap_reason" rows="3" required 
+                              placeholder="Why do you need to swap these schedules?"
                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none text-sm"></textarea>
                 </div>
 
@@ -639,7 +639,7 @@ try {
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         Supporting Document <span class="text-red-500">*</span>
                     </label>
-                    <input type="file" name="attachment_scr" id="switch_attachment" accept=".pdf,.jpg,.jpeg,.png" required
+                    <input type="file" name="attachment_scr" id="swap_attachment" accept=".pdf,.jpg,.jpeg,.png" required
                            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm
                                   file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium 
                                   file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 file:cursor-pointer">
@@ -648,7 +648,7 @@ try {
 
                 <!-- Buttons -->
                 <div class="flex gap-3 pt-4">
-                    <button type="button" onclick="closeScheduleSwitchModal()"
+                    <button type="button" onclick="closeScheduleSwapModal()"
                             class="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors">
                         Cancel
                     </button>
@@ -731,17 +731,17 @@ try {
 </div>
 
 <script>
-// Schedule Switch Modal Functions
+// Schedule Swap Modal Functions
 let sourceDateData = {};
 let isSelectingTargetDate = false;
-let switchSourceDate = null;
+let swapSourceDate = null;
 
-function openScheduleSwitchModal(date) {
-    console.log('🔄 Opening schedule switch modal for date:', date);
+function openScheduleSwapModal(date) {
+    console.log('🔄 Opening schedule swap modal for date:', date);
     
     // Enter date selection mode
     isSelectingTargetDate = true;
-    switchSourceDate = date;
+    swapSourceDate = date;
     
     // Highlight the source date
     highlightCalendarDate(date, 'source');
@@ -805,13 +805,13 @@ function cancelDateSelection() {
 }
 
 function handleDateClick(targetDate) {
-    if (!isSelectingTargetDate || !switchSourceDate) {
+    if (!isSelectingTargetDate || !swapSourceDate) {
         return;
     }
     
     // Validate: can't select the same date
-    if (targetDate === switchSourceDate) {
-        alert('⚠️ Please select a different date to switch with!');
+    if (targetDate === swapSourceDate) {
+        alert('⚠️ Please select a different date to swap with!');
         return;
     }
     
@@ -838,34 +838,34 @@ function handleDateClick(targetDate) {
     }
     
     // Open modal with both dates filled
-    openScheduleSwitchModalWithDates(switchSourceDate, targetDate);
+    openScheduleSwapModalWithDates(swapSourceDate, targetDate);
 }
 
-function openScheduleSwitchModalWithDates(sourceDate, targetDate) {
-    console.log('🔄 Opening schedule switch modal with dates:', sourceDate, targetDate);
+function openScheduleSwapModalWithDates(sourceDate, targetDate) {
+    console.log('🔄 Opening schedule swap modal with dates:', sourceDate, targetDate);
     
-    const modal = document.getElementById('scheduleSwitchModal');
+    const modal = document.getElementById('scheduleSwapModal');
     modal.style.display = 'block';
     document.body.style.overflow = 'hidden';
     
     // Set source date
-    document.getElementById('switch_source_date').value = sourceDate;
+    document.getElementById('swap_source_date').value = sourceDate;
     document.getElementById('source_date_display').textContent = formatDate(sourceDate);
     
     // Set target date
     document.getElementById('target_date').value = targetDate;
     
     // Fetch schedules for both dates
-    fetchScheduleForSwitch(sourceDate, 'source');
-    fetchScheduleForSwitch(targetDate, 'target');
+    fetchScheduleForSwap(sourceDate, 'source');
+    fetchScheduleForSwap(targetDate, 'target');
     
     // Clear form fields
-    document.getElementById('switch_reason').value = '';
-    document.getElementById('switch_attachment').value = '';
+    document.getElementById('swap_reason').value = '';
+    document.getElementById('swap_attachment').value = '';
 }
 
-function closeScheduleSwitchModal() {
-    const modal = document.getElementById('scheduleSwitchModal');
+function closeScheduleSwapModal() {
+    const modal = document.getElementById('scheduleSwapModal');
     modal.style.display = 'none';
     document.body.style.overflow = 'auto';
     sourceDateData = {};
@@ -889,7 +889,7 @@ function formatDate(dateString) {
     });
 }
 
-function fetchScheduleForSwitch(date, type) {
+function fetchScheduleForSwap(date, type) {
     fetch('../controller/ajax_get_schedule_for_date.php', {
         method: 'POST',
         headers: {
@@ -910,7 +910,7 @@ function fetchScheduleForSwitch(date, type) {
                 document.getElementById('target_schedule_display').classList.remove('hidden');
                 
                 // Show preview
-                updateSwitchPreview(date, displayText);
+                updateSwapPreview(date, displayText);
             }
         }
     })
@@ -919,9 +919,9 @@ function fetchScheduleForSwitch(date, type) {
     });
 }
 
-function updateSwitchPreview(targetDate, targetSchedule) {
-    const preview = document.getElementById('switch_preview');
-    const sourceDate = document.getElementById('switch_source_date').value;
+function updateSwapPreview(targetDate, targetSchedule) {
+    const preview = document.getElementById('swap_preview');
+    const sourceDate = document.getElementById('swap_source_date').value;
     
     document.getElementById('preview_source').textContent = 
         formatDate(sourceDate).split(',')[0] + ': ' + (sourceDateData.schedule || 'Loading...');
@@ -938,18 +938,18 @@ document.addEventListener('DOMContentLoaded', function() {
         targetDateInput.addEventListener('change', function() {
             const targetDate = this.value;
             if (targetDate) {
-                fetchScheduleForSwitch(targetDate, 'target');
+                fetchScheduleForSwap(targetDate, 'target');
             } else {
                 document.getElementById('target_schedule_display').classList.add('hidden');
-                document.getElementById('switch_preview').classList.add('hidden');
+                document.getElementById('swap_preview').classList.add('hidden');
             }
         });
     }
     
     // Close modal when clicking outside
-    document.getElementById('scheduleSwitchModal')?.addEventListener('click', function(e) {
+    document.getElementById('scheduleSwapModal')?.addEventListener('click', function(e) {
         if (e.target === this) {
-            closeScheduleSwitchModal();
+            closeScheduleSwapModal();
         }
     });
     
@@ -962,10 +962,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Close switch modal if open
-            const switchModal = document.getElementById('scheduleSwitchModal');
-            if (switchModal && switchModal.style.display === 'block') {
-                closeScheduleSwitchModal();
+            // Close swap modal if open
+            const swapModal = document.getElementById('scheduleSwapModal');
+            if (swapModal && swapModal.style.display === 'block') {
+                closeScheduleSwapModal();
             }
         }
     });

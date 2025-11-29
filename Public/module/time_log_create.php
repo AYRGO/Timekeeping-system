@@ -286,14 +286,14 @@ try {
         }
 
 
-// Handle Schedule Switch Request
-if (isset($_POST['submit_schedule_switch'])) {
+// Handle Schedule Swap Request
+if (isset($_POST['submit_schedule_swap'])) {
     $source_date = trim($_POST['source_date'] ?? '');
     $target_date = trim($_POST['target_date'] ?? '');
     $reason = trim($_POST['reason'] ?? '');
     
     // Debug logging
-    error_log("=== SCHEDULE SWITCH REQUEST RECEIVED ===");
+    error_log("=== SCHEDULE SWAP REQUEST RECEIVED ===");
     error_log("Employee ID: $employee_id");
     error_log("Source Date: $source_date");
     error_log("Target Date: $target_date");
@@ -302,13 +302,13 @@ if (isset($_POST['submit_schedule_switch'])) {
     // Validation
     if (empty($source_date) || empty($target_date)) {
         error_log("ERROR: Missing dates");
-        header("Location: time_log_create.php?schedule_switch=missing_dates#scheduleView");
+        header("Location: time_log_create.php?schedule_swap=missing_dates#scheduleView");
         exit;
     }
     
     if ($source_date === $target_date) {
         error_log("ERROR: Same dates");
-        header("Location: time_log_create.php?schedule_switch=same_dates#scheduleView");
+        header("Location: time_log_create.php?schedule_swap=same_dates#scheduleView");
         exit;
     }
     
@@ -316,13 +316,13 @@ if (isset($_POST['submit_schedule_switch'])) {
     $today = date('Y-m-d');
     if ($source_date < $today || $target_date < $today) {
         error_log("ERROR: Past dates");
-        header("Location: time_log_create.php?schedule_switch=past_dates#scheduleView");
+        header("Location: time_log_create.php?schedule_swap=past_dates#scheduleView");
         exit;
     }
     
     if (empty($reason)) {
         error_log("ERROR: No reason");
-        header("Location: time_log_create.php?schedule_switch=no_reason#scheduleView");
+        header("Location: time_log_create.php?schedule_swap=no_reason#scheduleView");
         exit;
     }
     
@@ -339,7 +339,7 @@ if (isset($_POST['submit_schedule_switch'])) {
         
         if (!in_array($file_extension, $allowed_extensions)) {
             error_log("ERROR: Invalid file type");
-            header("Location: time_log_create.php?schedule_switch=invalid_file#scheduleView");
+            header("Location: time_log_create.php?schedule_swap=invalid_file#scheduleView");
             exit;
         }
         
@@ -351,13 +351,13 @@ if (isset($_POST['submit_schedule_switch'])) {
             error_log("File uploaded: $target_path");
         } else {
             error_log("ERROR: File upload failed");
-            header("Location: time_log_create.php?schedule_switch=upload_failed#scheduleView");
+            header("Location: time_log_create.php?schedule_swap=upload_failed#scheduleView");
             exit;
         }
     } else {
         $upload_error = $_FILES['attachment_scr']['error'] ?? 'No file';
         error_log("ERROR: No attachment or upload error: $upload_error");
-        header("Location: time_log_create.php?schedule_switch=no_attachment#scheduleView");
+        header("Location: time_log_create.php?schedule_swap=no_attachment#scheduleView");
         exit;
     }
     
@@ -380,14 +380,14 @@ if (isset($_POST['submit_schedule_switch'])) {
         ]);
         
         $insert_id = $pdo->lastInsertId();
-        error_log("SUCCESS: Inserted schedule switch request with ID: $insert_id");
+        error_log("SUCCESS: Inserted schedule swap request with ID: $insert_id");
         
-        header("Location: time_log_create.php?schedule_switch=success#scheduleView");
+        header("Location: time_log_create.php?schedule_swap=success#scheduleView");
         exit;
     } catch (PDOException $e) {
         error_log("DATABASE ERROR: " . $e->getMessage());
         error_log("SQL State: " . $e->getCode());
-        header("Location: time_log_create.php?schedule_switch=error#scheduleView");
+        header("Location: time_log_create.php?schedule_swap=error#scheduleView");
         exit;
     }
 }

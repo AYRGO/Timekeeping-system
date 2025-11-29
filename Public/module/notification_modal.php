@@ -902,7 +902,7 @@ foreach ($ot_results as $ot) {
     }
 }
 
-// --- Schedule Switch Requests ---
+// --- Schedule Swap Requests ---
 $switch_stmt = $pdo->prepare("
     SELECT id, source_date, target_date, reason, attachment_path, status, created_at, processed_at, admin_notes
     FROM schedule_switch_requests 
@@ -922,9 +922,9 @@ foreach ($switch_requests as $switch) {
     $target_schedule = getActualCurrentScheduleFromCalendar($pdo, $current_user_id, $switch['target_date']);
     
     $notifications[] = [
-        'message' => "Schedule switch request from <strong>{$source_date}</strong> to <strong>{$target_date}</strong> was <strong>{$status}</strong>.",
+        'message' => "Schedule swap request from <strong>{$source_date}</strong> to <strong>{$target_date}</strong> was <strong>{$status}</strong>.",
         'created_at' => $switch['created_at'],
-        'type' => 'Schedule Switch Request',
+        'type' => 'Schedule Swap Request',
         'status' => $switch['status'],
         'source_date' => $switch['source_date'],
         'target_date' => $switch['target_date'],
