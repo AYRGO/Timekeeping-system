@@ -85,31 +85,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE employees SET fname = ?, lname = ?, email = ?, contact = ?, position = ?, status = ?, company = ?, Emp_Type = ? WHERE id = ?");
             $stmt->execute([$fname, $lname, $email, $contact, $position, $status, $company, $empType, $employeeId]);
             
-            // If employee was just regularized, top-up SL to 7.5 days total
+            // If employee was just regularized, grant VL and SL credits
             if ($wasRegularized) {
-                // Top-up to 7.5 days (they keep any accrued amount)
                 $currentYear = (int)date('Y');
-                $targetBalance = 7.5;
                 
-                // Check if SL record exists
-                $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'sick' AND year = ?");
+                // Grant 7.5 days Vacation Leave
+                $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'vacation' AND year = ?");
                 $stmt->execute([$employeeId, $currentYear]);
-                $existing = $stmt->fetch();
+                $existingVL = $stmt->fetch();
                 
-                if ($existing) {
-                    // Top-up to 7.5 if current balance is less
-                    $currentBalance = floatval($existing['balance']);
-                    $newBalance = max($currentBalance, $targetBalance);
-                    
-                    $stmt = $pdo->prepare("UPDATE leave_credits SET balance = ?, monthly_increment = 0, updated_at = NOW() WHERE id = ?");
-                    $stmt->execute([$newBalance, $existing['id']]);
+                if ($existingVL) {
+                    $stmt = $pdo->prepare("UPDATE leave_credits SET balance = 7.5, monthly_increment = 1.25, updated_at = NOW() WHERE id = ?");
+                    $stmt->execute([$existingVL['id']]);
                 } else {
-                    // Create new record with 7.5 days
-                    $stmt = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, carry_over, year, monthly_increment, updated_at) VALUES (?, 'sick', ?, NULL, ?, 0, NOW())");
-                    $stmt->execute([$employeeId, $targetBalance, $currentYear]);
+                    $stmt = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, carry_over, year, monthly_increment, updated_at) VALUES (?, 'vacation', 7.5, NULL, ?, 1.25, NOW())");
+                    $stmt->execute([$employeeId, $currentYear]);
                 }
                 
-                echo "<script>alert('Employee regularized successfully! Sick Leave balance is now 7.5 days.'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+                // Grant 5 days Sick Leave
+                $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'sick' AND year = ?");
+                $stmt->execute([$employeeId, $currentYear]);
+                $existingSL = $stmt->fetch();
+                
+                if ($existingSL) {
+                    $stmt = $pdo->prepare("UPDATE leave_credits SET balance = 5.0, monthly_increment = 0, updated_at = NOW() WHERE id = ?");
+                    $stmt->execute([$existingSL['id']]);
+                } else {
+                    $stmt = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, carry_over, year, monthly_increment, updated_at) VALUES (?, 'sick', 5.0, NULL, ?, 0, NOW())");
+                    $stmt->execute([$employeeId, $currentYear]);
+                }
+                
+                echo "<script>alert('Employee regularized successfully! Granted 7.5 days VL and 5 days SL.'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
             } else {
                 echo "<script>alert('Employee updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
             }
@@ -723,7 +729,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Employment Type 
-                                <span class="text-xs text-gray-500">(Probationary accrues 0.625 SL/month, Regular gets 7.5 SL immediately)</span>
+                                <span class="text-xs text-gray-500">(Regular gets 7.5 VL + 5 SL immediately)</span>
                             </label>
                             <select id="empTypeSelect" name="emp_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="Probationary" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Probationary' ? 'selected' : '' ?>>Probationary</option>
@@ -2196,9 +2202,10 @@ function initializeEmpTypeConfirmation() {
                 const confirmed = confirm(
                     '⚠️ REGULARIZATION CONFIRMATION\n\n' +
                     'You are about to regularize this employee.\n\n' +
-                    '✅ Sick Leave will be topped-up to 7.5 days (including any accrued amount)\n' +
-                    '✅ Employee will start accruing 1.25 days Vacation Leave (VL) monthly\n' +
-                    '❌ NO monthly SL accrual after regularization\n\n' +
+                    '✅ Will receive 7.5 days Vacation Leave (VL)\n' +
+                    '✅ Will receive 5 days Sick Leave (SL)\n' +
+                    '✅ VL will accrue 1.25 days monthly\n' +
+                    '❌ NO monthly SL accrual\n\n' +
                     'Do you want to proceed with regularization?'
                 );
                 
@@ -2220,7 +2227,8 @@ function initializeEmpTypeConfirmation() {
                     '🎯 FINAL CONFIRMATION\n\n' +
                     'Employee Name: <?= htmlspecialchars($employee["fname"] . " " . $employee["lname"]) ?>\n' +
                     'Action: Probationary → Regular\n\n' +
-                    '✅ Sick Leave will be topped-up to 7.5 days total\n' +
+                    '✅ 7.5 days Vacation Leave will be granted\n' +
+                    '✅ 5 days Sick Leave will be granted\n' +
                     '✅ Monthly VL accrual (1.25 days) will begin\n\n' +
                     'Click OK to confirm regularization.'
                 );
