@@ -85,11 +85,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE employees SET fname = ?, lname = ?, email = ?, contact = ?, position = ?, status = ?, company = ?, Emp_Type = ? WHERE id = ?");
             $stmt->execute([$fname, $lname, $email, $contact, $position, $status, $company, $empType, $employeeId]);
             
-            // If employee was just regularized, grant 5-day SL credit
+            // If employee was just regularized, top-up SL to 7.5 days total
             if ($wasRegularized) {
-                // Call the SL credit processor
+                // Top-up to 7.5 days (they keep any accrued amount)
                 $currentYear = (int)date('Y');
-                $slCredit = 5.00;
+                $targetBalance = 7.5;
                 
                 // Check if SL record exists
                 $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND leave_type = 'sick' AND year = ?");
@@ -97,17 +97,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $existing = $stmt->fetch();
                 
                 if ($existing) {
-                    $newBalance = floatval($existing['balance']) + $slCredit;
-                    if ($newBalance > 15.00) $newBalance = 15.00;
+                    // Top-up to 7.5 if current balance is less
+                    $currentBalance = floatval($existing['balance']);
+                    $newBalance = max($currentBalance, $targetBalance);
                     
                     $stmt = $pdo->prepare("UPDATE leave_credits SET balance = ?, monthly_increment = 0, updated_at = NOW() WHERE id = ?");
                     $stmt->execute([$newBalance, $existing['id']]);
                 } else {
+                    // Create new record with 7.5 days
                     $stmt = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, balance, carry_over, year, monthly_increment, updated_at) VALUES (?, 'sick', ?, NULL, ?, 0, NOW())");
-                    $stmt->execute([$employeeId, $slCredit, $currentYear]);
+                    $stmt->execute([$employeeId, $targetBalance, $currentYear]);
                 }
                 
-                echo "<script>alert('Employee regularized successfully! 5 days Sick Leave credit granted.'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
+                echo "<script>alert('Employee regularized successfully! Sick Leave balance is now 7.5 days.'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
             } else {
                 echo "<script>alert('Employee updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
             }
@@ -665,10 +667,10 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 
                                 if ($empType === 'Regular') {
                                     $colorClass = 'text-blue-600 font-semibold';
-                                    $displayText = 'Regular (New Policy)';
-                                } elseif ($empType === 'Old_Regular') {
-                                    $colorClass = 'text-green-600 font-semibold';
-                                    $displayText = 'Old Regular (Legacy)';
+                                    $displayText = 'Regular';
+                                } elseif ($empType === 'Probationary') {
+                                    $colorClass = 'text-orange-600';
+                                    $displayText = 'Probationary';
                                 }
                                 ?>
                                 <span class="<?= $colorClass ?>">
@@ -721,12 +723,11 @@ uasort($sortedScheduleOptions, function($a, $b) {
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Employment Type 
-                                <span class="text-xs text-gray-500">(Regular = VL only | Old Regular = SL+VL)</span>
+                                <span class="text-xs text-gray-500">(Probationary accrues 0.625 SL/month, Regular gets 7.5 SL immediately)</span>
                             </label>
                             <select id="empTypeSelect" name="emp_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="Probationary" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Probationary' ? 'selected' : '' ?>>Probationary</option>
-                                <option value="Regular" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Regular' ? 'selected' : '' ?>>Regular (New Policy - VL Only)</option>
-                                <option value="Old_Regular" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Old_Regular' ? 'selected' : '' ?>>Old Regular (Legacy - SL + VL)</option>
+                                <option value="Regular" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Regular' ? 'selected' : '' ?>>Regular</option>
                             </select>
                         </div>
 
@@ -2190,29 +2191,15 @@ function initializeEmpTypeConfirmation() {
         document.getElementById('empTypeSelect').addEventListener('change', function(e) {
             const newValue = this.value;
             
-            // Only show confirmation when changing FROM Probationary TO Regular (NEW policy employees)
+            // Only show confirmation when changing FROM Probationary TO Regular
             if (originalEmpType === 'Probationary' && newValue === 'Regular') {
                 const confirmed = confirm(
-                    '⚠️ REGULARIZATION CONFIRMATION (NEW POLICY)\n\n' +
-                    'You are about to regularize this employee under the NEW policy.\n\n' +
-                    '✅ This will automatically grant 5 days Sick Leave (SL) ONE-TIME\n' +
+                    '⚠️ REGULARIZATION CONFIRMATION\n\n' +
+                    'You are about to regularize this employee.\n\n' +
+                    '✅ Sick Leave will be topped-up to 7.5 days (including any accrued amount)\n' +
                     '✅ Employee will start accruing 1.25 days Vacation Leave (VL) monthly\n' +
-                    '❌ NO monthly SL accrual (new policy)\n\n' +
+                    '❌ NO monthly SL accrual after regularization\n\n' +
                     'Do you want to proceed with regularization?'
-                );
-                
-                if (!confirmed) {
-                    // Revert to original value if not confirmed
-                    this.value = originalEmpType;
-                }
-            } else if (originalEmpType === 'Probationary' && newValue === 'Old_Regular') {
-                const confirmed = confirm(
-                    '⚠️ OLD REGULAR CLASSIFICATION\n\n' +
-                    'You are setting this employee as "Old Regular" (Legacy Policy).\n\n' +
-                    '✅ Employee will accrue 0.42 days Sick Leave monthly\n' +
-                    '✅ Employee will accrue 1.25 days Vacation Leave monthly\n' +
-                    '⚠️ This should ONLY be used for employees hired before Jan 1, 2026\n\n' +
-                    'Do you want to proceed?'
                 );
                 
                 if (!confirmed) {
@@ -2233,7 +2220,7 @@ function initializeEmpTypeConfirmation() {
                     '🎯 FINAL CONFIRMATION\n\n' +
                     'Employee Name: <?= htmlspecialchars($employee["fname"] . " " . $employee["lname"]) ?>\n' +
                     'Action: Probationary → Regular\n\n' +
-                    '✅ 5 days Sick Leave will be granted immediately\n' +
+                    '✅ Sick Leave will be topped-up to 7.5 days total\n' +
                     '✅ Monthly VL accrual (1.25 days) will begin\n\n' +
                     'Click OK to confirm regularization.'
                 );
