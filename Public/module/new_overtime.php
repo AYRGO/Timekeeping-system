@@ -494,7 +494,8 @@ function getScheduleForDate($employee_id, $date, $pdo) {
         'status_text' => $status_text,
         'status_color' => $status_color,
         'was_changed' => $was_changed,
-        'is_default' => !$was_changed
+        'is_default' => !$was_changed,
+        'is_rest_day' => $cache['is_rest_day'] ?? ($weekly['is_rest_day'] ?? 0)
     ];
 }
 
@@ -1034,11 +1035,13 @@ button:hover {
                   data-end-ot="<?= $hasLog && isset($otDetails['end_ot']) ? $otDetails['end_ot'] : '' ?>"
                   data-max-ot-hours="<?= $hasLog && isset($otDetails['max_ot_hours']) ? $otDetails['max_ot_hours'] : '0' ?>"
                   <?php 
-                  // Add scheduled start time for Restday OT calculation
+                  // Add scheduled start time and rest day flag for Restday OT calculation
                   if ($hasDate) {
                     $scheduleForRestday = getScheduleForDate($employee_id, $log['log_date'], $pdo);
                     $scheduledStartTime = $scheduleForRestday['time_in'] ?? '07:00 AM';
-                    echo 'data-scheduled-start="' . htmlspecialchars($scheduledStartTime) . '"';
+                    $isRestDay = $scheduleForRestday['is_rest_day'] ?? 0;
+                    echo 'data-scheduled-start="' . htmlspecialchars($scheduledStartTime) . '" ';
+                    echo 'data-is-rest-day="' . ($isRestDay ? '1' : '0') . '"';
                   }
                   ?>>
                   
@@ -2045,6 +2048,7 @@ function openOvertimeModal(button) {
     const endOT = row.dataset.endOt || '';
     const maxOTHours = parseFloat(row.dataset.maxOtHours) || 0;
     const scheduledStart = row.dataset.scheduledStart || '';
+    const isRestDay = row.dataset.isRestDay === '1';
     
     console.log('Modal Data:', { timeLogId, timeIn, timeOut, otHours, date, startOT, endOT, maxOTHours }); // Debug log
     
@@ -2090,8 +2094,25 @@ function openOvertimeModal(button) {
         }
     }
     
-    // Set default OT type to Regular OT
-    document.getElementById('ot_type').value = 'Regular OT';
+    // Set default OT type based on rest day status
+    const otTypeSelect = document.getElementById('ot_type');
+    const restdayOption = otTypeSelect.querySelector('option[value="Restday OT"]');
+    
+    if (isRestDay) {
+        // Rest day: Enable Restday OT option and set as default
+        if (restdayOption) {
+            restdayOption.disabled = false;
+            restdayOption.textContent = 'Restday OT';
+        }
+        otTypeSelect.value = 'Restday OT';
+    } else {
+        // Not a rest day: Disable Restday OT option and set to Regular OT
+        if (restdayOption) {
+            restdayOption.disabled = true;
+            restdayOption.textContent = 'Restday OT (Only available on rest days)';
+        }
+        otTypeSelect.value = 'Regular OT';
+    }
     
     // Store regular OT hours and original start OT for restoration when switching types
     const overtimeForm = document.getElementById('overtimeForm');
@@ -2099,16 +2120,21 @@ function openOvertimeModal(button) {
         overtimeForm.dataset.regularOtHours = (otHours || 0).toFixed(2);
         overtimeForm.dataset.originalStartOt = startOT || '';
         overtimeForm.dataset.scheduledStartTime = scheduledStart || '';
+        overtimeForm.dataset.isRestDay = isRestDay ? '1' : '0';
     }
     
     // Clear previous values
     document.getElementById('reason').value = '';
     document.getElementById('attachment').value = '';
     
-    // Set modal title to default
+    // Set modal title based on rest day status
     const modalTitle = document.querySelector('#overtimeModal h3');
     if (modalTitle) {
-        modalTitle.textContent = 'Submit Overtime Request';
+        if (isRestDay) {
+            modalTitle.textContent = 'Submit Rest Day Overtime Request';
+        } else {
+            modalTitle.textContent = 'Submit Overtime Request';
+        }
     }
     
     // Show modal
@@ -2676,6 +2702,17 @@ function submitOvertimeForm(form) {
     const timeIn = form.querySelector('#selected_time_in')?.value || '';
     const timeOut = form.querySelector('#selected_time_out')?.value || '';
     const attachment = form.querySelector('#attachment')?.files[0];
+    
+    // Check if this is a rest day (from form dataset)
+    const overtimeForm = document.getElementById('overtimeForm');
+    const isRestDay = overtimeForm?.dataset.isRestDay === '1';
+    
+    // Validate RDOT can only be filed on rest days
+    if (otType === 'Restday OT' && !isRestDay) {
+        alert('⚠️ Restday OT can only be filed on days marked as "Rest Day" in your schedule.\\n\\nThis date is not a rest day. Please select "Regular OT" instead.');
+        form.querySelector('#ot_type')?.focus();
+        return;
+    }
     
     // Debug all form elements
     console.log('All form inputs:', {

@@ -92,6 +92,47 @@ try {
         exit;
     }
 
+    // SERVER-SIDE VALIDATION: Enforce RDOT only on rest days
+    if ($ot_type === 'Restday OT') {
+        $log_date = $time_log['log_date'];
+        
+        // Check if the date is marked as a rest day in the employee's schedule cache
+        $stmt = $pdo->prepare("
+            SELECT is_rest_day 
+            FROM employee_daily_schedule_cache 
+            WHERE employee_id = ? AND schedule_date = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$employee_id, $log_date]);
+        $schedule = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$schedule) {
+            // Fallback: Check employee_default_schedules
+            $dayOfWeek = date('w', strtotime($log_date));
+            $stmt = $pdo->prepare("
+                SELECT is_rest_day 
+                FROM employee_default_schedules 
+                WHERE employee_id = ? 
+                  AND day_of_week = ? 
+                  AND effective_from <= ? 
+                  AND (effective_until IS NULL OR effective_until >= ?)
+                LIMIT 1
+            ");
+            $stmt->execute([$employee_id, $dayOfWeek, $log_date, $log_date]);
+            $schedule = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        $isRestDay = $schedule && $schedule['is_rest_day'] == 1;
+        
+        if (!$isRestDay) {
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Restday OT can only be filed on days marked as "Rest Day" in your schedule. This date (' . date('M d, Y', strtotime($log_date)) . ') is not a rest day. Please select Regular OT instead.'
+            ]);
+            exit;
+        }
+    }
+
     // Double-check OT eligibility on server side
     require_once 'time_logs_helper.php';
     if (!isOvertimeEligible($time_in, $time_out, $ot_type)) {
