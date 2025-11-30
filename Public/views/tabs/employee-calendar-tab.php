@@ -230,12 +230,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $schedule_employee_id = (int)$_POST['employee_id'];
         $schedule_date = $_POST['schedule_date'];
         
-        // Prevent overrides for past dates
-        if ($schedule_date < date('Y-m-d')) {
-            echo "<script>alert('Cannot create override for past dates. Please select today or a future date.'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
-            exit;
-        }
-        
         $override_schedule_input = $_POST['override_schedule_id'] ?? '';
         $reason = $_POST['reason'] ?? '';
         $override_type = $_POST['override_type'] ?? 'schedule_change';
@@ -298,15 +292,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
     
-    if ($_POST['action'] === 'delete_override') {
+    elseif ($_POST['action'] === 'delete_override') {
         $schedule_employee_id = (int)$_POST['employee_id'];
         $schedule_date = $_POST['schedule_date'];
-        
-        // Prevent deletion of past overrides
-        if ($schedule_date < date('Y-m-d')) {
-            echo "<script>alert('Cannot delete override for past dates.'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
-            exit;
-        }
         
         // Delete the override from employee_daily_schedules
         $stmt = $pdo->prepare("DELETE FROM employee_daily_schedules WHERE employee_id = ? AND schedule_date = ?");
@@ -444,8 +432,8 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                             $isPast = ($date < date('Y-m-d'));
                             $isWeekend = (date('w', strtotime($date)) == 0 || date('w', strtotime($date)) == 6);
                             ?>
-                            <div class="border-r border-gray-100 last:border-r-0 p-3 min-h-[100px] relative group transition-all <?= $isPast ? 'bg-gray-50/50' : 'hover:bg-blue-50/30 cursor-pointer' ?>" 
-                                 <?= $isPast ? '' : "onclick=\"openOverride_admin('$date')\"" ?>>
+                            <div class="border-r border-gray-100 last:border-r-0 p-3 min-h-[100px] relative group transition-all hover:bg-blue-50/30 cursor-pointer <?= $isPast ? 'bg-gray-50/30' : '' ?>" 
+                                 onclick="openOverride_admin('<?= $date ?>')">
                                 
                                 <!-- Date Number -->
                                 <div class="flex items-center justify-between mb-2">
@@ -508,9 +496,17 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                                     <?php endif; ?>
                                 </div>
 
-                                <!-- Hover Effect -->
-                                <?php if (!$isPast): ?>
+                                <!-- Hover Effect - Now applies to all dates including past -->
                                 <div class="absolute inset-0 bg-blue-500 opacity-0 group-hover:opacity-5 pointer-events-none transition-opacity rounded"></div>
+                                
+                                <!-- Past Date Indicator -->
+                                <?php if ($isPast): ?>
+                                <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-500 text-white shadow-sm">
+                                        <i class="fas fa-history"></i>
+                                        <span>Edit History</span>
+                                    </span>
+                                </div>
                                 <?php endif; ?>
                             </div>
                         <?php else: ?>
@@ -538,11 +534,24 @@ $pendingOverrides = $pendingOverrides->fetchAll(PDO::FETCH_ASSOC);
                     <input type="hidden" name="employee_id" value="<?= $emp_id ?>">
                     <input type="hidden" name="reason" value="Admin override">
                     
+                    <!-- Info Alert -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div class="flex gap-2">
+                            <i class="fas fa-info-circle text-blue-500 text-sm mt-0.5"></i>
+                            <div class="flex-1">
+                                <p class="text-xs font-medium text-blue-800">Admin Privilege</p>
+                                <p class="text-[10px] text-blue-600 mt-1">You can edit schedules for any date including past dates and historical records.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Date</label>
                         <input type="date" id="override_date" name="schedule_date" required 
-                               min="<?= date('Y-m-d') ?>"
                                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                        <p class="text-[10px] text-gray-500 mt-1.5">
+                            <i class="fas fa-calendar-check text-gray-400"></i> Click any date on the calendar or select manually
+                        </p>
                     </div>
                     
                     <div>

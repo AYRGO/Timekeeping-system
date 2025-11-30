@@ -203,6 +203,14 @@ function getOvertimeTimesAndHours($time_in, $time_out, $log_date, $employee_id, 
     ];
   }
   
+  // Auto-detect rest day from schedule if ot_type not provided
+  if ($ot_type === null) {
+    $scheduleCheck = getScheduleForDate($employee_id, $log_date, $pdo);
+    if ($scheduleCheck['is_rest_day'] == 1) {
+      $ot_type = 'Restday OT';
+    }
+  }
+  
   // For Restday OT, start OT is time in and end OT is time out
   if ($ot_type === 'Restday OT') {
     $actual_in_dt = new DateTime($time_in);
@@ -265,6 +273,14 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
       'reason' => 'Missing time in or time out data',
       'details' => []
     ];
+  }
+  
+  // Auto-detect rest day from active schedule if ot_type not provided
+  if ($ot_type === null) {
+    $scheduleCheck = getScheduleForDate($employee_id, $log_date, $pdo);
+    if ($scheduleCheck['is_rest_day'] == 1) {
+      $ot_type = 'Restday OT';
+    }
   }
   
   // Special handling for Restday OT
@@ -1069,9 +1085,21 @@ button:hover {
                       // Get the correct schedule for this specific date
                       if ($hasDate) {
                         $dateSchedule = getScheduleForDate($employee_id, $log['log_date'], $pdo);
-                        $scheduleTime = $dateSchedule['time_in'] . ' - ' . $dateSchedule['time_out'];
-                        $statusText = $dateSchedule['status_text'];
-                        $statusColor = $dateSchedule['status_color']; // Use the color returned by the function
+                        
+                        // Check if it's a rest day or holiday
+                        if ($dateSchedule['is_rest_day'] == 1) {
+                          $scheduleTime = 'Rest Day';
+                          $statusText = $dateSchedule['status_text'];
+                          $statusColor = $dateSchedule['status_color'];
+                        } elseif (!empty($dateSchedule['is_holiday'])) {
+                          $scheduleTime = 'Holiday';
+                          $statusText = $dateSchedule['status_text'];
+                          $statusColor = $dateSchedule['status_color'];
+                        } else {
+                          $scheduleTime = $dateSchedule['time_in'] . ' - ' . $dateSchedule['time_out'];
+                          $statusText = $dateSchedule['status_text'];
+                          $statusColor = $dateSchedule['status_color']; // Use the color returned by the function
+                        }
                       } else {
                         $scheduleTime = '—';
                         $statusText = '—';
@@ -1527,9 +1555,21 @@ button:hover {
                         // Get the correct schedule for this specific date from the history
                         if (!empty($request['log_date'])) {
                           $historySchedule = getScheduleForDate($employee_id, $request['log_date'], $pdo);
-                          $historyScheduleTime = $historySchedule['time_in'] . ' - ' . $historySchedule['time_out'];
-                          $historyStatusText = $historySchedule['status_text'];
-                          $historyStatusColor = $historySchedule['status_color']; // Use the color returned by the function
+                          
+                          // Check if it's a rest day or holiday
+                          if ($historySchedule['is_rest_day'] == 1) {
+                            $historyScheduleTime = 'Rest Day';
+                            $historyStatusText = $historySchedule['status_text'];
+                            $historyStatusColor = $historySchedule['status_color'];
+                          } elseif (!empty($historySchedule['is_holiday'])) {
+                            $historyScheduleTime = 'Holiday';
+                            $historyStatusText = $historySchedule['status_text'];
+                            $historyStatusColor = $historySchedule['status_color'];
+                          } else {
+                            $historyScheduleTime = $historySchedule['time_in'] . ' - ' . $historySchedule['time_out'];
+                            $historyStatusText = $historySchedule['status_text'];
+                            $historyStatusColor = $historySchedule['status_color']; // Use the color returned by the function
+                          }
                         } else {
                           $historyScheduleTime = '—';
                           $historyStatusText = 'N/A';

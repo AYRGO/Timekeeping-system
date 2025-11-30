@@ -4,6 +4,9 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
 
+// Auto-forfeit expired pending requests
+include(__DIR__ . '/../cron/auto_forfeit_expired_requests.php');
+
 // Check which view to display (current requests, monthly, history, or swap)
 $view = isset($_GET['view']) ? $_GET['view'] : 'current';
 $isHistoryView = ($view === 'history');
@@ -68,7 +71,7 @@ if ($isMonthlyView) {
         FROM schedule_change_requests sr
         JOIN employees e ON sr.employee_id = e.id
         LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
-        WHERE sr.status NOT IN ('Declined', 'Rejected', 'Approved')
+        WHERE sr.status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited')
         ORDER BY sr.created_at DESC
     ");
 }
@@ -77,7 +80,7 @@ $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Get pending counts for each tab
 $pendingCurrentCount = $pdo->query("
     SELECT COUNT(*) FROM schedule_change_requests 
-    WHERE status NOT IN ('Declined', 'Rejected', 'Approved')
+    WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited')
 ")->fetchColumn();
 
 $pendingMonthlyCount = $pdo->query("
@@ -444,6 +447,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                                 'approved' => 'bg-green-100 text-green-800',
                                                 'pending' => 'bg-yellow-100 text-yellow-800',
                                                 'rejected', 'cancelled' => 'bg-red-100 text-red-800',
+                                                'forfeited' => 'bg-gray-100 text-gray-600',
                                                 default => 'bg-gray-100 text-gray-800'
                                             };
                                             ?>
@@ -500,7 +504,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                 <?php if (!empty($monthly_requests)): ?>
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <?php
-                    $monthlySummary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'cancelled' => 0];
+                    $monthlySummary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'cancelled' => 0, 'forfeited' => 0];
                     foreach ($monthly_requests as $req) {
                         $status = strtolower($req['status']);
                         if (isset($monthlySummary[$status])) {
@@ -638,6 +642,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                                 'approved' => 'bg-green-100 text-green-800',
                                                 'pending' => 'bg-yellow-100 text-yellow-800',
                                                 'rejected', 'cancelled' => 'bg-red-100 text-red-800',
+                                                'forfeited' => 'bg-gray-100 text-gray-600',
                                                 default => 'bg-gray-100 text-gray-800'
                                             };
                                             ?>
@@ -694,7 +699,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                 <?php if (!empty($swap_requests)): ?>
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <?php
-                    $swapSummary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'cancelled' => 0];
+                    $swapSummary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'cancelled' => 0, 'forfeited' => 0];
                     foreach ($swap_requests as $req) {
                         $status = strtolower($req['status']);
                         if (isset($swapSummary[$status])) {
@@ -858,6 +863,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                                 'approved' => 'bg-green-100 text-green-800',
                                                 'pending' => 'bg-yellow-100 text-yellow-800',
                                                 'rejected', 'declined' => 'bg-red-100 text-red-800',
+                                                'forfeited' => 'bg-gray-100 text-gray-600',
                                                 default => 'bg-gray-100 text-gray-800'
                                             };
                                             ?>
@@ -920,7 +926,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                 <?php if (!empty($schedule_requests)): ?>
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <?php
-                    $summary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'declined' => 0];
+                    $summary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'declined' => 0, 'forfeited' => 0];
                     foreach ($schedule_requests as $req) {
                         $status = strtolower($req['status']);
                         if (isset($summary[$status])) {

@@ -254,32 +254,51 @@ try {
                 }
                 
                 $body = "
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
-                    <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                        <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>Monthly Schedule Request Approved</h2>
-                        
-                        <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                            <h3 style='color: #374151; margin: 0 0 10px 0;'>Request Details</h3>
-                            <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
-                            <p><strong>Month:</strong> $month_name</p>
-                            <p><strong>Request ID:</strong> #{$request_id}</p>
+                <div style='font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8fafc; padding: 0;'>
+                    <!-- Header with RSS Branding -->
+                    <div style='background: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%); padding: 40px 30px; text-align: center;'>
+                        <div style='background: white; width: 100px; height: 100px; margin: 0 auto 20px; border-radius: 50%; display: inline-block; line-height: 100px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);'>
+                            <span style='font-family: Arial, sans-serif; font-size: 36px; font-weight: bold; color: #14b8a6; letter-spacing: -2px;'>RSS</span>
+                        </div>
+                        <h1 style='color: white; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;'>Resource Staff Solutions</h1>
+                        <p style='color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;'>Timekeeping & HR Management System</p>
+                    </div>
+                    
+                    <!-- Main Content -->
+                    <div style='background: white; padding: 40px 30px;'>
+                        <div style='text-align: center; margin-bottom: 30px;'>
+                            <div style='display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);'>
+                                📅 Monthly Schedule Approved
+                            </div>
                         </div>
                         
-                        <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                            <h3 style='color: #1e40af; margin: 0 0 10px 0;'>Weekly Schedule Pattern</h3>
+                        <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Hi <strong>{$employee['fname']}</strong>,</p>
+                        <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your monthly schedule request has been <strong>Approved</strong>. Your schedule has been applied for <strong>$month_name</strong>!</p>
+                        
+                        <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
+                            <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                            <table style='width: 100%; border-collapse: collapse;'>
+                                <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
+                                <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Month:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 700; font-size: 16px;'>$month_name</td></tr>
+                                <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Request ID:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>#{$request_id}</td></tr>
+                            </table>
+                        </div>
+                        
+                        <div style='background: #eff6ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                            <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>🗓️ Weekly Schedule Pattern</h3>
                             <table style='width: 100%; border-collapse: collapse; margin-top: 10px;'>
                                 $schedule_summary
                             </table>
                         </div>
-                        
-                        <div style='background: #ecfdf5; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981; margin-bottom: 20px;'>
-                            <h3 style='color: #065f46; margin: 0 0 10px 0;'>Status: Approved</h3>
-                            <p style='color: #374151; margin: 0;'>Your monthly schedule has been applied for $month_name!</p>
-                        </div>
-                        
-                        <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
-                            <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
-                            <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div style='background: #0f172a; padding: 30px; text-align: center; color: white;'>
+                        <p style='margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #14b8a6;'>Resource Staff Solutions</p>
+                        <p style='margin: 0 0 5px 0; font-size: 13px; color: #94a3b8;'>This is an automated notification from the Timekeeping System</p>
+                        <p style='margin: 0; font-size: 12px; color: #64748b;'>Please do not reply to this email</p>
+                        <div style='margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;'>
+                            <p style='margin: 0; font-size: 11px; color: #64748b;'>© " . date('Y') . " Resource Staff Solutions. All rights reserved.</p>
                         </div>
                     </div>
                 </div>";
@@ -338,29 +357,49 @@ try {
                     $month_name = date('F Y', strtotime("{$request['year']}-{$request['month']}-01"));
                     
                     $body = "
-                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
-                        <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                            <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>Monthly Schedule Request Declined</h2>
-                            
-                            <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                                <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
-                                <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
-                                <p><strong>Month:</strong> $month_name</p>
-                                <p><strong>Request ID:</strong> #{$request_id}</p>
+                    <div style='font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8fafc; padding: 0;'>
+                        <!-- Header with RSS Branding -->
+                        <div style='background: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%); padding: 40px 30px; text-align: center;'>
+                            <div style='background: white; width: 100px; height: 100px; margin: 0 auto 20px; border-radius: 50%; display: inline-block; line-height: 100px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);'>
+                                <span style='font-family: Arial, sans-serif; font-size: 36px; font-weight: bold; color: #14b8a6; letter-spacing: -2px;'>RSS</span>
+                            </div>
+                            <h1 style='color: white; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;'>Resource Staff Solutions</h1>
+                            <p style='color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;'>Timekeeping & HR Management System</p>
+                        </div>
+                        
+                        <!-- Main Content -->
+                        <div style='background: white; padding: 40px 30px;'>
+                            <div style='text-align: center; margin-bottom: 30px;'>
+                                <div style='display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);'>
+                                    📅 Monthly Schedule Declined
+                                </div>
                             </div>
                             
-                            <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
-                                <h3 style='color: #991b1b; margin: 0 0 10px 0;'>❌ Status: Declined</h3>
+                            <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Hi <strong>{$employee['fname']}</strong>,</p>
+                            <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your monthly schedule request has been <strong>Declined</strong>. Please review the explanation below.</p>
+                            
+                            <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
+                                <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                                <table style='width: 100%; border-collapse: collapse;'>
+                                    <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
+                                    <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Month:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 700; font-size: 16px;'>$month_name</td></tr>
+                                    <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Request ID:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>#{$request_id}</td></tr>
+                                </table>
                             </div>
                             
-                            <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
-                                <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
-                                <p style='color: #374151;'>" . nl2br(htmlspecialchars($explanation)) . "</p>
+                            <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
+                                <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                                <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($explanation)) . "</p>
                             </div>
-                            
-                            <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
-                                <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
-                                <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+                        </div>
+                        
+                        <!-- Footer -->
+                        <div style='background: #0f172a; padding: 30px; text-align: center; color: white;'>
+                            <p style='margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #14b8a6;'>Resource Staff Solutions</p>
+                            <p style='margin: 0 0 5px 0; font-size: 13px; color: #94a3b8;'>This is an automated notification from the Timekeeping System</p>
+                            <p style='margin: 0; font-size: 12px; color: #64748b;'>Please do not reply to this email</p>
+                            <div style='margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;'>
+                                <p style='margin: 0; font-size: 11px; color: #64748b;'>© " . date('Y') . " Resource Staff Solutions. All rights reserved.</p>
                             </div>
                         </div>
                     </div>";

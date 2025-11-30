@@ -245,45 +245,66 @@ foreach ($leave_results as $leave) {
             $body .= "<p><strong>Explanation:</strong> " . nl2br(htmlspecialchars($leave['explanation'])) . "</p>";
         }
 
-        // Enhanced email body with complete information
+        // Enhanced email body with RSS branding
         $enhanced_body = "
-        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
-            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>Leave Request {$status}</h2>
-                
-                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
-                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
-                    <p><strong>Leave Type:</strong> " . ucfirst($leave['leave_type']) . "</p>
-                    <p><strong>Date Range:</strong> $range</p>
-                    <p><strong>Request ID:</strong> #{$leave['id']}</p>
-                    <p><strong>Submitted:</strong> " . date('F j, Y g:i A', strtotime($leave['created_at'])) . "</p>
+        <div style='font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8fafc; padding: 0;'>
+            <!-- Header with RSS Branding -->
+            <div style='background: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%); padding: 40px 30px; text-align: center; border-radius: 0;'>
+                <div style='background: white; width: 100px; height: 100px; margin: 0 auto 20px; border-radius: 50%; display: inline-block; line-height: 100px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);'>
+                    <span style='font-family: Arial, sans-serif; font-size: 36px; font-weight: bold; color: #14b8a6; letter-spacing: -2px;'>RSS</span>
+                </div>
+                <h1 style='color: white; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;'>Resource Staff Solutions</h1>
+                <p style='color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;'>Timekeeping & HR Management System</p>
+            </div>
+            
+            <!-- Main Content -->
+            <div style='background: white; padding: 40px 30px; margin: 0;'>
+                <div style='text-align: center; margin-bottom: 30px;'>
+                    <div style='display: inline-block; background: " . ($raw_status === 'approved' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)') . "; color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px " . ($raw_status === 'approved' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)') . ";'>
+                        " . ($raw_status === 'approved' ? '✅' : '❌') . " Leave Request {$status}
+                    </div>
                 </div>
                 
-                <div style='background: " . ($raw_status === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . ($raw_status === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
-                    <h3 style='color: " . ($raw_status === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . ($raw_status === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Hi <strong>{$employee['fname']}</strong>,</p>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your leave request has been <strong>{$status}</strong>. Here are the details:</p>
+                
+                <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <table style='width: 100%; border-collapse: collapse;'>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Leave Type:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . ucfirst($leave['leave_type']) . "</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date Range:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$range</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Request ID:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>#{$leave['id']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Submitted:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . date('F j, Y g:i A', strtotime($leave['created_at'])) . "</td></tr>
+                    </table>
                 </div>";
         
         if (!empty($leave['reason'])) {
             $enhanced_body .= "
-                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
-                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($leave['reason'])) . "</p>
+                <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($leave['reason'])) . "</p>
                 </div>";
         }
         
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($leave['explanation'])) {
             $enhanced_body .= "
-                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
-                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($leave['explanation'])) . "</p>
+                <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($leave['explanation'])) . "</p>
                 </div>";
         }
         
         $enhanced_body .= "
-                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
-                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
-                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+            </div>
+            
+            <!-- Footer -->
+            <div style='background: #0f172a; padding: 30px; text-align: center; color: white;'>
+                <p style='margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #14b8a6;'>Resource Staff Solutions</p>
+                <p style='margin: 0 0 5px 0; font-size: 13px; color: #94a3b8;'>This is an automated notification from the Timekeeping System</p>
+                <p style='margin: 0; font-size: 12px; color: #64748b;'>Please do not reply to this email</p>
+                <div style='margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;'>
+                    <p style='margin: 0; font-size: 11px; color: #64748b;'>© " . date('Y') . " Resource Staff Solutions. All rights reserved.</p>
                 </div>
             </div>
         </div>";
@@ -401,69 +422,81 @@ foreach ($schedule_results as $sched) {
         $emailTitle = $isRestDay ? 'Day Off Request' : 'Schedule Change Request';
         
         $enhanced_body = "
-        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
-            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>{$emailIcon} {$emailTitle} {$status}</h2>
+        <div style='font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8fafc; padding: 0;'>
+            <!-- Header with RSS Branding -->
+            <div style='background: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%); padding: 40px 30px; text-align: center;'>
+                <div style='background: white; width: 100px; height: 100px; margin: 0 auto 20px; border-radius: 50%; display: inline-block; line-height: 100px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);'>
+                    <span style='font-family: Arial, sans-serif; font-size: 36px; font-weight: bold; color: #14b8a6; letter-spacing: -2px;'>RSS</span>
+                </div>
+                <h1 style='color: white; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;'>Resource Staff Solutions</h1>
+                <p style='color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;'>Timekeeping & HR Management System</p>
+            </div>
+            
+            <!-- Main Content -->
+            <div style='background: white; padding: 40px 30px;'>
+                <div style='text-align: center; margin-bottom: 30px;'>
+                    <div style='display: inline-block; background: " . (strtolower($sched['status']) === 'approved' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)') . "; color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px " . (strtolower($sched['status']) === 'approved' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)') . ";'>
+                        {$emailIcon} {$emailTitle} {$status}
+                    </div>
+                </div>
                 
-                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
-                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
-                    <p><strong>Date Range:</strong> $range</p>
-                    <p><strong>Request ID:</strong> #{$sched['id']}</p>
-                    <p><strong>Submitted:</strong> " . date('F j, Y g:i A', strtotime($sched['created_at'])) . "</p>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Hi <strong>{$employee['fname']}</strong>,</p>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your {$requestTypeText} has been <strong>{$status}</strong>. Here are the details:</p>
+                
+                <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <table style='width: 100%; border-collapse: collapse;'>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date Range:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$range</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Request ID:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>#{$sched['id']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Submitted:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . date('F j, Y g:i A', strtotime($sched['created_at'])) . "</td></tr>
+                    </table>
                 </div>";
         
         // Only show schedule details if it's NOT a rest day
         if (!$isRestDay) {
             $enhanced_body .= "
-                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #1e40af; margin: 0 0 15px 0;'>📅 Schedule Details</h3>
-                    <div style='display: flex; justify-content: space-between; margin-bottom: 10px;'>
-                        <div style='flex: 1; margin-right: 10px;'>
-                            <strong>Current Schedule:</strong><br>
-                            <span style='background: #fee2e2; padding: 5px 10px; border-radius: 5px; color: #991b1b;'>$current_schedule</span>
-                        </div>
-                        <div style='flex: 1; margin-left: 10px;'>
-                            <strong>Requested Schedule:</strong><br>
-                            <span style='background: #dcfce7; padding: 5px 10px; border-radius: 5px; color: #166534;'>$requested_schedule</span>
-                        </div>
-                    </div>
+                <div style='background: #eff6ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>🕒 Schedule Information</h3>
+                    <table style='width: 100%; border-collapse: collapse;'>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Current Schedule:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$current_schedule}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Requested Schedule:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$requested_schedule}</td></tr>
+                    </table>
                 </div>";
         } else {
-            // For rest days, show a special message
             $enhanced_body .= "
-                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ef4444;'>
-                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>🛏️ Day Off Request</h3>
-                    <p style='color: #374151;'>You requested a day off from <strong>$range</strong>.</p>
+                <div style='background: #fef3c7; padding: 20px; border-radius: 12px; border-left: 5px solid #f59e0b; margin-bottom: 25px;'>
+                    <h3 style='color: #92400e; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>🛏️ Rest Day Request</h3>
+                    <p style='margin: 0; color: #334155; font-size: 14px;'><strong>Requested:</strong> Day Off</p>
                 </div>";
         }
         
-        $enhanced_body .= "
-                
-                <div style='background: " . (strtolower($sched['status']) === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . (strtolower($sched['status']) === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
-                    <h3 style='color: " . (strtolower($sched['status']) === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . (strtolower($sched['status']) === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
-                </div>";
-        
         if (!empty($sched['reason'])) {
             $enhanced_body .= "
-                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
-                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($sched['reason'])) . "</p>
+                <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($sched['reason'])) . "</p>
                 </div>";
         }
         
         if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
             $enhanced_body .= "
-                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
-                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($sched['explanation'])) . "</p>
+                <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($sched['explanation'])) . "</p>
                 </div>";
         }
         
         $enhanced_body .= "
-                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
-                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
-                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+            </div>
+            
+            <!-- Footer -->
+            <div style='background: #0f172a; padding: 30px; text-align: center; color: white;'>
+                <p style='margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #14b8a6;'>Resource Staff Solutions</p>
+                <p style='margin: 0 0 5px 0; font-size: 13px; color: #94a3b8;'>This is an automated notification from the Timekeeping System</p>
+                <p style='margin: 0; font-size: 12px; color: #64748b;'>Please do not reply to this email</p>
+                <div style='margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;'>
+                    <p style='margin: 0; font-size: 11px; color: #64748b;'>© " . date('Y') . " Resource Staff Solutions. All rights reserved.</p>
                 </div>
             </div>
         </div>";
@@ -545,58 +578,79 @@ foreach ($adjust_results as $adjustment) {
         $requested_time_out = $adjustment['requested_time_out'] ? date('g:i A', strtotime($adjustment['requested_time_out'])) : 'Not specified';
         
         $enhanced_body = "
-        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
-            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>⏰ Time Adjustment Request {$status}</h2>
-                
-                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
-                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
-                    <p><strong>Date:</strong> " . date('F j, Y', strtotime($adjustment['log_date'])) . "</p>
-                    <p><strong>Request ID:</strong> #{$adjustment['id']}</p>
-                    <p><strong>Submitted:</strong> " . date('F j, Y g:i A', strtotime($adjustment['created_at'])) . "</p>
+        <div style='font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8fafc; padding: 0;'>
+            <!-- Header with RSS Branding -->
+            <div style='background: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%); padding: 40px 30px; text-align: center;'>
+                <div style='background: white; width: 100px; height: 100px; margin: 0 auto 20px; border-radius: 50%; display: inline-block; line-height: 100px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);'>
+                    <span style='font-family: Arial, sans-serif; font-size: 36px; font-weight: bold; color: #14b8a6; letter-spacing: -2px;'>RSS</span>
                 </div>
-                
-                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #1e40af; margin: 0 0 15px 0;'>🕐 Time Details</h3>
-                    <div style='margin-bottom: 15px;'>
-                        <strong>Current Times:</strong><br>
-                        <div style='background: #fee2e2; padding: 10px; border-radius: 5px; margin: 5px 0;'>
-                            <span style='color: #991b1b;'>Time In: $current_time_in | Time Out: $current_time_out</span>
-                        </div>
-                    </div>
-                    <div>
-                        <strong>Requested Times:</strong><br>
-                        <div style='background: #dcfce7; padding: 10px; border-radius: 5px; margin: 5px 0;'>
-                            <span style='color: #166534;'>Time In: $requested_time_in | Time Out: $requested_time_out</span>
-                        </div>
+                <h1 style='color: white; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;'>Resource Staff Solutions</h1>
+                <p style='color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;'>Timekeeping & HR Management System</p>
+            </div>
+            
+            <!-- Main Content -->
+            <div style='background: white; padding: 40px 30px;'>
+                <div style='text-align: center; margin-bottom: 30px;'>
+                    <div style='display: inline-block; background: " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') . "; color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)') . ";'>
+                        ⏰ Time Adjustment {$status}
                     </div>
                 </div>
                 
-                <div style='background: " . ($raw_status === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . ($raw_status === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
-                    <h3 style='color: " . ($raw_status === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . ($raw_status === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Hi <strong>{$employee['fname']}</strong>,</p>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your time adjustment request has been <strong>{$status}</strong>. Here are the details:</p>
+                
+                <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <table style='width: 100%; border-collapse: collapse;'>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . date('F j, Y', strtotime($adjustment['log_date'])) . "</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Request ID:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>#{$adjustment['id']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Submitted:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . date('F j, Y g:i A', strtotime($adjustment['created_at'])) . "</td></tr>
+                    </table>
+                </div>
+                
+                <div style='background: #eff6ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>🕒 Time Changes</h3>
+                    <table style='width: 100%; border-collapse: collapse;'>
+                        <tr>
+                            <td style='padding: 12px 0; color: #64748b; font-size: 14px; border-bottom: 1px solid #e0f2fe;'>Current Time In:</td>
+                            <td style='padding: 12px 0; color: #64748b; font-size: 14px; text-align: right; border-bottom: 1px solid #e0f2fe;'>$current_time_in</td>
+                            <td style='padding: 12px 0; color: #0f172a; font-weight: 600; font-size: 14px; text-align: right; border-bottom: 1px solid #e0f2fe;'>→ $requested_time_in</td>
+                        </tr>
+                        <tr>
+                            <td style='padding: 12px 0; color: #64748b; font-size: 14px;'>Current Time Out:</td>
+                            <td style='padding: 12px 0; color: #64748b; font-size: 14px; text-align: right;'>$current_time_out</td>
+                            <td style='padding: 12px 0; color: #0f172a; font-weight: 600; font-size: 14px; text-align: right;'>→ $requested_time_out</td>
+                        </tr>
+                    </table>
                 </div>";
         
         if (!empty($adjustment['reason'])) {
             $enhanced_body .= "
-                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
-                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>
+                <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>
                 </div>";
         }
         
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($adjustment['reason'])) {
             $enhanced_body .= "
-                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
-                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>
+                <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>
                 </div>";
         }
         
         $enhanced_body .= "
-                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
-                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
-                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+            </div>
+            
+            <!-- Footer -->
+            <div style='background: #0f172a; padding: 30px; text-align: center; color: white;'>
+                <p style='margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #14b8a6;'>Resource Staff Solutions</p>
+                <p style='margin: 0 0 5px 0; font-size: 13px; color: #94a3b8;'>This is an automated notification from the Timekeeping System</p>
+                <p style='margin: 0; font-size: 12px; color: #64748b;'>Please do not reply to this email</p>
+                <div style='margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;'>
+                    <p style='margin: 0; font-size: 11px; color: #64748b;'>© " . date('Y') . " Resource Staff Solutions. All rights reserved.</p>
                 </div>
             </div>
         </div>";
@@ -689,50 +743,84 @@ foreach ($pending_ot_results as $ot) {
         $end_time = $ot['end_time'] ? date('g:i A', strtotime($ot['end_time'])) : 'Not specified';
         
         $enhanced_body = "
-        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
-            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>⏰ Overtime Request {$status}</h2>
-                
-                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
-                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
-                    <p><strong>Date:</strong> {$date_str}</p>
-                    <p><strong>Overtime Type:</strong> {$ot_type}</p>
-                    <p><strong>Duration:</strong> {$duration} hours</p>
-                    <p><strong>Request ID:</strong> #{$ot['id']}</p>
-                    <p><strong>Submitted:</strong> " . date('F j, Y g:i A', strtotime($ot['created_at'])) . "</p>
+        <div style='font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8fafc; padding: 0;'>
+            <!-- Header with RSS Branding -->
+            <div style='background: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%); padding: 40px 30px; text-align: center;'>
+                <div style='background: white; width: 100px; height: 100px; margin: 0 auto 20px; border-radius: 50%; display: inline-block; line-height: 100px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);'>
+                    <span style='font-family: Arial, sans-serif; font-size: 36px; font-weight: bold; color: #14b8a6; letter-spacing: -2px;'>RSS</span>
+                </div>
+                        <circle cx='100' cy='100' r='90' fill='none' stroke='url(#gradient)' stroke-width='8'/>
+                        <circle cx='100' cy='100' r='70' fill='none' stroke='url(#gradient)' stroke-width='8'/>
+                        <text x='100' y='120' font-family='Arial, sans-serif' font-size='60' font-weight='bold' fill='url(#gradient)' text-anchor='middle'>RSS</text>
+                        <defs>
+                            <linearGradient id='gradient' x1='0%' y1='0%' x2='100%' y2='100%'>
+                                <stop offset='0%' style='stop-color:#14b8a6;stop-opacity:1' />
+                                <stop offset='100%' style='stop-color:#06b6d4;stop-opacity:1' />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1 style='color: white; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;'>Resource Staff Solutions</h1>
+                <p style='color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;'>Timekeeping & HR Management System</p>
+            </div>
+            
+            <!-- Main Content -->
+            <div style='background: white; padding: 40px 30px;'>
+                <div style='text-align: center; margin-bottom: 30px;'>
+                    <div style='display: inline-block; background: " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') . "; color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)') . ";'>
+                        💼 Overtime Request {$status}
+                    </div>
                 </div>
                 
-                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>🕐 Time Schedule</h3>
-                    <p><strong>Start Time:</strong> $start_time</p>
-                    <p><strong>End Time:</strong> $end_time</p>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Hi <strong>{$employee['fname']}</strong>,</p>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your overtime request has been <strong>{$status}</strong>. Here are the details:</p>
+                
+                <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <table style='width: 100%; border-collapse: collapse;'>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$date_str}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>OT Type:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$ot_type}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Duration:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 700; font-size: 16px;'>{$duration} hours</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Request ID:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>#{$ot['id']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Submitted:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . date('F j, Y g:i A', strtotime($ot['created_at'])) . "</td></tr>
+                    </table>
                 </div>
                 
-                <div style='background: " . ($raw_status === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . ($raw_status === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
-                    <h3 style='color: " . ($raw_status === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . ($raw_status === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
+                <div style='background: #eff6ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>🕒 Overtime Hours</h3>
+                    <table style='width: 100%; border-collapse: collapse;'>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Start Time:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$start_time</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>End Time:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$end_time</td></tr>
+                    </table>
                 </div>";
         
         if (!empty($ot['reason'])) {
             $enhanced_body .= "
-                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
-                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
+                <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
                 </div>";
         }
         
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
             $enhanced_body .= "
-                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
-                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
+                <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
                 </div>";
         }
         
         $enhanced_body .= "
-                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
-                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
-                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+            </div>
+            
+            <!-- Footer -->
+            <div style='background: #0f172a; padding: 30px; text-align: center; color: white;'>
+                <p style='margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #14b8a6;'>Resource Staff Solutions</p>
+                <p style='margin: 0 0 5px 0; font-size: 13px; color: #94a3b8;'>This is an automated notification from the Timekeeping System</p>
+                <p style='margin: 0; font-size: 12px; color: #64748b;'>Please do not reply to this email</p>
+                <div style='margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;'>
+                    <p style='margin: 0; font-size: 11px; color: #64748b;'>© " . date('Y') . " Resource Staff Solutions. All rights reserved.</p>
                 </div>
             </div>
         </div>";
@@ -835,56 +923,79 @@ foreach ($ot_results as $ot) {
         $end_ot_display = $end_ot ? date('g:i A', strtotime($end_ot)) : 'Not calculated';
         
         $enhanced_body = "
-        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;'>
-            <div style='background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);'>
-                <h2 style='color: #1f2937; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;'>⏰ Overtime Request {$status}</h2>
-                
-                <div style='background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #374151; margin: 0 0 10px 0;'>📋 Request Details</h3>
-                    <p><strong>Employee:</strong> {$employee['fname']} {$employee['lname']}</p>
-                    <p><strong>Date:</strong> {$date_str}</p>
-                    <p><strong>Overtime Type:</strong> {$ot_type}</p>
-                    <p><strong>Duration:</strong> {$duration} hours</p>
-                    <p><strong>Request ID:</strong> #{$ot['id']}</p>
-                    <p><strong>Processed:</strong> " . date('F j, Y g:i A', strtotime($created_at)) . "</p>
+        <div style='font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8fafc; padding: 0;'>
+            <!-- Header with RSS Branding -->
+            <div style='background: linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%); padding: 40px 30px; text-align: center;'>
+                <div style='background: white; width: 100px; height: 100px; margin: 0 auto 20px; border-radius: 50%; display: inline-block; line-height: 100px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);'>
+                    <span style='font-family: Arial, sans-serif; font-size: 36px; font-weight: bold; color: #14b8a6; letter-spacing: -2px;'>RSS</span>
                 </div>
-                
-                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #1e40af; margin: 0 0 15px 0;'>🕐 Time Details</h3>
-                    <div style='margin-bottom: 10px;'>
-                        <strong>Work Schedule:</strong><br>
-                        <span style='background: #e0e7ff; padding: 5px 10px; border-radius: 5px; color: #3730a3;'>In: $actual_time_in_display | Out: $actual_time_out_display</span>
-                    </div>
-                    <div>
-                        <strong>Overtime Period:</strong><br>
-                        <span style='background: #fbbf24; padding: 5px 10px; border-radius: 5px; color: #92400e;'>Start: $start_ot_display | End: $end_ot_display</span>
+                <h1 style='color: white; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;'>Resource Staff Solutions</h1>
+                <p style='color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;'>Timekeeping & HR Management System</p>
+            </div>
+            
+            <!-- Main Content -->
+            <div style='background: white; padding: 40px 30px;'>
+                <div style='text-align: center; margin-bottom: 30px;'>
+                    <div style='display: inline-block; background: " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') . "; color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)') . ";'>
+                        💼 Overtime Request {$status}
                     </div>
                 </div>
                 
-                <div style='background: " . ($raw_status === 'approved' ? '#ecfdf5' : '#fef2f2') . "; padding: 15px; border-radius: 8px; border-left: 4px solid " . ($raw_status === 'approved' ? '#10b981' : '#ef4444') . "; margin-bottom: 20px;'>
-                    <h3 style='color: " . ($raw_status === 'approved' ? '#065f46' : '#991b1b') . "; margin: 0 0 10px 0;'>" . ($raw_status === 'approved' ? '✅' : '❌') . " Status: {$status}</h3>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Hi <strong>{$employee['fname']}</strong>,</p>
+                <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your overtime request has been <strong>{$status}</strong>. Here are the details:</p>
+                
+                <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <table style='width: 100%; border-collapse: collapse;'>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$date_str}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>OT Type:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$ot_type}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Duration:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 700; font-size: 16px;'>{$duration} hours</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Request ID:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>#{$ot['id']}</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Processed:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . date('F j, Y g:i A', strtotime($created_at)) . "</td></tr>
+                    </table>
+                </div>
+                
+                <div style='background: #eff6ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>🕒 Time Details</h3>
+                    <table style='width: 100%; border-collapse: collapse; margin-bottom: 15px;'>
+                        <tr><td colspan='2' style='padding: 8px 0; color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase;'>Work Schedule</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Time In:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$actual_time_in_display</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Time Out:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$actual_time_out_display</td></tr>
+                    </table>
+                    <table style='width: 100%; border-collapse: collapse;'>
+                        <tr><td colspan='2' style='padding: 8px 0; color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase;'>Overtime Period</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Start OT:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 600; font-size: 14px;'>$start_ot_display</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>End OT:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 600; font-size: 14px;'>$end_ot_display</td></tr>
+                    </table>
                 </div>";
         
         if (!empty($ot['reason'])) {
             $enhanced_body .= "
-                <div style='background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;'>
-                    <h3 style='color: #1e40af; margin: 0 0 10px 0;'>💬 Your Reason</h3>
-                    <p style='font-style: italic; color: #374151;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
+                <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
                 </div>";
         }
         
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
             $enhanced_body .= "
-                <div style='background: #fef2f2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin-bottom: 20px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 10px 0;'>📝 Admin Explanation</h3>
-                    <p style='color: #374151;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
+                <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
                 </div>";
         }
         
         $enhanced_body .= "
-                <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;'>
-                    <p style='color: #6b7280; font-size: 14px;'>This is an automated notification from the Timekeeping System</p>
-                    <p style='color: #6b7280; font-size: 12px;'>Please do not reply to this email</p>
+            </div>
+            
+            <!-- Footer -->
+            <div style='background: #0f172a; padding: 30px; text-align: center; color: white;'>
+                <p style='margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #14b8a6;'>Resource Staff Solutions</p>
+                <p style='margin: 0 0 5px 0; font-size: 13px; color: #94a3b8;'>This is an automated notification from the Timekeeping System</p>
+                <p style='margin: 0; font-size: 12px; color: #64748b;'>Please do not reply to this email</p>
+                <div style='margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;'>
+                    <p style='margin: 0; font-size: 11px; color: #64748b;'>© " . date('Y') . " Resource Staff Solutions. All rights reserved.</p>
                 </div>
             </div>
         </div>";
