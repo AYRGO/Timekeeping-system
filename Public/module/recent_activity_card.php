@@ -508,8 +508,8 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
                             'start_date' => !empty($activity['start_date']) ? date('M j, Y', strtotime($activity['start_date'])) : '',
                             'end_date' => !empty($activity['end_date']) ? date('M j, Y', strtotime($activity['end_date'])) : '',
-                            'reason' => $activity['reason'] ?? '',
-                            'explanation' => $activity['explanation'] ?? '',
+                            'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['reason'] ?? ''),
+                            'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             'request_id' => $activity['request_id'] ?? '',
                             'work_schedule_id' => $activity['work_schedule_id'] ?? '',
                             'attachment_scr' => $activity['attachment_scr'] ?? '',
@@ -530,8 +530,8 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'source_schedule_out' => $activity['source_schedule_out'] ?? '',
                             'target_schedule_in' => $activity['target_schedule_in'] ?? '',
                             'target_schedule_out' => $activity['target_schedule_out'] ?? '',
-                            'reason' => $activity['reason'] ?? '',
-                            'explanation' => $activity['explanation'] ?? '',
+                            'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['reason'] ?? ''),
+                            'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             'attachment_scr' => $activity['attachment_scr'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
@@ -954,7 +954,7 @@ function showActivityDetails(title, dataJson) {
                             <div class="text-xs font-semibold ${textColor} mb-2">${dayLabel}</div>
                             <div class="text-xs ${textColor} space-y-1">
                                 ${isRestDay ? 
-                                    '<div class="text-gray-400 font-medium">—</div>' : 
+                                    '<div class="text-red-600 font-semibold">Rest Day</div>' : 
                                     '<div class="font-medium">' + timeIn + '</div><div class="text-gray-400">to</div><div class="font-medium">' + timeOut + '</div>'
                                 }
                             </div>

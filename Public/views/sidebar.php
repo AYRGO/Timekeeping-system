@@ -12,10 +12,11 @@ try {
     $stmt->execute();
     $pendingLeaveCount = $stmt->fetchColumn();
 
-    // Schedule Change Requests
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM schedule_change_requests WHERE status = 'pending'");
-    $stmt->execute();
-    $pendingScheduleCount = $stmt->fetchColumn();
+    // Schedule Change Requests - Sum all pending from single, monthly, and swap requests
+    $pendingSingleSchedule = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited')")->fetchColumn();
+    $pendingMonthlySchedule = $pdo->query("SELECT COUNT(*) FROM month_weekly_schedule WHERE LOWER(status) = 'pending'")->fetchColumn();
+    $pendingSwapSchedule = $pdo->query("SELECT COUNT(*) FROM schedule_switch_requests WHERE LOWER(status) = 'pending'")->fetchColumn();
+    $pendingScheduleCount = $pendingSingleSchedule + $pendingMonthlySchedule + $pendingSwapSchedule;
 
     // Overtime Requests - Updated to use post_ot_requests table and only count pending
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM post_ot_requests WHERE status = 'Pending'");

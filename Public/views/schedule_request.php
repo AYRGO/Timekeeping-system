@@ -7,18 +7,27 @@ include('../config/db.php');
 // Auto-forfeit expired pending requests
 include(__DIR__ . '/../cron/auto_forfeit_expired_requests.php');
 
-// Check which view to display (current requests, monthly, history, or swap)
-$view = isset($_GET['view']) ? $_GET['view'] : 'current';
+// Check which view to display (single requests, monthly, history, or swap)
+$view = isset($_GET['view']) ? $_GET['view'] : 'single';
 $isHistoryView = ($view === 'history');
 $isMonthlyView = ($view === 'monthly');
 $isSwapView = ($view === 'swap');
 
-$pageTitle = $isMonthlyView ? 'Monthly Schedule Requests' : ($isSwapView ? 'Schedule Swap Requests' : ($isHistoryView ? 'Schedule Changes & Day Off History' : 'Schedule Change & Day Off Requests'));
+$pageTitle = $isMonthlyView ? 'Monthly Schedule Requests' : ($isSwapView ? 'Schedule Swap Requests' : ($isHistoryView ? 'Schedule Changes & Day Off History' : 'Single Day Schedule Requests'));
+
+// Pagination settings
+$records_per_page = 10;
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$offset = ($page - 1) * $records_per_page;
 
 // Fetch schedule change requests with employee names, attachments, and current schedule
 if ($isMonthlyView) {
-    // Fetch from month_weekly_schedule table (monthly requests)
-    $stmt = $pdo->query("
+    // Count total monthly requests
+    $totalMonthlyCount = $pdo->query("SELECT COUNT(*) FROM month_weekly_schedule")->fetchColumn();
+    $totalMonthlyPages = ceil($totalMonthlyCount / $records_per_page);
+    
+    // Fetch from month_weekly_schedule table (monthly requests) with pagination
+    $stmt = $pdo->prepare("
         SELECT mws.id, mws.reason, mws.status, mws.year, mws.month, mws.created_at,
                mws.sunday_schedule_id, mws.sunday_is_rest_day,
                mws.monday_schedule_id, mws.monday_is_rest_day,
@@ -32,24 +41,44 @@ if ($isMonthlyView) {
                e.fname, e.lname
         FROM month_weekly_schedule mws
         JOIN employees e ON mws.employee_id = e.id
-        ORDER BY mws.created_at DESC
+        ORDER BY 
+            CASE WHEN LOWER(mws.status) = 'pending' THEN 0 ELSE 1 END,
+            mws.created_at DESC
+        LIMIT :limit OFFSET :offset
     ");
+    $stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
     $monthly_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else if ($isSwapView) {
-    // Fetch from schedule_switch_requests table (swap requests)
-    $stmt = $pdo->query("
+    // Count total swap requests
+    $totalSwapCount = $pdo->query("SELECT COUNT(*) FROM schedule_switch_requests")->fetchColumn();
+    $totalSwapPages = ceil($totalSwapCount / $records_per_page);
+    
+    // Fetch from schedule_switch_requests table (swap requests) with pagination
+    $stmt = $pdo->prepare("
         SELECT ssr.id, ssr.employee_id, ssr.source_date, ssr.target_date, 
                ssr.reason, ssr.attachment_path, ssr.status, ssr.created_at,
                ssr.processed_at, ssr.processed_by, ssr.admin_notes,
                e.fname, e.lname
         FROM schedule_switch_requests ssr
         JOIN employees e ON ssr.employee_id = e.id
-        ORDER BY ssr.created_at DESC
+        ORDER BY 
+            CASE WHEN LOWER(ssr.status) = 'pending' THEN 0 ELSE 1 END,
+            ssr.created_at DESC
+        LIMIT :limit OFFSET :offset
     ");
+    $stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
     $swap_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else if ($isHistoryView) {
-    // Fetch from post_schedule_change_requests table (history)
-    $stmt = $pdo->query("
+    // Count total history requests
+    $totalHistoryCount = $pdo->query("SELECT COUNT(*) FROM post_schedule_change_requests")->fetchColumn();
+    $totalHistoryPages = ceil($totalHistoryCount / $records_per_page);
+    
+    // Fetch from post_schedule_change_requests table (history) with pagination
+    $stmt = $pdo->prepare("
         SELECT psr.id, psr.reason, psr.status, psr.start_date, psr.end_date, psr.created_at,
                psr.work_schedule_id, psr.current_work_schedule_id, psr.attachment_scr, psr.explanation,
                psr.created_at as approved_at, psr.employee_id, psr.is_rest_day,
@@ -59,10 +88,18 @@ if ($isMonthlyView) {
         JOIN employees e ON psr.employee_id = e.id
         LEFT JOIN work_schedules ws ON psr.work_schedule_id = ws.id
         ORDER BY psr.created_at DESC
+        LIMIT :limit OFFSET :offset
     ");
+    $stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
 } else {
-    // Fetch from schedule_change_requests table (current requests)
-    $stmt = $pdo->query("
+    // Count total single day requests
+    $totalSingleCount = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests")->fetchColumn();
+    $totalSinglePages = ceil($totalSingleCount / $records_per_page);
+    
+    // Fetch from schedule_change_requests table (single day requests) with pagination
+    $stmt = $pdo->prepare("
         SELECT sr.id, sr.reason, sr.status, sr.start_date, sr.end_date, sr.created_at,
                sr.work_schedule_id, sr.current_work_schedule_id, sr.attachment_scr, sr.explanation,
                sr.employee_id, sr.is_rest_day,
@@ -71,9 +108,14 @@ if ($isMonthlyView) {
         FROM schedule_change_requests sr
         JOIN employees e ON sr.employee_id = e.id
         LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
-        WHERE sr.status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited')
-        ORDER BY sr.created_at DESC
+        ORDER BY 
+            CASE WHEN sr.status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited') THEN 0 ELSE 1 END,
+            sr.created_at DESC
+        LIMIT :limit OFFSET :offset
     ");
+    $stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
 }
 $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -242,9 +284,9 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
 
                         </div>
                         <div class="flex space-x-2">
-                            <a href="?view=current" 
+                            <a href="?view=single" 
                                class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= !$isHistoryView && !$isMonthlyView && !$isSwapView ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
-                                <i class="fas fa-clock mr-2"></i>Current Requests
+                                <i class="fas fa-calendar-day mr-2"></i>Single Request
                                 <?php if ($pendingCurrentCount > 0): ?>
                                     <span class="ml-2 px-2 py-0.5 text-xs font-bold rounded-full <?= !$isHistoryView && !$isMonthlyView && !$isSwapView ? 'bg-white text-blue-600' : 'bg-blue-600 text-white' ?>">
                                         <?= $pendingCurrentCount ?>
@@ -500,6 +542,35 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                     </table>
                 </div>
 
+                <!-- Monthly Pagination -->
+                <?php if ($totalMonthlyPages > 1): ?>
+                <div class="mt-4 flex items-center justify-between bg-white px-6 py-3 rounded-lg shadow">
+                    <div class="text-sm text-gray-700">
+                        Showing <?= $offset + 1 ?> to <?= min($offset + $records_per_page, $totalMonthlyCount) ?> of <?= $totalMonthlyCount ?> results
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <?php if ($page > 1): ?>
+                            <a href="?view=monthly&page=<?= $page - 1 ?>" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = max(1, $page - 2); $i <= min($totalMonthlyPages, $page + 2); $i++): ?>
+                            <a href="?view=monthly&page=<?= $i ?>" 
+                               class="px-3 py-1 rounded <?= $i == $page ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <?= $i ?>
+                            </a>
+                        <?php endfor; ?>
+                        
+                        <?php if ($page < $totalMonthlyPages): ?>
+                            <a href="?view=monthly&page=<?= $page + 1 ?>" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <!-- Monthly Summary Cards -->
                 <?php if (!empty($monthly_requests)): ?>
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -694,6 +765,35 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Swap Pagination -->
+                <?php if ($totalSwapPages > 1): ?>
+                <div class="mt-4 flex items-center justify-between bg-white px-6 py-3 rounded-lg shadow">
+                    <div class="text-sm text-gray-700">
+                        Showing <?= $offset + 1 ?> to <?= min($offset + $records_per_page, $totalSwapCount) ?> of <?= $totalSwapCount ?> results
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <?php if ($page > 1): ?>
+                            <a href="?view=swap&page=<?= $page - 1 ?>" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = max(1, $page - 2); $i <= min($totalSwapPages, $page + 2); $i++): ?>
+                            <a href="?view=swap&page=<?= $i ?>" 
+                               class="px-3 py-1 rounded <?= $i == $page ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <?= $i ?>
+                            </a>
+                        <?php endfor; ?>
+                        
+                        <?php if ($page < $totalSwapPages): ?>
+                            <a href="?view=swap&page=<?= $page + 1 ?>" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- Swap Summary Cards -->
                 <?php if (!empty($swap_requests)): ?>
@@ -921,6 +1021,39 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Single/History Pagination -->
+                <?php 
+                $currentTotalPages = $isHistoryView ? $totalHistoryPages : $totalSinglePages;
+                $currentTotalCount = $isHistoryView ? $totalHistoryCount : $totalSingleCount;
+                if ($currentTotalPages > 1): 
+                ?>
+                <div class="mt-4 flex items-center justify-between bg-white px-6 py-3 rounded-lg shadow">
+                    <div class="text-sm text-gray-700">
+                        Showing <?= $offset + 1 ?> to <?= min($offset + $records_per_page, $currentTotalCount) ?> of <?= $currentTotalCount ?> results
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <?php if ($page > 1): ?>
+                            <a href="?view=<?= $view ?>&page=<?= $page - 1 ?>" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = max(1, $page - 2); $i <= min($currentTotalPages, $page + 2); $i++): ?>
+                            <a href="?view=<?= $view ?>&page=<?= $i ?>" 
+                               class="px-3 py-1 rounded <?= $i == $page ? ($isHistoryView ? 'bg-green-600' : 'bg-blue-600') . ' text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
+                                <?= $i ?>
+                            </a>
+                        <?php endfor; ?>
+                        
+                        <?php if ($page < $currentTotalPages): ?>
+                            <a href="?view=<?= $view ?>&page=<?= $page + 1 ?>" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- Summary Cards -->
                 <?php if (!empty($schedule_requests)): ?>

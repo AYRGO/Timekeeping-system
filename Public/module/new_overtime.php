@@ -492,13 +492,13 @@ function getScheduleForDate($employee_id, $date, $pdo) {
             $status_text = "Admin Override (ID: {$schedule_id})";
             $status_color = 'text-purple-600';
         } else {
-            $status_text = "Default Schedule";
+            $status_text = "";
             $status_color = 'text-blue-600';
         }
         $was_changed = in_array($cache['source'], ['approved_request', 'admin_override']);
     } else {
         // Using fallback data
-        $status_text = "Default Schedule";
+        $status_text = "";
         $status_color = 'text-blue-600';
         $was_changed = false;
     }
@@ -1162,9 +1162,6 @@ button:hover {
                           <div class="text-lg font-bold text-gray-900">
                             <?= formatDurationPHP($workHours) ?>
                           </div>
-                          <div class="text-xs text-gray-500">
-                            (<?= formatDurationPHP($totalHours) ?> total - 1 hr lunch)
-                          </div>
                         <?php else: ?>
                           <div class="text-lg font-bold text-gray-400">—</div>
                         <?php endif; ?>
@@ -1184,9 +1181,6 @@ button:hover {
                         <?php if ($hasLog && isset($otDetails['max_ot_hours']) && $otDetails['max_ot_hours'] > 0): ?>
                           <div class="text-lg font-bold text-emerald-600">
                             <?= formatDurationPHP($otDetails['max_ot_hours']) ?>
-                          </div>
-                          <div class="text-xs text-gray-500">
-                            (<?= $otDetails['exact_ot_minutes'] ?> minutes)
                           </div>
                           <?php if ($otDetails['eligible']): ?>
                             <div class="text-sm text-emerald-600 font-medium">
@@ -1219,7 +1213,7 @@ button:hover {
                       <div class="flex items-center justify-center w-full">
                         <span class="inline-flex items-center px-4 py-3 bg-red-100 text-red-600 rounded-xl text-sm font-medium border border-red-200">
                           <i class="fas fa-clock mr-2"></i>
-                          Request Expired (30+ days old)
+                          Request Expired
                         </span>
                       </div>
                     <?php elseif ($requestStatus === 'approved'): ?>

@@ -210,6 +210,33 @@ try {
         }
         error_log("MONTHLY APPROVAL: Inserted $cacheInsertCount cache rows");
         
+        // STEP 3: CANCEL CONFLICTING PENDING REQUESTS FOR THIS MONTH
+        // Cancel pending schedule change requests
+        $cancelChangeStmt = $pdo->prepare("
+            UPDATE schedule_change_requests 
+            SET status = 'Cancelled', 
+                explanation = CONCAT(COALESCE(explanation, ''), ' [Auto-cancelled: Monthly schedule approved for ', ?, ']')
+            WHERE employee_id = ? 
+              AND status = 'Pending'
+              AND start_date BETWEEN ? AND ?
+        ");
+        $cancelChangeStmt->execute([date('F Y', strtotime("$year-$month-01")), $employee_id, $startDate, $lastDayOfMonth]);
+        $cancelledChanges = $cancelChangeStmt->rowCount();
+        error_log("MONTHLY APPROVAL: Cancelled $cancelledChanges pending schedule change requests");
+        
+        // Cancel pending schedule swap requests (use lowercase 'cancelled' to match ENUM)
+        $cancelSwapStmt = $pdo->prepare("
+            UPDATE schedule_switch_requests 
+            SET status = 'cancelled', 
+                reason = CONCAT(COALESCE(reason, ''), ' [Auto-cancelled: Monthly schedule approved for ', ?, ']')
+            WHERE employee_id = ?
+              AND status = 'pending'
+              AND source_date BETWEEN ? AND ?
+        ");
+        $cancelSwapStmt->execute([date('F Y', strtotime("$year-$month-01")), $employee_id, $startDate, $lastDayOfMonth]);
+        $cancelledSwaps = $cancelSwapStmt->rowCount();
+        error_log("MONTHLY APPROVAL: Cancelled $cancelledSwaps pending schedule swap requests");
+        
         // Update request status to approved and mark as processed
         $updateStmt = $pdo->prepare("
             UPDATE month_weekly_schedule 

@@ -290,9 +290,10 @@
               <div class="relative">
                 <input type="month" name="schedule_month" id="schedule_month" 
                        min="<?= date('Y-m') ?>"
-                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white">
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white month-input">
                 <i class="fas fa-calendar-alt absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
               </div>
+              <p class="text-xs text-gray-500 mt-1 italic">Please choose a month</p>
             </div>
 
             <!-- Weekly Schedule Configuration -->
@@ -336,20 +337,6 @@
                                autocomplete="off"
                                data-day="<?= $day['key'] ?>">
                         <i class="fas fa-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
-                      </div>
-                      
-                      <!-- Selected schedule display -->
-                      <div id="<?= $day['key'] ?>_selected" class="hidden mt-2">
-                        <div class="px-3 py-2 bg-green-50 border-l-4 border-green-500 rounded flex items-center justify-between">
-                          <div class="flex items-center gap-2 flex-1">
-                            <i class="fas fa-check-circle text-green-600 text-xs"></i>
-                            <span class="text-sm font-medium text-green-900" id="<?= $day['key'] ?>_selected_text"></span>
-                          </div>
-                          <button type="button" onclick="clearDaySchedule('<?= $day['key'] ?>')" 
-                                  class="text-gray-400 hover:text-red-500 text-xs transition-colors">
-                            <i class="fas fa-times"></i>
-                          </button>
-                        </div>
                       </div>
                       
                       <!-- Schedule dropdown (hidden by default) -->
@@ -637,6 +624,20 @@
     color: #9ca3af;
     font-size: 0.875rem;
 }
+
+/* Month input styling */
+.schedule-change-modal-container .month-input {
+    color: #6b7280;
+}
+
+.schedule-change-modal-container .month-input:not([value=""]):valid,
+.schedule-change-modal-container .month-input.has-value {
+    color: #111827;
+    font-weight: 600;
+    background-color: #f0fdf4;
+    border-color: #22c55e;
+}
+
 </style>
 
 <script>
@@ -710,11 +711,18 @@ document.getElementById('scheduleChangeForm').addEventListener('submit', functio
         // Validate at least one day has a schedule selected
         const dayValueInputs = document.querySelectorAll('.day-schedule-value');
         let hasSchedule = false;
+        let scheduleValues = [];
+        
         dayValueInputs.forEach(input => {
-            if (input.value) {
+            const value = input.value.trim();
+            scheduleValues.push(value);
+            if (value && value !== '') {
                 hasSchedule = true;
             }
         });
+        
+        console.log('📋 Schedule validation - Values found:', scheduleValues);
+        console.log('✓ Has at least one schedule:', hasSchedule);
         
         if (!hasSchedule) {
             isValid = false;
@@ -1178,6 +1186,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Month input highlight on change
+    const monthInput = document.getElementById('schedule_month');
+    if (monthInput) {
+        monthInput.addEventListener('change', function() {
+            if (this.value) {
+                this.classList.add('has-value');
+            } else {
+                this.classList.remove('has-value');
+            }
+        });
+    }
 });
 
 // Monthly schedule day selection functions
@@ -1189,7 +1209,10 @@ function selectDaySchedule(optionElement) {
     
     // Set hidden input value
     const hiddenInput = document.getElementById(day + '_schedule_id');
-    hiddenInput.value = scheduleId === 'rest_day' ? 'rest_day' : scheduleId;
+    const valueToSet = scheduleId === 'rest_day' ? 'rest_day' : scheduleId;
+    hiddenInput.value = valueToSet;
+    
+    console.log('✅ SET VALUE for', day + ':', valueToSet, '(Hidden input now:', hiddenInput.value + ')');
     
     // Update search input display
     const searchInput = document.getElementById(day + '_search');
@@ -1198,18 +1221,6 @@ function selectDaySchedule(optionElement) {
     } else {
         searchInput.value = scheduleName === scheduleTime ? scheduleTime : scheduleName + ' (' + scheduleTime + ')';
     }
-    
-    // Update selected display
-    const selectedDiv = document.getElementById(day + '_selected');
-    const selectedText = document.getElementById(day + '_selected_text');
-    
-    if (scheduleId === 'rest_day') {
-        selectedText.textContent = '🛌 ' + scheduleName;
-    } else {
-        selectedText.textContent = scheduleName === scheduleTime ? scheduleTime : scheduleName + ' • ' + scheduleTime;
-    }
-    
-    selectedDiv.classList.remove('hidden');
     
     // Hide dropdown
     document.getElementById(day + '_dropdown').classList.add('hidden');
@@ -1223,9 +1234,6 @@ function clearDaySchedule(day) {
     
     // Clear search input
     document.getElementById(day + '_search').value = '';
-    
-    // Hide selected display
-    document.getElementById(day + '_selected').classList.add('hidden');
     
     // Hide dropdown
     document.getElementById(day + '_dropdown').classList.add('hidden');
@@ -1241,12 +1249,10 @@ function clearAllDaySchedules() {
     days.forEach(day => {
         const hiddenInput = document.getElementById(day + '_schedule_id');
         const searchInput = document.getElementById(day + '_search');
-        const selectedDiv = document.getElementById(day + '_selected');
         const dropdown = document.getElementById(day + '_dropdown');
         
         if (hiddenInput) hiddenInput.value = '';
         if (searchInput) searchInput.value = '';
-        if (selectedDiv) selectedDiv.classList.add('hidden');
         if (dropdown) dropdown.classList.add('hidden');
     });
 }
