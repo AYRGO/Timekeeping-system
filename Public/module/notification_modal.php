@@ -269,7 +269,7 @@ foreach ($leave_results as $leave) {
                 <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your leave request has been <strong>{$status}</strong>. Here are the details:</p>
                 
                 <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
-                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>Request Details</h3>
                     <table style='width: 100%; border-collapse: collapse;'>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Leave Type:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . ucfirst($leave['leave_type']) . "</td></tr>
@@ -282,7 +282,7 @@ foreach ($leave_results as $leave) {
         if (!empty($leave['reason'])) {
             $enhanced_body .= "
                 <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
-                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Your Reason</h3>
                     <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($leave['reason'])) . "</p>
                 </div>";
         }
@@ -290,7 +290,7 @@ foreach ($leave_results as $leave) {
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($leave['explanation'])) {
             $enhanced_body .= "
                 <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Admin Explanation</h3>
                     <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($leave['explanation'])) . "</p>
                 </div>";
         }
@@ -418,7 +418,7 @@ foreach ($schedule_results as $sched) {
                 date('g:i A', strtotime($sched['requested_time_in'])) . ' - ' . date('g:i A', strtotime($sched['requested_time_out'])) : 'Not specified';
         }
             
-        $emailIcon = $isRestDay ? '🛏️' : '🕒';
+        $emailIcon = '';
         $emailTitle = $isRestDay ? 'Day Off Request' : 'Schedule Change Request';
         
         $enhanced_body = "
@@ -444,7 +444,7 @@ foreach ($schedule_results as $sched) {
                 <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your {$requestTypeText} has been <strong>{$status}</strong>. Here are the details:</p>
                 
                 <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
-                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>Request Details</h3>
                     <table style='width: 100%; border-collapse: collapse;'>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date Range:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$range</td></tr>
@@ -457,7 +457,7 @@ foreach ($schedule_results as $sched) {
         if (!$isRestDay) {
             $enhanced_body .= "
                 <div style='background: #eff6ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
-                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>🕒 Schedule Information</h3>
+                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>Schedule Information</h3>
                     <table style='width: 100%; border-collapse: collapse;'>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Current Schedule:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$current_schedule}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Requested Schedule:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$requested_schedule}</td></tr>
@@ -466,7 +466,7 @@ foreach ($schedule_results as $sched) {
         } else {
             $enhanced_body .= "
                 <div style='background: #fef3c7; padding: 20px; border-radius: 12px; border-left: 5px solid #f59e0b; margin-bottom: 25px;'>
-                    <h3 style='color: #92400e; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>🛏️ Rest Day Request</h3>
+                    <h3 style='color: #92400e; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Rest Day Request</h3>
                     <p style='margin: 0; color: #334155; font-size: 14px;'><strong>Requested:</strong> Day Off</p>
                 </div>";
         }
@@ -474,7 +474,7 @@ foreach ($schedule_results as $sched) {
         if (!empty($sched['reason'])) {
             $enhanced_body .= "
                 <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
-                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Your Reason</h3>
                     <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($sched['reason'])) . "</p>
                 </div>";
         }
@@ -482,7 +482,7 @@ foreach ($schedule_results as $sched) {
         if (strtolower($sched['status']) === 'declined' && !empty($sched['explanation'])) {
             $enhanced_body .= "
                 <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Admin Explanation</h3>
                     <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($sched['explanation'])) . "</p>
                 </div>";
         }
@@ -592,7 +592,7 @@ foreach ($adjust_results as $adjustment) {
             <div style='background: white; padding: 40px 30px;'>
                 <div style='text-align: center; margin-bottom: 30px;'>
                     <div style='display: inline-block; background: " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') . "; color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)') . ";'>
-                        ⏰ Time Adjustment {$status}
+                        Time Adjustment {$status}
                     </div>
                 </div>
                 
@@ -600,7 +600,7 @@ foreach ($adjust_results as $adjustment) {
                 <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your time adjustment request has been <strong>{$status}</strong>. Here are the details:</p>
                 
                 <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
-                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>Request Details</h3>
                     <table style='width: 100%; border-collapse: collapse;'>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . date('F j, Y', strtotime($adjustment['log_date'])) . "</td></tr>
@@ -610,7 +610,7 @@ foreach ($adjust_results as $adjustment) {
                 </div>
                 
                 <div style='background: #eff6ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
-                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>🕒 Time Changes</h3>
+                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>Time Changes</h3>
                     <table style='width: 100%; border-collapse: collapse;'>
                         <tr>
                             <td style='padding: 12px 0; color: #64748b; font-size: 14px; border-bottom: 1px solid #e0f2fe;'>Current Time In:</td>
@@ -628,7 +628,7 @@ foreach ($adjust_results as $adjustment) {
         if (!empty($adjustment['reason'])) {
             $enhanced_body .= "
                 <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
-                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Your Reason</h3>
                     <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>
                 </div>";
         }
@@ -636,7 +636,7 @@ foreach ($adjust_results as $adjustment) {
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($adjustment['reason'])) {
             $enhanced_body .= "
                 <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Admin Explanation</h3>
                     <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($adjustment['reason'])) . "</p>
                 </div>";
         }
@@ -768,7 +768,7 @@ foreach ($pending_ot_results as $ot) {
             <div style='background: white; padding: 40px 30px;'>
                 <div style='text-align: center; margin-bottom: 30px;'>
                     <div style='display: inline-block; background: " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') . "; color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)') . ";'>
-                        💼 Overtime Request {$status}
+                        Overtime Request {$status}
                     </div>
                 </div>
                 
@@ -776,7 +776,7 @@ foreach ($pending_ot_results as $ot) {
                 <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your overtime request has been <strong>{$status}</strong>. Here are the details:</p>
                 
                 <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
-                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>Request Details</h3>
                     <table style='width: 100%; border-collapse: collapse;'>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$date_str}</td></tr>
@@ -788,7 +788,7 @@ foreach ($pending_ot_results as $ot) {
                 </div>
                 
                 <div style='background: #eff6ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
-                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>🕒 Overtime Hours</h3>
+                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>Overtime Hours</h3>
                     <table style='width: 100%; border-collapse: collapse;'>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Start Time:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$start_time</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>End Time:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$end_time</td></tr>
@@ -798,7 +798,7 @@ foreach ($pending_ot_results as $ot) {
         if (!empty($ot['reason'])) {
             $enhanced_body .= "
                 <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
-                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Your Reason</h3>
                     <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
                 </div>";
         }
@@ -806,7 +806,7 @@ foreach ($pending_ot_results as $ot) {
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
             $enhanced_body .= "
                 <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Admin Explanation</h3>
                     <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
                 </div>";
         }
@@ -937,7 +937,7 @@ foreach ($ot_results as $ot) {
             <div style='background: white; padding: 40px 30px;'>
                 <div style='text-align: center; margin-bottom: 30px;'>
                     <div style='display: inline-block; background: " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)') . "; color: white; padding: 12px 30px; border-radius: 50px; font-size: 18px; font-weight: 600; box-shadow: 0 4px 12px " . (($raw_status === 'declined' || $raw_status === 'rejected') ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)') . ";'>
-                        💼 Overtime Request {$status}
+                        Overtime Request {$status}
                     </div>
                 </div>
                 
@@ -945,7 +945,7 @@ foreach ($ot_results as $ot) {
                 <p style='color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;'>Your overtime request has been <strong>{$status}</strong>. Here are the details:</p>
                 
                 <div style='background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 25px; border-radius: 12px; border-left: 5px solid #14b8a6; margin-bottom: 25px;'>
-                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>📋 Request Details</h3>
+                    <h3 style='color: #0f766e; margin: 0 0 15px 0; font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;'>Request Details</h3>
                     <table style='width: 100%; border-collapse: collapse;'>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$date_str}</td></tr>
@@ -957,7 +957,7 @@ foreach ($ot_results as $ot) {
                 </div>
                 
                 <div style='background: #eff6ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
-                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>🕒 Time Details</h3>
+                    <h3 style='color: #075985; margin: 0 0 15px 0; font-size: 15px; font-weight: 600;'>Time Details</h3>
                     <table style='width: 100%; border-collapse: collapse; margin-bottom: 15px;'>
                         <tr><td colspan='2' style='padding: 8px 0; color: #64748b; font-size: 13px; font-weight: 600; text-transform: uppercase;'>Work Schedule</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Time In:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>$actual_time_in_display</td></tr>
@@ -973,7 +973,7 @@ foreach ($ot_results as $ot) {
         if (!empty($ot['reason'])) {
             $enhanced_body .= "
                 <div style='background: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 5px solid #0ea5e9; margin-bottom: 25px;'>
-                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>💬 Your Reason</h3>
+                    <h3 style='color: #075985; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Your Reason</h3>
                     <p style='font-style: italic; color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
                 </div>";
         }
@@ -981,7 +981,7 @@ foreach ($ot_results as $ot) {
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
             $enhanced_body .= "
                 <div style='background: #fef2f2; padding: 20px; border-radius: 12px; border-left: 5px solid #ef4444; margin-bottom: 25px;'>
-                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>📝 Admin Explanation</h3>
+                    <h3 style='color: #991b1b; margin: 0 0 12px 0; font-size: 15px; font-weight: 600;'>Admin Explanation</h3>
                     <p style='color: #334155; line-height: 1.6; margin: 0; font-size: 14px;'>" . nl2br(htmlspecialchars($ot['reason'])) . "</p>
                 </div>";
         }
