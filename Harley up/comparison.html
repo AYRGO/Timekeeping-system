@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSS Timekeeping System - Before & After Comparison</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            font-size: 0.95em;
+            opacity: 0.8;
+        }
+
+        .comparison-section {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+
+        .section-description {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .updates-list {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+
+        .updates-list li {
+            margin: 8px 0;
+            color: #555;
+        }
+
+        .updates-list li strong {
+            color: #667eea;
+        }
+
+        .comparison-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            padding: 0;
+        }
+
+        .before, .after {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .before {
+            background: #fff5f5;
+            border-right: 1px solid #e0e0e0;
+        }
+
+        .after {
+            background: #f0fdf4;
+        }
+
+        .label {
+            font-size: 1.2em;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .label.before-label {
+            color: #dc2626;
+        }
+
+        .label.after-label {
+            color: #16a34a;
+        }
+
+        .icon {
+            font-size: 1.5em;
+        }
+
+        .image-container {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .image-container img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .caption {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 15px;
+            text-align: center;
+            font-style: italic;
+        }
+
+        @media (max-width: 900px) {
+            .comparison-content {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .before {
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+
+        .feature-highlight {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            color: #78350f;
+        }
+
+        .improvements {
+            background: #dcfce7;
+            border-left: 4px solid #16a34a;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            color: #15803d;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e0e0e0;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .key-changes {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .key-changes h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .change-item {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .change-item h3 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .change-item p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 50px;
+            padding: 20px;
+            opacity: 0.8;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎯 RSS Timekeeping System</h1>
+            <p><strong>Before & After Comparison</strong></p>
+            <p class="subtitle">UI/UX Improvements & Feature Enhancements</p>
+        </div>
+
+        <!-- Key Changes Summary -->
+        <div class="key-changes">
+            <h2>📋 Key Updates Summary</h2>
+            <div class="stats-container">
+                <div class="stat-box">
+                    <div class="stat-number">2</div>
+                    <div class="stat-label">Major Interface Redesigns</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">8+</div>
+                    <div class="stat-label">UI Improvements</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">New Features Added</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">Email Encoding Fixed</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Comparison -->
+        <div class="comparison-section">
+            <div class="section-title">
+                📊 Admin Dashboard
+            </div>
+            <div class="section-description">
+                <p><strong>The admin dashboard is the central hub for managing all employee requests and schedules.</strong></p>
+                <ul class="updates-list">
+                    <li><strong>Renamed "Current Requests" to "Single Request":</strong> More accurately describes pending individual schedule change requests</li>
+                    <li><strong>Pagination Added (10 per page):</strong> All request tabs now support pagination for better performance with large datasets</li>
+                    <li><strong>Pending Requests Prioritized:</strong> Approved and declined requests moved to next pages; pending requests shown first</li>
+                    <li><strong>Unified Badge Counter:</strong> Sidebar badge now sums all pending requests across Single Request, Monthly Schedule, and Swap Request tabs</li>
+                    <li><strong>Cleaner Layout:</strong> Removed redundant information for a more focused user experience</li>
+                </ul>
+
+                <div class="improvements">
+                    <strong>✅ Improvements:</strong> Better organization of request management, faster loading times, clearer priority visibility, centralized pending count.
+                </div>
+            </div>
+            <div class="comparison-content">
+                <div class="before">
+                    <div class="label before-label">
+                        <span class="icon">❌</span>
+                        BEFORE
+                    </div>
+                    <div class="image-container">
+                        <img src="Dashboard - old.png" alt="Dashboard - Old Design">
+                    </div>
+                    <div class="caption">
+                        Old dashboard with "Current Requests" label and no pagination
+                    </div>
+                </div>
+                <div class="after">
+                    <div class="label after-label">
+                        <span class="icon">✅</span>
+                        AFTER
+                    </div>
+                    <div class="image-container">
+                        <img src="Dashboard - new.png" alt="Dashboard - New Design">
+                    </div>
+                    <div class="caption">
+                        New dashboard with "Single Request" label, pagination, and improved badge counting
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schedule Change Request Comparison -->
+        <div class="comparison-section">
+            <div class="section-title">
+                📅 Schedule Change Request Form
+            </div>
+            <div class="section-description">
+                <p><strong>The schedule change request form allows employees to submit requests to change their work schedules.</strong></p>
+                <ul class="updates-list">
+                    <li><strong>Removed Green Selection Display:</strong> The redundant green highlight for selected schedules has been removed</li>
+                    <li><strong>Month Input Placeholder:</strong> Added clear "Please Choose Month" placeholder text for better UX</li>
+                    <li><strong>Month Selection Highlighting:</strong> When a month is selected, it now highlights with a visual indicator</li>
+                    <li><strong>Cleaner Form Layout:</strong> More intuitive form structure with better visual hierarchy</li>
+                    <li><strong>"Less is More" Design Philosophy:</strong> Removed verbose text like "Default Schedule", duration breakdowns, and outdated information</li>
+                    <li><strong>Simplified Request Status:</strong> Changed "Request Expired (30+ days old)" to simply "Request Expired"</li>
+                </ul>
+
+                <div class="feature-highlight">
+                    <strong>🎨 Design Focus:</strong> Emphasis on clarity and simplicity while maintaining full functionality.
+                </div>
+            </div>
+            <div class="comparison-content">
+                <div class="before">
+                    <div class="label before-label">
+                        <span class="icon">❌</span>
+                        BEFORE
+                    </div>
+                    <div class="image-container">
+                        <img src="Schedule Change req - old.png" alt="Schedule Change - Old Design">
+                    </div>
+                    <div class="caption">
+                        Old form with green selections and verbose text
+                    </div>
+                </div>
+                <div class="after">
+                    <div class="label after-label">
+                        <span class="icon">✅</span>
+                        AFTER
+                    </div>
+                    <div class="image-container">
+                        <img src="Schedule Change req - new.png" alt="Schedule Change - New Design">
+                    </div>
+                    <div class="caption">
+                        New form with clean placeholder, month highlighting, and simplified text
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System-Wide Improvements -->
+        <div class="key-changes">
+            <h2>🚀 System-Wide Improvements</h2>
+            
+            <div class="change-item">
+                <h3>🔄 Auto-Forfeit System</h3>
+                <p>Automatically marks requests as "Forfeited" if they remain pending past the current date. Implemented with Windows Task Scheduler for reliable daily execution.</p>
+            </div>
+
+            <div class="change-item">
+                <h3>📅 Historical Schedule Editing</h3>
+                <p>Administrators can now edit past schedules in the calendar history. Previously restricted date editing has been removed to allow full schedule management flexibility.</p>
+            </div>
+
+            <div class="change-item">
+                <h3>⏰ Smart Overtime Calculation</h3>
+                <p>Overtime display now reflects the actual work schedule from the calendar. RDOT (Rest Day OT) is automatically detected and calculated when overtime occurs on a rest day (time in to time out).</p>
+            </div>
+
+            <div class="change-item">
+                <h3>🎯 Conflict Resolution</h3>
+                <p>When a monthly schedule change is approved, any pending swap requests or single schedule change requests that conflict are automatically cancelled to prevent scheduling conflicts.</p>
+            </div>
+
+            <div class="change-item">
+                <h3>✉️ Email Encoding Fix</h3>
+                <p>Fixed emoji characters displaying as garbled text (ðŸ"…) in email notifications. All emojis removed from HTML email templates for proper UTF-8 encoding and professional appearance.</p>
+            </div>
+
+            <div class="change-item">
+                <h3>💾 Database Updates</h3>
+                <p>Updated database schema with new status options (Cancelled, Forfeited). Fixed column errors and JSON parsing issues for improved data integrity.</p>
+            </div>
+
+            <div class="change-item">
+                <h3>🎨 UI Simplification</h3>
+                <p>Applied "less is more" principle across all screens. Removed verbose text labels, unnecessary duration breakdowns, and redundant information for a cleaner, more professional appearance.</p>
+            </div>
+
+            <div class="change-item">
+                <h3>📱 Pagination System</h3>
+                <p>Implemented 10-records-per-page pagination with pending-first sorting across all request tabs. Improves performance and makes data browsing more manageable.</p>
+            </div>
+        </div>
+
+        <!-- Technical Details -->
+        <div class="key-changes">
+            <h2>🔧 Technical Implementation Details</h2>
+            
+            <div class="change-item">
+                <h3>Modified Files</h3>
+                <p>
+                    • Public/module/notification_modal.php - Email templates and emoji fixes<br>
+                    • Public/views/schedule_request.php - Pagination and "Single Request" rename<br>
+                    • Public/views/sidebar.php - Badge aggregation logic<br>
+                    • Public/module/new_overtime.php - Rest day detection and simplified UI<br>
+                    • Public/module/schedule_change_form.php - Month highlighting and placeholder<br>
+                    • Public/cron/auto_forfeit_expired_requests.php - Auto-forfeit system<br>
+                    • Public/views/process_monthly_schedule_action.php - Conflict resolution
+                </p>
+            </div>
+
+            <div class="change-item">
+                <h3>Database Enhancements</h3>
+                <p>
+                    • Added 'Cancelled' status to all request status ENUMs<br>
+                    • Added 'Forfeited' status to request status ENUMs<br>
+                    • Fixed updated_at column definitions across tables<br>
+                    • Improved JSON parsing for schedule data
+                </p>
+            </div>
+
+            <div class="change-item">
+                <h3>Automation & Scheduling</h3>
+                <p>
+                    • Windows Task Scheduler integration for daily auto-forfeit execution<br>
+                    • CRON-ready backup system for non-Windows environments<br>
+                    • Employee daily schedule cache as single source of truth for calculations
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>RSS Timekeeping System | UI/UX Enhancement Update | December 2025</p>
+            <p>For detailed documentation, visit the system's GitHub repository or contact the development team.</p>
+        </footer>
+    </div>
+</body>
+</html>
