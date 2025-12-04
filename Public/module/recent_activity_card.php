@@ -1448,11 +1448,14 @@ function showActivityDetails(title, dataJson) {
         }, 50);
         
         // Add Edit and Cancel buttons if applicable (status is 'pending' and we have request data)
+        // Exclude Monthly Schedule Request and Schedule Swap Request from edit functionality
         const unsubmitContainer = document.getElementById('unsubmitButtonContainer');
         unsubmitContainer.innerHTML = '';
         
         if (data.status && data.status.toLowerCase() === 'pending' && 
-            data.request_id && data.table_name) {
+            data.request_id && data.table_name &&
+            !data.type.includes('Monthly Schedule Request') && 
+            !data.type.includes('Schedule Swap')) {
             unsubmitContainer.innerHTML = `
                 <div class="flex gap-2">
                     <button id="edit-save-btn-${data.request_id}" onclick="toggleEditMode('${data.type}', ${data.request_id}, '${data.table_name}', '${data.source_table}')" 

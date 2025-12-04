@@ -1,0 +1,240 @@
+📋 RSS TIMEKEEPING SYSTEM - COMPLETE DOCUMENTATION
+================================================================
+
+Two comprehensive user manuals have been created in the "Harley up" folder:
+
+1️⃣ EMPLOYEE MANUAL (New - Detailed User Guide)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+File: employee_manual.html
+Link: https://updateharley.resourcestaffonline.com/Harley%20up/employee_manual.html
+
+Content Includes:
+✅ Recent Activities Dashboard - View, edit, cancel requests with attachments
+✅ Attendance History - 5 status categories: Complete, Late, Undertime, Leave, Incomplete
+✅ Overtime Requests - NDOT/RDOT auto-detection, client approval, hour submission
+✅ Schedule Calendar - Full month view with rest days and OT windows
+✅ Monthly Schedule Requests - Change entire month schedule for client requirements
+✅ Single Day Schedule Requests - One-off schedule changes
+✅ Day Off / Rest Day Requests - Request days off different from leave requests
+✅ Schedule Swap Requests - Swap two dates' schedules within same month
+
+Features:
+• Table of Contents with quick navigation
+• Step-by-step guides for each feature
+• Best practices section
+• Quick reference cards
+• Warning boxes for important restrictions
+• Feature comparison (Before/After concepts)
+• Image references showing actual interfaces
+
+
+2️⃣ ADMIN/SYSTEM COMPARISON (Enhanced Admin View)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+File: comparison.html
+Link: https://updateharley.resourcestaffonline.com/Harley%20up/comparison.html
+
+Content Includes:
+✅ Dashboard Improvements - Single Request rename, pagination, badge aggregation
+✅ Schedule Change Form Updates - Month highlighting, placeholder text
+✅ System-Wide Improvements - Auto-forfeit, historical editing, RDOT calculation
+✅ Technical Implementation Details - Files modified, database updates
+✅ Email Encoding Fix - UTF-8 emoji removal (production-ready)
+
+
+IMAGES USED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Dashboard - old.png
+• Dashboard - new.png
+• Schedule Change req - old.png
+• Schedule Change req - new.png
+• monthy_schedule_request_form_recent_act.png
+• Ot_old.png
+• Ot_new.png
+• ot_new(restday showing).png
+• schedule_swap.png
+
+
+RECOMMENDED USAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For Employee Training:
+→ Use employee_manual.html
+→ Covers all employee-facing features
+→ Perfect for onboarding new employees
+→ Share via email or training sessions
+
+For Stakeholder Presentations:
+→ Use comparison.html for management review
+→ Shows system improvements and technical updates
+→ Good for documenting changes
+
+For NotebookLM / AI Processing:
+→ Either document can be fed into NotebookLM
+→ Both are comprehensive and well-structured
+→ Non-technical language for easy understanding
+
+
+QUICK ACCESS LINKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Employee Manual: https://updateharley.resourcestaffonline.com/Harley%20up/employee_manual.html
+Admin Comparison: https://updateharley.resourcestaffonline.com/Harley%20up/comparison.html
+
+
+DOCUMENT STATISTICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Employee Manual:
+- 8 Major Feature Sections
+- 30+ Step-by-step guides
+- 15+ Best practices
+- 5+ Comparison boxes
+- 9 Image references
+- Responsive mobile-friendly design
+
+Admin Comparison:
+- 2 UI redesigns documented
+- 8+ System improvements
+- 7 Technical implementation details
+- 4 Screenshot references
+- Stats boxes with metrics
+
+
+FEATURES DOCUMENTED IN EMPLOYEE MANUAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. RECENT ACTIVITIES DASHBOARD
+   - View all pending requests (Leave, Schedule, Time, OT)
+   - Edit pending requests without resubmitting
+   - Cancel requests directly
+   - Manage attachments (upload/download/delete)
+   - See detailed request information
+
+2. ATTENDANCE HISTORY
+   - Daily attendance records from July 1, 2025 onwards
+   - 5 Status Types:
+     ✓ Complete - Full shift worked
+     ✓ Late - Clocked in after scheduled time
+     ✓ Undertime - Left before scheduled time
+     ✓ Leave - Approved leave day
+     ✗ Incomplete - No clock in/out
+   - Search and filter functionality
+   - Time adjustment tracking
+
+3. OVERTIME REQUESTS
+   - NDOT (Normal Day OT) - Regular day overtime
+   - RDOT (Rest Day OT) - Auto-detected on rest days
+   - Hours and minutes input (e.g., 2 hrs 30 mins)
+   - Client approval attachment required
+   - Reason for overtime required
+   - Edit hours before approval
+   - Tracks from Start OT to End OT time windows
+
+4. SCHEDULE CALENDAR
+   - Complete monthly view of your schedule
+   - Color-coded working days, rest days, special schedules
+   - Shows time windows and OT availability
+   - Active schedule section showing current times
+   - Foundation for accurate OT and day-off calculations
+   - Must be set up properly BEFORE requesting OT/changes
+
+5. MONTHLY SCHEDULE REQUESTS
+   - Change entire month's schedule at once
+   - Day-by-day schedule selection
+   - Include rest days for the entire month
+   - Submit with client documentation
+   - Approval applies schedule immediately
+   - Automatically cancels conflicting pending requests
+
+6. SINGLE DAY SCHEDULE REQUESTS
+   - Change one specific date's schedule
+   - Different work shift for one day
+   - Requires attachment and reason
+   - Fast approval process
+   - Track in Recent Activities
+
+7. DAY OFF / REST DAY REQUESTS
+   - Request a day off from work
+   - Different from Leave Requests
+   - Single date selection
+   - Requires reason and documentation
+   - Changes that date to a rest day
+
+8. SCHEDULE SWAP REQUESTS
+   - Swap schedules between two dates
+   - Both dates must be in same month
+   - Both dates must be in future
+   - Violet/purple swap icon on calendar
+   - Shows side-by-side schedule comparison
+   - Perfect for flexible rearrangement
+
+
+KEY SYSTEM IMPROVEMENTS HIGHLIGHTED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Auto-Forfeit System
+   - Automatically marks old pending requests as "Forfeited"
+   - Runs daily via Windows Task Scheduler
+   - Prevents indefinite pending status
+
+✅ Email Encoding Fixed
+   - Removed all emoji characters from email templates
+   - Proper UTF-8 encoding in all notifications
+   - Professional appearance in all email clients
+
+✅ Smart RDOT Detection
+   - Automatically identifies Rest Day OT
+   - Based on actual schedule calendar entry
+   - Critical for overtime calculation accuracy
+
+✅ Conflict Resolution
+   - Monthly schedule approval auto-cancels conflicting swaps
+   - Prevents scheduling conflicts
+   - Maintains data integrity
+
+✅ Historical Editing
+   - Admins can edit past schedules
+   - Better schedule management flexibility
+   - Audit trail maintained
+
+✅ Pagination System
+   - 10 records per page
+   - Better performance with large datasets
+   - Pending requests shown first
+
+
+DOCUMENT DESIGN FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ User-Friendly Layout:
+   - Color-coded sections (blue, green, orange)
+   - Clear navigation and table of contents
+   - Responsive mobile design
+   - Professional gradient backgrounds
+
+📊 Visual Elements:
+   - Feature comparison boxes
+   - Status indicator cards
+   - Step-by-step numbered guides
+   - Info/warning/success boxes
+   - Benefits grids
+   - Quick reference cards
+
+🎯 Organization:
+   - Logical section progression
+   - Table of contents for quick navigation
+   - Internal anchor links
+   - Consistent styling throughout
+   - Footer with metadata
+
+All documents are production-ready and can be:
+→ Shared via email
+→ Used for training sessions
+→ Fed into NotebookLM for presentations
+→ Printed for physical documentation
+→ Embedded in knowledge bases
+→ Used for onboarding materials
+
+================================================================
+Created: December 4, 2025
+System: RSS Timekeeping System 2025
+Status: Ready for Deployment ✅
+================================================================

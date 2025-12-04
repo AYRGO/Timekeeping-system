@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSS Timekeeping System - Employee Guide 2025</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            font-size: 0.95em;
+            opacity: 0.8;
+        }
+
+        .quick-nav {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+
+        .nav-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .nav-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .nav-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .nav-desc {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            scroll-margin-top: 100px;
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            font-size: 1.8em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .section-icon {
+            font-size: 2em;
+        }
+
+        .section-content {
+            padding: 30px;
+        }
+
+        .feature-intro {
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 6px;
+            font-size: 1.05em;
+            line-height: 1.7;
+            color: #333;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .before-box {
+            background: #fff5f5;
+            border: 2px solid #fca5a5;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .after-box {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .box-title {
+            font-weight: 700;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .before-title {
+            color: #dc2626;
+        }
+
+        .after-title {
+            color: #16a34a;
+        }
+
+        .feature-list {
+            list-style: none;
+        }
+
+        .feature-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-list strong {
+            color: #333;
+        }
+
+        .highlight-new {
+            background: #fef3c7;
+            color: #78350f;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        .image-showcase {
+            margin: 25px 0;
+        }
+
+        .image-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .image-container {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .image-caption {
+            background: #f9fafb;
+            padding: 12px;
+            font-size: 0.9em;
+            color: #666;
+            border-top: 1px solid #e5e7eb;
+            font-style: italic;
+        }
+
+        .step-guide {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .step {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: flex-start;
+        }
+
+        .step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            width: 32px;
+            height: 32px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+            padding-top: 3px;
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .step-description {
+            color: #666;
+            line-height: 1.6;
+            font-size: 0.95em;
+        }
+
+        .info-box {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 6px;
+            color: #1e40af;
+        }
+
+        .warning-box {
+            background: #fed7aa;
+            border-left: 4px solid #f97316;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 6px;
+            color: #92400e;
+        }
+
+        .success-box {
+            background: #dcfce7;
+            border-left: 4px solid #22c55e;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 6px;
+            color: #15803d;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+
+        .feature-highlight {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #78350f;
+        }
+
+        .feature-highlight h3 {
+            margin-bottom: 10px;
+            color: #92400e;
+        }
+
+        @media (max-width: 1024px) {
+            .comparison-grid,
+            .image-row {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .section-header {
+                font-size: 1.4em;
+                padding: 20px;
+            }
+        }
+
+        .benefits-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .benefit-item {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 8px;
+            padding: 15px;
+            color: #15803d;
+        }
+
+        .benefit-icon {
+            font-size: 1.5em;
+            margin-bottom: 8px;
+        }
+
+        .benefit-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .benefit-desc {
+            font-size: 0.9em;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 50px;
+            padding: 20px;
+            opacity: 0.8;
+            font-size: 0.9em;
+        }
+
+        .toc {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .toc h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .toc-list {
+            list-style: none;
+            columns: 2;
+            column-gap: 30px;
+        }
+
+        .toc-list li {
+            margin-bottom: 12px;
+            break-inside: avoid;
+        }
+
+        .toc-list a {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .toc-list a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📱 RSS Timekeeping System</h1>
+            <p><strong>Employee Guide 2025</strong></p>
+            <p class="subtitle">Complete Feature Update & User Manual</p>
+        </div>
+
+        <!-- Table of Contents -->
+        <div class="toc">
+            <h2>📑 Table of Contents</h2>
+            <ul class="toc-list">
+                <li><a href="#recent-activities">Recent Activities Dashboard</a></li>
+                <li><a href="#attendance-history">Attendance History</a></li>
+                <li><a href="#overtime">Overtime Requests</a></li>
+                <li><a href="#schedule-calendar">Schedule Calendar</a></li>
+                <li><a href="#monthly-schedule">Monthly Schedule Requests</a></li>
+                <li><a href="#single-day">Single Day Schedule Requests</a></li>
+                <li><a href="#day-off">Day Off / Rest Day Requests</a></li>
+                <li><a href="#schedule-swap">Schedule Swap Requests</a></li>
+            </ul>
+        </div>
+
+        <!-- SECTION 1: Recent Activities Dashboard -->
+        <div class="section" id="recent-activities">
+            <div class="section-header">
+                <span class="section-icon">📊</span>
+                Recent Activities Dashboard
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    The Recent Activities Dashboard is your centralized hub for managing all pending requests. View summary details of your requests, cancel them, or edit them before approval. This replaces the scattered request view with one unified interface.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin-bottom: 15px;">✨ What's New</h3>
+                <div class="benefits-list">
+                    <div class="benefit-item">
+                        <div class="benefit-icon">📋</div>
+                        <div class="benefit-title">Request Summaries</div>
+                        <div class="benefit-desc">See pending Leave, Schedule Change, Time Adjustment, and Overtime requests at a glance</div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">✏️</div>
+                        <div class="benefit-title">Edit Requests</div>
+                        <div class="benefit-desc">Modify pending requests before admin approval without canceling and re-submitting</div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">❌</div>
+                        <div class="benefit-title">Cancel Anytime</div>
+                        <div class="benefit-desc">Instantly cancel pending requests directly from the activity summary</div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">📎</div>
+                        <div class="benefit-title">Attachments</div>
+                        <div class="benefit-desc">View, download, upload, or delete attachments for each request</div>
+                    </div>
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">Request Types in Dashboard</h3>
+                
+                <div style="background: #f9fafb; border-left: 4px solid #667eea; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                    <strong style="color: #333;">📝 Leave Request Summary:</strong> Shows your leave request status, dates, type, reason, and any attachments. Click to view full details and edit if pending.
+                </div>
+
+                <div style="background: #f9fafb; border-left: 4px solid #667eea; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                    <strong style="color: #333;">📅 Schedule Change Summary:</strong> Displays the schedule you're requesting to change to, the date range, reason, and current status. Edit individual fields like schedule, dates, or reason before approval.
+                </div>
+
+                <div style="background: #f9fafb; border-left: 4px solid #667eea; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                    <strong style="color: #333;">⏰ Time Adjustment Summary:</strong> Shows your requested time in/out, current times, duration, reason, and status. Make quick time adjustments without resubmitting.
+                </div>
+
+                <div style="background: #f9fafb; border-left: 4px solid #667eea; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                    <strong style="color: #333;">💼 Overtime Summary:</strong> View your OT hours, type (NDOT/RDOT), date, reason, and approval status. Edit duration and reason if still pending.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">How to Use Recent Activities</h3>
+                <div class="step-guide">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Navigate to Dashboard</div>
+                            <div class="step-description">Go to your employee dashboard. Recent Activities will be prominently displayed on the home page.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">View Request Summary</div>
+                            <div class="step-description">Click on any request card to see the full details in a modal dialog. All information is organized by request type.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Edit or Modify (Pending Only)</div>
+                            <div class="step-description">If your request is still pending, click "Edit Form" to modify specific fields. Changes are saved immediately.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Cancel or Manage Attachments</div>
+                            <div class="step-description">Use the "Cancel" button to withdraw your request, or upload/delete attachments as needed.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="image-showcase">
+                    <div class="image-row">
+                        <div class="image-container">
+                            <img src="monthy_schedule_request_form_recent_act.png" alt="Recent Activities Dashboard">
+                            <div class="image-caption">Recent Activities showing request summaries with edit and cancel options</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: Attendance History -->
+        <div class="section" id="attendance-history">
+            <div class="section-header">
+                <span class="section-icon">📜</span>
+                Attendance History
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    The Attendance History section provides a comprehensive record of your daily attendance with status indicators. Track your work patterns and understand your attendance at a glance with five distinct status categories.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin-bottom: 15px;">Five Status Categories</h3>
+                
+                <div class="benefits-list">
+                    <div class="benefit-item" style="border-left: 4px solid #22c55e;">
+                        <div class="benefit-icon">✅</div>
+                        <div class="benefit-title">Complete</div>
+                        <div class="benefit-desc">You clocked in and out within your scheduled time</div>
+                    </div>
+                    <div class="benefit-item" style="border-left: 4px solid #ef4444;">
+                        <div class="benefit-icon">🕐</div>
+                        <div class="benefit-title">Late</div>
+                        <div class="benefit-desc">You clocked in after your scheduled time in</div>
+                    </div>
+                    <div class="benefit-item" style="border-left: 4px solid #f97316;">
+                        <div class="benefit-icon">⏱️</div>
+                        <div class="benefit-title">Undertime</div>
+                        <div class="benefit-desc">You left before your scheduled time out or clocked out early</div>
+                    </div>
+                    <div class="benefit-item" style="border-left: 4px solid #3b82f6;">
+                        <div class="benefit-icon">🎫</div>
+                        <div class="benefit-title">Leave</div>
+                        <div class="benefit-desc">You had an approved leave request for that day</div>
+                    </div>
+                    <div class="benefit-item" style="border-left: 4px solid #8b5cf6;">
+                        <div class="benefit-icon">❌</div>
+                        <div class="benefit-title">Incomplete</div>
+                        <div class="benefit-desc">You did not clock in or clock out on that day</div>
+                    </div>
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">Features & Benefits</h3>
+                <ul class="feature-list" style="margin: 20px 0;">
+                    <li><strong>Daily Records:</strong> Complete attendance history dating back to July 1, 2025</li>
+                    <li><strong>Status Indicators:</strong> Color-coded status badges for quick identification</li>
+                    <li><strong>Search Functionality:</strong> Find specific dates or attendance records quickly</li>
+                    <li><strong>Time Details:</strong> View your actual clock in/out times versus scheduled times</li>
+                    <li><strong>Adjustments Tracking:</strong> See any approved time adjustments applied to your records</li>
+                </ul>
+
+                <div class="info-box">
+                    💡 <strong>Tip:</strong> Use the search feature to find attendance records by date, day of week, or status type for quick reference.
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 3: Overtime Requests -->
+        <div class="section" id="overtime">
+            <div class="section-header">
+                <span class="section-icon">⚡</span>
+                Overtime (OT) Requests
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    Request and track your overtime work. The system automatically detects Rest Day OT (RDOT) when your overtime falls on a scheduled rest day. All OT hours are calculated from your actual start OT to end OT times, not from work schedule times.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin-bottom: 15px;">Understanding OT Types</h3>
+                
+                <div class="benefits-list">
+                    <div class="benefit-item" style="background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%); border-left: 4px solid #3b82f6;">
+                        <div class="benefit-icon">⏰</div>
+                        <div class="benefit-title">NDOT (Normal Day OT)</div>
+                        <div class="benefit-desc">Overtime on a regular working day (not a rest day)</div>
+                    </div>
+                    <div class="benefit-item" style="background: linear-gradient(135deg, #fce7f3 0%, #f3e8ff 100%); border-left: 4px solid #ec4899;">
+                        <div class="benefit-icon">🛏️</div>
+                        <div class="benefit-title">RDOT (Rest Day OT)</div>
+                        <div class="benefit-desc">Overtime on your scheduled rest day - automatically detected when your schedule shows a rest day</div>
+                    </div>
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">How to Submit an OT Request</h3>
+                <div class="step-guide">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Check Your Schedule</div>
+                            <div class="step-description">First, verify in the Schedule Calendar section whether the date you'll work OT is a regular day or a rest day. Your OT type is automatically determined by this.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">Set OT Hours</div>
+                            <div class="step-description">Enter the OT duration (hours and minutes). Example: 2 hours 30 minutes. The system calculates from your Start OT to End OT times on your calendar.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Add Client Approval</div>
+                            <div class="step-description">Attach a document from your client approving the overtime work (email, document, screenshot, etc.)</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Provide Reason</div>
+                            <div class="step-description">Explain why you worked overtime (urgent project, deadline, etc.)</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <div class="step-title">Submit & Track</div>
+                            <div class="step-description">Submit your request and track its status in the Recent Activities dashboard. Admin will review and approve/decline.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    ⚠️ <strong>Important:</strong> Your monthly schedule MUST be set in advance to properly detect RDOT. If your rest day is not configured for the month, the system cannot identify RDOT. Check your schedule calendar before requesting overtime.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">OT Hours Calculation</h3>
+                <div class="info-box">
+                    The system calculates OT hours based on your calendar's "Start OT" and "End OT" times, not your regular work schedule times. This is crucial for accurate OT tracking when you work extended hours.
+                </div>
+
+                <div class="image-showcase">
+                    <h4 style="margin-bottom: 15px; color: #333;">OT Request Interface Evolution</h4>
+                    <div class="image-row">
+                        <div class="image-container">
+                            <img src="Ot_old.png" alt="Old OT Interface">
+                            <div class="image-caption">Previous OT interface</div>
+                        </div>
+                        <div class="image-container">
+                            <img src="Ot_new.png" alt="New OT Interface">
+                            <div class="image-caption">New OT interface with clearer input</div>
+                        </div>
+                    </div>
+                    <div class="image-row">
+                        <div class="image-container">
+                            <img src="ot_new(restday showing).png" alt="OT with Rest Day">
+                            <div class="image-caption">Rest day detection in OT form (showing RDOT option)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="success-box">
+                    ✅ <strong>Pro Tip:</strong> After submitting OT, you can edit the hours or reason directly from Recent Activities if your request is still pending. No need to cancel and resubmit!
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: Schedule Calendar -->
+        <div class="section" id="schedule-calendar">
+            <div class="section-header">
+                <span class="section-icon">📆</span>
+                Schedule Calendar
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    Your personal schedule calendar displays your complete monthly work schedule. This is your single source of truth for when you work, your rest days, and your available time windows. Upon deployment, your admin will set your initial schedule. Going forward, you must request schedule changes through the Monthly Schedule Change feature to modify your entire monthly schedule.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin-bottom: 15px;">Calendar Features</h3>
+                <div class="benefits-list">
+                    <div class="benefit-item">
+                        <div class="benefit-icon">📋</div>
+                        <div class="benefit-title">Complete Month View</div>
+                        <div class="benefit-desc">See your entire month of work schedules at a glance</div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">🎨</div>
+                        <div class="benefit-title">Color-Coded Schedule</div>
+                        <div class="benefit-desc">Different colors for working days, rest days, and special schedules</div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">🛏️</div>
+                        <div class="benefit-title">Rest Day Visibility</div>
+                        <div class="benefit-desc">Clearly see your scheduled rest days for the entire month</div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon">⏱️</div>
+                        <div class="benefit-title">Time Windows</div>
+                        <div class="benefit-desc">View Start OT and End OT windows for potential overtime work</div>
+                    </div>
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">Understanding Your Active Schedule</h3>
+                <div style="background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); border-left: 4px solid #8b5cf6; padding: 20px; border-radius: 6px; margin: 20px 0; color: #5b21b6;">
+                    <strong>📍 Active Schedule Section:</strong> Shows you your currently active/effective schedule for today. You can view your time in, time out, rest day status, and OT window times here. This information updates automatically based on your monthly schedule.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">Important: Set Your Schedule Before Requesting Changes</h3>
+                <div class="warning-box">
+                    ⚠️ You MUST have your full monthly schedule configured BEFORE submitting overtime requests or requesting day-off changes. If a date doesn't have a schedule assigned, the system cannot:
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Properly detect RDOT (Rest Day OT)</li>
+                        <li>Calculate OT hours correctly</li>
+                        <li>Process rest day requests accurately</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 5: Monthly Schedule Requests -->
+        <div class="section" id="monthly-schedule">
+            <div class="section-header">
+                <span class="section-icon">📅</span>
+                Monthly Schedule Requests
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    This feature allows you to request changes to your entire monthly schedule. Instead of changing individual days, you can submit a complete new schedule for the month, including rest days and working hours for each day of the week.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin-bottom: 15px;">Why Use Monthly Schedule Requests?</h3>
+                <ul class="feature-list" style="margin: 20px 0;">
+                    <li><strong>Bulk Changes:</strong> Change your schedule for the entire month instead of individual days</li>
+                    <li><strong>Rest Day Planning:</strong> Plan your rest days for the whole month in advance</li>
+                    <li><strong>Consistency:</strong> Ensure your weekly schedule pattern is maintained throughout the month</li>
+                    <li><strong>Client Requirements:</strong> Adapt your schedule when client requirements change for extended periods</li>
+                    <li><strong>Admin Approval:</strong> One request for one-time approval instead of multiple individual requests</li>
+                </ul>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">How to Submit a Monthly Schedule Request</h3>
+                <div class="step-guide">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Select Month</div>
+                            <div class="step-description">Choose the month you want to change your schedule for. You'll see a month picker with clear navigation.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">Assign Schedule Per Day</div>
+                            <div class="step-description">For each day of the month, select a work schedule (e.g., 8:00 AM - 5:00 PM) or mark it as a Rest Day. Click the day to open the schedule selector and type to search if needed.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Verify All Days</div>
+                            <div class="step-description">Make sure every day of the month has a schedule assigned (either a work shift or Rest Day). Days with assigned schedules will be highlighted.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Add Supporting Documents</div>
+                            <div class="step-description">Attach a document from your client (email, schedule document, contract addendum) that justifies the new schedule.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <div class="step-title">Provide Reason</div>
+                            <div class="step-description">Explain why you're requesting this new monthly schedule (client requirements, project duration, etc.)</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">6</div>
+                        <div class="step-content">
+                            <div class="step-title">Submit & Wait for Approval</div>
+                            <div class="step-description">Submit your request. Once approved, your new schedule applies immediately. Track status in Recent Activities.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-highlight">
+                    <h3>⚡ What Happens When Approved</h3>
+                    When your monthly schedule is approved:
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Your entire month's schedule updates to the new schedule</li>
+                        <li>Your calendar reflects all new rest days and work times</li>
+                        <li>Any conflicting pending requests (single day changes, swaps) are automatically cancelled</li>
+                        <li>Your active schedule display updates to show the new times</li>
+                    </ul>
+                </div>
+
+                <div class="image-showcase">
+                    <div class="image-row">
+                        <div class="image-container">
+                            <img src="monthy_schedule_request_form_recent_act.png" alt="Monthly Schedule Request">
+                            <div class="image-caption">Monthly Schedule Request form with day-by-day schedule selection</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="success-box">
+                    ✅ <strong>Best Practice:</strong> Submit your monthly schedule request early in the month so admin has time to review and approve before important dates.
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 6: Single Day Schedule Requests -->
+        <div class="section" id="single-day">
+            <div class="section-header">
+                <span class="section-icon">📆</span>
+                Single Day Schedule Requests
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    Request a schedule change for a single specific date. Use this when you need to change your shift for just one day without affecting your monthly schedule. This is the classic schedule change request feature.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin-bottom: 15px;">When to Use Single Day Requests</h3>
+                <ul class="feature-list" style="margin: 20px 0;">
+                    <li><strong>One-Time Changes:</strong> You need a different schedule for just one specific date</li>
+                    <li><strong>Quick Adjustments:</strong> Change a single day without submitting a full monthly request</li>
+                    <li><strong>Ad-Hoc Scheduling:</strong> Handle unexpected schedule changes for individual days</li>
+                    <li><strong>Not a Rest Day Request:</strong> Use this when you're changing to a different working shift (not requesting a day off)</li>
+                </ul>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">How to Submit a Single Day Request</h3>
+                <div class="step-guide">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Select Date</div>
+                            <div class="step-description">Choose the specific date you want to change your schedule for</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">Choose New Schedule</div>
+                            <div class="step-description">Select the new work schedule (time in and time out) for that day</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Add Attachment & Reason</div>
+                            <div class="step-description">Upload a supporting document and provide a reason for the change</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Submit</div>
+                            <div class="step-description">Submit your request and track it in Recent Activities</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    💡 <strong>Note:</strong> Single day requests are only for schedule time changes. To request a day off for a single day, use the Day Off / Rest Day Request feature instead.
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 7: Day Off / Rest Day Requests -->
+        <div class="section" id="day-off">
+            <div class="section-header">
+                <span class="section-icon">🛏️</span>
+                Day Off / Rest Day Requests
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    Request a single day off from work or change a working day to a rest day. This is separate from leave requests (vacation, sick leave) and represents a change to your working schedule for a specific date.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin-bottom: 15px;">Day Off vs. Leave Requests</h3>
+                <div class="comparison-grid">
+                    <div class="before-box" style="background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%); border-left: 4px solid #3b82f6;">
+                        <div class="box-title before-title" style="color: #1e40af;">
+                            <span>🛏️</span> Day Off / Rest Day
+                        </div>
+                        <ul class="feature-list">
+                            <li>Schedule change to not work on a specific date</li>
+                            <li>You're marked as having a rest day</li>
+                            <li>Different from taking vacation/sick leave</li>
+                            <li>For schedule adjustments, not absences due to leave types</li>
+                        </ul>
+                    </div>
+                    <div class="after-box" style="background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%); border-left: 4px solid #10b981;">
+                        <div class="box-title after-title" style="color: #047857;">
+                            <span>🎫</span> Leave Requests
+                        </div>
+                        <ul class="feature-list">
+                            <li>Time off for specific leave types (vacation, sick, etc.)</li>
+                            <li>Tracked separately in leave balance</li>
+                            <li>Uses your available leave credits</li>
+                            <li>For official absences and leave types</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">How to Request a Day Off</h3>
+                <div class="step-guide">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Select "Rest Day / Day Off" Option</div>
+                            <div class="step-description">In the schedule change form, choose the "Rest Day / Day Off" option instead of a work schedule</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">Choose the Date</div>
+                            <div class="step-description">Select the specific date you want as a day off</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Add Reason & Documentation</div>
+                            <div class="step-description">Provide a reason for the day off and any supporting documents</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Submit for Approval</div>
+                            <div class="step-description">Submit and wait for admin approval. Track status in Recent Activities.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="success-box">
+                    ✅ <strong>Note:</strong> You can also see and request rest days directly from the Schedule Calendar by clicking the "OFF / Rest Day" option for any date in the month.
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 8: Schedule Swap Requests -->
+        <div class="section" id="schedule-swap">
+            <div class="section-header">
+                <span class="section-icon">🔄</span>
+                Schedule Swap Requests
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    Swap the schedules between two dates within the same month. This feature allows you to exchange your work schedules with another date, moving your work hours around while keeping your total monthly schedule balanced. Perfect for coordinating with other plans.
+                </div>
+
+                <h3 style="font-size: 1.3em; color: #333; margin-bottom: 15px;">When to Use Schedule Swaps</h3>
+                <ul class="feature-list" style="margin: 20px 0;">
+                    <li><strong>Flexible Scheduling:</strong> Swap two days to accommodate personal plans</li>
+                    <li><strong>Same Month Changes:</strong> Both dates must be within the same month</li>
+                    <li><strong>Preserve Schedule:</strong> Your total work schedule for the month stays the same</li>
+                    <li><strong>Quick Rearrangement:</strong> Faster than submitting multiple single-day requests</li>
+                    <li><strong>Both Must Be Future Dates:</strong> Cannot swap past dates</li>
+                </ul>
+
+                <h3 style="font-size: 1.3em; color: #333; margin: 30px 0 15px 0;">How to Submit a Schedule Swap Request</h3>
+                <div class="step-guide">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Access from Calendar</div>
+                            <div class="step-description">In your Schedule Calendar, look for the violet/purple swap icon on the dates you want to swap. Or use the schedule swap request form.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">Select Date A (From)</div>
+                            <div class="step-description">Choose the first date. The system will show you the current schedule for that day.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Select Date B (To)</div>
+                            <div class="step-description">Choose the second date. The system will show the current schedule for this day too.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Review the Swap</div>
+                            <div class="step-description">See side-by-side what schedules are being swapped. Date A will take Date B's schedule and vice versa.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <div class="step-title">Provide Reason & Documents</div>
+                            <div class="step-description">Explain why you're swapping these dates and attach any supporting documentation from your client</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">6</div>
+                        <div class="step-content">
+                            <div class="step-title">Submit & Track</div>
+                            <div class="step-description">Submit the swap request. Once approved, the schedules for both dates are exchanged.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="image-showcase">
+                    <div class="image-row">
+                        <div class="image-container">
+                            <img src="schedule_swap.png" alt="Schedule Swap Interface">
+                            <div class="image-caption">Schedule Swap showing two dates being exchanged with visual swap icon</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    ⚠️ <strong>Important Restrictions:</strong>
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Both dates must be FUTURE dates (not in the past)</li>
+                        <li>Both dates must be within the SAME month</li>
+                        <li>You cannot swap with a rest day unless swapping with another rest day</li>
+                        <li>When a monthly schedule is approved, all pending swaps may be cancelled to prevent conflicts</li>
+                    </ul>
+                </div>
+
+                <div class="feature-highlight">
+                    <h3>💡 Calendar Swap Icon</h3>
+                    Look for the violet/purple swap icon (🔄) on each date in your Schedule Calendar. Click it to quickly access the swap request form with that date pre-selected as the starting point.
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Reference Card -->
+        <div class="section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <div class="section-content">
+                <h2 style="font-size: 1.8em; margin-bottom: 25px;">📚 Quick Reference Guide</h2>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 8px; backdrop-filter: blur(10px);">
+                        <div style="font-size: 1.5em; margin-bottom: 10px;">📊</div>
+                        <strong style="font-size: 1.1em; display: block; margin-bottom: 8px;">Recent Activities</strong>
+                        <p style="opacity: 0.9; font-size: 0.9em;">View all pending requests, edit details, upload/delete attachments, and cancel requests without resubmitting</p>
+                    </div>
+
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 8px; backdrop-filter: blur(10px);">
+                        <div style="font-size: 1.5em; margin-bottom: 10px;">📜</div>
+                        <strong style="font-size: 1.1em; display: block; margin-bottom: 8px;">Attendance History</strong>
+                        <p style="opacity: 0.9; font-size: 0.9em;">Complete daily attendance record with 5 status types: Complete, Late, Undertime, Leave, Incomplete</p>
+                    </div>
+
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 8px; backdrop-filter: blur(10px);">
+                        <div style="font-size: 1.5em; margin-bottom: 10px;">⚡</div>
+                        <strong style="font-size: 1.1em; display: block; margin-bottom: 8px;">Overtime Requests</strong>
+                        <p style="opacity: 0.9; font-size: 0.9em;">Submit OT with automatic RDOT detection. Requires client approval document, reason, and duration</p>
+                    </div>
+
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 8px; backdrop-filter: blur(10px);">
+                        <div style="font-size: 1.5em; margin-bottom: 10px;">📆</div>
+                        <strong style="font-size: 1.1em; display: block; margin-bottom: 8px;">Schedule Calendar</strong>
+                        <p style="opacity: 0.9; font-size: 0.9em;">View your entire monthly schedule, rest days, and OT windows. Source of truth for your work times</p>
+                    </div>
+
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 8px; backdrop-filter: blur(10px);">
+                        <div style="font-size: 1.5em; margin-bottom: 10px;">📅</div>
+                        <strong style="font-size: 1.1em; display: block; margin-bottom: 8px;">Monthly Schedule</strong>
+                        <p style="opacity: 0.9; font-size: 0.9em;">Change your entire month's schedule at once. Perfect for client requirement changes or extended projects</p>
+                    </div>
+
+                    <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 8px; backdrop-filter: blur(10px);">
+                        <div style="font-size: 1.5em; margin-bottom: 10px;">🔄</div>
+                        <strong style="font-size: 1.1em; display: block; margin-bottom: 8px;">Schedule Swap</strong>
+                        <p style="opacity: 0.9; font-size: 0.9em;">Swap two dates' schedules within the same month. Both dates must be in the future</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Best Practices Section -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">💡</span>
+                Best Practices & Tips
+            </div>
+            <div class="section-content">
+                <div class="benefits-list">
+                    <div class="benefit-item" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+                        <div class="benefit-icon">✅</div>
+                        <div class="benefit-title">Plan Your Schedule Early</div>
+                        <div class="benefit-desc">Set up your full monthly schedule at the beginning of each month to avoid complications with OT requests and day-off approvals</div>
+                    </div>
+
+                    <div class="benefit-item" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+                        <div class="benefit-icon">📎</div>
+                        <div class="benefit-title">Always Include Attachments</div>
+                        <div class="benefit-desc">Provide client-approved documents with all schedule and OT requests. This speeds up admin approval.</div>
+                    </div>
+
+                    <div class="benefit-item" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+                        <div class="benefit-icon">💬</div>
+                        <div class="benefit-title">Clear Reasons & Communication</div>
+                        <div class="benefit-desc">Always provide a clear reason for your requests. Good communication helps admin understand and approve faster.</div>
+                    </div>
+
+                    <div class="benefit-item" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+                        <div class="benefit-icon">📊</div>
+                        <div class="benefit-title">Monitor Recent Activities</div>
+                        <div class="benefit-desc">Regularly check Recent Activities to see approval status, edit pending requests if needed, and manage attachments</div>
+                    </div>
+
+                    <div class="benefit-item" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+                        <div class="benefit-icon">🛑</div>
+                        <div class="benefit-title">Don't Request Past Dates</div>
+                        <div class="benefit-desc">You cannot submit schedule requests, swaps, or day-off requests for dates in the past. Plan ahead.</div>
+                    </div>
+
+                    <div class="benefit-item" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+                        <div class="benefit-icon">🎯</div>
+                        <div class="benefit-title">Use Appropriate Request Type</div>
+                        <div class="benefit-desc">Choose Monthly Schedule for big changes, Single Day for one-off shifts, and Swaps for flexible rearrangement</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>RSS Timekeeping System - Employee User Guide 2025</p>
+            <p>For technical support or questions, contact your administrator.</p>
+            <p style="margin-top: 10px; font-size: 0.8em; opacity: 0.7;">Updated December 2025 | All features are production-ready</p>
+        </footer>
+    </div>
+</body>
+</html>
