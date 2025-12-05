@@ -483,33 +483,35 @@
 
                 <h3 style="font-size: 1.6em; color: #333; margin: 30px 0 20px 0;">Understanding OT Types in Harley</h3>
                 
-                <div class="comparison-grid">
-                    <div class="before-box" style="background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%); border-left: 5px solid #3b82f6;">
-                        <div class="box-title" style="color: #1e40af;">
-                            <span>⏰</span> NDOT - Normal Day Overtime
-                        </div>
-                        <ul class="feature-list">
-                            <li><strong>What it is:</strong> Overtime worked on a regular working day (not a rest day)</li>
-                            <li><strong>When it applies:</strong> Your schedule calendar shows you have a work shift assigned for that day</li>
-                            <li><strong>Detection:</strong> Harley automatically identifies this when the date is a working day in your calendar</li>
-                            <li><strong>Calculation:</strong> OT hours are counted from your Start OT time to End OT time</li>
-                        </ul>
+                <div class="info-box">
+                    💡 <strong>Overtime Type Selection:</strong> Harley now offers multiple overtime type options to accommodate different work situations. You can select from Regular OT, Special Holiday OT, Regular Holiday OT, or Rest Day OT depending on the nature of the day you're working overtime. The system will help guide you based on your schedule calendar.
+                </div>
+
+                <div class="benefits-grid">
+                    <div class="benefit-card" style="background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%); border: 2px solid #3b82f6;">
+                        <div class="benefit-icon">⏰</div>
+                        <div class="benefit-title" style="color: #1e40af;">Regular OT</div>
+                        <div class="benefit-desc" style="color: #1e3a8a;">Overtime worked on a regular working day (not a rest day or holiday). This is your standard overtime when you work extra hours beyond your normal shift.</div>
                     </div>
-                    <div class="after-box" style="background: linear-gradient(135deg, #fce7f3 0%, #f3e8ff 100%); border-left: 5px solid #ec4899;">
-                        <div class="box-title" style="color: #be185d;">
-                            <span>🛏️</span> RDOT - Rest Day Overtime
-                        </div>
-                        <ul class="feature-list">
-                            <li><strong>What it is:</strong> Overtime worked on your scheduled rest day</li>
-                            <li><strong>When it applies:</strong> Your schedule calendar shows the day is marked as a rest day</li>
-                            <li><strong>Detection:</strong> Harley automatically detects this when you submit OT for a rest day</li>
-                            <li><strong>Importance:</strong> RDOT typically has different compensation rates than NDOT</li>
-                        </ul>
+                    <div class="benefit-card" style="background: linear-gradient(135deg, #fce7f3 0%, #f3e8ff 100%); border: 2px solid #ec4899;">
+                        <div class="benefit-icon">🎉</div>
+                        <div class="benefit-title" style="color: #be185d;">Special Holiday OT</div>
+                        <div class="benefit-desc" style="color: #9f1239;">Overtime worked on a special non-working holiday. These are holidays declared by the government as special days, and working OT on these days has specific compensation rates.</div>
+                    </div>
+                    <div class="benefit-card" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b;">
+                        <div class="benefit-icon">🎊</div>
+                        <div class="benefit-title" style="color: #92400e;">Regular Holiday OT</div>
+                        <div class="benefit-desc" style="color: #78350f;">Overtime worked on a regular holiday (like New Year's Day, Independence Day, etc.). Regular holidays typically have higher compensation rates than special holidays.</div>
+                    </div>
+                    <div class="benefit-card" style="background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%); border: 2px solid #8b5cf6;">
+                        <div class="benefit-icon">🛏️</div>
+                        <div class="benefit-title" style="color: #6b21a8;">Rest Day OT</div>
+                        <div class="benefit-desc" style="color: #5b21b6;">Overtime worked on your scheduled rest day. The system automatically detects when the selected date is marked as a rest day in your schedule calendar and makes this option available.</div>
                     </div>
                 </div>
 
                 <div class="info-box">
-                    💡 <strong>Key Insight:</strong> The distinction between NDOT and RDOT is crucial because they often have different pay rates or compensation structures per labor law and company policy. Harley's automatic detection ensures you're always compensated correctly based on what type of day you worked overtime.
+                    💡 <strong>Key Insight:</strong> The distinction between different OT types is crucial because they have different pay rates and compensation structures per labor law and company policy. Harley gives you the flexibility to select the appropriate OT type based on the nature of the day - whether it's a regular working day, a special holiday, a regular holiday, or your rest day. When you select Rest Day OT, the system validates it against your schedule calendar to ensure the date is actually marked as a rest day.
                 </div>
 
                 <h3 style="font-size: 1.6em; color: #333; margin: 30px 0 20px 0;">How to Submit an OT Request with Selectable Hours</h3>
@@ -547,8 +549,8 @@
                     <div class="step">
                         <div class="step-number">5</div>
                         <div class="step-content">
-                            <div class="step-title">System Auto-Detects OT Type</div>
-                            <div class="step-description">Harley will automatically check your schedule calendar for that date. If it's a working day, it marks it as NDOT. If it's a rest day, it marks it as RDOT. You don't have to manually select the type - the system does it for you.</div>
+                            <div class="step-title">Select OT Type</div>
+                            <div class="step-description">Choose the appropriate overtime type from the dropdown menu: Regular OT (normal working day), Special Holiday OT (special non-working holiday), Regular Holiday OT (regular holiday like Christmas, New Year), or Rest Day OT (only available when the date is marked as a rest day in your calendar). The system will validate your selection against your schedule.</div>
                         </div>
                     </div>
                     <div class="step">
@@ -616,8 +618,8 @@
                     </div>
                     <div class="benefit-card">
                         <div class="benefit-icon">🤖</div>
-                        <div class="benefit-title">Automated OT Type Detection</div>
-                        <div class="benefit-desc">System automatically determines NDOT vs. RDOT based on your schedule calendar.</div>
+                        <div class="benefit-title">Multiple OT Type Options</div>
+                        <div class="benefit-desc">Choose from Regular OT, Special Holiday OT, Regular Holiday OT, or Rest Day OT based on the type of day you're working overtime.</div>
                     </div>
                 </div>
 
@@ -693,8 +695,8 @@
                     <div class="step">
                         <div class="step-number">5</div>
                         <div class="step-content">
-                            <div class="step-title">OT Type Auto-Detection</div>
-                            <div class="step-description">Based on what the calendar shows (working day vs. rest day), Harley automatically sets the OT type to NDOT or RDOT.</div>
+                            <div class="step-title">Select Appropriate OT Type</div>
+                            <div class="step-description">Choose the OT type that matches the day: Regular OT for normal working days, Special Holiday OT or Regular Holiday OT for holidays, or Rest Day OT if working on your scheduled rest day.</div>
                         </div>
                     </div>
                     <div class="step">
