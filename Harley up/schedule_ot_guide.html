@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harley - Schedule Calendar & Overtime Guide 2026</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 1em;
+            opacity: 0.85;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            font-size: 2em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .section-icon {
+            font-size: 2.5em;
+        }
+
+        .section-content {
+            padding: 40px;
+        }
+
+        .feature-intro {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e9d5ff 100%);
+            border-left: 6px solid #667eea;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            font-size: 1.15em;
+            line-height: 1.8;
+            color: #333;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 3px solid #f59e0b;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+            color: #78350f;
+        }
+
+        .highlight-box h3 {
+            margin-bottom: 15px;
+            color: #92400e;
+            font-size: 1.4em;
+        }
+
+        .highlight-box p {
+            line-height: 1.7;
+            font-size: 1.05em;
+        }
+
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .benefit-card {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 2px solid #86efac;
+            border-radius: 10px;
+            padding: 25px;
+            color: #15803d;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .benefit-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .benefit-icon {
+            font-size: 2.5em;
+            margin-bottom: 12px;
+        }
+
+        .benefit-title {
+            font-weight: 700;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            color: #166534;
+        }
+
+        .benefit-desc {
+            line-height: 1.6;
+            font-size: 1em;
+        }
+
+        .step-guide {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+
+        .step-guide h3 {
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+        }
+
+        .step {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+            align-items: flex-start;
+        }
+
+        .step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 45px;
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 1.2em;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+            padding-top: 5px;
+        }
+
+        .step-title {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1.15em;
+        }
+
+        .step-description {
+            color: #666;
+            line-height: 1.7;
+            font-size: 1.05em;
+        }
+
+        .info-box {
+            background: #dbeafe;
+            border-left: 5px solid #3b82f6;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            color: #1e40af;
+            font-size: 1.05em;
+            line-height: 1.7;
+        }
+
+        .warning-box {
+            background: #fed7aa;
+            border-left: 5px solid #f97316;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            color: #92400e;
+            font-size: 1.05em;
+            line-height: 1.7;
+        }
+
+        .success-box {
+            background: #dcfce7;
+            border-left: 5px solid #22c55e;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            color: #15803d;
+            font-size: 1.05em;
+            line-height: 1.7;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin: 25px 0;
+        }
+
+        .feature-list li {
+            padding: 15px;
+            border-bottom: 2px solid #e5e7eb;
+            color: #555;
+            line-height: 1.7;
+            font-size: 1.05em;
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-list strong {
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .image-showcase {
+            margin: 30px 0;
+        }
+
+        .image-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+
+        .image-container {
+            border: 3px solid #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .image-caption {
+            background: #f9fafb;
+            padding: 15px;
+            font-size: 0.95em;
+            color: #666;
+            border-top: 2px solid #e5e7eb;
+            font-style: italic;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .before-box {
+            background: #fff5f5;
+            border: 3px solid #fca5a5;
+            border-radius: 10px;
+            padding: 25px;
+        }
+
+        .after-box {
+            background: #f0fdf4;
+            border: 3px solid #86efac;
+            border-radius: 10px;
+            padding: 25px;
+        }
+
+        .box-title {
+            font-weight: 700;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .before-title {
+            color: #dc2626;
+        }
+
+        .after-title {
+            color: #16a34a;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 60px;
+            padding: 30px;
+            opacity: 0.9;
+            font-size: 1em;
+        }
+
+        @media (max-width: 1024px) {
+            .comparison-grid,
+            .image-row {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .section-header {
+                font-size: 1.5em;
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📆 Harley</h1>
+            <p><strong>Schedule Calendar & Overtime Guide 2026</strong></p>
+            <p class="subtitle">Master Your Work Schedule and Overtime Management</p>
+        </div>
+
+        <!-- SECTION 1: Schedule Calendar -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">📅</span>
+                Schedule Calendar - Your Complete Month View
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    The Schedule Calendar in Harley is your personal window into your entire work month. Imagine having a bird's eye view of all thirty or thirty-one days laid out in front of you, showing exactly when you work, when you rest, and what your schedule looks like for each day. This isn't just a basic calendar - it's an intelligent scheduling tool that displays your complete monthly work pattern in vivid, color-coded detail. You can see your time in, time out, rest days, and even your overtime windows all in one comprehensive view. This calendar is the foundation of everything else in Harley because it tells the system when you're scheduled to work, which then drives features like overtime detection and rest day identification.
+                </div>
+
+                <h3 style="font-size: 1.6em; color: #333; margin-bottom: 20px;">✨ Why the Whole Month View Matters</h3>
+                
+                <div class="benefits-grid">
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🗓️</div>
+                        <div class="benefit-title">Complete Monthly Overview</div>
+                        <div class="benefit-desc">See all 30 or 31 days of your schedule at once. No more clicking day by day or week by week - your entire month is visible on one screen.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🎨</div>
+                        <div class="benefit-title">Color-Coded Schedules</div>
+                        <div class="benefit-desc">Different schedules are shown in different colors. Working days, rest days, and special schedules each have their own visual identity so you can instantly recognize patterns.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🛏️</div>
+                        <div class="benefit-title">Rest Day Visibility</div>
+                        <div class="benefit-desc">Your rest days are clearly marked throughout the month. You'll never wonder which days are your days off - they stand out immediately.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">⏰</div>
+                        <div class="benefit-title">Daily Time Details</div>
+                        <div class="benefit-desc">Click any day to see your exact time in, time out, and overtime windows. Every day's schedule is accessible with one click.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🔄</div>
+                        <div class="benefit-title">Dynamic Updates</div>
+                        <div class="benefit-desc">When your schedule requests are approved, the calendar updates automatically. You always see your current, active schedule.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">📊</div>
+                        <div class="benefit-title">Pattern Recognition</div>
+                        <div class="benefit-desc">Easily spot your weekly work patterns, identify consecutive work days, and plan ahead based on your schedule rhythm.</div>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <h3>🎯 The Single Source of Truth</h3>
+                    <p>Your Schedule Calendar is the definitive reference for your work schedule. When Harley needs to determine if you're working on a particular day, if it's a rest day, or what your overtime window is, it looks at this calendar. That's why it's critical to have your full monthly schedule set up correctly. Everything else in the system - from overtime requests to rest day changes - depends on the accuracy of this calendar.</p>
+                </div>
+
+                <h3 style="font-size: 1.6em; color: #333; margin: 30px 0 20px 0;">Understanding Your Active Schedule Display</h3>
+                
+                <div class="info-box">
+                    <strong>📍 Active Schedule Section:</strong> At the top of your calendar page, you'll see your "Active Schedule" for today. This shows your currently effective schedule - your time in, time out, whether today is a rest day, and your OT window times. This information is pulled directly from your monthly calendar and updates automatically based on what day it is. Think of it as your "schedule for today" quick reference.
+                </div>
+
+                <h3 style="font-size: 1.6em; color: #333; margin: 30px 0 20px 0;">How Your Schedule Gets Set</h3>
+                
+                <div class="step-guide">
+                    <h3>Initial Setup & Ongoing Changes</h3>
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Admin Sets Your Initial Schedule</div>
+                            <div class="step-description">When Harley is first deployed or when you first join, your administrator will configure your initial monthly schedule. They'll set up your working days, rest days, time in, time out, and OT windows for the entire month.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">You Request Changes When Needed</div>
+                            <div class="step-description">Going forward, if you need to change your schedule, you'll submit a request through Harley's request system. You can request monthly schedule changes (entire month), single day changes (one specific date), or rest day changes.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Calendar Updates Upon Approval</div>
+                            <div class="step-description">Once your schedule request is reviewed and approved by admin, your calendar updates automatically to reflect the new schedule. You'll see the changes immediately in your whole month view.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    ⚠️ <strong>Critical Requirement:</strong> You MUST have your complete monthly schedule set up before you can submit overtime requests or request specific day changes. Here's why: if a particular date doesn't have a schedule assigned in your calendar, the system cannot properly detect whether overtime on that day should be classified as RDOT (Rest Day OT) or NDOT (Normal Day OT). It also cannot calculate your OT hours correctly because it doesn't know your work times. Always ensure every day of your month has a schedule assigned - either a work shift or marked as a rest day.
+                </div>
+
+                <h3 style="font-size: 1.6em; color: #333; margin: 30px 0 20px 0;">Navigating Your Calendar</h3>
+                
+                <ul class="feature-list">
+                    <li><strong>Month Navigation:</strong> Use the arrows or month selector to move between different months. You can view past months to see your historical schedule or future months to see your upcoming schedule.</li>
+                    <li><strong>Day Details:</strong> Click on any day in the calendar to see detailed information about that day's schedule, including time in, time out, Start OT, and End OT times.</li>
+                    <li><strong>Request Icons:</strong> Each day may have action icons like the swap icon (🔄) that let you quickly initiate schedule requests for that specific day.</li>
+                    <li><strong>Status Indicators:</strong> Days are color-coded and styled to show working days vs. rest days vs. days with pending schedule changes.</li>
+                    <li><strong>Today Highlight:</strong> The current day is specially highlighted so you always know where you are in the month.</li>
+                </ul>
+
+                <div class="success-box">
+                    ✅ <strong>Pro Tip:</strong> At the beginning of each month, take a moment to review your entire monthly schedule in the calendar. Make sure all your rest days are correctly positioned, your work times are accurate, and there are no gaps in your schedule. This prevents issues later when you need to submit OT or make schedule changes.
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: Overtime System -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">⚡</span>
+                Overtime Management - Selectable Hours System
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    The Overtime system in Harley has been revolutionized with a new selectable hours feature that makes requesting OT incredibly straightforward and accurate. Here's how it works: when your client approves you for overtime work, they specify the number of hours you're allowed to work as OT. Now, instead of manually typing in hours and minutes and potentially making mistakes, Harley presents you with a dropdown menu where you can select the exact OT hours that your client has approved. This ensures accuracy, prevents errors, and makes the whole process of submitting OT requests faster and more reliable. The system is smart enough to automatically detect whether your OT is happening on a regular work day or a rest day, and it calculates your total OT time based on your actual overtime start and end times from your calendar.
+                </div>
+
+                <div class="highlight-box">
+                    <h3>🎯 Revolutionary Selectable Hours Feature</h3>
+                    <p>This is a game-changer for OT requests. Previously, you might have had to manually enter "2 hours 30 minutes" and risk typos or calculation errors. Now, Harley gives you a selection menu with standard OT hour increments based on what your client approved. Simply select from the dropdown - whether it's 1 hour, 2 hours, 3 hours, or any other approved duration - and Harley automatically fills in the time. This is based on your client's approved OT hours, ensuring you never request more OT than what's authorized.</p>
+                </div>
+
+                <h3 style="font-size: 1.6em; color: #333; margin: 30px 0 20px 0;">Understanding OT Types in Harley</h3>
+                
+                <div class="comparison-grid">
+                    <div class="before-box" style="background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%); border-left: 5px solid #3b82f6;">
+                        <div class="box-title" style="color: #1e40af;">
+                            <span>⏰</span> NDOT - Normal Day Overtime
+                        </div>
+                        <ul class="feature-list">
+                            <li><strong>What it is:</strong> Overtime worked on a regular working day (not a rest day)</li>
+                            <li><strong>When it applies:</strong> Your schedule calendar shows you have a work shift assigned for that day</li>
+                            <li><strong>Detection:</strong> Harley automatically identifies this when the date is a working day in your calendar</li>
+                            <li><strong>Calculation:</strong> OT hours are counted from your Start OT time to End OT time</li>
+                        </ul>
+                    </div>
+                    <div class="after-box" style="background: linear-gradient(135deg, #fce7f3 0%, #f3e8ff 100%); border-left: 5px solid #ec4899;">
+                        <div class="box-title" style="color: #be185d;">
+                            <span>🛏️</span> RDOT - Rest Day Overtime
+                        </div>
+                        <ul class="feature-list">
+                            <li><strong>What it is:</strong> Overtime worked on your scheduled rest day</li>
+                            <li><strong>When it applies:</strong> Your schedule calendar shows the day is marked as a rest day</li>
+                            <li><strong>Detection:</strong> Harley automatically detects this when you submit OT for a rest day</li>
+                            <li><strong>Importance:</strong> RDOT typically has different compensation rates than NDOT</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    💡 <strong>Key Insight:</strong> The distinction between NDOT and RDOT is crucial because they often have different pay rates or compensation structures per labor law and company policy. Harley's automatic detection ensures you're always compensated correctly based on what type of day you worked overtime.
+                </div>
+
+                <h3 style="font-size: 1.6em; color: #333; margin: 30px 0 20px 0;">How to Submit an OT Request with Selectable Hours</h3>
+                
+                <div class="step-guide">
+                    <h3>Step-by-Step OT Request Process</h3>
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Get Client Approval First</div>
+                            <div class="step-description">Before you can request OT in Harley, your client must first approve you to work overtime and specify how many hours you're authorized to work. Get this approval in writing - it could be an email, a message, or a formal document.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">Check Your Schedule Calendar</div>
+                            <div class="step-description">Go to your Schedule Calendar and verify what type of day it is. Is it a working day or a rest day? This tells you whether your OT will be NDOT or RDOT. Make sure the date has a schedule assigned.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Open OT Request Form</div>
+                            <div class="step-description">Navigate to the Overtime request section and open the OT request form. Select the date you'll be working overtime.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Select Your Approved OT Hours</div>
+                            <div class="step-description">Here's where the new feature shines. Instead of typing hours manually, you'll see a dropdown menu with selectable OT hour options. These options are based on standard OT increments and your client-approved hours. Simply click and select the duration that matches your client's approval - for example, "2 hours" or "3 hours" or "4 hours".</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <div class="step-title">System Auto-Detects OT Type</div>
+                            <div class="step-description">Harley will automatically check your schedule calendar for that date. If it's a working day, it marks it as NDOT. If it's a rest day, it marks it as RDOT. You don't have to manually select the type - the system does it for you.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">6</div>
+                        <div class="step-content">
+                            <div class="step-title">Attach Client Approval Document</div>
+                            <div class="step-description">Upload the document where your client approved your overtime. This could be an email screenshot, a formal approval letter, a chat message, or any written confirmation. This is required for all OT requests.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">7</div>
+                        <div class="step-content">
+                            <div class="step-title">Provide Reason for OT</div>
+                            <div class="step-description">In the reason field, explain why you worked overtime. Examples: "Urgent project deadline", "Client requested extended support hours", "System maintenance work", "End of month reporting requirements", etc.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">8</div>
+                        <div class="step-content">
+                            <div class="step-title">Review & Submit</div>
+                            <div class="step-description">Double-check that the OT hours match your client approval, the date is correct, and the OT type (NDOT/RDOT) is accurate. Then submit your request.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">9</div>
+                        <div class="step-content">
+                            <div class="step-title">Track in Recent Activities</div>
+                            <div class="step-description">After submission, your OT request appears in the Recent Activities dashboard where you can track its approval status. If it's still pending, you can even edit the hours or reason if needed.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <h3>⚡ How OT Hours are Calculated</h3>
+                    <p>This is important to understand: Harley calculates your overtime hours based on your calendar's "Start OT" and "End OT" times, NOT your regular work schedule times. For example, if your regular shift is 8:00 AM - 5:00 PM, but your calendar shows Start OT at 5:00 PM and End OT at 9:00 PM, and you select "3 hours" of OT, the system knows you worked from 5:00 PM to 8:00 PM as overtime. This precision ensures you're credited for every single minute of OT you actually work, not just rough estimates.</p>
+                </div>
+
+                <h3 style="font-size: 1.6em; color: #333; margin: 30px 0 20px 0;">Benefits of Selectable Hours System</h3>
+                
+                <div class="benefits-grid">
+                    <div class="benefit-card">
+                        <div class="benefit-icon">✅</div>
+                        <div class="benefit-title">Eliminates Manual Entry Errors</div>
+                        <div class="benefit-desc">No more typos or miscalculations. Select the exact hours from a dropdown menu instead of typing.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">⚡</div>
+                        <div class="benefit-title">Faster Request Submission</div>
+                        <div class="benefit-desc">Click, select, done. Submit OT requests in seconds instead of minutes.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🎯</div>
+                        <div class="benefit-title">Matches Client Approval Exactly</div>
+                        <div class="benefit-desc">Select only the hours your client approved, ensuring compliance with authorization.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🔍</div>
+                        <div class="benefit-title">Prevents Requesting Excess OT</div>
+                        <div class="benefit-desc">You can only select from approved increments, preventing accidental over-requests.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">📊</div>
+                        <div class="benefit-title">Accurate Record Keeping</div>
+                        <div class="benefit-desc">Every OT entry is precise and matches what was actually approved and worked.</div>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🤖</div>
+                        <div class="benefit-title">Automated OT Type Detection</div>
+                        <div class="benefit-desc">System automatically determines NDOT vs. RDOT based on your schedule calendar.</div>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    ⚠️ <strong>Important Prerequisites for OT Requests:</strong>
+                    <ul style="margin-top: 15px; margin-left: 25px; line-height: 1.8;">
+                        <li>Your monthly schedule MUST be fully configured with all dates assigned a schedule or marked as rest days</li>
+                        <li>The date you're requesting OT for must have a schedule entry in your calendar</li>
+                        <li>You must have written client approval for the OT hours you're requesting</li>
+                        <li>You must attach the client approval document to your OT request</li>
+                        <li>Without these prerequisites, the system cannot properly process your OT request</li>
+                    </ul>
+                </div>
+
+                <h3 style="font-size: 1.6em; color: #333; margin: 30px 0 20px 0;">What Happens After You Submit OT</h3>
+                
+                <ul class="feature-list">
+                    <li><strong>Pending Status:</strong> Your OT request enters "Pending" status and appears in your Recent Activities dashboard with all details visible.</li>
+                    <li><strong>Admin Review:</strong> Your administrator reviews the request, checks the client approval document, verifies the hours, and confirms the OT type is correct.</li>
+                    <li><strong>Approval/Denial:</strong> Admin either approves or denies the request. If approved, the OT hours are added to your work record. If denied, you'll see the reason why.</li>
+                    <li><strong>Edit While Pending:</strong> If your request is still pending and you need to change the hours or reason, you can edit it directly from Recent Activities without canceling and resubmitting.</li>
+                    <li><strong>Record Keeping:</strong> Once approved, your OT is permanently recorded in the system and will be reflected in your payroll and time records.</li>
+                </ul>
+
+                <div class="success-box">
+                    ✅ <strong>Best Practice:</strong> Always submit your OT request as soon as possible after working the overtime - ideally the same day or the next business day. This ensures accurate record-keeping and prevents you from forgetting important details like exact hours worked or the reason for the OT. Fresh memory equals accurate requests!
+                </div>
+            </div>
+        </div>
+
+        <!-- Integration Section -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">🔗</span>
+                How Schedule Calendar & OT Work Together
+            </div>
+            <div class="section-content">
+                <div class="feature-intro">
+                    The Schedule Calendar and Overtime system in Harley aren't separate islands - they're deeply integrated and work together seamlessly. Your calendar is the foundation that makes smart OT detection possible. When you submit an OT request, Harley immediately looks at your Schedule Calendar for that specific date to determine if it's a working day or rest day, what your scheduled times are, and what your OT window times are. This integration is what enables automatic RDOT detection, accurate hour calculations, and prevents you from requesting OT for dates that don't have a schedule configured. Everything is connected.
+                </div>
+
+                <h3 style="font-size: 1.6em; color: #333; margin-bottom: 20px;">The Integration Flow</h3>
+                
+                <div class="step-guide">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Calendar is Configured</div>
+                            <div class="step-description">Your admin sets up your full monthly schedule in the calendar, assigning work shifts and rest days to every date of the month.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">You Get Client OT Approval</div>
+                            <div class="step-description">Your client approves you to work overtime for a specific number of hours on a specific date.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">You Access OT Request Form</div>
+                            <div class="step-description">You open the Overtime request form and select the date you'll work OT.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Harley Checks Your Calendar</div>
+                            <div class="step-description">The system immediately queries your Schedule Calendar for that date to retrieve schedule information.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <div class="step-title">OT Type Auto-Detection</div>
+                            <div class="step-description">Based on what the calendar shows (working day vs. rest day), Harley automatically sets the OT type to NDOT or RDOT.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">6</div>
+                        <div class="step-content">
+                            <div class="step-title">You Select OT Hours</div>
+                            <div class="step-description">Using the selectable hours dropdown, you choose the exact hours your client approved.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">7</div>
+                        <div class="step-content">
+                            <div class="step-title">Time Calculation</div>
+                            <div class="step-description">Harley uses your calendar's Start OT and End OT times to calculate when your overtime window is and validate your selected hours.</div>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">8</div>
+                        <div class="step-content">
+                            <div class="step-title">Request Submission</div>
+                            <div class="step-description">You attach client approval, provide a reason, and submit. The request is logged with perfect accuracy.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <h3>🎯 Why This Integration Matters</h3>
+                    <p>Without your Schedule Calendar being properly configured, the OT system simply cannot function correctly. It's like trying to calculate a route without knowing the starting point. The calendar provides the starting point - it tells Harley "this is when this employee normally works, and this is when they have rest days." With that foundation in place, the OT system can then accurately determine when you're working extra hours, what type of OT it is, and how to calculate it properly. This is why setting up your full monthly schedule is not optional - it's a requirement.</p>
+                </div>
+
+                <div class="success-box">
+                    ✅ <strong>Complete Workflow Summary:</strong> Set up your monthly schedule in the calendar → Get client OT approval → Select OT date in request form → Harley auto-detects OT type from your calendar → Select approved hours from dropdown → Attach approval document → Submit request → Track in Recent Activities. It's a seamless, integrated process from start to finish.
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>Harley - Schedule Calendar & Overtime Guide 2026</p>
+            <p>For technical support or questions, contact your administrator.</p>
+            <p style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">Updated January 2026 | Production-Ready Features</p>
+        </footer>
+    </div>
+</body>
+</html>
