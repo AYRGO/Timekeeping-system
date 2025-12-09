@@ -422,7 +422,7 @@
                 Reason for Change
                 <span class="text-red-500 ml-1">*</span>
               </label>
-              <textarea name="reason" id="reason" rows="4" placeholder="Provide details about your schedule change request..."
+              <textarea name="reason" id="scheduleReason" rows="4" placeholder="Provide details about your schedule change request..."
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white resize-none" required></textarea>
               <p class="text-xs text-gray-500 mt-1.5">
                 Be specific to help with approval
@@ -435,7 +435,7 @@
                 Supporting Document
                 <span class="text-red-500 ml-1">*</span>
               </label>
-              <input type="file" name="attachment_scr" id="fileInput" accept=".pdf,.jpg,.jpeg,.png"
+              <input type="file" name="attachment_scr" id="scheduleFileInput" accept=".pdf,.jpg,.jpeg,.png"
                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:cursor-pointer" required>
               <p class="text-xs text-gray-500 mt-1.5">
                 PDF, JPG, JPEG, PNG (Max 10MB)
@@ -449,7 +449,7 @@
                     class="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm">
               Cancel
             </button>
-            <button type="submit" id="submitBtn"
+            <button type="submit" id="scheduleSubmitBtn"
                     class="flex-1 px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm">
               Submit Request
             </button>

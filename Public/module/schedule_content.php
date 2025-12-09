@@ -34,6 +34,49 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
     $stmt->execute([$employee_id, $date]);
     $cache = $stmt->fetch(PDO::FETCH_ASSOC);
     
+    // Check if OT eligible for this date (if there's a time log with completed clock in/out)
+    $ot_eligible = false;
+    $time_log_id = null;
+    
+    // Only check past dates (not today or future)
+    if ($date < date('Y-m-d')) {
+        // Check if date is within 7-day request window
+        $days_ago = (strtotime(date('Y-m-d')) - strtotime($date)) / 86400;
+        
+        if ($days_ago <= 7) {
+            $log_stmt = $pdo->prepare("
+                SELECT id, time_in, time_out 
+                FROM time_logs 
+                WHERE employee_id = ? AND log_date = ? AND time_out IS NOT NULL
+                LIMIT 1
+            ");
+            $log_stmt->execute([$employee_id, $date]);
+            $log = $log_stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($log) {
+                $time_log_id = $log['id'];
+                
+                // Check if ANY OT request already exists (pending, approved, OR rejected)
+                // Employees should not be able to submit duplicate OT requests
+                $ot_check = $pdo->prepare("
+                    SELECT COUNT(*) as count 
+                    FROM post_ot_requests 
+                    WHERE time_log_id = ?
+                ");
+                $ot_check->execute([$time_log_id]);
+                $has_any_ot_request = $ot_check->fetch(PDO::FETCH_ASSOC)['count'] > 0;
+                
+                // Eligible ONLY if:
+                // 1. Completed time log exists (clocked in and out)
+                // 2. No OT request exists yet (any status)
+                // 3. Within 7-day request window
+                if (!$has_any_ot_request) {
+                    $ot_eligible = true;
+                }
+            }
+        }
+    }
+    
     // If found in cache, return formatted data
     if ($cache) {
         $cell = [
@@ -43,7 +86,9 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
             'is_rest_day' => $cache['is_rest_day'],
             'is_holiday' => $cache['is_holiday'],
             'source' => $cache['source'],
-            'schedule_color' => getScheduleColor_schedule($cache['source'], $cache['is_rest_day'], $cache['is_holiday'])
+            'schedule_color' => getScheduleColor_schedule($cache['source'], $cache['is_rest_day'], $cache['is_holiday']),
+            'ot_eligible' => $ot_eligible,
+            'time_log_id' => $time_log_id
         ];
         
         // Add schedule details if not a rest day
@@ -88,7 +133,9 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
                 'is_rest_day' => 1,
                 'is_holiday' => 0,
                 'source' => 'weekly_default',
-                'schedule_color' => '#e2e8f0'
+                'schedule_color' => '#e2e8f0',
+                'ot_eligible' => $ot_eligible,
+                'time_log_id' => $time_log_id
             ];
         } elseif ($weekly['work_schedule_id']) {
             return [
@@ -103,7 +150,9 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
                 'is_rest_day' => 0,
                 'is_holiday' => 0,
                 'source' => 'weekly_default',
-                'schedule_color' => '#3b82f6'
+                'schedule_color' => '#3b82f6',
+                'ot_eligible' => $ot_eligible,
+                'time_log_id' => $time_log_id
             ];
         }
     }
@@ -117,7 +166,9 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
             'is_rest_day' => 1,
             'is_holiday' => 0,
             'source' => 'weekend',
-            'schedule_color' => '#e2e8f0'
+            'schedule_color' => '#e2e8f0',
+            'ot_eligible' => $ot_eligible,
+            'time_log_id' => $time_log_id
         ];
     }
     
@@ -129,7 +180,9 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
         'is_rest_day' => 1,
         'is_holiday' => 0,
         'source' => 'none',
-        'schedule_color' => '#e2e8f0'
+        'schedule_color' => '#e2e8f0',
+        'ot_eligible' => $ot_eligible,
+        'time_log_id' => $time_log_id
     ];
 }
 
@@ -207,7 +260,7 @@ try {
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <button onclick="window.location.href='?ym=<?= date('Y-n') ?>#scheduleView'"
+                <button onclick="window.location.href='?view=schedule&ym=<?= date('Y-n') ?>'" 
                         class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow">
                     <i class="fas fa-calendar-day mr-2 text-gray-400"></i>Today
                 </button>
@@ -364,19 +417,17 @@ try {
     <div class="px-8 py-5 border-b border-gray-100 bg-white">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
-                <a href="?ym=<?= h_schedule($nav_schedule['prev']) ?>#scheduleView" 
-                   onclick="showSection('scheduleView')"
+                <button onclick="window.location.href='?view=schedule&ym=<?= h_schedule($nav_schedule['prev']) ?>'" 
                    class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow">
                     <i class="fas fa-chevron-left"></i>
-                </a>
+                </button>
                 <h3 class="text-2xl font-bold text-gray-900 min-w-[200px] text-center tracking-tight">
                     <?= date('F Y', strtotime("$year_schedule-$month_schedule-01")) ?>
                 </h3>
-                <a href="?ym=<?= h_schedule($nav_schedule['next']) ?>#scheduleView" 
-                   onclick="showSection('scheduleView')"
+                <button onclick="window.location.href='?view=schedule&ym=<?= h_schedule($nav_schedule['next']) ?>'" 
                    class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow">
                     <i class="fas fa-chevron-right"></i>
-                </a>
+                </button>
             </div>
         </div>
     </div>
@@ -436,21 +487,31 @@ try {
                                 <?php endif; ?>
                               </div>
                               
-                              <!-- Quick Action Buttons (Shown on Hover for Future Dates) -->
-                              <?php if (!$isPast && !$cell['is_holiday']): ?>
-                              <div class="absolute top-2 right-2 hidden group-hover:flex gap-1 z-10">
+                              <!-- Quick Action Buttons (Top Right) -->
+                              <div class="absolute top-2 right-2 flex gap-1 z-10">
+                                <!-- OT Eligible Icon (for Past Dates) -->
+                                <?php if (isset($cell['ot_eligible']) && $cell['ot_eligible']): ?>
+                                <button onclick="event.stopPropagation(); openOTRequestFromCalendar('<?= $cellDate ?>', '<?= $cell['time_log_id'] ?>')" 
+                                        class="p-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-lg shadow-lg transition-all duration-200 transform hover:scale-110 pulse-glow text-xs"
+                                        title="Request Overtime - <?= $cellDate ?>">
+                                    <i class="fas fa-clock"></i>
+                                </button>
+                                <?php endif; ?>
+                                
+                                <!-- Schedule Action Buttons (for Future Dates - shown on hover) -->
+                                <?php if (!$isPast && !$cell['is_holiday']): ?>
                                 <button onclick="event.stopPropagation(); openScheduleSwapModal('<?= $cellDate ?>')" 
-                                        class="p-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-lg transition-all duration-200 text-xs"
+                                        class="p-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-lg transition-all duration-200 text-xs hidden group-hover:block"
                                         title="Swap with another date">
                                     <i class="fas fa-exchange-alt"></i>
                                 </button>
                                 <button onclick="event.stopPropagation(); openScheduleChangeModal('<?= $cellDate ?>')" 
-                                        class="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-lg transition-all duration-200 text-xs"
+                                        class="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-lg transition-all duration-200 text-xs hidden group-hover:block"
                                         title="Change schedule">
                                     <i class="fas fa-edit"></i>
                                 </button>
+                                <?php endif; ?>
                               </div>
-                              <?php endif; ?>
 
                               <!-- Schedule Card (if exists) -->
                               <?php if ($cell['is_rest_day'] || $cell['is_holiday']): ?>
@@ -731,10 +792,74 @@ try {
 </div>
 
 <script>
+// Open OT Request Form from Calendar
+function openOTRequestFromCalendar(date, timeLogId) {
+    console.log('⚡ Opening OT request form for date:', date, 'time log:', timeLogId);
+    
+    // Switch to overtime view
+    if (typeof switchView === 'function') {
+        switchView('overtime');
+    }
+    
+    // Wait for view to load, then find and click the OT button for this date
+    setTimeout(() => {
+        const otButton = document.querySelector(`button[data-log-date="${date}"][data-time-log-id="${timeLogId}"]`);
+        if (otButton) {
+            otButton.click();
+            // Scroll to the OT form
+            setTimeout(() => {
+                const modal = document.getElementById('overtimeModal');
+                if (modal) {
+                    modal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 300);
+        } else {
+            console.warn('⚠️ OT button not found for time log:', timeLogId);
+            // Fallback: try to open modal directly if function exists
+            if (typeof openOvertimeModal === 'function') {
+                // Get the time log data via AJAX or pass necessary data
+                showNotification('Opening overtime request form...', 'info');
+            }
+        }
+    }, 500);
+}
+
 // Schedule Swap Modal Functions
 let sourceDateData = {};
 let isSelectingTargetDate = false;
 let swapSourceDate = null;
+
+// Open OT Request Form from Calendar
+function openOTRequestFromCalendar(date, timeLogId) {
+    console.log('⚡ Opening OT request form for date:', date, 'time log:', timeLogId);
+    
+    // Switch to overtime view
+    if (typeof switchView === 'function') {
+        switchView('overtime');
+    }
+    
+    // Wait for view to load, then find and click the OT button for this date
+    setTimeout(() => {
+        const otButton = document.querySelector(`button[data-log-date="${date}"][data-time-log-id="${timeLogId}"]`);
+        if (otButton) {
+            otButton.click();
+            // Scroll to the OT form
+            setTimeout(() => {
+                const modal = document.getElementById('overtimeModal');
+                if (modal) {
+                    modal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 300);
+        } else {
+            console.warn('⚠️ OT button not found for time log:', timeLogId);
+            // Fallback: try to open modal directly if function exists
+            if (typeof openOvertimeModal === 'function') {
+                // Get the time log data via AJAX or pass necessary data
+                showNotification('Opening overtime request form...', 'info');
+            }
+        }
+    }, 500);
+}
 
 function openScheduleSwapModal(date) {
     console.log('🔄 Opening schedule swap modal for date:', date);
@@ -1235,5 +1360,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .animate-bounce-in {
     animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* OT Eligible Icon Pulse Animation */
+.pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.5), 0 0 20px rgba(16, 185, 129, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.7), 0 0 30px rgba(16, 185, 129, 0.5), 0 0 40px rgba(16, 185, 129, 0.3);
+        transform: scale(1.05);
+    }
 }
 </style>

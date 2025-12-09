@@ -124,7 +124,7 @@
 
           <!-- Submit Button -->
           <div class="flex justify-center pt-6 border-t border-gray-100">
-            <button type="submit" id="submitBtn"
+            <button type="submit" id="leaveSubmitBtn"
                     class="group relative px-12 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1">
               <div class="flex items-center space-x-3">
                 <i class="fas fa-paper-plane group-hover:translate-x-1 transition-transform duration-200"></i>

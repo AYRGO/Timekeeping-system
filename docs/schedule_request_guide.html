@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule Change Request Guide - Harley Timekeeping System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .intro {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 20px;
+            margin-bottom: 40px;
+            border-radius: 8px;
+        }
+        
+        .intro h2 {
+            color: #166534;
+            margin-bottom: 10px;
+            font-size: 1.5em;
+        }
+        
+        .intro p {
+            color: #15803d;
+            font-size: 1.05em;
+        }
+        
+        .section {
+            margin-bottom: 50px;
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .section-header.monthly {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+        
+        .section-header .icon {
+            font-size: 2em;
+        }
+        
+        .section-header h2 {
+            font-size: 1.8em;
+            font-weight: 600;
+        }
+        
+        .section-header p {
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+        
+        .step {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 2px solid #e5e7eb;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .step:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+        }
+        
+        .step-number {
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2em;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .monthly .step-number {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+        
+        .step h3 {
+            color: #1f2937;
+            margin-bottom: 12px;
+            margin-left: 30px;
+            font-size: 1.3em;
+        }
+        
+        .step p {
+            color: #4b5563;
+            margin-left: 30px;
+            font-size: 1.05em;
+            line-height: 1.7;
+        }
+        
+        .step ul {
+            margin-left: 60px;
+            margin-top: 10px;
+            color: #4b5563;
+        }
+        
+        .step li {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+        
+        .tip {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        
+        .tip strong {
+            color: #92400e;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .tip p {
+            color: #78350f;
+            margin: 0;
+        }
+        
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        
+        .warning strong {
+            color: #991b1b;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .warning p {
+            color: #991b1b;
+            margin: 0;
+        }
+        
+        .info {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        
+        .info strong {
+            color: #1e40af;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .info p {
+            color: #1e3a8a;
+            margin: 0;
+        }
+        
+        .screenshot-placeholder {
+            background: #e5e7eb;
+            border: 2px dashed #9ca3af;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            color: #6b7280;
+            font-style: italic;
+        }
+        
+        .requirements {
+            background: #f0f9ff;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+        
+        .requirements h3 {
+            color: #0c4a6e;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .requirements ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .requirements li {
+            padding: 10px 0;
+            padding-left: 30px;
+            position: relative;
+            color: #0369a1;
+        }
+        
+        .requirements li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #22c55e;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        
+        .footer {
+            background: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            color: #6b7280;
+            border-top: 2px solid #e5e7eb;
+        }
+        
+        .footer p {
+            margin-bottom: 10px;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 30px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .comparison-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .comparison-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .comparison-table tr:hover {
+            background: #f9fafb;
+        }
+        
+        .comparison-table .feature {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .badge.new {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .badge.important {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 Schedule Change Request Guide</h1>
+            <p>Step-by-step instructions for requesting schedule changes</p>
+        </div>
+        
+        <div class="content">
+            <div class="intro">
+                <h2>Welcome to the Schedule Change System!</h2>
+                <p>You can now request schedule changes in two ways: <strong>Single Day</strong> (one specific date) or <strong>Monthly Schedule</strong> (entire week for a month). This guide will walk you through both processes step by step.</p>
+            </div>
+            
+            <!-- Comparison Table -->
+            <h2 style="margin-bottom: 20px; color: #1f2937;">📊 Request Types Comparison</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Single Day Request</th>
+                        <th>Monthly Request</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="feature">Best For</td>
+                        <td>One-time schedule changes or emergencies</td>
+                        <td>Regular weekly schedule changes</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Dates Affected</td>
+                        <td>Only ONE specific date</td>
+                        <td>Entire month (recurring weekly)</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Request Frequency</td>
+                        <td>As needed</td>
+                        <td>Once per month</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Approval Time</td>
+                        <td>Usually faster</td>
+                        <td>May take longer</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Examples</td>
+                        <td>Doctor's appointment, personal errand</td>
+                        <td>Permanent shift change, school schedule</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="warning">
+                <strong>⚠️ Important Reminders</strong>
+                <p><strong>7-Day OT Request Window:</strong> You can only request overtime for dates within the last 7 days. After 7 days, the request window expires. Make sure to submit your OT requests promptly after completing your work!</p>
+            </div>
+            
+            <!-- SECTION 1: SINGLE DAY REQUEST -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="icon">📆</span>
+                    <div>
+                        <h2>Single Day Schedule Request</h2>
+                        <p>For one-time schedule changes on a specific date</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Access the Schedule Calendar</h3>
+                    <p>Navigate to your dashboard and click on the <strong>"Schedule"</strong> tab or button to view your monthly calendar.</p>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Select the Date</h3>
+                    <p>Click on the specific date you want to change. You can:</p>
+                    <ul>
+                        <li>Click directly on any future date in the calendar</li>
+                        <li>Or click the <strong>"New Request"</strong> button at the top</li>
+                    </ul>
+                    <div class="tip">
+                        <strong>💡 Tip:</strong>
+                        <p>You can only request changes for future dates. Past dates cannot be modified.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Choose Request Type</h3>
+                    <p>In the modal that appears, ensure <strong>"Single Day Request"</strong> is selected (it's the default option).</p>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Select Your New Schedule</h3>
+                    <p>Click on the search box under "Work Schedule" and type to search for your desired schedule:</p>
+                    <ul>
+                        <li><strong>Type a time</strong> (e.g., "7" or "06") to find schedules starting at that hour</li>
+                        <li><strong>Type "rest"</strong> to select a rest day</li>
+                        <li><strong>Browse all options</strong> by clicking the search box</li>
+                    </ul>
+                    <p>Click on your desired schedule card to select it.</p>
+                    <div class="info">
+                        <strong>ℹ️ Current Schedule:</strong>
+                        <p>Your existing schedule for the selected date will be displayed automatically so you can compare before requesting a change.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <h3>Provide a Reason</h3>
+                    <p>In the "Reason for Request" field, clearly explain why you need this schedule change. Be specific and professional.</p>
+                    <div class="tip">
+                        <strong>💡 Examples of good reasons:</strong>
+                        <p>"Medical appointment at 2 PM - need to leave early"<br>
+                        "Family emergency - need day off"<br>
+                        "Training session scheduled for morning shift"</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <h3>Upload Supporting Document</h3>
+                    <p>Click "Choose File" and upload a supporting document (medical certificate, appointment slip, etc.).</p>
+                    <div class="requirements">
+                        <h3>File Requirements:</h3>
+                        <ul>
+                            <li>Accepted formats: PDF, JPG, JPEG, PNG</li>
+                            <li>Maximum file size: 10MB</li>
+                            <li>Document must be clear and readable</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">7</div>
+                    <h3>Submit Your Request</h3>
+                    <p>Review all information carefully, then click the <strong>"Submit Request"</strong> button.</p>
+                    <p>You'll see a confirmation message and your request will be sent to management for approval.</p>
+                </div>
+                
+                <div class="info">
+                    <strong>📬 What Happens Next?</strong>
+                    <p>Your supervisor will review your request. You'll be notified once it's approved or if more information is needed. Approved changes will automatically appear in your calendar.</p>
+                </div>
+            </div>
+            
+            <!-- SECTION 2: MONTHLY REQUEST -->
+            <div class="section monthly">
+                <div class="section-header monthly">
+                    <span class="icon">📅</span>
+                    <div>
+                        <h2>Monthly Schedule Request <span class="badge new">NEW</span></h2>
+                        <p>For recurring weekly schedule changes throughout an entire month</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Open Schedule Request Modal</h3>
+                    <p>From your dashboard, click on the <strong>"Schedule"</strong> tab, then click the <strong>"New Request"</strong> button.</p>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Select "Monthly Request"</h3>
+                    <p>In the request type selection area, click on <strong>"Monthly Request"</strong>. The form will change to show weekly schedule options.</p>
+                    <div class="warning">
+                        <strong>⚠️ Important:</strong>
+                        <p>Monthly requests affect your ENTIRE schedule for the selected month. This will change your default weekly schedule, not just individual days.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Choose the Month</h3>
+                    <p>Click on the "Select Month" field and choose which month you want to change your schedule for (e.g., January 2026, February 2026).</p>
+                    <div class="tip">
+                        <strong>💡 Tip:</strong>
+                        <p>You can only select current and future months. The selected month will highlight in green once chosen.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Set Schedule for Each Day of the Week</h3>
+                    <p>You'll see a row for each day of the week (Sunday through Saturday). For each day:</p>
+                    <ul>
+                        <li><strong>Click the search box</strong> for that day</li>
+                        <li><strong>Type to search</strong> for a schedule (by time or name)</li>
+                        <li><strong>Select from the dropdown</strong> that appears</li>
+                        <li>Choose <strong>"Rest Day"</strong> if that day should be your day off</li>
+                    </ul>
+                    <div class="info">
+                        <strong>ℹ️ Flexibility:</strong>
+                        <p>You don't need to fill in all 7 days. Only set schedules for the days you want to change. Days left blank will keep their current schedule.</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <h3>Example Weekly Schedule Setup</h3>
+                    <p>Here's an example of how you might set up a monthly schedule:</p>
+                    <ul>
+                        <li><strong>Monday:</strong> 7:00 AM - 4:00 PM</li>
+                        <li><strong>Tuesday:</strong> 7:00 AM - 4:00 PM</li>
+                        <li><strong>Wednesday:</strong> 7:00 AM - 4:00 PM</li>
+                        <li><strong>Thursday:</strong> 7:00 AM - 4:00 PM</li>
+                        <li><strong>Friday:</strong> 7:00 AM - 4:00 PM</li>
+                        <li><strong>Saturday:</strong> Rest Day</li>
+                        <li><strong>Sunday:</strong> Rest Day</li>
+                    </ul>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <h3>Clear or Change Selections</h3>
+                    <p>Made a mistake? No problem!</p>
+                    <ul>
+                        <li>Click the <strong>✕ button</strong> next to any day to clear that selection</li>
+                        <li>Click the search box again to choose a different schedule</li>
+                    </ul>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">7</div>
+                    <h3>Provide Detailed Reason</h3>
+                    <p>Explain why you need this monthly schedule change. Since this affects an entire month, provide a clear, comprehensive reason.</p>
+                    <div class="tip">
+                        <strong>💡 Examples of good reasons:</strong>
+                        <p>"Starting evening classes in January - need morning shift"<br>
+                        "Childcare arrangement changed - requesting earlier schedule"<br>
+                        "Medical treatment schedule requires afternoon availability"</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">8</div>
+                    <h3>Upload Supporting Document</h3>
+                    <p>Attach a document that supports your monthly schedule change request (school enrollment, medical schedule, etc.).</p>
+                    <div class="requirements">
+                        <h3>File Requirements:</h3>
+                        <ul>
+                            <li>Accepted formats: PDF, JPG, JPEG, PNG</li>
+                            <li>Maximum file size: 10MB</li>
+                            <li>Document must be clear and readable</li>
+                            <li>Should show the time period/dates that require the schedule change</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">9</div>
+                    <h3>Review and Submit</h3>
+                    <p>Double-check all your selections:</p>
+                    <ul>
+                        <li>✓ Correct month selected?</li>
+                        <li>✓ All desired days configured?</li>
+                        <li>✓ Reason provided?</li>
+                        <li>✓ Supporting document uploaded?</li>
+                    </ul>
+                    <p>When everything looks good, click <strong>"Submit Request"</strong>.</p>
+                </div>
+                
+                <div class="warning">
+                    <strong>⚠️ Processing Time</strong>
+                    <p>Monthly schedule requests typically require more time for approval since they affect an entire month. Submit your request well in advance - ideally at least 2 weeks before the month starts.</p>
+                </div>
+                
+                <div class="info">
+                    <strong>📬 What Happens After Submission?</strong>
+                    <p>Your monthly schedule request will be reviewed by management. Once approved, your new weekly schedule will be automatically applied for the entire selected month. You'll receive a notification when the decision is made.</p>
+                </div>
+            </div>
+            
+            <!-- SECTION 3: OT REQUESTS FROM CALENDAR -->
+            <div class="section">
+                <div class="section-header" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <span class="icon">⏰</span>
+                    <div>
+                        <h2>Quick Overtime Requests <span class="badge new">NEW</span></h2>
+                        <p>Request overtime directly from the calendar</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Look for the Green Clock Icon</h3>
+                    <p>On your calendar, past dates where you worked and are eligible for overtime will show a pulsing <strong>green clock icon ⏰</strong> in the top-right corner.</p>
+                    <div class="info">
+                        <strong>ℹ️ When will you see this icon?</strong>
+                        <p>The icon appears when:</p>
+                        <ul>
+                            <li>You clocked in AND out for that day</li>
+                            <li>You haven't submitted an OT request yet</li>
+                            <li>The date is within the last 7 days</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Click the Green Clock Icon</h3>
+                    <p>Simply click the green clock icon on any eligible date. You'll be automatically taken to the overtime request form with that date pre-selected.</p>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Fill Out the OT Request Form</h3>
+                    <p>Complete the overtime request form with:</p>
+                    <ul>
+                        <li>Actual overtime hours worked</li>
+                        <li>Reason for overtime</li>
+                        <li>Supporting documentation</li>
+                    </ul>
+                </div>
+                
+                <div class="warning">
+                    <strong class="badge important">IMPORTANT</strong> <strong>7-Day Request Window</strong>
+                    <p>You can only request overtime within <strong>7 days</strong> after the work date. After this period, the request option will no longer be available. Don't wait too long!</p>
+                </div>
+                
+                <div class="tip">
+                    <strong>💡 Best Practice:</strong>
+                    <p>Submit your overtime requests as soon as possible after completing the work. This ensures:</p>
+                    <ul>
+                        <li>You don't miss the 7-day deadline</li>
+                        <li>Details are fresh in your memory</li>
+                        <li>Faster approval processing</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- TIPS AND BEST PRACTICES -->
+            <div class="section">
+                <h2 style="color: #1f2937; margin-bottom: 20px;">💡 Tips & Best Practices</h2>
+                
+                <div class="tip">
+                    <strong>Plan Ahead</strong>
+                    <p>Submit schedule change requests as early as possible. Last-minute requests may not be approved in time.</p>
+                </div>
+                
+                <div class="tip">
+                    <strong>Be Specific</strong>
+                    <p>Provide clear, detailed reasons for your requests. The more information you give, the easier it is for management to approve.</p>
+                </div>
+                
+                <div class="tip">
+                    <strong>Keep Documents Ready</strong>
+                    <p>Have your supporting documents (medical certificates, appointment slips, etc.) scanned and ready to upload.</p>
+                </div>
+                
+                <div class="tip">
+                    <strong>Check Your Requests</strong>
+                    <p>Regularly check the status of your pending requests. You'll be notified of approvals or if additional information is needed.</p>
+                </div>
+                
+                <div class="tip">
+                    <strong>Overtime Request Timing</strong>
+                    <p>Don't forget the 7-day window for overtime requests! Set a reminder to submit OT requests within a few days after working overtime.</p>
+                </div>
+                
+                <div class="warning">
+                    <strong>❌ Common Mistakes to Avoid</strong>
+                    <ul>
+                        <li>Forgetting to attach supporting documents</li>
+                        <li>Submitting requests too close to the date</li>
+                        <li>Providing vague or unclear reasons</li>
+                        <li>Not double-checking the selected date/month</li>
+                        <li>Missing the 7-day overtime request deadline</li>
+                        <li>Uploading files that are too large or in wrong format</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- FAQ -->
+            <div class="section">
+                <h2 style="color: #1f2937; margin-bottom: 20px;">❓ Frequently Asked Questions</h2>
+                
+                <div class="step" style="border-left: 4px solid #3b82f6;">
+                    <h3>Can I edit a request after submitting?</h3>
+                    <p>No, once submitted, requests cannot be edited. If you need to make changes, contact your supervisor or HR department.</p>
+                </div>
+                
+                <div class="step" style="border-left: 4px solid #3b82f6;">
+                    <h3>How long does approval take?</h3>
+                    <p>Single day requests are usually processed within 1-3 business days. Monthly requests may take up to 1 week for review.</p>
+                </div>
+                
+                <div class="step" style="border-left: 4px solid #3b82f6;">
+                    <h3>Can I cancel a pending request?</h3>
+                    <p>Contact your supervisor or HR department to cancel a pending request.</p>
+                </div>
+                
+                <div class="step" style="border-left: 4px solid #3b82f6;">
+                    <h3>What if my request is rejected?</h3>
+                    <p>You'll receive a notification explaining why. You can submit a new request with additional information or speak with your supervisor.</p>
+                </div>
+                
+                <div class="step" style="border-left: 4px solid #3b82f6;">
+                    <h3>Why can't I see the OT icon on some past dates?</h3>
+                    <p>The OT icon only appears on dates where: (1) you completed your time log (clocked in and out), (2) you haven't submitted an OT request yet, and (3) the date is within the last 7 days.</p>
+                </div>
+                
+                <div class="step" style="border-left: 4px solid #3b82f6;">
+                    <h3>What happens after the 7-day OT request window?</h3>
+                    <p>After 7 days, the system will no longer allow overtime requests for that date. The green clock icon will disappear. If you have a special circumstance, contact HR immediately.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Need Help?</strong></p>
+            <p>Contact your supervisor or HR department for assistance with schedule requests.</p>
+            <p style="margin-top: 20px; font-size: 0.9em;">Harley Timekeeping System © 2025</p>
+        </div>
+    </div>
+</body>
+</html>

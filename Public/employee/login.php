@@ -188,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- Login Form -->
     <form method="POST" class="space-y-5">
-      <?= csrf_token_field() ?>>
+      <?= csrf_token_field() ?>
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>

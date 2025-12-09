@@ -160,8 +160,8 @@ if ($cacheData) {
         }
         
         // Use times from cache
-        $sched_time_in = date('h:i A', strtotime($cacheData['time_in']));
-        $sched_time_out = date('h:i A', strtotime($cacheData['time_out']));
+        $sched_time_in = $cacheData['time_in'] ? date('h:i A', strtotime($cacheData['time_in'])) : 'N/A';
+        $sched_time_out = $cacheData['time_out'] ? date('h:i A', strtotime($cacheData['time_out'])) : 'N/A';
     }
 } elseif ($weeklyDefault) {
     // Fallback to weekly default
@@ -179,7 +179,7 @@ if ($cacheData) {
         $status_text = "Active Schedule";
         
         // Use times from weekly default
-        if ($weeklyDefault['time_in'] && $weeklyDefault['time_out']) {
+        if (!empty($weeklyDefault['time_in']) && !empty($weeklyDefault['time_out'])) {
             $sched_time_in = date('h:i A', strtotime($weeklyDefault['time_in']));
             $sched_time_out = date('h:i A', strtotime($weeklyDefault['time_out']));
         } else {

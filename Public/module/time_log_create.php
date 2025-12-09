@@ -1144,8 +1144,13 @@ function closeDropdownOnClickOutside(e) {
 }
 </script>
 
+<?php
+// Determine initial view based on URL parameter to prevent flash
+$initialView = isset($_GET['view']) && $_GET['view'] === 'schedule' ? 'schedule' : 'dashboard';
+?>
+
 <main class="flex-1 pt-20 px-8 overflow-auto">
-<div id="dashboardView" class="mt-20">
+<div id="dashboardView" class="<?= $initialView === 'dashboard' ? 'mt-20' : 'hidden' ?>">
 <?php
 // Fetch the number of announcements
 $stmt = $pdo->query("SELECT COUNT(announcement_id) AS total_announcements FROM announcements");
@@ -1221,7 +1226,7 @@ $announcementCount = $stmt->fetchColumn();
 </div>
 
 <!-- Schedule Management View -->
-<div id="scheduleView" class="hidden">
+<div id="scheduleView" class="<?= $initialView === 'schedule' ? 'mt-20' : 'hidden' ?>">
     <?php include 'schedule_content.php'; ?>
 </div>
 
@@ -1556,8 +1561,16 @@ function showSection(sectionId) {
 
 // Set initial active state on page load
 document.addEventListener('DOMContentLoaded', function() {
-  // Set Home as default active
-  showSection('dashboardView');
+  // Check URL for view parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewParam = urlParams.get('view');
+  
+  // Show the requested view or default to dashboard
+  if (viewParam === 'schedule') {
+    showSection('scheduleView');
+  } else {
+    showSection('dashboardView');
+  }
 });
 </script>
 

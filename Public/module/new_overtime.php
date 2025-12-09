@@ -1042,6 +1042,7 @@ button:hover {
                   ?>"
                   style="animation-delay: <?= $index * 0.05 ?>s;"
                   data-date="<?= $hasDate ? date('M d, Y', strtotime($log['log_date'])) : '' ?>"
+                  data-log-date="<?= $hasDate ? $log['log_date'] : '' ?>"
                   data-status="<?= $hasLog ? $rowStatus : 'rdot' ?>"
                   data-log-id="<?= $hasLog ? $log['id'] : '' ?>"
                   data-time-in="<?= $hasLog ? $log['time_in'] : '' ?>"
@@ -1232,6 +1233,8 @@ button:hover {
                       </div>
                     <?php elseif ($requestStatus === 'declined' || !$hasRequest): ?>
                       <button onclick="openOvertimeModal(this)"
+                              data-log-date="<?= $hasDate ? $log['log_date'] : '' ?>"
+                              data-time-log-id="<?= $hasLog ? $log['id'] : '' ?>"
                               class="group inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300">
                         <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
                         OT Request
