@@ -280,8 +280,14 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
 
                 <div class="mb-6">
                     <div class="flex items-center justify-between">
-                        <div>
-
+                        <div class="flex-1 max-w-md">
+                            <div class="relative">
+                                <input type="text" id="searchInput" placeholder="Search by employee, date, status, reason..." 
+                                       class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fas fa-search text-gray-400"></i>
+                                </div>
+                            </div>
                         </div>
                         <div class="flex space-x-2">
                             <a href="?view=single" 
@@ -1254,6 +1260,26 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                 alert('Request ID missing. Please try again.');
                 e.preventDefault();
             }
+        });
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
+            const tableRows = document.querySelectorAll('tbody tr');
+            
+            tableRows.forEach(row => {
+                // Skip the "no results" row
+                if (row.querySelector('td[colspan]')) {
+                    return;
+                }
+                
+                const text = row.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
         });
     </script>
 
