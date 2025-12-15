@@ -147,15 +147,19 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
             $created = date('M j, Y', strtotime($activity['created_at']));
             $msg = strip_tags($activity['message']);
 
-            // Detect type - check for schedule swap first, then monthly schedule, then day off/rest day
+            // Detect type - check for schedule swap first, then monthly schedule, then overtime, then day off/rest day
             if (isset($activity['type']) && $activity['type'] === 'Schedule Swap Request') {
                 $type = 'Schedule Swap';
             } elseif (isset($activity['type']) && $activity['type'] === 'Monthly Schedule Request') {
                 $type = 'Monthly Schedule';
-            } elseif (preg_match('/\b(day\s*off|rest\s*day|off\s*day)\b/i', $msg)) {
+            } elseif (preg_match('/\b(overtime|OT|RDOT)\b/i', $msg)) {
+                // Check for overtime first to prevent RDOT from being detected as "Day Off"
+                $type = 'Overtime';
+            } elseif (preg_match('/\b(day\s*off|rest\s*day|off\s*day)\b/i', $msg) && !preg_match('/\b(overtime|OT|RDOT)\b/i', $msg)) {
+                // Only match day off if it's NOT an overtime request
                 $type = 'Day Off';
             } else {
-                preg_match('/\b(Leave|Schedule|Time|Overtime)\b/i', $msg, $typeMatch);
+                preg_match('/\b(Leave|Schedule|Time)\b/i', $msg, $typeMatch);
                 $type = $typeMatch[0] ?? 'Request';
             }
 
