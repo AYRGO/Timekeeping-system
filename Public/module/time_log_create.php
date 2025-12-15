@@ -1070,6 +1070,76 @@ nav {
 }
 </style>
 
+<script>
+// Essential functions needed by sidebar and other inline onclick handlers
+// These must be defined before the HTML that uses them
+
+function showSection(sectionId) {
+  // Hide all sections
+  document.querySelectorAll('[id$="View"]').forEach(el => el.classList.add('hidden'));
+
+  // Show the selected section
+  const targetSection = document.getElementById(sectionId);
+  if (targetSection) {
+    targetSection.classList.remove('hidden');
+  }
+  
+  // Update active states in sidebar
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.remove('active-nav', 'bg-green-100', 'text-green-700', 'border-l-4', 'border-green-600');
+    link.classList.add('text-gray-700');
+  });
+  
+  // Add active state to clicked link
+  const activeLink = document.querySelector(`.nav-link[data-section="${sectionId}"]`);
+  if (activeLink) {
+    activeLink.classList.add('active-nav', 'bg-green-100', 'text-green-700', 'border-l-4', 'border-green-600');
+    activeLink.classList.remove('text-gray-700');
+  }
+  
+  // If it's a leave submenu item, also highlight the parent
+  if (sectionId === 'requestView' || sectionId === 'leaveCreditsView') {
+    const leaveParent = document.querySelector('.nav-link[data-section="leaveMenu"]');
+    if (leaveParent) {
+      leaveParent.classList.add('active-nav', 'bg-green-100', 'text-green-700', 'border-l-4', 'border-green-600');
+      leaveParent.classList.remove('text-gray-700');
+    }
+    // Make sure submenu is open
+    const submenu = document.getElementById('leaveSubmenu');
+    if (submenu) {
+      submenu.classList.remove('hidden');
+    }
+  }
+}
+
+function toggleLeaveMenu() {
+    const submenu = document.getElementById('leaveSubmenu');
+    const icon = document.getElementById('leaveMenuIcon');
+
+    if (submenu) submenu.classList.toggle('hidden');
+    if (icon) icon.classList.toggle('rotate-180');
+}
+
+function toggleMobileMenu() {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar) sidebar.classList.toggle("hidden");
+}
+
+// Set initial active state on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Check URL for view parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewParam = urlParams.get('view');
+  
+  // Show the requested view or default to dashboard
+  if (viewParam === 'schedule') {
+    showSection('scheduleView');
+  } else {
+    showSection('dashboardView');
+  }
+});
+</script>
+
 </head>
 <body class="bg-gray-50">
     <div class="flex h-screen overflow-hidden relative">
@@ -1468,14 +1538,6 @@ document.addEventListener("DOMContentLoaded", function () {
     updateAllClocks();
     setInterval(updateAllClocks, 1000);
 });
-// Section toggle - Updated to include overtimeView
-function showSection(id) {
-    ['dashboardView', 'requestView', 'scheduleView', 'attendanceView', 'profileView', 'newsFeedView', 'overtimeView', 'leaveCreditsView']
-        .forEach(x => document.getElementById(x)?.classList.add('hidden'));
-    document.getElementById(id)?.classList.remove('hidden');
-}
-
-
 
 function openCommentsModal(announcementId) {
     // Set hidden input field with announcement ID
@@ -1524,80 +1586,17 @@ function closeEditModal() {
 <!--End of Tawk.to Script-->
 
 <script>
-function showSection(sectionId) {
-  // Hide all sections
-  document.querySelectorAll('[id$="View"]').forEach(el => el.classList.add('hidden'));
+    // Hamburger menu toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        const sidebar = document.getElementById('sidebar');
 
-  // Show the selected section
-  document.getElementById(sectionId).classList.remove('hidden');
-  
-  // Update active states in sidebar
-  document.querySelectorAll('.nav-link').forEach(link => {
-    link.classList.remove('active-nav', 'bg-green-100', 'text-green-700', 'border-l-4', 'border-green-600');
-    link.classList.add('text-gray-700');
-  });
-  
-  // Add active state to clicked link
-  const activeLink = document.querySelector(`.nav-link[data-section="${sectionId}"]`);
-  if (activeLink) {
-    activeLink.classList.add('active-nav', 'bg-green-100', 'text-green-700', 'border-l-4', 'border-green-600');
-    activeLink.classList.remove('text-gray-700');
-  }
-  
-  // If it's a leave submenu item, also highlight the parent
-  if (sectionId === 'requestView' || sectionId === 'leaveCreditsView') {
-    const leaveParent = document.querySelector('.nav-link[data-section="leaveMenu"]');
-    if (leaveParent) {
-      leaveParent.classList.add('active-nav', 'bg-green-100', 'text-green-700', 'border-l-4', 'border-green-600');
-      leaveParent.classList.remove('text-gray-700');
-    }
-    // Make sure submenu is open
-    const submenu = document.getElementById('leaveSubmenu');
-    if (submenu) {
-      submenu.classList.remove('hidden');
-    }
-  }
-}
-
-// Set initial active state on page load
-document.addEventListener('DOMContentLoaded', function() {
-  // Check URL for view parameter
-  const urlParams = new URLSearchParams(window.location.search);
-  const viewParam = urlParams.get('view');
-  
-  // Show the requested view or default to dashboard
-  if (viewParam === 'schedule') {
-    showSection('scheduleView');
-  } else {
-    showSection('dashboardView');
-  }
-});
-</script>
-
-<script>
-    const hamburgerBtn = document.getElementById('hamburgerBtn');
-    const sidebar = document.getElementById('sidebar');
-
-    hamburgerBtn.addEventListener('click', () => {
-        sidebar.classList.toggle('-translate-x-full');
+        if (hamburgerBtn && sidebar) {
+            hamburgerBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('-translate-x-full');
+            });
+        }
     });
-</script>
-
-<script>
-  function toggleMobileMenu() {
-    const sidebar = document.getElementById("sidebar");
-    sidebar.classList.toggle("hidden");
-  }
-</script>
-
-<script>
-function toggleLeaveMenu() {
-    const submenu = document.getElementById('leaveSubmenu');
-    const icon = document.getElementById('leaveMenuIcon');
-
-    submenu.classList.toggle('hidden');
-    icon.classList.toggle('rotate-180'); // Optional: rotate arrow icon
-}
 </script>
 
 <script>

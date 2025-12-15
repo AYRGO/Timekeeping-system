@@ -370,16 +370,7 @@ SELECT id, 1, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Gabriel' AND lnam
 UNION ALL
 SELECT id, 2, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Gabriel' AND lname = 'Capiral'
 UNION ALL
-SELECT id, 3, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Gabriel' AND lname = 'Capiral'
-UNION ALL
-SELECT id, 4, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Gabriel' AND lname = 'Capiral'
-UNION ALL
-SELECT id, 5, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Gabriel' AND lname = 'Capiral'
-UNION ALL
-SELECT id, 6, NULL, 1, '2025-01-01' FROM employees WHERE fname = 'Gabriel' AND lname = 'Capiral';
-
--- Caraan, Sarah - M-F 8AM-4:30PM
-INSERT INTO employee_default_schedules (employee_id, day_of_week, work_schedule_id, is_rest_day, effective_from)
+SELECT id, 3, 4, 0, '2025-01-01' Fschedules (employee_id, day_of_week, work_schedule_id, is_rest_day, effective_from)
 SELECT id, 0, NULL, 1, '2025-01-01' FROM employees WHERE fname = 'Sarah' AND lname = 'Caraan'
 UNION ALL
 SELECT id, 1, 9, 0, '2025-01-01' FROM employees WHERE fname = 'Sarah' AND lname = 'Caraan'
@@ -495,7 +486,16 @@ INSERT INTO employee_default_schedules (employee_id, day_of_week, work_schedule_
 SELECT id, 0, NULL, 1, '2025-01-01' FROM employees WHERE fname = 'Ron Paulo' AND lname = 'Cueto'
 UNION ALL
 SELECT id, 1, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Ron Paulo' AND lname = 'Cueto'
+UNION ALLROM employees WHERE fname = 'Gabriel' AND lname = 'Capiral'
 UNION ALL
+SELECT id, 4, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Gabriel' AND lname = 'Capiral'
+UNION ALL
+SELECT id, 5, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Gabriel' AND lname = 'Capiral'
+UNION ALL
+SELECT id, 6, NULL, 1, '2025-01-01' FROM employees WHERE fname = 'Gabriel' AND lname = 'Capiral';
+
+-- Caraan, Sarah - M-F 8AM-4:30PM
+INSERT INTO employee_default_
 SELECT id, 2, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Ron Paulo' AND lname = 'Cueto'
 UNION ALL
 SELECT id, 3, 4, 0, '2025-01-01' FROM employees WHERE fname = 'Ron Paulo' AND lname = 'Cueto'

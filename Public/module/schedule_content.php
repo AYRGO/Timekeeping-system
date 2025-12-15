@@ -14,6 +14,13 @@ function getMonthsNav_schedule($year, $month) {
 // Get employee's schedule for a specific date - FROM PERSONAL CALENDAR CACHE
 // This is the employee's ACTUAL calendar - showing approved requests, admin overrides, holidays, and defaults
 function getScheduleCell_schedule($pdo, $employee_id, $date) {
+    // Initialize OT-related variables first (before any return statements)
+    $ot_eligible = false;
+    $time_log_id = null;
+    $ot_request_status = null;
+    $ot_request_id = null;
+    $ot_request_data = null;
+    
     // Query the pre-computed cache table - THIS IS THE EMPLOYEE'S PERSONAL CALENDAR DATA
     $stmt = $pdo->prepare("
         SELECT 
@@ -34,10 +41,6 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
     $stmt->execute([$employee_id, $date]);
     $cache = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Check if OT eligible for this date (if there's a time log with completed clock in/out)
-    $ot_eligible = false;
-    $time_log_id = null;
-    
     // Only check past dates (not today or future)
     if ($date < date('Y-m-d')) {
         // Check if date is within 7-day request window
@@ -56,22 +59,56 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
             if ($log) {
                 $time_log_id = $log['id'];
                 
-                // Check if ANY OT request already exists (pending, approved, OR rejected)
-                // Employees should not be able to submit duplicate OT requests
+                // Check if ANY OT request already exists and get its status
                 $ot_check = $pdo->prepare("
-                    SELECT COUNT(*) as count 
+                    SELECT id, status, ot_duration, reason, created_at, time_in, time_out, ot_type
                     FROM post_ot_requests 
                     WHERE time_log_id = ?
+                    LIMIT 1
                 ");
                 $ot_check->execute([$time_log_id]);
-                $has_any_ot_request = $ot_check->fetch(PDO::FETCH_ASSOC)['count'] > 0;
+                $ot_request = $ot_check->fetch(PDO::FETCH_ASSOC);
                 
-                // Eligible ONLY if:
-                // 1. Completed time log exists (clocked in and out)
-                // 2. No OT request exists yet (any status)
-                // 3. Within 7-day request window
-                if (!$has_any_ot_request) {
-                    $ot_eligible = true;
+                if ($ot_request) {
+                    // OT request exists - store its details
+                    $ot_request_status = $ot_request['status'];
+                    $ot_request_id = $ot_request['id'];
+                    $ot_request_data = $ot_request;
+                    $ot_eligible = false; // Can't submit new request
+                } else {
+                    // Check if there are actually OT hours available
+                    // Get the employee's schedule for this date to calculate OT
+                    $schedule_check = $pdo->prepare("
+                        SELECT work_schedule_id, time_in as sched_time_in, time_out as sched_time_out
+                        FROM employee_daily_schedule_cache
+                        WHERE employee_id = ? AND schedule_date = ?
+                        LIMIT 1
+                    ");
+                    $schedule_check->execute([$employee_id, $date]);
+                    $schedule = $schedule_check->fetch(PDO::FETCH_ASSOC);
+                    
+                    // Calculate if OT hours are available
+                    $has_ot_hours = false;
+                    if ($schedule && $schedule['sched_time_in'] && $schedule['sched_time_out']) {
+                        $log_in = strtotime($log['time_in']);
+                        $log_out = strtotime($log['time_out']);
+                        $sched_in = strtotime($schedule['sched_time_in']);
+                        $sched_out = strtotime($schedule['sched_time_out']);
+                        
+                        // Calculate OT: time worked outside scheduled hours
+                        $ot_minutes = 0;
+                        if ($log_in < $sched_in) {
+                            $ot_minutes += ($sched_in - $log_in) / 60;
+                        }
+                        if ($log_out > $sched_out) {
+                            $ot_minutes += ($log_out - $sched_out) / 60;
+                        }
+                        
+                        $has_ot_hours = ($ot_minutes > 0);
+                    }
+                    
+                    // Only set eligible if OT hours are available
+                    $ot_eligible = $has_ot_hours;
                 }
             }
         }
@@ -88,7 +125,10 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
             'source' => $cache['source'],
             'schedule_color' => getScheduleColor_schedule($cache['source'], $cache['is_rest_day'], $cache['is_holiday']),
             'ot_eligible' => $ot_eligible,
-            'time_log_id' => $time_log_id
+            'time_log_id' => $time_log_id,
+            'ot_request_status' => $ot_request_status,
+            'ot_request_id' => $ot_request_id,
+            'ot_request_data' => $ot_request_data
         ];
         
         // Add schedule details if not a rest day
@@ -135,7 +175,10 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
                 'source' => 'weekly_default',
                 'schedule_color' => '#e2e8f0',
                 'ot_eligible' => $ot_eligible,
-                'time_log_id' => $time_log_id
+                'time_log_id' => $time_log_id,
+                'ot_request_status' => $ot_request_status,
+                'ot_request_id' => $ot_request_id,
+                'ot_request_data' => $ot_request_data
             ];
         } elseif ($weekly['work_schedule_id']) {
             return [
@@ -152,7 +195,10 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
                 'source' => 'weekly_default',
                 'schedule_color' => '#3b82f6',
                 'ot_eligible' => $ot_eligible,
-                'time_log_id' => $time_log_id
+                'time_log_id' => $time_log_id,
+                'ot_request_status' => $ot_request_status,
+                'ot_request_id' => $ot_request_id,
+                'ot_request_data' => $ot_request_data
             ];
         }
     }
@@ -168,7 +214,10 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
             'source' => 'weekend',
             'schedule_color' => '#e2e8f0',
             'ot_eligible' => $ot_eligible,
-            'time_log_id' => $time_log_id
+            'time_log_id' => $time_log_id,
+            'ot_request_status' => $ot_request_status,
+            'ot_request_id' => $ot_request_id,
+            'ot_request_data' => $ot_request_data
         ];
     }
     
@@ -182,7 +231,10 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
         'source' => 'none',
         'schedule_color' => '#e2e8f0',
         'ot_eligible' => $ot_eligible,
-        'time_log_id' => $time_log_id
+        'time_log_id' => $time_log_id,
+        'ot_request_status' => $ot_request_status,
+        'ot_request_id' => $ot_request_id,
+        'ot_request_data' => $ot_request_data
     ];
 }
 
@@ -489,13 +541,34 @@ try {
                               
                               <!-- Quick Action Buttons (Top Right) -->
                               <div class="absolute top-2 right-2 flex gap-1 z-10">
-                                <!-- OT Eligible Icon (for Past Dates) -->
-                                <?php if (isset($cell['ot_eligible']) && $cell['ot_eligible']): ?>
-                                <button onclick="event.stopPropagation(); openOTRequestFromCalendar('<?= $cellDate ?>', '<?= $cell['time_log_id'] ?>')" 
-                                        class="p-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-lg shadow-lg transition-all duration-200 transform hover:scale-110 pulse-glow text-xs"
-                                        title="Request Overtime - <?= $cellDate ?>">
-                                    <i class="fas fa-clock"></i>
-                                </button>
+                                <!-- OT Request Status Icon -->
+                                <?php if (isset($cell['ot_request_status']) && $cell['ot_request_status']): ?>
+                                    <?php 
+                                    // Determine icon color and style based on status
+                                    $otStatus = strtolower($cell['ot_request_status']);
+                                    if ($otStatus === 'pending') {
+                                        $otIconClass = 'bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 pulse-pending';
+                                        $otTitle = 'Pending OT Request - Click to view details';
+                                    } elseif ($otStatus === 'approved') {
+                                        $otIconClass = 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600';
+                                        $otTitle = 'Approved OT Request - Click to view details';
+                                    } else { // rejected/declined
+                                        $otIconClass = 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600';
+                                        $otTitle = 'Rejected OT Request - Click to view details';
+                                    }
+                                    ?>
+                                    <button onclick="event.stopPropagation(); viewOTRequestDetails(<?= htmlspecialchars(json_encode($cell['ot_request_data']), ENT_QUOTES) ?>, '<?= $cellDate ?>')" 
+                                            class="p-1.5 <?= $otIconClass ?> text-white rounded-lg shadow-lg transition-all duration-200 transform hover:scale-110 text-xs"
+                                            title="<?= $otTitle ?>">
+                                        <i class="fas fa-clock"></i>
+                                    </button>
+                                <?php elseif (isset($cell['ot_eligible']) && $cell['ot_eligible']): ?>
+                                    <!-- OT Eligible Icon (for Past Dates - no request yet) -->
+                                    <button onclick="event.stopPropagation(); openOTRequestFromCalendar('<?= $cellDate ?>', '<?= $cell['time_log_id'] ?>')" 
+                                            class="p-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-lg shadow-lg transition-all duration-200 transform hover:scale-110 pulse-glow text-xs"
+                                            title="Request Overtime - <?= $cellDate ?>">
+                                        <i class="fas fa-clock"></i>
+                                    </button>
                                 <?php endif; ?>
                                 
                                 <!-- Schedule Action Buttons (for Future Dates - shown on hover) -->
@@ -822,6 +895,48 @@ function openOTRequestFromCalendar(date, timeLogId) {
             }
         }
     }, 500);
+}
+
+// View OT Request Details from Calendar
+function viewOTRequestDetails(otRequestData, date) {
+    console.log('👁️ Viewing OT request details:', otRequestData);
+    
+    if (!otRequestData) {
+        console.error('No OT request data provided');
+        return;
+    }
+    
+    // Build the data JSON for showActivityDetails (matching recent_activity_card.php format)
+    const activityData = {
+        type: 'Overtime Request',
+        request_id: otRequestData.id,
+        table_name: 'post_ot_requests',
+        source_table: 'post_ot_requests',
+        status: otRequestData.status,
+        ot_duration: otRequestData.ot_duration || 0,
+        reason: otRequestData.reason || '',
+        created_at: otRequestData.created_at,
+        date: date,
+        ot_date: date,
+        log_date: date,
+        // OT Schedule times (what employee submitted)
+        start_ot: otRequestData.time_in || '',
+        end_ot: otRequestData.time_out || '',
+        time_in: otRequestData.time_in || '',
+        time_out: otRequestData.time_out || '',
+        ot_type: otRequestData.ot_type || 'Regular OT'
+    };
+    
+    // Create title similar to recent activities
+    const title = '⏰ Overtime Request';
+    
+    // Call showActivityDetails from recent_activity_card.php
+    if (typeof showActivityDetails === 'function') {
+        showActivityDetails(title, JSON.stringify(activityData));
+    } else {
+        console.error('showActivityDetails function not found. Make sure recent_activity_card.php is loaded.');
+        alert('Unable to display request details. Please refresh the page and try again.');
+    }
 }
 
 // Schedule Swap Modal Functions
@@ -1362,7 +1477,7 @@ document.addEventListener('DOMContentLoaded', function() {
     animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* OT Eligible Icon Pulse Animation */
+/* OT Eligible Icon Pulse Animation (Green - No Request Yet) */
 .pulse-glow {
     animation: pulse-glow 2s ease-in-out infinite;
 }
@@ -1373,6 +1488,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     50% {
         box-shadow: 0 0 15px rgba(16, 185, 129, 0.7), 0 0 30px rgba(16, 185, 129, 0.5), 0 0 40px rgba(16, 185, 129, 0.3);
+        transform: scale(1.05);
+    }
+}
+
+/* OT Pending Request Pulse Animation (Yellow/Amber) */
+.pulse-pending {
+    animation: pulse-pending 2s ease-in-out infinite;
+}
+
+@keyframes pulse-pending {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(251, 191, 36, 0.6), 0 0 20px rgba(251, 191, 36, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 15px rgba(251, 191, 36, 0.8), 0 0 30px rgba(251, 191, 36, 0.6), 0 0 40px rgba(251, 191, 36, 0.4);
         transform: scale(1.05);
     }
 }
