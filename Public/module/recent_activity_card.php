@@ -730,8 +730,12 @@ function showActivityDetails(title, dataJson) {
         const modalTitle = document.getElementById('modalTitle');
         const modalBody = document.getElementById('modalBody');
         
-        // Set modal title
-        modalTitle.textContent = data.type || title;
+        // Set modal title - check if it's RDOT
+        let displayTitle = data.type || title;
+        if (data.type && data.type.includes('Overtime') && data.ot_type && (data.ot_type.toLowerCase().includes('rdot') || data.ot_type.toLowerCase().includes('rest'))) {
+            displayTitle = 'RDOT Request';
+        }
+        modalTitle.textContent = displayTitle;
         
         // Build modal content based on request type
         let content = '';
@@ -741,7 +745,7 @@ function showActivityDetails(title, dataJson) {
         content += `
             <div class="flex items-start justify-between pb-4 border-b border-gray-200 mb-4">
                 <div>
-                    <h3 class="text-lg font-bold text-gray-800">${data.type}</h3>
+                    <h3 class="text-lg font-bold text-gray-800">${displayTitle}</h3>
                     <p class="text-sm text-gray-500">${data.date}</p>
                 </div>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${statusClass}">
