@@ -79,7 +79,7 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
                     // Check if there are actually OT hours available
                     // Get the employee's schedule for this date to calculate OT
                     $schedule_check = $pdo->prepare("
-                        SELECT work_schedule_id, time_in as sched_time_in, time_out as sched_time_out
+                        SELECT work_schedule_id, time_in as sched_time_in, time_out as sched_time_out, is_rest_day
                         FROM employee_daily_schedule_cache
                         WHERE employee_id = ? AND schedule_date = ?
                         LIMIT 1
@@ -89,7 +89,12 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
                     
                     // Calculate if OT hours are available
                     $has_ot_hours = false;
-                    if ($schedule && $schedule['sched_time_in'] && $schedule['sched_time_out']) {
+                    
+                    // If it's a rest day and employee worked, ALL hours are OT
+                    if ($schedule && $schedule['is_rest_day'] == 1) {
+                        $has_ot_hours = true; // Any work on rest day is OT
+                    } elseif ($schedule && $schedule['sched_time_in'] && $schedule['sched_time_out']) {
+                        // Regular work day - calculate OT based on schedule
                         $log_in = strtotime($log['time_in']);
                         $log_out = strtotime($log['time_out']);
                         $sched_in = strtotime($schedule['sched_time_in']);
@@ -662,20 +667,6 @@ try {
                     <i class="fas fa-info-circle text-blue-600 text-sm"></i>
                 </div>
                 <span class="font-medium">Click on any future date to request a schedule change</span>
-            </div>
-            <div class="flex items-center gap-5">
-                <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <span class="text-xs font-medium text-gray-500">Work Day</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-amber-500"></div>
-                    <span class="text-xs font-medium text-gray-500">Holiday</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-slate-400"></div>
-                    <span class="text-xs font-medium text-gray-500">Rest Day</span>
-                </div>
             </div>
         </div>
     </div>
