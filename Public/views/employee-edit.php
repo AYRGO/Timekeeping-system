@@ -298,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Note: schedule_override_history table uses different columns (schedule_date, original_schedule_id, new_schedule_id, override_reason, applied_by)
         // Skipping history logging for weekly schedule updates since it's for daily overrides
         
-        echo "<script>alert('Weekly schedule updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId#weekly-schedule';</script>";
+        echo "<script>alert('Weekly schedule updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId#current-schedule';</script>";
         exit;
     }
     
