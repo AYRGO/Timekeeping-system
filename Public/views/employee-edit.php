@@ -298,7 +298,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Note: schedule_override_history table uses different columns (schedule_date, original_schedule_id, new_schedule_id, override_reason, applied_by)
         // Skipping history logging for weekly schedule updates since it's for daily overrides
         
-        echo "<script>alert('Weekly schedule updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId#current-schedule';</script>";
+        $_SESSION['success_message'] = 'Weekly schedule updated successfully!';
+        header("Location: employee-edit.php?id=$employeeId#current-schedule");
         exit;
     }
     
@@ -530,6 +531,18 @@ uasort($sortedScheduleOptions, function($a, $b) {
         ?>
         
         <main class="flex-1 p-6 overflow-y-auto">
+            <?php if (isset($_SESSION['success_message'])): ?>
+                <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 rounded-md shadow-md" role="alert">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle mr-3 text-xl"></i>
+                        <div>
+                            <p class="font-medium"><?= htmlspecialchars($_SESSION['success_message']) ?></p>
+                        </div>
+                    </div>
+                </div>
+                <?php unset($_SESSION['success_message']); ?>
+            <?php endif; ?>
+            
             <!-- Profile Header -->
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
                 <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
@@ -776,7 +789,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                     // Get all work schedules
                     $allSchedules = $pdo->query("SELECT id, name, time_in, time_out FROM work_schedules ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
                     ?>
-                    <form method="post" class="space-y-4" id="weeklyScheduleForm">
+                    <form method="post" action="employee-edit.php?id=<?= $employeeId ?>" class="space-y-4" id="weeklyScheduleForm">
                         <input type="hidden" name="action" value="update_weekly_schedule">
                         
                         <!-- Hidden fields for schedule IDs -->
@@ -2266,6 +2279,8 @@ function openTab(evt, tabName) {
 
 // Show default tab on page load, or tab from URL hash
 document.addEventListener('DOMContentLoaded', function() {
+    let tabOpened = false;
+    
     // Check if there's a hash in the URL
     const hash = window.location.hash.substring(1); // Remove the # symbol
     
@@ -2276,16 +2291,20 @@ document.addEventListener('DOMContentLoaded', function() {
             // Find the corresponding tab button and click it
             const tabButtons = document.querySelectorAll('.tab-button');
             for (let button of tabButtons) {
-                if (button.getAttribute('onclick') && button.getAttribute('onclick').includes(`'${hash}'`)) {
+                const onclick = button.getAttribute('onclick');
+                if (onclick && (onclick.includes(`'${hash}'`) || onclick.includes(`"${hash}"`))) {
                     button.click();
-                    return;
+                    tabOpened = true;
+                    break;
                 }
             }
         }
     }
     
-    // Default: open the first tab
-    document.getElementById('default-tab').click();
+    // Default: open the first tab only if no tab was opened from hash
+    if (!tabOpened) {
+        document.getElementById('default-tab').click();
+    }
 });
 
 function confirmScheduleChange(scheduleId, inTime, outTime, isCurrent) {
