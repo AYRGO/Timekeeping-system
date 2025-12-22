@@ -1999,8 +1999,7 @@ function initializeTimePicker(maxHours) {
     const isRestdayOT = otTypeSelect && otTypeSelect.value === 'Restday OT';
     
     if (isRestdayOT) {
-        const payableHours = Math.max(0, maxHours - 1);
-        rangeInfo.innerHTML = `Maximum available: ${formatDuration(maxHours)} <span class="text-orange-600 font-semibold">(Payable: ${formatDuration(payableHours)} after 1hr lunch deduction)</span>`;
+        rangeInfo.innerHTML = `Maximum available: ${formatDuration(maxHours)} <span class="text-orange-600 font-semibold">(1hr lunch deduction applies)</span>`;
     } else {
         rangeInfo.textContent = `Maximum available: ${formatDuration(maxHours)}`;
     }
@@ -2023,13 +2022,8 @@ function initializeTimePicker(maxHours) {
         } else {
             hiddenInput.value = totalHours.toFixed(2);
             
-            // For Restday OT, show both selected and payable hours
-            if (isRestdayOT) {
-                const payableHours = Math.max(0, totalHours - 1);
-                validationInfo.innerHTML = `Selected: ${formatDuration(totalHours)} <span class="text-orange-600 font-semibold">(Payable: ${formatDuration(payableHours)})</span>`;
-            } else {
-                validationInfo.textContent = `Selected: ${formatDuration(totalHours)}`;
-            }
+            // Show selected hours
+            validationInfo.textContent = `Selected: ${formatDuration(totalHours)}`;
             validationInfo.className = 'mt-0.5 text-xs text-emerald-600 truncate';
         }
     }
