@@ -99,6 +99,15 @@ try {
                             <span class="text-base">All caught up! View News Feed</span>
                         </button>
                     <?php endif; ?>
+                    
+                    <!-- Recent Updates Button -->
+                    <a href="../../Harley up/employee_manual.html" 
+                       target="_blank"
+                       class="bg-white text-emerald-700 px-7 py-3 rounded-xl font-semibold hover:bg-opacity-90 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl flex items-center space-x-3 group"
+                    >
+                        <i class="fas fa-book-open text-lg group-hover:animate-pulse"></i>
+                        <span class="text-base">See What's New</span>
+                    </a>
                 </div>
             </div>
             
