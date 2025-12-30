@@ -42,6 +42,9 @@ if (
             'application/vnd.ms-powerpoint',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            // Video types
+            'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime',
+            'video/x-msvideo', 'video/x-ms-wmv', 'video/mpeg', 'video/3gpp',
         ];
 
         // Use correct upload directory (relative to Public/views)
@@ -429,14 +432,36 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                                 // Clean up the file path
                                                 $filePath = str_replace(['\\', '//'], '/', $filePath);
                                                 $filePath = ltrim($filePath, '/');
-
-                                                // Construct proper file URL for download
-                                                $fileUrl = '/Timekeeping-system/Public/views/uploads/' . basename($filePath);
+                                                
+                                                // Get just the filename
+                                                $cleanFileName = basename($filePath);
+                                                
+                                                // Detect if we're on production or local
+                                                $isProduction = (strpos($_SERVER['HTTP_HOST'] ?? '', 'resourcestaffonline.com') !== false);
+                                                
+                                                if ($isProduction) {
+                                                    // Production server - use relative path from document root
+                                                    $fileUrl = '/Public/views/uploads/' . $cleanFileName;
+                                                } else {
+                                                    // Local development (XAMPP)
+                                                    $fileUrl = '/Timekeeping-system/Public/views/uploads/' . $cleanFileName;
+                                                }
 
                                                 $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
                                                 $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']);
+                                                $isVideo = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'mpeg', '3gp']);
                                             ?>
-                                                <?php if ($isImage): ?>
+                                                <?php if ($isVideo): ?>
+                                                    <div class="rounded-lg overflow-hidden border border-gray-200 bg-black">
+                                                        <video controls class="w-full" style="max-height: 500px;">
+                                                            <source src="<?= htmlspecialchars($fileUrl) ?>" type="video/<?= $ext === 'mov' ? 'quicktime' : ($ext === 'avi' ? 'x-msvideo' : $ext) ?>">
+                                                            Your browser does not support the video tag.
+                                                        </video>
+                                                        <div class="p-2 bg-gray-50 text-sm text-gray-600">
+                                                            <i class="fas fa-video mr-2"></i><?= htmlspecialchars($originalName) ?>
+                                                        </div>
+                                                    </div>
+                                                <?php elseif ($isImage): ?>
                                                     <div class="rounded-lg overflow-hidden border border-gray-200">
                                                         <img src="<?= htmlspecialchars($fileUrl) ?>" 
                                                              alt="<?= htmlspecialchars($originalName) ?>" 

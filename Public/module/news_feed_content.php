@@ -358,11 +358,24 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     $filePath = str_replace(['\\', '//'], '/', $filePath);
                                     $filePath = ltrim($filePath, '/');
                                     
-                                    // Construct proper file URL for download
-                                    $fileUrl = '/Timekeeping-system/Public/views/' . $filePath;
+                                    // Remove 'uploads/' prefix if present to avoid duplication
+                                    $cleanFileName = basename($filePath);
+                                    
+                                    // Try multiple possible paths for compatibility
+                                    // Detect if we're on production or local
+                                    $isProduction = (strpos($_SERVER['HTTP_HOST'] ?? '', 'resourcestaffonline.com') !== false);
+                                    
+                                    if ($isProduction) {
+                                        // Production server - try relative path from document root
+                                        $fileUrl = '/Public/views/uploads/' . $cleanFileName;
+                                    } else {
+                                        // Local development (XAMPP)
+                                        $fileUrl = '/Timekeeping-system/Public/views/uploads/' . $cleanFileName;
+                                    }
                                     
                                     $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
                                     $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']);
+                                    $isVideo = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'mpeg', '3gp']);
                                     
                                     // Get file size if possible
                                     $fullPath = $_SERVER['DOCUMENT_ROOT'] . $fileUrl;
@@ -380,7 +393,33 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         }
                                     }
                                 ?>
-                                    <?php if ($isImage): ?>
+                                    <?php if ($isVideo): ?>
+                                        <div class="rounded-lg overflow-hidden border border-gray-200 bg-black">
+                                            <video controls class="w-full" style="max-height: 500px;"
+                                                   onerror="console.error('Video failed to load:', this.querySelector('source').src); this.nextElementSibling.style.display='block';"
+                                                   onloadeddata="console.log('Video loaded successfully');">
+                                                <source src="<?= htmlspecialchars($fileUrl) ?>" type="video/<?= $ext === 'mov' ? 'quicktime' : ($ext === 'avi' ? 'x-msvideo' : ($ext === 'wmv' ? 'x-ms-wmv' : $ext)) ?>">
+                                                Your browser does not support the video tag.
+                                            </video>
+                                            <!-- Fallback if video fails -->
+                                            <div class="hidden p-4 text-center bg-gray-700">
+                                                <i class="fas fa-exclamation-triangle text-yellow-400 text-2xl mb-2"></i>
+                                                <p class="text-white text-sm mb-2">Video could not be loaded</p>
+                                                <p class="text-gray-400 text-xs mb-3">Path: <?= htmlspecialchars($fileUrl) ?></p>
+                                                <a href="<?= htmlspecialchars($fileUrl) ?>" 
+                                                   class="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" 
+                                                   download="<?= htmlspecialchars($originalName) ?>">
+                                                    <i class="fas fa-download mr-2"></i>Download Video
+                                                </a>
+                                            </div>
+                                            <div class="p-2 bg-gray-800 text-sm text-gray-300 flex items-center justify-between">
+                                                <span><i class="fas fa-video mr-2"></i><?= htmlspecialchars($originalName) ?></span>
+                                                <?php if ($fileSize): ?>
+                                                    <span class="text-gray-400"><?= $fileSize ?></span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php elseif ($isImage): ?>
                                         <div class="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
                                             <img src="<?= htmlspecialchars($fileUrl) ?>" 
                                                  alt="<?= htmlspecialchars($originalName) ?>" 
