@@ -351,34 +351,6 @@ $sheet->getStyle("A1:{$lastCol}{$lastRow}")->getBorders()->getOutline()->setBord
 // Set default row height for better readability
 $sheet->getDefaultRowDimension()->setRowHeight(25);
 
-// Add legend/instructions at the bottom
-$legendRow = $lastRow + 2;
-$sheet->setCellValue("A{$legendRow}", "INSTRUCTIONS:");
-$sheet->getStyle("A{$legendRow}")->getFont()->setBold(true)->setSize(12);
-
-$legendRow++;
-$instructions = [
-    ['VL', 'Vacation Leave (1 full day) - Green text', false],
-    ['SL', 'Sick Leave (1 full day) - Purple text', false], 
-    ['PL', 'Paternity Leave (1 full day) - Blue text', false],
-    ['ML', 'Maternity Leave (1 full day) - Pink text', false],
-    ['SPL', 'Solo Parent Leave (1 full day) - Orange text', false],
-    ['Half_VL', 'Half Day Vacation (0.5 day) - Green text', false],
-    ['Half_SL', 'Half Day Sick (0.5 day) - Purple text', false],
-    ['LWOP', 'Leave Without Pay (1 full day) - Gray text', false],
-    ['BL', 'Bereavement Leave (1 full day) - Black text', false],
-    ['Auto-populated from approved requests', '', false]
-];
-
-foreach ($instructions as $i => $instruction) {
-    $currentLegendRow = $legendRow + $i;
-    $sheet->setCellValue("A{$currentLegendRow}", $instruction[0]);
-    $sheet->setCellValue("B{$currentLegendRow}", $instruction[1]);
-    
-    $sheet->getStyle("A{$currentLegendRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-    $sheet->getStyle("A{$currentLegendRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-}
-
 // Output
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 $startFile = date('M_j_Y', strtotime($startDate));
