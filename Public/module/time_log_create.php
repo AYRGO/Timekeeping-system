@@ -1369,7 +1369,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Leave credit checking functionality
     const leaveTypeSelect = document.getElementById("leaveType");
     const leaveBalanceDisplay = document.getElementById("leaveBalanceDisplay");
-    const submitBtn = document.getElementById("submitBtn");
+    const submitBtn = document.getElementById("leaveSubmitBtn");
     const dateRangeInput = document.getElementById("date_range");
 
     function checkLeaveCredits() {
@@ -1450,20 +1450,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 textSpan.textContent = `✅ ${displayType}: ${balance} day(s) available. Requesting ${requestedDays} day(s). After approval: ${(balance - requestedDays).toFixed(1)} day(s) remaining.`;
                 enableSubmitButton();
             } else {
-                // Insufficient credits - show warning but still allow submission
-                container.className = "bg-yellow-50 border border-yellow-300 rounded-xl p-4";
-                icon.className = "fas fa-exclamation-triangle text-yellow-600 mr-3";
-                textSpan.className = "text-yellow-800 font-medium";
-                textSpan.textContent = `⚠️ ${displayType}: ${balance} day(s) available. Requesting ${requestedDays} day(s). You have insufficient credits, but can still submit for admin review.`;
-                enableSubmitButton();
+                // Insufficient credits - block submission
+                container.className = "bg-red-50 border border-red-300 rounded-xl p-4";
+                icon.className = "fas fa-times-circle text-red-600 mr-3";
+                textSpan.className = "text-red-800 font-medium";
+                textSpan.textContent = `❌ ${displayType}: ${balance} day(s) available. Requesting ${requestedDays} day(s). Insufficient credits - cannot submit request.`;
+                disableSubmitButton();
             }
         }
     }
 
     function disableSubmitButton() {
-        // Function kept for compatibility but no longer disables button
-        // Always keep button enabled - no credit restrictions
-        enableSubmitButton();
+        submitBtn.disabled = true;
+        submitBtn.classList.remove("bg-green-600", "hover:bg-green-700");
+        submitBtn.classList.add("opacity-50", "cursor-not-allowed", "bg-gray-400");
+        const btnText = submitBtn.querySelector('span');
+        if (btnText) {
+            btnText.textContent = "Insufficient Credits";
+        } else {
+            submitBtn.textContent = "Insufficient Credits";
+        }
     }
 
     function enableSubmitButton() {

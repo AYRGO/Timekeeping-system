@@ -114,10 +114,10 @@
 
           <!-- Leave Balance Warning -->
           <div id="leaveBalanceDisplay" class="hidden mb-6">
-            <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div class="rounded-xl p-4">
               <div class="flex items-center">
-                <i class="fas fa-exclamation-circle text-red-600 mr-3"></i>
-                <span class="text-red-700 font-medium"></span>
+                <i class="mr-3"></i>
+                <span></span>
               </div>
             </div>
           </div>

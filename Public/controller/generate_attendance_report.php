@@ -69,51 +69,105 @@ foreach ($approvedLeaves as $leave) {
     $leaveMap[$leave['employee_id']][] = $leave;
 }
 
-// Fetch approved schedule changes
-$scheduleChangesStmt = $pdo->prepare("
-    SELECT employee_id, work_schedule_id, start_date, end_date 
-    FROM post_schedule_change_requests 
-    WHERE status = 'Approved' 
-    AND end_date >= :start AND start_date <= :end
-    ORDER BY created_at DESC
-");
-$scheduleChangesStmt->execute(['start' => $start, 'end' => $end]);
-$scheduleChanges = $scheduleChangesStmt->fetchAll(PDO::FETCH_ASSOC);
+// Fetch employee daily schedule cache for all employees in date range (if table exists)
+// This is the employee's ACTUAL calendar data - matching schedule_content.php
+$scheduleCacheMap = [];
+try {
+    $cacheStmt = $pdo->prepare("
+        SELECT edsc.employee_id, edsc.schedule_date, edsc.work_schedule_id, edsc.is_rest_day,
+               edsc.time_in, edsc.time_out, edsc.schedule_name
+        FROM employee_daily_schedule_cache edsc
+        WHERE edsc.schedule_date BETWEEN :start AND :end
+    ");
+    $cacheStmt->execute(['start' => $start, 'end' => $end]);
+    $scheduleCacheRows = $cacheStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Create schedule change map by employee
-$scheduleChangeMap = [];
-foreach ($scheduleChanges as $change) {
-    if (!isset($scheduleChangeMap[$change['employee_id']])) {
-        $scheduleChangeMap[$change['employee_id']] = [];
+    // Create schedule cache map by employee and date
+    foreach ($scheduleCacheRows as $cache) {
+        $key = $cache['employee_id'] . '_' . $cache['schedule_date'];
+        $scheduleCacheMap[$key] = $cache;
     }
-    $scheduleChangeMap[$change['employee_id']][] = $change;
+} catch (PDOException $e) {
+    // Table doesn't exist, continue without cache
+    $scheduleCacheMap = [];
 }
 
-// Define schedule times (same as attendance-history.php)
-$schedule_times = [
-    1 => ['in' => '06:30:00', 'out' => '15:30:00'],
-    2 => ['in' => '08:00:00', 'out' => '19:00:00'],
-    3 => ['in' => '07:30:00', 'out' => '16:30:00'],
-    4 => ['in' => '07:00:00', 'out' => '16:00:00'],
-    5 => ['in' => '08:00:00', 'out' => '17:00:00'],
-    6 => ['in' => '09:00:00', 'out' => '18:00:00'],
-    7 => ['in' => '10:00:00', 'out' => '19:00:00'],
-    8 => ['in' => '06:00:00', 'out' => '15:00:00'],
-    9 => ['in' => '08:00:00', 'out' => '16:30:00'],
-    10 => ['in' => '07:40:00', 'out' => '16:40:00'],
-    11 => ['in' => '06:30:00', 'out' => '15:00:00'],
-    12 => ['in' => '06:30:00', 'out' => '17:30:00'],
-    13 => ['in' => '07:00:00', 'out' => '18:00:00'],
-    14 => ['in' => '06:00:00', 'out' => '17:00:00'],
-    15 => ['in' => '06:00:00', 'out' => '16:00:00'],
-    16 => ['in' => '08:30:00', 'out' => '16:30:00'],
-    17 => ['in' => '06:00:00', 'out' => '12:00:00'],
-    18 => ['in' => '06:00:00', 'out' => '14:30:00'],
-    19 => ['in' => '19:00:00', 'out' => '03:00:00'],
-    20 => ['in' => '19:00:00', 'out' => '04:30:00'],
-    21 => ['in' => '17:00:00', 'out' => '02:00:00'],
-    22 => ['in' => '17:30:00', 'out' => '02:00:00'],
-];
+// Fetch employee default schedules (weekly patterns)
+$defaultScheduleMap = [];
+try {
+    $defaultSchedStmt = $pdo->prepare("
+        SELECT eds.employee_id, eds.day_of_week, eds.work_schedule_id, eds.is_rest_day,
+               eds.effective_from, eds.effective_until,
+               ws.time_in, ws.time_out, ws.name as schedule_name
+        FROM employee_default_schedules eds
+        LEFT JOIN work_schedules ws ON eds.work_schedule_id = ws.id
+    ");
+    $defaultSchedStmt->execute();
+    $defaultSchedules = $defaultSchedStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Create default schedule map by employee and day of week
+    foreach ($defaultSchedules as $sched) {
+        $key = $sched['employee_id'] . '_' . $sched['day_of_week'];
+        if (!isset($defaultScheduleMap[$key])) {
+            $defaultScheduleMap[$key] = [];
+        }
+        $defaultScheduleMap[$key][] = $sched;
+    }
+} catch (PDOException $e) {
+    // Table doesn't exist, continue without default schedules
+    $defaultScheduleMap = [];
+}
+
+// Function to get employee schedule for a specific date
+function getEmployeeSchedule($employeeId, $logDate, $scheduleCacheMap, $defaultScheduleMap) {
+    // Default values
+    $result = [
+        'time_in' => '07:00:00',
+        'time_out' => '16:00:00',
+        'is_rest_day' => false,
+        'schedule_name' => 'Default'
+    ];
+    
+    // PRIORITY 1: Check daily_schedule_cache
+    $cacheKey = $employeeId . '_' . $logDate;
+    if (isset($scheduleCacheMap[$cacheKey])) {
+        $cache = $scheduleCacheMap[$cacheKey];
+        $result['is_rest_day'] = ($cache['is_rest_day'] == 1);
+        if ($cache['work_schedule_id'] && $cache['time_in'] && $cache['time_out']) {
+            $result['time_in'] = $cache['time_in'];
+            $result['time_out'] = $cache['time_out'];
+            $result['schedule_name'] = $cache['schedule_name'] ?? 'Cached';
+        }
+        return $result;
+    }
+    
+    // PRIORITY 2: Check employee_default_schedules (weekly pattern)
+    $dayOfWeek = date('w', strtotime($logDate));
+    $defaultKey = $employeeId . '_' . $dayOfWeek;
+    
+    if (isset($defaultScheduleMap[$defaultKey])) {
+        foreach ($defaultScheduleMap[$defaultKey] as $sched) {
+            // Check if the schedule is effective for this date
+            if ($logDate >= $sched['effective_from'] && 
+                ($sched['effective_until'] === null || $logDate <= $sched['effective_until'])) {
+                $result['is_rest_day'] = ($sched['is_rest_day'] == 1);
+                if ($sched['work_schedule_id'] && $sched['time_in'] && $sched['time_out']) {
+                    $result['time_in'] = $sched['time_in'];
+                    $result['time_out'] = $sched['time_out'];
+                    $result['schedule_name'] = $sched['schedule_name'] ?? 'Weekly Default';
+                }
+                return $result;
+            }
+        }
+    }
+    
+    // PRIORITY 3: Weekend fallback
+    if ($dayOfWeek == 0 || $dayOfWeek == 6) {
+        $result['is_rest_day'] = true;
+    }
+    
+    return $result;
+}
 
 // Function to check if a date is within approved leave period
 function isOnApprovedLeave($checkDate, $approvedLeaves) {
@@ -173,31 +227,14 @@ foreach ($timeLogs as $log) {
     // Determine log out date - use log_out_date if available, otherwise use log_date
     $logOutDate = !empty($log['log_out_date']) ? $log['log_out_date'] : $log['log_date'];
     
-    // Get employee's schedule for this date (same logic as attendance-history.php)
-    $default_schedule_id = $log['official_sched'] ?? 4;
-    $schedule_id_to_use = $default_schedule_id;
+    // Get employee's schedule for this date using the proper priority system
+    $schedule = getEmployeeSchedule($employeeId, $logDate, $scheduleCacheMap, $defaultScheduleMap);
     
-    // Check if there's an approved schedule change for this date
-    $employeeScheduleChanges = $scheduleChangeMap[$employeeId] ?? [];
-    foreach ($employeeScheduleChanges as $scheduleChange) {
-        if ($logDate >= $scheduleChange['start_date'] && $logDate <= $scheduleChange['end_date']) {
-            $schedule_id_to_use = $scheduleChange['work_schedule_id'];
-            break;
-        }
-    }
-    
-    // Get schedule times
-    if (isset($schedule_times[$schedule_id_to_use])) {
-        $schedule_in_24h = $schedule_times[$schedule_id_to_use]['in'];
-        $schedule_out_24h = $schedule_times[$schedule_id_to_use]['out'];
-        $schedule_in = date('h:i A', strtotime($schedule_in_24h));
-        $schedule_out = date('h:i A', strtotime($schedule_out_24h));
-    } else {
-        $schedule_in_24h = '07:00:00';
-        $schedule_out_24h = '16:00:00';
-        $schedule_in = '07:00 AM';
-        $schedule_out = '04:00 PM';
-    }
+    $schedule_in_24h = $schedule['time_in'];
+    $schedule_out_24h = $schedule['time_out'];
+    $isRestDay = $schedule['is_rest_day'];
+    $schedule_in = date('h:i A', strtotime($schedule_in_24h));
+    $schedule_out = date('h:i A', strtotime($schedule_out_24h));
     
     // Get employee's approved leaves
     $employeeLeaves = $leaveMap[$employeeId] ?? [];
@@ -218,10 +255,13 @@ foreach ($timeLogs as $log) {
     // Check for night shift
     $isNightShift = $timeIn && strtotime($timeIn) > strtotime('18:00:00');
     
-    // Status calculation using 5 specific categories: Complete, Incomplete, Leave, Late, Undertime
+    // Status calculation using 5 specific categories: Complete, Incomplete, Leave, Late, Undertime, Rest Day
     $status = '-';
     
-    if ($leaveType) {
+    if ($isRestDay && !$timeIn && !$timeOut) {
+        // Rest day with no work
+        $status = 'Rest Day';
+    } elseif ($leaveType) {
         // Employee is on approved leave
         $status = 'Leave';
     } elseif ($isAutoIncomplete || !$timeOut || $timeOut === 'INC') {

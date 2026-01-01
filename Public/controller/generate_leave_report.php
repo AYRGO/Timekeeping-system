@@ -73,7 +73,7 @@ try {
         $leaveMap[$credit['employee_id']][$credit['leave_type']] = floatval($credit['balance']);
     }
 
-    // Get approved leave requests for the date range
+    // Get approved leave requests for the date range - ONLY INCLUDE SPECIFIC LEAVE TYPES
     $leaveRequestsQuery = "
         SELECT 
             employee_id, 
@@ -83,6 +83,7 @@ try {
             status
         FROM post_leave_requests 
         WHERE status = 'approved'
+        AND leave_type IN ('sick', 'vacation', 'paternity', 'maternity', 'solo_parent', 'halfday', 'halfday_sick', 'lwop', 'bereavement')
         AND end_date >= :start_date 
         AND start_date <= :end_date
         ORDER BY employee_id, start_date
@@ -253,7 +254,7 @@ foreach ($employees as $employee) {
         if (isset($leavesByEmployeeAndDate[$employee['id']][$date])) {
             $leaveType = $leavesByEmployeeAndDate[$employee['id']][$date];
             
-            // Convert leave types to display format
+            // Convert leave types to display format - MATCH DROPDOWN OPTIONS EXACTLY
             switch (strtolower($leaveType)) {
                 case 'vacation':
                     $leaveValue = 'VL';
@@ -261,29 +262,30 @@ foreach ($employees as $employee) {
                 case 'sick':
                     $leaveValue = 'SL';
                     break;
+                case 'paternity':
+                    $leaveValue = 'PL';
+                    break;
+                case 'maternity':
+                    $leaveValue = 'ML';
+                    break;
                 case 'solo_parent':
                     $leaveValue = 'SPL';
                     break;
-                case 'emergency':
-                    $leaveValue = 'EL';
-                    break;
-                case 'half_day_vacation':
-                case 'halfday_vacation':
                 case 'halfday':
-                    $leaveValue = 'HDVL'; // Halfday is automatically HDVL (Half Day Vacation Leave)
+                    $leaveValue = 'Half_VL'; // Half Day Vacation
                     break;
-                case 'half_day_sick':
                 case 'halfday_sick':
-                    $leaveValue = 'HDSL';
+                    $leaveValue = 'Half_SL'; // Half Day Sick
                     break;
-                case 'half_day_solo_parent':
-                case 'halfday_solo_parent':
-                    $leaveValue = 'HDSPL';
+                case 'lwop':
+                    $leaveValue = 'LWOP';
+                    break;
+                case 'bereavement':
+                    $leaveValue = 'BL';
                     break;
                 default:
-                    // For any unknown leave type, just show it as is but uppercase
-                    $leaveValue = strtoupper($leaveType);
-                    break;
+                    // Skip any leave types not in the approved list
+                    continue 2;
             }
         }
         
@@ -297,7 +299,7 @@ foreach ($employees as $employee) {
         if (!empty($leaveValue)) {
             $sheet->getStyle($colLetter . $row)->getFont()->setBold(true);
             
-            // Color code the leave types
+            // Color code the leave types - MATCH NEW LEAVE TYPES
             switch ($leaveValue) {
                 case 'VL':
                     $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('006100'); // Dark green
@@ -305,26 +307,26 @@ foreach ($employees as $employee) {
                 case 'SL':
                     $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('7030A0'); // Purple
                     break;
+                case 'PL': // Paternity
+                    $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('0070C0'); // Blue
+                    break;
+                case 'ML': // Maternity
+                    $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('FF69B4'); // Hot pink
+                    break;
                 case 'SPL':
                     $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('C55A11'); // Orange
                     break;
-                case 'EL':
-                    $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('C00000'); // Red
-                    break;
-                case 'HDVL':
+                case 'Half_VL':
                     $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('006100'); // Dark green (same as VL)
                     break;
-                case 'HDSL':
+                case 'Half_SL':
                     $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('7030A0'); // Purple (same as SL)
                     break;
-                case 'HDSPL':
-                    $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('C55A11'); // Orange (same as SPL)
+                case 'LWOP':
+                    $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('808080'); // Gray
                     break;
-                case 'HDL':
-                    $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('006100'); // Dark green (generic halfday)
-                    break;
-                case 'HALFDAY':
-                    $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('006100'); // Dark green (for existing HALFDAY entries)
+                case 'BL': // Bereavement
+                    $sheet->getStyle($colLetter . $row)->getFont()->getColor()->setRGB('000000'); // Black
                     break;
             }
         }
@@ -358,12 +360,13 @@ $legendRow++;
 $instructions = [
     ['VL', 'Vacation Leave (1 full day) - Green text', false],
     ['SL', 'Sick Leave (1 full day) - Purple text', false], 
+    ['PL', 'Paternity Leave (1 full day) - Blue text', false],
+    ['ML', 'Maternity Leave (1 full day) - Pink text', false],
     ['SPL', 'Solo Parent Leave (1 full day) - Orange text', false],
-    ['EL', 'Emergency Leave (1 full day) - Red text', false],
-    ['HDVL', 'Half Day Vacation Leave (0.5 day) - Green text', false],
-    ['HDSL', 'Half Day Sick Leave (0.5 day) - Purple text', false],
-    ['HDSPL', 'Half Day Solo Parent Leave (0.5 day) - Orange text', false],
-    ['HDL', 'Half Day Leave (0.5 day) - Generic', false],
+    ['Half_VL', 'Half Day Vacation (0.5 day) - Green text', false],
+    ['Half_SL', 'Half Day Sick (0.5 day) - Purple text', false],
+    ['LWOP', 'Leave Without Pay (1 full day) - Gray text', false],
+    ['BL', 'Bereavement Leave (1 full day) - Black text', false],
     ['Auto-populated from approved requests', '', false]
 ];
 

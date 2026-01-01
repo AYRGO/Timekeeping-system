@@ -358,22 +358,15 @@ for ($i = 5; $i >= 0; $i--) {
                                 <?php if (!$autoAccrualEnabled): ?>
                                     <p class="font-medium text-gray-900 mb-1">Manual Mode</p>
                                     <p class="text-gray-600">
-                                        Process leave accruals manually each month via 
+                                        Process leave accruals manually via 
                                         <a href="../module/leave_accrual_manager.php" class="text-indigo-600 underline hover:text-indigo-700">Leave Accrual Manager</a>
                                     </p>
                                 <?php else: ?>
-                                    <p class="font-medium text-green-900 mb-1">✅ Production Mode - Automatic</p>
-                                    <p class="text-green-800 mb-2">
-                                        System checks hourly and processes leave credits on the last day of each month.<br>
-                                        <strong>Sick Leave:</strong> 0.42 days/month | <strong>Vacation Leave:</strong> 1.25 days/month
-                                    </p>
+                                    <p class="font-medium text-green-900 mb-1">✅ Automatic Mode</p>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-lg text-xs font-medium">
                                             <span class="w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse"></span>
                                             Active
-                                        </span>
-                                        <span class="text-xs text-green-700">
-                                            <i class="fas fa-clock mr-1"></i>Next check: Every hour
                                         </span>
                                     </div>
                                 <?php endif; ?>
