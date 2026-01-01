@@ -832,7 +832,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                         </div>
                     </form>
                     
-                    <!-- JavaScript for Autocomplete with Auto-Sync -->
+                    <!-- JavaScript for Autocomplete -->
                     <script>
                     document.addEventListener('DOMContentLoaded', function() {
                         // Schedule data for autocomplete
@@ -860,71 +860,56 @@ uasort($sortedScheduleOptions, function($a, $b) {
                             const dropdown = input.nextElementSibling;
                             const hiddenInput = document.getElementById('schedule_id_' + day);
                             
-                            // Auto-sync hidden field based on input value
-                            function syncHiddenField() {
-                                const currentValue = input.value.trim();
-                                
-                                // Find matching schedule
-                                const matchedSchedule = schedules.find(s => 
-                                    s.display.toLowerCase() === currentValue.toLowerCase() ||
-                                    s.name.toLowerCase() === currentValue.toLowerCase()
-                                );
-                                
-                                if (matchedSchedule) {
-                                    hiddenInput.value = matchedSchedule.id;
-                                    input.value = matchedSchedule.display; // Ensure consistent display
-                                } else if (currentValue.toLowerCase().includes('off') || currentValue === '') {
-                                    hiddenInput.value = '';
-                                    input.value = currentValue === '' ? '' : 'OFF / Rest Day';
-                                } else {
-                                    // Try partial matching for typed input
-                                    const partialMatch = schedules.find(s => 
-                                        s.name.toLowerCase().includes(currentValue.toLowerCase()) ||
-                                        s.display.toLowerCase().includes(currentValue.toLowerCase())
-                                    );
-                                    if (partialMatch) {
-                                        hiddenInput.value = partialMatch.id;
-                                        input.value = partialMatch.display;
-                                    }
-                                }
-                            }
-                            
-                            // Sync on every input change
-                            input.addEventListener('input', function() {
-                                syncHiddenField();
-                                const query = this.value.toLowerCase().trim();
-                                
-                                if (query === '') {
-                                    showAllOptions(input, dropdown, schedules, hiddenInput, day);
-                                    return;
-                                }
-                                
-                                // Filter schedules
-                                const filtered = schedules.filter(s => 
-                                    s.name.toLowerCase().includes(query) ||
-                                    s.display.toLowerCase().includes(query) ||
-                                    (s.time_in && s.time_in.toLowerCase().includes(query)) ||
-                                    (s.time_out && s.time_out.toLowerCase().includes(query))
-                                );
-                                
-                                showFilteredOptions(input, dropdown, filtered, hiddenInput, day);
-                            });
-                            
-                            // Sync on blur to ensure final value is correct
-                            input.addEventListener('blur', function() {
-                                syncHiddenField();
-                                setTimeout(() => {
-                                    dropdown.classList.add('hidden');
-                                }, 200);
-                            });
-                            
                             // Show dropdown on focus
                             input.addEventListener('focus', function() {
                                 showAllOptions(input, dropdown, schedules, hiddenInput, day);
                             });
                             
-                            // Initial sync when page loads
-                            syncHiddenField();
+                            // Filter on input with improved search
+                            input.addEventListener('input', function() {
+                                const query = this.value.toLowerCase().trim();
+                                
+                                if (query === '') {
+                                    showAllOptions(input, dropdown, schedules, hiddenInput, day);
+                                    hiddenInput.value = '';
+                                    return;
+                                }
+                                
+                                // Enhanced filter - searches in name, time_in, time_out, and handles numeric searches better
+                                const filtered = schedules.filter(s => {
+                                    const nameMatch = s.name.toLowerCase().includes(query);
+                                    const displayMatch = s.display.toLowerCase().includes(query);
+                                    
+                                    // Better numeric/time matching - removes colons and spaces for comparison
+                                    const timeInClean = s.time_in ? s.time_in.replace(/[:\s]/g, '').toLowerCase() : '';
+                                    const timeOutClean = s.time_out ? s.time_out.replace(/[:\s]/g, '').toLowerCase() : '';
+                                    const queryClean = query.replace(/[:\s]/g, '');
+                                    
+                                    const timeInMatch = timeInClean.includes(queryClean) || s.time_in.toLowerCase().includes(query);
+                                    const timeOutMatch = timeOutClean.includes(queryClean) || s.time_out.toLowerCase().includes(query);
+                                    
+                                    return nameMatch || displayMatch || timeInMatch || timeOutMatch;
+                                });
+                                
+                                showFilteredOptions(input, dropdown, filtered, hiddenInput, day);
+                            });
+                            
+                            // Hide dropdown on blur (with delay for click)
+                            input.addEventListener('blur', function() {
+                                setTimeout(() => {
+                                    dropdown.classList.add('hidden');
+                                }, 200);
+                            });
+                            
+                            // Allow easy deletion with keyboard
+                            input.addEventListener('keydown', function(e) {
+                                if (e.key === 'Backspace' || e.key === 'Delete') {
+                                    // Allow normal deletion behavior
+                                    if (this.value === '') {
+                                        hiddenInput.value = '';
+                                    }
+                                }
+                            });
                         });
                         
                         function showAllOptions(input, dropdown, schedules, hiddenInput, day) {
@@ -974,17 +959,10 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 `;
                             }
                             
-                            div.addEventListener('click', function(e) {
-                                // Don't prevent default or stop propagation
+                            div.addEventListener('click', function() {
                                 input.value = schedule.display;
                                 hiddenInput.value = schedule.id;
                                 dropdown.classList.add('hidden');
-                                
-                                // Focus the input and select all text for easy editing
-                                setTimeout(() => {
-                                    input.focus();
-                                    input.select();
-                                }, 50);
                                 
                                 // Visual feedback
                                 input.classList.add('bg-green-50');
