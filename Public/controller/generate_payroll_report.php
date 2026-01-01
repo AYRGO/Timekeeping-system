@@ -132,15 +132,20 @@ function getScheduleForDate($pdo, $employee_id, $date) {
     
     // If found in cache, return formatted data
     if ($cache) {
-        return [
-            'is_rest_day' => $cache['is_rest_day'],
-            'is_holiday' => $cache['is_holiday'],
-            'schedule_name' => $cache['schedule_name'],
-            'time_in' => $cache['time_in'],
-            'time_out' => $cache['time_out'],
-            'holiday_name' => $cache['holiday_name'] ?? null,
-            'source' => $cache['source']
-        ];
+        // If cache has valid schedule data, use it
+        if ($cache['is_rest_day'] || $cache['is_holiday'] || 
+            (!empty($cache['time_in']) && !empty($cache['time_out']))) {
+            return [
+                'is_rest_day' => $cache['is_rest_day'],
+                'is_holiday' => $cache['is_holiday'],
+                'schedule_name' => $cache['schedule_name'],
+                'time_in' => $cache['time_in'],
+                'time_out' => $cache['time_out'],
+                'holiday_name' => $cache['holiday_name'] ?? null,
+                'source' => $cache['source']
+            ];
+        }
+        // If cache exists but has empty/invalid data, fall through to weekly default lookup
     }
     
     // Fallback: Check employee_default_schedules (same logic as schedule_content.php)
@@ -243,6 +248,9 @@ function getWeeklyScheduleSummary($pdo, $employee_id, $startDate) {
             $schedKey = 'OFF';
         } elseif ($sched['is_holiday']) {
             $schedKey = 'HOLIDAY';
+        } elseif (empty($sched['time_in']) || empty($sched['time_out'])) {
+            // Handle empty/null schedule times - treat as OFF/unscheduled
+            $schedKey = 'OFF';
         } else {
             $schedKey = $sched['time_in'] . '-' . $sched['time_out'];
         }
@@ -288,6 +296,9 @@ function getWeeklyScheduleSummary($pdo, $employee_id, $startDate) {
             $parts[] = $dayRange . '; OFF';
         } elseif ($sched['is_holiday']) {
             $parts[] = $dayRange . '; HOLIDAY';
+        } elseif (empty($sched['time_in']) || empty($sched['time_out'])) {
+            // Handle empty/null schedule times
+            $parts[] = $dayRange . '; OFF';
         } else {
             $timeIn = date('ga', strtotime($sched['time_in'])); // 7am
             $timeOut = date('ga', strtotime($sched['time_out'])); // 4pm
