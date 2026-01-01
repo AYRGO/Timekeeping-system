@@ -209,24 +209,70 @@ function getScheduleForDate($pdo, $employee_id, $date) {
 }
 
 // Function to build weekly schedule summary in format: "M-F; 7am-4pm | Sat-Sun; OFF"
+// ONLY uses calendar cache data from January 2026 onwards for accuracy
 function getWeeklyScheduleSummary($pdo, $employee_id, $startDate) {
     $days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     $dayAbbrev = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     
-    // Get schedule for each day of the week
+    // Get schedule for each day of the week FROM CALENDAR CACHE ONLY
     $weekSchedule = [];
     $checkDate = new DateTime($startDate);
     
-    // Start from Monday (or the nearest Monday before startDate)
+    // Ensure we're only using data from January 2026 onwards
+    $minDate = new DateTime('2026-01-01');
+    if ($checkDate < $minDate) {
+        $checkDate = clone $minDate;
+    }
+    
+    // Start from Monday (or the nearest Monday before/after startDate)
     $dayOfWeek = $checkDate->format('w'); // 0=Sunday, 6=Saturday
     if ($dayOfWeek != 1) { // If not Monday
         $daysToSubtract = ($dayOfWeek == 0) ? 6 : ($dayOfWeek - 1);
         $checkDate->modify("-{$daysToSubtract} days");
     }
     
+    // Ensure adjusted date is still >= Jan 2026
+    if ($checkDate < $minDate) {
+        $checkDate = clone $minDate;
+    }
+    
     for ($i = 0; $i < 7; $i++) {
         $date = $checkDate->format('Y-m-d');
-        $schedInfo = getScheduleForDate($pdo, $employee_id, $date);
+        
+        // Fetch ONLY from calendar cache - this is what employee sees in their calendar
+        $stmt = $pdo->prepare("
+            SELECT 
+                schedule_date, work_schedule_id, is_rest_day, is_holiday,
+                schedule_name, time_in, time_out, source
+            FROM employee_daily_schedule_cache
+            WHERE employee_id = ? AND schedule_date = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$employee_id, $date]);
+        $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($cache && ($cache['is_rest_day'] || $cache['is_holiday'] || 
+            (!empty($cache['time_in']) && !empty($cache['time_out'])))) {
+            // Valid cache data found
+            $schedInfo = [
+                'is_rest_day' => $cache['is_rest_day'],
+                'is_holiday' => $cache['is_holiday'],
+                'schedule_name' => $cache['schedule_name'],
+                'time_in' => $cache['time_in'],
+                'time_out' => $cache['time_out'],
+                'source' => $cache['source']
+            ];
+        } else {
+            // No valid cache data - treat as OFF/unscheduled
+            $schedInfo = [
+                'is_rest_day' => 1,
+                'is_holiday' => 0,
+                'schedule_name' => 'OFF',
+                'time_in' => null,
+                'time_out' => null,
+                'source' => 'cache_missing'
+            ];
+        }
         
         $dow = $checkDate->format('w'); // 0=Sunday, 6=Saturday
         $weekSchedule[$dow] = $schedInfo;
