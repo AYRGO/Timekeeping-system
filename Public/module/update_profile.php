@@ -99,17 +99,8 @@ if (!empty($current_password) || !empty($new_password) || !empty($confirm_passwo
             die("No password set for this account. Please contact administrator.");
         }
         
-        // Try both password_verify (for hashed passwords) and direct comparison (for plain text)
-        $password_valid = false;
-        
-        // First try password_verify for hashed passwords
-        if (password_verify($current_password, $user['password'])) {
-            $password_valid = true;
-        } 
-        // If that fails, try direct comparison for plain text passwords
-        else if ($current_password === $user['password']) {
-            $password_valid = true;
-        }
+        // Direct password comparison (plain text)
+        $password_valid = ($current_password === $user['password']);
         
         if (!$password_valid) {
             die("Current password is incorrect. Please check your password and try again.");
@@ -133,18 +124,16 @@ try {
             die("User not found.");
         }
         
-        // Hash the new password
-        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+        // Store new password as plain text (no hashing)
         
         // Update only password
         $stmt = $pdo->prepare("UPDATE employees SET password = ? WHERE id = ?");
-        $stmt->execute([$hashed_password, $employee_id]);
+        $stmt->execute([$new_password, $employee_id]);
         
         $message = "Password updated successfully!";
         
     } else if ($password_change) {
-        // Hash the new password
-        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+        // Store new password as plain text (no hashing)
         
         // Update with password
         $stmt = $pdo->prepare("UPDATE employees SET 
@@ -157,7 +146,7 @@ try {
             password = ?
             WHERE id = ?");
 
-        $stmt->execute([$fname, $lname, $email, $contact, $position, $company, $hashed_password, $employee_id]);
+        $stmt->execute([$fname, $lname, $email, $contact, $position, $company, $new_password, $employee_id]);
         
         // Update session values
         $_SESSION['employee']['fname'] = $fname;

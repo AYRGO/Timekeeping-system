@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // If validation passes, save the employee
     try {
-        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+        // Store password as plain text (no hashing)
         
         $stmt = $pdo->prepare("INSERT INTO employees 
             (fname, lname, username, password, email, contact, position, status, created_at)
@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $fname,
             $lname,
             $username,
-            $hashedPassword,
+            $password,
             !empty($email) ? $email : null,
             !empty($contact) ? $contact : null,
             !empty($position) ? $position : null,

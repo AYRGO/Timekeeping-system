@@ -71,19 +71,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Check password - handle both hashed and plain text passwords
     $password_valid = false;
     if ($user) {
-        // First try password_verify for hashed passwords (new method)
+        // First try password_verify for hashed passwords
         if (password_verify($password, $user['password'])) {
             $password_valid = true;
         } 
-        // If that fails, try direct comparison for plain text passwords (legacy method)
+        // If that fails, try direct comparison for plain text passwords
         else if ($user['password'] === $password) {
             $password_valid = true;
-            
-            // Optional: Update to hashed password for security
-            // This will automatically upgrade plain text passwords to hashed ones
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $update_stmt = $pdo->prepare("UPDATE employees SET password = ? WHERE id = ?");
-            $update_stmt->execute([$hashed_password, $user['id']]);
         }
     }
 

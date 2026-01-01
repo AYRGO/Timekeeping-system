@@ -818,7 +818,8 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                        data-day="<?= $d ?>"
                                        value="<?= $currentValue ?>"
                                        placeholder="Type schedule name or time, or 'OFF' for rest day"
-                                       autocomplete="off">
+                                       autocomplete="off"
+                                       spellcheck="false">
                                 <div class="autocomplete-dropdown hidden absolute z-10 w-full bg-white border border-gray-300 rounded-b-lg shadow-lg max-h-60 overflow-y-auto"></div>
                             </div>
                         <?php endforeach; ?>
@@ -973,10 +974,17 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 `;
                             }
                             
-                            div.addEventListener('click', function() {
+                            div.addEventListener('click', function(e) {
+                                // Don't prevent default or stop propagation
                                 input.value = schedule.display;
                                 hiddenInput.value = schedule.id;
                                 dropdown.classList.add('hidden');
+                                
+                                // Focus the input and select all text for easy editing
+                                setTimeout(() => {
+                                    input.focus();
+                                    input.select();
+                                }, 50);
                                 
                                 // Visual feedback
                                 input.classList.add('bg-green-50');
