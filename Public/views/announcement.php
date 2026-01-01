@@ -126,8 +126,8 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/Public/assets/css/tailwind.min.css" rel="stylesheet">
+    <link href="/Public/assets/css/fontawesome.min.css" rel="stylesheet">
     <title>Announcements</title>
     <style>
         .facebook-post {

@@ -1,0 +1,13 @@
+# Enable video file serving
+AddType video/mp4 .mp4
+AddType video/webm .webm
+AddType video/ogg .ogv
+
+# Allow video streaming
+<FilesMatch "\.(mp4|webm|ogv)$">
+    Header set Access-Control-Allow-Origin "*"
+    Header set Accept-Ranges bytes
+</FilesMatch>
+
+# Enable range requests for video streaming
+AcceptRanges bytes
