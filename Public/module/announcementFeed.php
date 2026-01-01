@@ -95,11 +95,17 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']);
                 $isVideo = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'mpeg', '3gp']);
+                
+                // URL encode the filename (but not the path slashes)
+                $pathParts = explode('/', $fileUrl);
+                $pathParts[count($pathParts) - 1] = rawurlencode($pathParts[count($pathParts) - 1]);
+                $encodedFileUrl = implode('/', $pathParts);
             ?>
                 <?php if ($isVideo): ?>
                     <div class="rounded-lg overflow-hidden border border-gray-200 bg-black">
-                        <video controls class="w-full" style="max-height: 500px;" preload="metadata">
-                            <source src="<?= htmlspecialchars($fileUrl) ?>" type="video/<?= $ext === 'mov' ? 'quicktime' : ($ext === 'avi' ? 'x-msvideo' : $ext) ?>">
+                        <video controls class="w-full" style="max-height: 500px;" preload="auto" playsinline>
+                            <source src="<?= $encodedFileUrl ?>" type="video/mp4">
+                            <source src="<?= $encodedFileUrl ?>" type="video/<?= $ext ?>">
                             Your browser does not support the video tag.
                         </video>
                         <div class="p-2 bg-gray-50 text-sm text-gray-600">
@@ -108,7 +114,7 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                 <?php elseif ($isImage): ?>
                     <div class="rounded-lg overflow-hidden border border-gray-200">
-                        <img src="<?= htmlspecialchars($fileUrl) ?>" 
+                        <img src="<?= $encodedFileUrl ?>" 
                              alt="<?= htmlspecialchars($originalName) ?>" 
                              class="w-full h-auto"
                              style="max-height: 500px; object-fit: contain; background: white;">
@@ -118,7 +124,7 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <span class="text-sm text-gray-700">
                             <i class="fas fa-file mr-2"></i><?= htmlspecialchars($originalName) ?>
                         </span>
-                        <a href="<?= htmlspecialchars($fileUrl) ?>" 
+                        <a href="<?= $encodedFileUrl ?>" 
                            download="<?= htmlspecialchars($originalName) ?>"
                            class="text-blue-600 hover:text-blue-800 text-sm">
                             <i class="fas fa-download"></i> Download

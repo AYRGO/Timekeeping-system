@@ -455,49 +455,36 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                                 
                                                 $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']);
                                                 $isVideo = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'mpeg', '3gp']);
+                                                
+                                                // URL encode the filename (but not the path slashes)
+                                                $pathParts = explode('/', $fileUrl);
+                                                $pathParts[count($pathParts) - 1] = rawurlencode($pathParts[count($pathParts) - 1]);
+                                                $encodedFileUrl = implode('/', $pathParts);
                                             ?>
                                                 <?php if ($isVideo): ?>
                                                     <div class="rounded-lg overflow-hidden border border-gray-200 bg-black">
-                                                        <video controls class="w-full" style="max-height: 500px;" preload="metadata" controlsList="nodownload">
-                                                            <source src="<?= htmlspecialchars($fileUrl) ?>" type="video/<?= $ext === 'mov' ? 'quicktime' : ($ext === 'avi' ? 'x-msvideo' : $ext) ?>">
+                                                        <video controls class="w-full" style="max-height: 500px;" preload="auto" playsinline>
+                                                            <source src="<?= $encodedFileUrl ?>" type="video/mp4">
+                                                            <source src="<?= $encodedFileUrl ?>" type="video/<?= $ext ?>">
                                                             Your browser does not support the video tag.
                                                         </video>
                                                         <div class="p-2 bg-gray-50 text-sm text-gray-600">
                                                             <i class="fas fa-video mr-2"></i><?= htmlspecialchars($originalName) ?>
                                                         </div>
                                                     </div>
-                                                    <script>
-                                                        // Debug video loading
-                                                        (function() {
-                                                            const video = document.querySelector('video[src*="<?= addslashes($cleanFileName) ?>"], video source[src*="<?= addslashes($cleanFileName) ?>"]');
-                                                            if (video) {
-                                                                const videoElement = video.tagName === 'VIDEO' ? video : video.parentElement;
-                                                                videoElement.addEventListener('error', function(e) {
-                                                                    console.error('Video error:', {
-                                                                        src: '<?= addslashes($fileUrl) ?>',
-                                                                        error: videoElement.error ? videoElement.error.code : 'unknown',
-                                                                        message: videoElement.error ? videoElement.error.message : 'No error message'
-                                                                    });
-                                                                });
-                                                                videoElement.addEventListener('loadeddata', function() {
-                                                                    console.log('Video loaded successfully:', '<?= addslashes($fileUrl) ?>');
-                                                                });
-                                                            }
-                                                        })();
-                                                    </script>
                                                 <?php elseif ($isImage): ?>
                                                     <div class="rounded-lg overflow-hidden border border-gray-200">
-                                                        <img src="<?= htmlspecialchars($fileUrl) ?>" 
+                                                        <img src="<?= $encodedFileUrl ?>" 
                                                              alt="<?= htmlspecialchars($originalName) ?>" 
                                                              class="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
                                                              style="max-height: 500px; object-fit: contain; background: white;"
-                                                             onclick="openLightbox('<?= htmlspecialchars($fileUrl) ?>')"
+                                                             onclick="openLightbox('<?= $encodedFileUrl ?>')"
                                                              onerror="console.log('Image failed to load:', this.src); this.style.display='none'; this.nextElementSibling.style.display='block';">
                                                         <!-- Fallback for broken images -->
                                                         <div class="hidden p-4 text-center bg-gray-100">
                                                             <i class="fas fa-image text-gray-400 text-2xl mb-2"></i>
                                                             <p class="text-gray-500 text-sm">Image not available</p>
-                                                            <a href="<?= htmlspecialchars($fileUrl) ?>" 
+                                                            <a href="<?= $encodedFileUrl ?>" 
                                                                class="text-blue-600 hover:underline text-sm" 
                                                                download="<?= htmlspecialchars($originalName) ?>">
                                                                 Download <?= htmlspecialchars($originalName) ?>
@@ -508,7 +495,7 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                                     <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border">
                                                         <i class="fas fa-file-alt text-blue-600 text-xl"></i>
                                                         <div class="flex-1">
-                                                            <a href="<?= htmlspecialchars($fileUrl) ?>" 
+                                                            <a href="<?= $encodedFileUrl ?>" 
                                                                class="text-blue-600 hover:underline font-medium" download>
                                                                 <?= htmlspecialchars($originalName) ?>
                                                             </a>
