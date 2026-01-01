@@ -869,14 +869,19 @@ uasort($sortedScheduleOptions, function($a, $b) {
                             input.addEventListener('input', function() {
                                 const query = this.value.toLowerCase().trim();
                                 
+                                // Always clear hidden field when typing manually
                                 if (query === '') {
-                                    showAllOptions(input, dropdown, schedules, hiddenInput, day);
                                     hiddenInput.value = '';
+                                    showAllOptions(input, dropdown, schedules, hiddenInput, day);
                                     return;
                                 }
                                 
                                 // Enhanced filter - searches in name, time_in, time_out, and handles numeric searches better
                                 const filtered = schedules.filter(s => {
+                                    if (s.isOff) {
+                                        return 'off'.includes(query) || 'rest'.includes(query);
+                                    }
+                                    
                                     const nameMatch = s.name.toLowerCase().includes(query);
                                     const displayMatch = s.display.toLowerCase().includes(query);
                                     
@@ -885,12 +890,16 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                     const timeOutClean = s.time_out ? s.time_out.replace(/[:\s]/g, '').toLowerCase() : '';
                                     const queryClean = query.replace(/[:\s]/g, '');
                                     
-                                    const timeInMatch = timeInClean.includes(queryClean) || s.time_in.toLowerCase().includes(query);
-                                    const timeOutMatch = timeOutClean.includes(queryClean) || s.time_out.toLowerCase().includes(query);
+                                    const timeInMatch = timeInClean.includes(queryClean) || (s.time_in && s.time_in.toLowerCase().includes(query));
+                                    const timeOutMatch = timeOutClean.includes(queryClean) || (s.time_out && s.time_out.toLowerCase().includes(query));
                                     
                                     return nameMatch || displayMatch || timeInMatch || timeOutMatch;
                                 });
                                 
+                                // Clear hidden field when typing (only set when clicking an option)
+                                hiddenInput.value = '';
+                                
+                                // Show filtered results
                                 showFilteredOptions(input, dropdown, filtered, hiddenInput, day);
                             });
                             
