@@ -23,8 +23,8 @@ if ($isLocal) {
 } else {
     // Hostinger production settings
     $host = EnvLoader::get('DB_HOST', 'localhost');
-    $dbname = EnvLoader::get('DB_NAME', 'u816220874_calendartype');
-    $username = EnvLoader::get('DB_USER', 'u816220874_calendartype');
+    $dbname = EnvLoader::get('DB_NAME', 'u8162220874_u8162220874');
+    $username = EnvLoader::get('DB_USER', 'u8162220874_u8162220874');
     $password = EnvLoader::get('DB_PASS', 'Gr33n$$wRf');
 }
 
