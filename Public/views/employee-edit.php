@@ -831,7 +831,7 @@ uasort($sortedScheduleOptions, function($a, $b) {
                         </div>
                     </form>
                     
-                    <!-- JavaScript for Autocomplete -->
+                    <!-- JavaScript for Autocomplete with Auto-Sync -->
                     <script>
                     document.addEventListener('DOMContentLoaded', function() {
                         // Schedule data for autocomplete
@@ -859,13 +859,38 @@ uasort($sortedScheduleOptions, function($a, $b) {
                             const dropdown = input.nextElementSibling;
                             const hiddenInput = document.getElementById('schedule_id_' + day);
                             
-                            // Show dropdown on focus
-                            input.addEventListener('focus', function() {
-                                showAllOptions(input, dropdown, schedules, hiddenInput, day);
-                            });
+                            // Auto-sync hidden field based on input value
+                            function syncHiddenField() {
+                                const currentValue = input.value.trim();
+                                
+                                // Find matching schedule
+                                const matchedSchedule = schedules.find(s => 
+                                    s.display.toLowerCase() === currentValue.toLowerCase() ||
+                                    s.name.toLowerCase() === currentValue.toLowerCase()
+                                );
+                                
+                                if (matchedSchedule) {
+                                    hiddenInput.value = matchedSchedule.id;
+                                    input.value = matchedSchedule.display; // Ensure consistent display
+                                } else if (currentValue.toLowerCase().includes('off') || currentValue === '') {
+                                    hiddenInput.value = '';
+                                    input.value = currentValue === '' ? '' : 'OFF / Rest Day';
+                                } else {
+                                    // Try partial matching for typed input
+                                    const partialMatch = schedules.find(s => 
+                                        s.name.toLowerCase().includes(currentValue.toLowerCase()) ||
+                                        s.display.toLowerCase().includes(currentValue.toLowerCase())
+                                    );
+                                    if (partialMatch) {
+                                        hiddenInput.value = partialMatch.id;
+                                        input.value = partialMatch.display;
+                                    }
+                                }
+                            }
                             
-                            // Filter on input
+                            // Sync on every input change
                             input.addEventListener('input', function() {
+                                syncHiddenField();
                                 const query = this.value.toLowerCase().trim();
                                 
                                 if (query === '') {
@@ -884,12 +909,21 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 showFilteredOptions(input, dropdown, filtered, hiddenInput, day);
                             });
                             
-                            // Hide dropdown on blur (with delay for click)
+                            // Sync on blur to ensure final value is correct
                             input.addEventListener('blur', function() {
+                                syncHiddenField();
                                 setTimeout(() => {
                                     dropdown.classList.add('hidden');
                                 }, 200);
                             });
+                            
+                            // Show dropdown on focus
+                            input.addEventListener('focus', function() {
+                                showAllOptions(input, dropdown, schedules, hiddenInput, day);
+                            });
+                            
+                            // Initial sync when page loads
+                            syncHiddenField();
                         });
                         
                         function showAllOptions(input, dropdown, schedules, hiddenInput, day) {
