@@ -211,7 +211,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             $log = $logMap[$logDate] ?? null;
 
                             // Fetch schedule using the same logic as schedule_content.php calendar
-                            // Query the pre-computed cache table
+                            // Query the pre-computed cache table - THIS IS THE EMPLOYEE'S PERSONAL CALENDAR DATA
                             $cacheStmt = $pdo->prepare("
                                 SELECT 
                                     schedule_date,
@@ -233,12 +233,18 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             
                             // Initialize default values
                             $isRestDay = false;
-                            $schedule_in_24h = '07:00:00';
-                            $schedule_out_24h = '16:00:00';
+                            $isHoliday = false;
+                            $schedule_in_24h = null;
+                            $schedule_out_24h = null;
+                            $scheduleName = null;
+                            $scheduleSource = 'none';
                             
-                            // If found in cache, use cache data
+                            // If found in cache, use cache data (MATCHES CALENDAR DISPLAY)
                             if ($scheduleCache) {
                                 $isRestDay = ($scheduleCache['is_rest_day'] == 1);
+                                $isHoliday = ($scheduleCache['is_holiday'] == 1);
+                                $scheduleSource = $scheduleCache['source'];
+                                $scheduleName = $scheduleCache['schedule_name'];
                                 
                                 if ($scheduleCache['work_schedule_id'] && $scheduleCache['time_in'] && $scheduleCache['time_out']) {
                                     $schedule_in_24h = $scheduleCache['time_in'];
@@ -262,6 +268,8 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 
                                 if ($weekly) {
                                     $isRestDay = ($weekly['is_rest_day'] == 1);
+                                    $scheduleSource = 'weekly_default';
+                                    $scheduleName = $weekly['name'];
                                     if ($weekly['work_schedule_id'] && $weekly['time_in'] && $weekly['time_out']) {
                                         $schedule_in_24h = $weekly['time_in'];
                                         $schedule_out_24h = $weekly['time_out'];
@@ -270,12 +278,14 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                     // Final fallback: Check if weekend
                                     if ($dayOfWeek == 0 || $dayOfWeek == 6) {
                                         $isRestDay = true;
+                                        $scheduleSource = 'weekend';
                                     }
                                 }
                             }
                             
-                            $schedule_in = date('h:i A', strtotime($schedule_in_24h));
-                            $schedule_out = date('h:i A', strtotime($schedule_out_24h));
+                            // Format schedule times for display (only if not a rest day)
+                            $schedule_in = $schedule_in_24h ? date('h:i A', strtotime($schedule_in_24h)) : '-';
+                            $schedule_out = $schedule_out_24h ? date('h:i A', strtotime($schedule_out_24h)) : '-';
 
                             // Handle times - Updated to consider status and log_out_date
                             $isApproved = isset($log) && strtolower($log['request_status'] ?? '') === 'approved';
@@ -349,11 +359,11 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             // Check if this date is on approved leave first
                             $leaveType = isOnApprovedLeave($logDate, $approvedLeaves);
                             
-                            // Calculate late and undertime minutes
+                            // Calculate late and undertime minutes (only for scheduled work days)
                             $lateMinutes = 0;
                             $undertimeMinutes = 0;
                             
-                            if ($timeIn && !$leaveType) {
+                            if ($timeIn && !$leaveType && !$isRestDay && $schedule_in_24h) {
                                 $actualTimeIn = date('H:i:s', strtotime($timeIn));
                                 $scheduledTimeIn = $schedule_in_24h;
                                 $graceTimeIn = date('H:i:s', strtotime($scheduledTimeIn . ' +15 minutes'));
@@ -365,7 +375,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 }
                             }
                             
-            if ($timeOut && $timeOut !== 'INC' && !$leaveType && !$isAutoIncomplete) {
+            if ($timeOut && $timeOut !== 'INC' && !$leaveType && !$isAutoIncomplete && !$isRestDay && $schedule_out_24h) {
                 $actualTimeOut = date('H:i:s', strtotime($timeOut));
                 $scheduledTimeOut = $schedule_out_24h;
                 
@@ -401,35 +411,45 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 $badgeClass = 'bg-red-100 text-red-800';
                             } elseif ($timeIn && $timeOut && $timeOut !== 'INC') {
                                 // Both time in and time out are present
-                                $actualTimeIn = date('H:i:s', strtotime($timeIn));
-                                $actualTimeOut = date('H:i:s', strtotime($timeOut));
                                 
-                                // Calculate grace period (15 minutes after scheduled time in)
-                                $scheduledTimeIn = $schedule_in_24h;
-                                $graceTimeIn = date('H:i:s', strtotime($scheduledTimeIn . ' +15 minutes'));
-                                $scheduledTimeOut = $schedule_out_24h;
-                                
-                                // Check if late (arrived after grace period)
-                                $isLate = $actualTimeIn > $graceTimeIn;
-                                
-                // Check if undertime (left early before scheduled time out)
-                $isUndertime = false;
-                
-                if ($isCrossMidnight) {
-                    // For cross-midnight shifts, we need to handle the time comparison differently
-                    // The scheduled out time might be on the next day
-                    $isUndertime = false; // For cross-midnight, consider complete unless obviously early
-                } else {
-                    // Regular shift - check if left before scheduled time out
-                    $isUndertime = $actualTimeOut < $scheduledTimeOut;
-                }                                // Determine final status - prioritize Late over Undertime
-                                if ($isLate) {
-                                    $status = $lateMinutes > 0 ? "Late ({$lateMinutes}mins)" : 'Late';
-                                    $badgeClass = 'bg-orange-100 text-orange-800';
-                                } elseif ($isUndertime) {
-                                    $status = $undertimeMinutes > 0 ? "Undertime ({$undertimeMinutes}mins)" : 'Undertime';
-                                    $badgeClass = 'bg-yellow-100 text-yellow-800';
+                                // Only calculate late/undertime for scheduled work days
+                                if (!$isRestDay && $schedule_in_24h && $schedule_out_24h) {
+                                    $actualTimeIn = date('H:i:s', strtotime($timeIn));
+                                    $actualTimeOut = date('H:i:s', strtotime($timeOut));
+                                    
+                                    // Calculate grace period (15 minutes after scheduled time in)
+                                    $scheduledTimeIn = $schedule_in_24h;
+                                    $graceTimeIn = date('H:i:s', strtotime($scheduledTimeIn . ' +15 minutes'));
+                                    $scheduledTimeOut = $schedule_out_24h;
+                                    
+                                    // Check if late (arrived after grace period)
+                                    $isLate = $actualTimeIn > $graceTimeIn;
+                                    
+                    // Check if undertime (left early before scheduled time out)
+                    $isUndertime = false;
+                    
+                    if ($isCrossMidnight) {
+                        // For cross-midnight shifts, we need to handle the time comparison differently
+                        // The scheduled out time might be on the next day
+                        $isUndertime = false; // For cross-midnight, consider complete unless obviously early
+                    } else {
+                        // Regular shift - check if left before scheduled time out
+                        $isUndertime = $actualTimeOut < $scheduledTimeOut;
+                    }
+                                    
+                                    // Determine final status - prioritize Late over Undertime
+                                    if ($isLate) {
+                                        $status = $lateMinutes > 0 ? "Late ({$lateMinutes}mins)" : 'Late';
+                                        $badgeClass = 'bg-orange-100 text-orange-800';
+                                    } elseif ($isUndertime) {
+                                        $status = $undertimeMinutes > 0 ? "Undertime ({$undertimeMinutes}mins)" : 'Undertime';
+                                        $badgeClass = 'bg-yellow-100 text-yellow-800';
+                                    } else {
+                                        $status = 'Complete';
+                                        $badgeClass = 'bg-green-100 text-green-800';
+                                    }
                                 } else {
+                                    // Rest day work or no schedule - just mark as complete
                                     $status = 'Complete';
                                     $badgeClass = 'bg-green-100 text-green-800';
                                 }
@@ -456,9 +476,13 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                         <i class="fas fa-moon mr-1"></i>Night Shift
                                     </div>
                                 <?php endif; ?>
-                                <?php if ($status !== 'Off'): ?>
+                                <?php if ($status !== 'Off' && !$isRestDay && $schedule_in_24h): ?>
                                     <div class="text-xs text-gray-400 mt-1">
                                         Sched: <?= $schedule_in ?>
+                                    </div>
+                                <?php elseif ($isRestDay && $timeIn): ?>
+                                    <div class="text-xs text-blue-500 mt-1">
+                                        <i class="fas fa-calendar-day mr-1"></i>Rest Day
                                     </div>
                                 <?php endif; ?>
                             </td>
@@ -478,7 +502,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                             $currentTime = date('H:i:s');
                                             $scheduledOut = $schedule_out_24h;
                                             
-                                            if ($currentTime < $scheduledOut) {
+                                            if ($scheduledOut && $currentTime < $scheduledOut) {
                                                 echo '<span class="text-blue-600 font-medium">In Progress</span>';
                                             } else {
                                                 $timeSinceScheduled = strtotime($currentTime) - strtotime($scheduledOut);
@@ -500,7 +524,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 <?php else: ?>
                                     <span class="text-gray-400">-</span>
                                 <?php endif; ?>
-                                <?php if ($status !== 'Off'): ?>
+                                <?php if ($status !== 'Off' && !$isRestDay && $schedule_out_24h): ?>
                                     <div class="text-xs text-gray-400 mt-1">
                                         Sched: <?= $schedule_out ?>
                                     </div>
