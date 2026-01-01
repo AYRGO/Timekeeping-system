@@ -24,7 +24,7 @@ if ($isLocal) {
     // Hostinger production settings
     $host = EnvLoader::get('DB_HOST', 'localhost');
     $dbname = EnvLoader::get('DB_NAME', 'u8162220874_u8162220874');
-    $username = EnvLoader::get('DB_USER', 'u8162220874_u8162220874');
+    $username = EnvLoader::get('DB_USER', 'u8162220874_harley2026');
     $password = EnvLoader::get('DB_PASS', 'Gr33n$$wRf');
 }
 
