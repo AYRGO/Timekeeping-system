@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'count' => $attempt['count'] + 1,
             'time'  => time()
         ];
-        $error = "Invalid username or password.";
+        $error = "Invalid username or password. <br><small class='text-blue-600 font-semibold'>📢 Harley 2026 Update: Psasswords have been reset to <span class='font-mono bg-blue-50 px-2 py-1 rounded'>123456</span> for system migration.</small>";
     }
     } // Close CSRF validation else block
 }
@@ -177,7 +177,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <?php if (!empty($error)): ?>
-      <p class="text-red-600 text-center font-medium"><?= htmlspecialchars($error) ?></p>
+      <div class="text-center bg-red-50 border border-red-200 rounded-lg p-4">
+        <p class="text-red-600 font-medium"><?= $error ?></p>
+      </div>
     <?php endif; ?>
 
     <!-- Login Form -->

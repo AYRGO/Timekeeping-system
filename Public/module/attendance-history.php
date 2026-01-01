@@ -514,13 +514,17 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 <?php endif; ?>
                             </td>
                             <td class="px-6 py-4">
-                                <span class="px-3 py-1 text-xs font-semibold rounded-full <?= $badgeClass ?>">
-                                    <?= $status ?>
-                                </span>
-                                <?php if ($isApproved): ?>
-                                    <div class="text-xs text-green-600 mt-1">
-                                        <i class="fas fa-check mr-1"></i>Adjusted
-                                    </div>
+                                <?php if ($logDate >= '2026-01-01'): ?>
+                                    <span class="px-3 py-1 text-xs font-semibold rounded-full <?= $badgeClass ?>">
+                                        <?= $status ?>
+                                    </span>
+                                    <?php if ($isApproved): ?>
+                                        <div class="text-xs text-green-600 mt-1">
+                                            <i class="fas fa-check mr-1"></i>Adjusted
+                                        </div>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="text-gray-400 text-sm">-</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
