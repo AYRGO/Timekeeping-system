@@ -350,7 +350,7 @@ date_default_timezone_set('Asia/Manila');
           Experience the future of time tracking with our cutting-edge system designed for modern professionals
         </p>
         <div class="flex flex-col sm:flex-row gap-6 justify-center items-center animate__animated animate__fadeInUp animate__delay-2s">
-          <a href="https://updateharley.resourcestaffonline.com/Public/employee/login.php"
+          <a href="https://harley.resourcestaffonline.com/Public/employee/login.php"
             class="inline-block px-12 py-4 btn-gradient text-white font-semibold rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 text-lg">
             Start Time in
           </a>
