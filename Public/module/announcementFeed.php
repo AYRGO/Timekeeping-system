@@ -15,6 +15,7 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <title>Announcements</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
 
@@ -53,8 +54,80 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <span class="font-bold text-green-600"><?= htmlspecialchars($announcement['admin_name']) ?></span>
             <span class="text-sm text-gray-500"><?= date('F j, Y · g:i A', strtotime($announcement['created_at'])) ?></span>
         </div>
-        <h2 class="text-lg font-semibold text-gray-800">📢 Announcement</h2>
+        <h2 class="text-lg font-semibold text-gray-800">
+            <?= !empty($announcement['title']) ? htmlspecialchars($announcement['title']) : '📢 Announcement' ?>
+        </h2>
         <p class="text-gray-700 mt-2 whitespace-pre-line"><?= nl2br(htmlspecialchars($announcement['content'])) ?></p>
+
+        <!-- Attachments (Videos & Images) -->
+        <?php if (!empty($announcement['image'])):
+            $files = json_decode($announcement['image'], true);
+            if (!is_array($files)) $files = [$announcement['image']];
+        ?>
+        <div class="mt-4 space-y-3">
+            <?php foreach ($files as $fileInfo):
+                $filePath = is_array($fileInfo) ? ($fileInfo['stored'] ?? $fileInfo['path'] ?? $fileInfo['filename'] ?? $fileInfo) : $fileInfo;
+                $originalName = is_array($fileInfo) ? ($fileInfo['original'] ?? basename($filePath)) : basename($filePath);
+                
+                // Clean up the file path
+                $filePath = str_replace(['\\', '//'], '/', $filePath);
+                $filePath = ltrim($filePath, '/');
+                
+                // Get just the filename
+                $cleanFileName = basename($filePath);
+                
+                // Detect if we're on production or local
+                $isProduction = (strpos($_SERVER['HTTP_HOST'] ?? '', 'resourcestaffonline.com') !== false);
+                
+                if ($isProduction) {
+                    // Production server - use relative path from document root
+                    $fileUrl = '/Public/views/uploads/' . $cleanFileName;
+                } else {
+                    // Local development (XAMPP)
+                    $fileUrl = '/Timekeeping-system/Public/views/uploads/' . $cleanFileName;
+                }
+                
+                // Get extension from both original name and actual filename
+                $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+                if (empty($ext)) {
+                    $ext = strtolower(pathinfo($cleanFileName, PATHINFO_EXTENSION));
+                }
+                
+                $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg']);
+                $isVideo = in_array($ext, ['mp4', 'webm', 'ogg', 'mov', 'avi', 'wmv', 'mpeg', '3gp']);
+            ?>
+                <?php if ($isVideo): ?>
+                    <div class="rounded-lg overflow-hidden border border-gray-200 bg-black">
+                        <video controls class="w-full" style="max-height: 500px;" preload="metadata">
+                            <source src="<?= htmlspecialchars($fileUrl) ?>" type="video/<?= $ext === 'mov' ? 'quicktime' : ($ext === 'avi' ? 'x-msvideo' : $ext) ?>">
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="p-2 bg-gray-50 text-sm text-gray-600">
+                            <i class="fas fa-video mr-2"></i><?= htmlspecialchars($originalName) ?>
+                        </div>
+                    </div>
+                <?php elseif ($isImage): ?>
+                    <div class="rounded-lg overflow-hidden border border-gray-200">
+                        <img src="<?= htmlspecialchars($fileUrl) ?>" 
+                             alt="<?= htmlspecialchars($originalName) ?>" 
+                             class="w-full h-auto"
+                             style="max-height: 500px; object-fit: contain; background: white;">
+                    </div>
+                <?php else: ?>
+                    <div class="p-3 bg-gray-50 rounded border border-gray-200 flex items-center justify-between">
+                        <span class="text-sm text-gray-700">
+                            <i class="fas fa-file mr-2"></i><?= htmlspecialchars($originalName) ?>
+                        </span>
+                        <a href="<?= htmlspecialchars($fileUrl) ?>" 
+                           download="<?= htmlspecialchars($originalName) ?>"
+                           class="text-blue-600 hover:text-blue-800 text-sm">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                <?php endif; ?>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
 
         <div class="mt-4 border-t pt-3">
             <button onclick="openCommentsModal('<?= $aid ?>')" class="text-sm text-blue-600 hover:underline">
