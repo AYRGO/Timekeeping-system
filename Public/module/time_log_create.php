@@ -1378,16 +1378,19 @@ document.addEventListener("DOMContentLoaded", function () {
         
         if (!selectedType) return;
 
-        // Reset state - Always enable submission (no restrictions)
-        leaveBalanceDisplay.classList.remove("hidden");
-        enableSubmitButton();
-
         // Map halfday types to their base credit types
         let creditType = selectedType;
+        let requiresCredits = false;
+        
         if (selectedType === 'halfday') {
             creditType = 'vacation';
+            requiresCredits = true;
         } else if (selectedType === 'halfday_sick') {
             creditType = 'sick';
+            requiresCredits = true;
+        } else if (selectedType === 'sick' || selectedType === 'vacation') {
+            creditType = selectedType;
+            requiresCredits = true;
         }
 
         // Get available balance for the correct credit type
@@ -1396,6 +1399,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Debug logging
         console.log('Selected Type:', selectedType);
         console.log('Credit Type:', creditType);
+        console.log('Requires Credits:', requiresCredits);
         console.log('Available Leave Credits:', leaveCredits);
         console.log('Balance for', creditType, ':', balance);
 
@@ -1407,43 +1411,53 @@ document.addEventListener("DOMContentLoaded", function () {
                 const startDate = new Date(dates[0]);
                 const endDate = new Date(dates[1]);
                 const timeDiff = endDate.getTime() - startDate.getTime();
-
                 requestedDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
             }
         }
 
+        // Adjust for half days
+        if (selectedType === "halfday" || selectedType === "halfday_sick") {
+            requestedDays = requestedDays * 0.5;
+        }
+
         console.log('Requested Days:', requestedDays);
 
+        // Show balance display
+        leaveBalanceDisplay.classList.remove("hidden");
+        
         // Get the inner container and elements
         const container = leaveBalanceDisplay.querySelector('div');
         const icon = container.querySelector('i');
         const textSpan = container.querySelector('span');
 
-        // Handle different leave types - Show info only, no restrictions
-        if (selectedType === "lwop") {
-            // Update for LWOP (blue/info style)
+        // Handle different leave types
+        if (!requiresCredits) {
+            // Leave types that don't require credits (LWOP, Paternity, Maternity, etc.)
             container.className = "bg-blue-50 border border-blue-200 rounded-xl p-4";
             icon.className = "fas fa-info-circle text-blue-600 mr-3";
             textSpan.className = "text-blue-700 font-medium";
-            textSpan.textContent = "ℹ️ Leave Without Pay doesn't require credits.";
-        } else if (selectedType === "halfday" || selectedType === "halfday_sick") {
-            requestedDays = requestedDays * 0.5; // Half days
-            const displayType = creditType.replace('_', ' ').toUpperCase();
-            // Always show as informational (blue) - no restrictions
-            container.className = "bg-blue-50 border border-blue-200 rounded-xl p-4";
-            icon.className = "fas fa-info-circle text-blue-600 mr-3";
-            textSpan.className = "text-blue-700 font-medium";
-            textSpan.textContent = `ℹ️ Requesting ${requestedDays} day(s) of ${displayType}. Available: ${balance} day(s). (No restrictions applied)`;
+            textSpan.textContent = `ℹ️ This leave type doesn't require leave credits.`;
+            enableSubmitButton();
         } else {
-            // Always show as informational (blue) - no restrictions
-            container.className = "bg-blue-50 border border-blue-200 rounded-xl p-4";
-            icon.className = "fas fa-info-circle text-blue-600 mr-3";
-            textSpan.className = "text-blue-700 font-medium";
-            textSpan.textContent = `ℹ️ Requesting ${requestedDays} day(s). Available credits: ${balance} day(s). (No restrictions applied)`;
+            // Leave types that require credits (VL, SL, Half_VL, Half_SL)
+            const displayType = creditType === 'sick' ? 'Sick Leave (SL)' : 'Vacation Leave (VL)';
+            
+            if (balance >= requestedDays) {
+                // Sufficient credits
+                container.className = "bg-green-50 border border-green-200 rounded-xl p-4";
+                icon.className = "fas fa-check-circle text-green-600 mr-3";
+                textSpan.className = "text-green-700 font-medium";
+                textSpan.textContent = `✅ ${displayType}: ${balance} day(s) available. Requesting ${requestedDays} day(s). After approval: ${(balance - requestedDays).toFixed(1)} day(s) remaining.`;
+                enableSubmitButton();
+            } else {
+                // Insufficient credits - show warning but still allow submission
+                container.className = "bg-yellow-50 border border-yellow-300 rounded-xl p-4";
+                icon.className = "fas fa-exclamation-triangle text-yellow-600 mr-3";
+                textSpan.className = "text-yellow-800 font-medium";
+                textSpan.textContent = `⚠️ ${displayType}: ${balance} day(s) available. Requesting ${requestedDays} day(s). You have insufficient credits, but can still submit for admin review.`;
+                enableSubmitButton();
+            }
         }
-
-        // Always ensure button is enabled - no restrictions
-        enableSubmitButton();
     }
 
     function disableSubmitButton() {
