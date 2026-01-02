@@ -438,13 +438,13 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'current_time_out' => !empty($activity['current_time_out']) ? date('g:i A', strtotime($activity['current_time_out'])) : '',
                             'requested_time_in' => !empty($activity['requested_time_in']) ? date('g:i A', strtotime($activity['requested_time_in'])) : '',
                             'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
-                            'reason' => $activity['reason'] ?? '',
-                            'explanation' => $activity['explanation'] ?? '',
+                            'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['reason'] ?? ''),
+                            'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             'attachment' => $activity['attachment'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
-                        ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG)) ?>`)" 
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
                         </button>
@@ -454,7 +454,7 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'status' => $status,
                             'date' => $created,
                             'ot_date' => !empty($activity['ot_date']) ? date('M j, Y', strtotime($activity['ot_date'])) : (!empty($activity['log_date']) ? date('M j, Y', strtotime($activity['log_date'])) : (!empty($activity['created_at']) ? date('M j, Y', strtotime($activity['created_at'])) : 'Not specified')),
-                            'reason' => $activity['ot_reason'] ?? '',
+                            'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['ot_reason'] ?? ''),
                             'ot_type' => $activity['ot_type'] ?? 'Overtime',
                             'ot_duration' => isset($activity['ot_duration']) ? number_format((float)$activity['ot_duration'], 2) : '',
                             'max_ot_hours' => isset($activity['max_ot_hours']) ? number_format((float)$activity['max_ot_hours'], 2) : '',
@@ -462,12 +462,12 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'end_ot' => !empty($activity['end_ot']) ? date('g:i A', strtotime($activity['end_ot'])) : '',
                             'time_in' => !empty($activity['time_in']) ? date('g:i A', strtotime($activity['time_in'])) : '',
                             'time_out' => !empty($activity['time_out']) ? date('g:i A', strtotime($activity['time_out'])) : '',
-                            'explanation' => $activity['explanation'] ?? '',
+                            'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             'attachment' => $activity['attachment'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
-                        ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG)) ?>`)" 
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
                         </button>
@@ -478,13 +478,13 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'date' => $created,
                             'start_date' => !empty($activity['start_date']) ? date('M j, Y', strtotime($activity['start_date'])) : '',
                             'end_date' => !empty($activity['end_date']) ? date('M j, Y', strtotime($activity['end_date'])) : '',
-                            'reason' => $activity['reason'] ?? '',
-                            'explanation' => $activity['explanation'] ?? '',
+                            'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['reason'] ?? ''),
+                            'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             'attachment_lr' => $activity['attachment_lr'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
-                        ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG)) ?>`)" 
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
                         </button>
@@ -513,14 +513,14 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
                             'start_date' => !empty($activity['start_date']) ? date('M j, Y', strtotime($activity['start_date'])) : '',
                             'end_date' => !empty($activity['end_date']) ? date('M j, Y', strtotime($activity['end_date'])) : '',
-                            'reason' => $activity['reason'] ?? '',
-                            'explanation' => $activity['explanation'] ?? '',
+                            'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['reason'] ?? ''),
+                            'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             'request_id' => $activity['request_id'] ?? '',
                             'work_schedule_id' => $activity['work_schedule_id'] ?? '',
                             'attachment_scr' => $activity['attachment_scr'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
-                        ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG)) ?>`)" 
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
                         </button>
@@ -535,14 +535,14 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'source_schedule_out' => $activity['source_schedule_out'] ?? '',
                             'target_schedule_in' => $activity['target_schedule_in'] ?? '',
                             'target_schedule_out' => $activity['target_schedule_out'] ?? '',
-                            'reason' => $activity['reason'] ?? '',
-                            'explanation' => $activity['explanation'] ?? '',
+                            'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['reason'] ?? ''),
+                            'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             'attachment_scr' => $activity['attachment_scr'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? '',
                             'processed_at' => !empty($activity['processed_at']) ? date('M j, Y g:i A', strtotime($activity['processed_at'])) : ''
-                        ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG)) ?>`)" 
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
                         </button>
@@ -555,14 +555,14 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'year' => $activity['year'] ?? '',
                             'month' => $activity['month'] ?? '',
                             'weekly_schedules' => $activity['weekly_schedules'] ?? [],
-                            'reason' => $activity['reason'] ?? '',
-                            'explanation' => $activity['explanation'] ?? '',
+                            'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['reason'] ?? ''),
+                            'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             'attachment_scr' => $activity['attachment_scr'] ?? '',
                             'request_id' => $activity['request_id'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? '',
                             'processed_at' => !empty($activity['processed_at']) ? date('M j, Y g:i A', strtotime($activity['processed_at'])) : ''
-                        ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG)) ?>`)" 
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
                         </button>
@@ -591,15 +591,15 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                             'requested_time_out' => !empty($activity['requested_time_out']) ? date('g:i A', strtotime($activity['requested_time_out'])) : '',
                             'start_date' => !empty($activity['start_date']) ? date('M j, Y', strtotime($activity['start_date'])) : '',
                             'end_date' => !empty($activity['end_date']) ? date('M j, Y', strtotime($activity['end_date'])) : '',
-                            'reason' => $activity['reason'] ?? '',
-                            'explanation' => $activity['explanation'] ?? '',
+                            'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['reason'] ?? ''),
+                            'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             'request_id' => $activity['request_id'] ?? '',
                             'work_schedule_id' => $activity['work_schedule_id'] ?? '',
                             'is_rest_day' => $activity['is_rest_day'] ?? 1,
                             'attachment_scr' => $activity['attachment_scr'] ?? '',
                             'table_name' => $activity['table_name'] ?? '',
                             'source_table' => $activity['source_table'] ?? ''
-                        ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG)) ?>`)" 
+                        ], JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
                         </button>
@@ -609,14 +609,14 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                                 'type' => $type . ' Request',
                                 'status' => $status,
                                 'date' => $created,
-                                'reason' => $activity['reason'] ?? '',
-                                'explanation' => $activity['explanation'] ?? '',
+                                'reason' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['reason'] ?? ''),
+                                'explanation' => str_replace(["\r\n", "\r", "\n"], ' ', $activity['explanation'] ?? ''),
                             ];
                             if (!empty($activity['request_id'])) { $fallbackPayload['request_id'] = $activity['request_id']; }
                             if (!empty($activity['table_name'])) { $fallbackPayload['table_name'] = $activity['table_name']; }
                             if (!empty($activity['source_table'])) { $fallbackPayload['source_table'] = $activity['source_table']; }
                         ?>
-                        <button onclick="showActivityDetails('<?= $type ?> Request', `<?= htmlspecialchars(json_encode($fallbackPayload, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG)) ?>`)" 
+                        <button onclick="showActivityDetails('<?= $type ?> Request', `<?= htmlspecialchars(json_encode($fallbackPayload, JSON_HEX_APOS | JSON_HEX_QUOT)) ?>`)" 
                                 class="inline-flex px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md transition-all duration-200 shadow-sm ring-1 ring-blue-200/50">
                             View Details
                         </button>
