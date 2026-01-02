@@ -1,4 +1,9 @@
 <?php
+// Prevent caching to ensure JSON fix is applied
+header("Cache-Control: no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+header("Expires: 0");
+
 $filterDate = $_GET['activityDate'] ?? null;
 
 // First, remove any potential duplicates based on message content and date
@@ -100,6 +105,7 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
 ?>
 
 <!-- ✅ DO NOT TOUCH CONTAINER ABOVE THIS -->
+<!-- 🔧 JSON FIX APPLIED: <?= date('Y-m-d H:i:s') ?> - JSON_HEX_TAG enabled for newline handling -->
 
 <div class="bg-white rounded-xl shadow-sm p-6 w-full md:w-2/3 xl:w-1/2 2xl:w-5/12 border border-gray-200/80 transition-all duration-300 hover:shadow-lg">
     <!-- Header -->

@@ -3,6 +3,11 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// Prevent caching to ensure JSON fix is applied immediately
+header("Cache-Control: no-cache, no-store, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+header("Expires: 0");
+
 session_start();
 include('../config/db.php');
 include('../config/csrf_helper.php');
