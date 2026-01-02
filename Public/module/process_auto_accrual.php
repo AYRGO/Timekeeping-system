@@ -95,8 +95,8 @@ try {
     // 3. Process the accrual
     $currentYear = (int)date('Y');
     
-    // ACCRUAL POLICY:
-    // - OLD_REGULAR (hired before Jan 1, 2026): Gets BOTH SL (0.42/month) + VL (1.25/month) - legacy policy
+    // ACCRUAL POLICY (Updated - No Sick Leave Accrual):
+    // - OLD_REGULAR (hired before Jan 1, 2026): Gets ONLY VL (1.25/month) - sick leave accrual removed
     // - REGULAR (regularized after Jan 1, 2026): Gets ONLY VL (1.25/month) - already got 5-day SL upon regularization
     // - PROBATIONARY: No automatic accrual
     
@@ -116,9 +116,8 @@ try {
             $leaveRates = [];
             
             if ($empType === 'Old_Regular') {
-                // Old employees get BOTH SL and VL monthly
+                // Old employees now get ONLY VL monthly (sick leave accrual removed)
                 $leaveRates = [
-                    'sick' => 0.42,      // 5 days / 12 months
                     'vacation' => 1.25   // 15 days / 12 months
                 ];
             } elseif ($empType === 'Regular') {
