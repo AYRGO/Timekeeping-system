@@ -1,9 +1,4 @@
 <?php
-// Prevent caching to ensure JSON fix is applied
-header("Cache-Control: no-cache, must-revalidate, max-age=0");
-header("Pragma: no-cache");
-header("Expires: 0");
-
 $filterDate = $_GET['activityDate'] ?? null;
 
 // First, remove any potential duplicates based on message content and date
