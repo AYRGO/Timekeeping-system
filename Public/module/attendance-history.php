@@ -61,6 +61,34 @@ foreach ($otRequests as $otRequest) {
     $otStatusMap[$otRequest['log_date']] = $otRequest['ot_status'];
 }
 
+// 2026 Holidays array
+$holidays2026 = [
+    '2026-01-01' => 'New Year\'s Day',
+    '2026-01-26' => 'Australia Day',
+    '2026-04-02' => 'Maundy Thursday',
+    '2026-04-03' => 'Good Friday',
+    '2026-04-04' => 'Easter Saturday',
+    '2026-04-05' => 'Easter Sunday',
+    '2026-04-06' => 'Easter Monday',
+    '2026-04-09' => 'Araw ng Kagitingan',
+    '2026-04-25' => 'ANZAC Day',
+    '2026-05-01' => 'Labor Day',
+    '2026-06-08' => 'King\'s Birthday',
+    '2026-06-12' => 'Independence Day',
+    '2026-08-31' => 'National Heroes Day',
+    '2026-10-05' => 'Labour Day',
+    '2026-11-30' => 'Bonifacio Day',
+    '2026-12-25' => 'Christmas Day',
+    '2026-12-26' => 'Boxing Day',
+    '2026-12-28' => 'Boxing Day (observed)',
+    '2026-12-30' => 'Rizal Day'
+];
+
+// Function to check if a date is a holiday
+function isHoliday($checkDate, $holidays) {
+    return isset($holidays[$checkDate]) ? $holidays[$checkDate] : false;
+}
+
 // Function to check if a date is within approved leave period
 function isOnApprovedLeave($checkDate, $approvedLeaves) {
     foreach ($approvedLeaves as $leave) {
@@ -388,22 +416,16 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             $status = '-';
                             $badgeClass = 'bg-gray-100 text-gray-800';
 
-                            if ($leaveType) {
+                            // Check if date is a holiday first
+                            $holidayName = isHoliday($logDate, $holidays2026);
+                            if ($holidayName) {
+                                // It's a holiday
+                                $status = $holidayName;
+                                $badgeClass = 'bg-indigo-100 text-indigo-800';
+                            } elseif ($leaveType) {
                                 // Employee is on approved leave
                                 $status = 'On Leave';
                                 $badgeClass = 'bg-purple-100 text-purple-800';
-                            } elseif ($isHoliday) {
-                                // Holiday - check if employee worked or not
-                                if ($timeIn && $timeOut && $timeOut !== 'INC' && !$isAutoIncomplete) {
-                                    $status = 'Holiday Work';
-                                    $badgeClass = 'bg-indigo-100 text-indigo-800';
-                                } elseif ($timeIn && (!$timeOut || $timeOut === 'INC' || $isAutoIncomplete)) {
-                                    $status = 'Holiday Work (INC)';
-                                    $badgeClass = 'bg-indigo-100 text-indigo-800';
-                                } else {
-                                    $status = 'Holiday';
-                                    $badgeClass = 'bg-indigo-100 text-indigo-800';
-                                }
                             } elseif ($isRestDay && !$timeIn) {
                                 // Rest day/Off day with no time in (not working)
                                 $status = 'Off';
@@ -488,11 +510,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                         <i class="fas fa-moon mr-1"></i>Night Shift
                                     </div>
                                 <?php endif; ?>
-                                <?php if ($isHoliday && isset($scheduleCache['holiday_name'])): ?>
-                                    <div class="text-xs text-indigo-600 mt-1">
-                                        <i class="fas fa-calendar-alt mr-1"></i><?= htmlspecialchars($scheduleCache['holiday_name']) ?>
-                                    </div>
-                                <?php elseif ($status !== 'Off' && !$isRestDay && !$isHoliday && $schedule_in_24h): ?>
+                                <?php if ($status !== 'Off' && !$isRestDay && $schedule_in_24h): ?>
                                     <div class="text-xs text-gray-400 mt-1">
                                         Sched: <?= $schedule_in ?>
                                     </div>
@@ -540,7 +558,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 <?php else: ?>
                                     <span class="text-gray-400">-</span>
                                 <?php endif; ?>
-                                <?php if ($status !== 'Off' && !$isRestDay && !$isHoliday && $schedule_out_24h): ?>
+                                <?php if ($status !== 'Off' && !$isRestDay && $schedule_out_24h): ?>
                                     <div class="text-xs text-gray-400 mt-1">
                                         Sched: <?= $schedule_out ?>
                                     </div>
