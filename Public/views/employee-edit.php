@@ -249,42 +249,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        // Rebuild cache for this employee (next 6 months)
+        // Rebuild cache for this employee (next 1 month only - for performance)
         $startDate = date('Y-m-d');
-        $endDate = date('Y-m-d', strtotime('+6 months'));
+        $endDate = date('Y-m-d', strtotime('+1 month'));
         
         // Delete existing cache entries for this date range
         $pdo->prepare("DELETE FROM employee_daily_schedule_cache WHERE employee_id = ? AND schedule_date BETWEEN ? AND ?")
             ->execute([$employeeId, $startDate, $endDate]);
         
-        // Rebuild cache day by day
+        // Fetch all default schedules for this employee at once
+        $schedStmt = $pdo->prepare("
+            SELECT eds.day_of_week, eds.work_schedule_id, eds.is_rest_day, ws.name as schedule_name, ws.time_in, ws.time_out
+            FROM employee_default_schedules eds
+            LEFT JOIN work_schedules ws ON eds.work_schedule_id = ws.id
+            WHERE eds.employee_id = ?
+        ");
+        $schedStmt->execute([$employeeId]);
+        $weeklySchedules = [];
+        while ($row = $schedStmt->fetch(PDO::FETCH_ASSOC)) {
+            $weeklySchedules[$row['day_of_week']] = $row;
+        }
+        
+        // Prepare batch insert statement
+        $cacheStmt = $pdo->prepare("
+            INSERT INTO employee_daily_schedule_cache 
+            (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'weekly_default', NULL, NOW())
+        ");
+        
+        // Build cache day by day
         $currentDate = $startDate;
         while ($currentDate <= $endDate) {
             $dayOfWeek = date('w', strtotime($currentDate)); // 0 (Sunday) to 6 (Saturday)
             
-            // Get default schedule for this day of week
-            $schedStmt = $pdo->prepare("
-                SELECT eds.work_schedule_id, eds.is_rest_day, ws.name as schedule_name, ws.time_in, ws.time_out
-                FROM employee_default_schedules eds
-                LEFT JOIN work_schedules ws ON eds.work_schedule_id = ws.id
-                WHERE eds.employee_id = ? AND eds.day_of_week = ?
-            ");
-            $schedStmt->execute([$employeeId, $dayOfWeek]);
-            $defaultSched = $schedStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($defaultSched) {
-                // Insert cache entry
-                $cacheStmt = $pdo->prepare("
-                    INSERT INTO employee_daily_schedule_cache 
-                    (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'weekly_default', NULL, NOW())
-                ");
+            if (isset($weeklySchedules[$dayOfWeek])) {
+                $defaultSched = $weeklySchedules[$dayOfWeek];
                 $cacheStmt->execute([
                     $employeeId,
                     $currentDate,
                     $defaultSched['work_schedule_id'],
                     $defaultSched['is_rest_day'],
-                    0, // is_holiday - set to 0 (no holiday checking)
+                    0, // is_holiday
                     $defaultSched['schedule_name'],
                     $defaultSched['time_in'],
                     $defaultSched['time_out'],
