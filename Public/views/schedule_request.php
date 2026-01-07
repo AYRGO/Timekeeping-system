@@ -334,7 +334,6 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month/Year</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Weekly Schedule</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Effective Period</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attachment</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -346,21 +345,6 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                             <?php if (!empty($monthly_requests)): ?>
                                 <?php foreach ($monthly_requests as $mr): ?>
                                     <?php
-                                    // Calculate effective date range (from today or start of month to end of month)
-                                    $today = date('Y-m-d');
-                                    $firstDayOfMonth = date('Y-m-d', strtotime("{$mr['year']}-{$mr['month']}-01"));
-                                    $lastDayOfMonth = date('Y-m-t', strtotime("{$mr['year']}-{$mr['month']}-01"));
-                                    
-                                    if (strtotime($firstDayOfMonth) > strtotime($today)) {
-                                        $effectiveStart = $firstDayOfMonth;
-                                    } else if (strtotime($lastDayOfMonth) < strtotime($today)) {
-                                        $effectiveStart = 'Past month';
-                                        $effectiveEnd = '';
-                                    } else {
-                                        $effectiveStart = $today;
-                                    }
-                                    $effectiveEnd = $lastDayOfMonth;
-                                    
                                     // Get schedule names helper function
                                     if (!function_exists('getScheduleName')) {
                                         function getScheduleName($schedId, $isRestDay, $pdo) {
@@ -454,24 +438,6 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                                     </div>
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-900">
-                                            <?php if ($effectiveStart === 'Past month'): ?>
-                                                <span class="text-gray-500 italic">Past month</span>
-                                            <?php else: ?>
-                                                <div class="flex flex-col">
-                                                    <span class="font-medium">From: <?= date('M d, Y', strtotime($effectiveStart)) ?></span>
-                                                    <span class="font-medium">To: <?= date('M d, Y', strtotime($effectiveEnd)) ?></span>
-                                                    <span class="text-xs text-gray-500 mt-1">
-                                                        <?php
-                                                        $start = new DateTime($effectiveStart);
-                                                        $end = new DateTime($effectiveEnd);
-                                                        $days = $start->diff($end)->days + 1;
-                                                        echo "($days day" . ($days > 1 ? 's' : '') . ")";
-                                                        ?>
-                                                    </span>
-                                                </div>
-                                            <?php endif; ?>
                                         </td>
                                         <td class="px-6 py-4 max-w-xs text-sm text-gray-900">
                                             <div class="truncate hover:whitespace-normal cursor-help" title="<?= htmlspecialchars($mr['reason']) ?>">
