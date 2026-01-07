@@ -288,7 +288,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $pdo->prepare("INSERT INTO schedule_override_history (employee_id, schedule_date, new_schedule_id, override_reason, applied_by, applied_at) VALUES (?, ?, ?, ?, ?, NOW())")
             ->execute([$schedule_employee_id, $schedule_date, $actual_schedule_id, $reason, $_SESSION['user_id'] ?? null]);
         
-        echo "<script>alert('Schedule override created successfully!'); window.location.href='employee-edit.php?id={$employeeId}#current-schedule';</script>";
+        $_SESSION['success_message'] = 'Schedule override created successfully!';
+        header("Location: employee-edit.php?id={$employeeId}#current-schedule");
         exit;
     }
     
