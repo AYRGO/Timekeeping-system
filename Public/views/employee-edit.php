@@ -63,6 +63,119 @@ if (isset($_GET['delete_attachment']) && isset($_GET['field'])) {
 
 // Save form
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Calendar Override Handlers (must be before any output for header redirects)
+    if (isset($_POST['action']) && $_POST['action'] === 'add_override') {
+        $schedule_employee_id = (int)$_POST['employee_id'];
+        $schedule_date = $_POST['schedule_date'];
+        
+        $override_schedule_input = $_POST['override_schedule_id'] ?? '';
+        $reason = $_POST['reason'] ?? '';
+        $override_type = $_POST['override_type'] ?? 'schedule_change';
+        
+        // Handle "OFF" option - set override_schedule_id to null for rest day
+        if ($override_schedule_input === 'OFF' || $override_schedule_input === '') {
+            $actual_schedule_id = null;
+            $is_rest_day = 1;
+        } else {
+            $actual_schedule_id = (int)$override_schedule_input;
+            $is_rest_day = 0;
+        }
+        
+        // ADMIN OVERRIDE: Delete any existing schedule for this date (from ANY source)
+        $pdo->prepare("DELETE FROM employee_daily_schedules WHERE employee_id = ? AND schedule_date = ?")
+            ->execute([$schedule_employee_id, $schedule_date]);
+        
+        $pdo->prepare("DELETE FROM employee_daily_schedule_cache WHERE employee_id = ? AND schedule_date = ?")
+            ->execute([$schedule_employee_id, $schedule_date]);
+        
+        // Insert new daily override
+        $stmt = $pdo->prepare("INSERT INTO employee_daily_schedules (employee_id, schedule_date, actual_schedule_id, is_rest_day, notes, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([$schedule_employee_id, $schedule_date, $actual_schedule_id, $is_rest_day, $reason]);
+        
+        // INSERT INTO CACHE
+        if ($is_rest_day) {
+            $pdo->prepare("INSERT INTO employee_daily_schedule_cache 
+                (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at, updated_at) 
+                VALUES (?, ?, NULL, 1, 0, NULL, NULL, NULL, NULL, 'admin_override', NULL, NOW(), NOW())")
+                ->execute([$schedule_employee_id, $schedule_date]);
+        } else {
+            $schedStmt = $pdo->prepare("SELECT id, name, time_in, time_out FROM work_schedules WHERE id = ?");
+            $schedStmt->execute([$actual_schedule_id]);
+            $schedDetails = $schedStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($schedDetails) {
+                $pdo->prepare("INSERT INTO employee_daily_schedule_cache 
+                    (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at, updated_at) 
+                    VALUES (?, ?, ?, 0, 0, ?, ?, ?, NULL, 'admin_override', NULL, NOW(), NOW())")
+                    ->execute([
+                        $schedule_employee_id, 
+                        $schedule_date, 
+                        $schedDetails['id'],
+                        $schedDetails['name'],
+                        $schedDetails['time_in'],
+                        $schedDetails['time_out']
+                    ]);
+            }
+        }
+        
+        // Add to audit trail
+        $pdo->prepare("INSERT INTO schedule_override_history (employee_id, schedule_date, new_schedule_id, override_reason, applied_by, applied_at) VALUES (?, ?, ?, ?, ?, NOW())")
+            ->execute([$schedule_employee_id, $schedule_date, $actual_schedule_id, $reason, $_SESSION['user_id'] ?? null]);
+        
+        $_SESSION['success_message'] = 'Schedule override created successfully!';
+        header("Location: employee-edit.php?id={$employeeId}#current-schedule");
+        exit;
+    }
+    
+    if (isset($_POST['action']) && $_POST['action'] === 'delete_override') {
+        $schedule_employee_id = (int)$_POST['employee_id'];
+        $schedule_date = $_POST['schedule_date'];
+        
+        $pdo->prepare("DELETE FROM employee_daily_schedules WHERE employee_id = ? AND schedule_date = ?")
+            ->execute([$schedule_employee_id, $schedule_date]);
+        
+        $pdo->prepare("DELETE FROM employee_daily_schedule_cache WHERE employee_id = ? AND schedule_date = ? AND source = 'admin_override'")
+            ->execute([$schedule_employee_id, $schedule_date]);
+        
+        // REBUILD CACHE FROM DEFAULT SCHEDULE
+        $dayOfWeek = date('w', strtotime($schedule_date));
+        $weeklyStmt = $pdo->prepare("
+            SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
+            FROM employee_default_schedules edd
+            LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+            WHERE edd.employee_id = ? AND edd.day_of_week = ?
+        ");
+        $weeklyStmt->execute([$schedule_employee_id, $dayOfWeek]);
+        $weekly = $weeklyStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($weekly) {
+            if ($weekly['is_rest_day']) {
+                $pdo->prepare("INSERT INTO employee_daily_schedule_cache 
+                    (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at, updated_at) 
+                    VALUES (?, ?, NULL, 1, 0, NULL, NULL, NULL, NULL, 'weekly_default', NULL, NOW(), NOW())")
+                    ->execute([$schedule_employee_id, $schedule_date]);
+            } else {
+                $pdo->prepare("INSERT INTO employee_daily_schedule_cache 
+                    (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at, updated_at) 
+                    VALUES (?, ?, ?, 0, 0, ?, ?, ?, NULL, 'weekly_default', NULL, NOW(), NOW())")
+                    ->execute([
+                        $schedule_employee_id, 
+                        $schedule_date, 
+                        $weekly['work_schedule_id'],
+                        $weekly['name'],
+                        $weekly['time_in'],
+                        $weekly['time_out']
+                    ]);
+            }
+        }
+        
+        $pdo->prepare("INSERT INTO schedule_override_history (employee_id, schedule_date, new_schedule_id, override_reason, applied_by, applied_at) VALUES (?, ?, NULL, 'Override cancelled by admin', ?, NOW())")
+            ->execute([$schedule_employee_id, $schedule_date, $_SESSION['user_id'] ?? null]);
+        
+        echo json_encode(['success' => true]);
+        exit;
+    }
+    
     // Profile Update
     if (isset($_POST['update_profile'])) {
         $fname = $_POST['fname'] ?? '';
