@@ -325,7 +325,9 @@ foreach ($leave_results as $leave) {
 // --- Schedule Requests (from both tables) ---
 $schedule_stmt = $pdo->prepare("
     SELECT scr.id, scr.work_schedule_id, scr.status, scr.start_date, scr.end_date, scr.created_at, scr.notified, scr.explanation, scr.reason,
-           scr.current_work_schedule_id, scr.attachment_scr, scr.is_rest_day, 'pending' as source_table, scr.employee_id,
+           scr.current_work_schedule_id, scr.attachment_scr, 
+           CASE WHEN scr.work_schedule_id IS NULL OR scr.work_schedule_id = 0 THEN 1 ELSE 0 END as is_rest_day, 
+           'pending' as source_table, scr.employee_id,
            current_ws.time_in as stored_current_time_in, current_ws.time_out as stored_current_time_out,
            new_ws.time_in as requested_time_in, new_ws.time_out as requested_time_out
     FROM schedule_change_requests scr
@@ -334,7 +336,9 @@ $schedule_stmt = $pdo->prepare("
     WHERE scr.employee_id = ?
     UNION ALL
     SELECT pscr.id, pscr.work_schedule_id, pscr.status, pscr.start_date, pscr.end_date, pscr.created_at, pscr.notified, pscr.explanation, pscr.reason,
-           pscr.current_work_schedule_id, pscr.attachment_scr, pscr.is_rest_day, 'approved' as source_table, pscr.employee_id,
+           pscr.current_work_schedule_id, pscr.attachment_scr, 
+           CASE WHEN pscr.work_schedule_id IS NULL OR pscr.work_schedule_id = 0 THEN 1 ELSE 0 END as is_rest_day, 
+           'approved' as source_table, pscr.employee_id,
            current_ws2.time_in as stored_current_time_in, current_ws2.time_out as stored_current_time_out,
            new_ws2.time_in as requested_time_in, new_ws2.time_out as requested_time_out
     FROM post_schedule_change_requests pscr

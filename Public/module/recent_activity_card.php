@@ -216,17 +216,18 @@ if (!function_exists('getActualCurrentScheduleFromCalendar')) {
                 }
             }
             // For Schedule Swap requests
-            elseif ($type === 'Schedule Swap' && isset($activity['status'])) {
+            elseif ($type === 'Schedule Swap' && isset($activity['status']) && !empty($activity['status'])) {
                 $status = ucfirst(strtolower($activity['status']));
             }
             // For Monthly Schedule requests
-            elseif ($type === 'Monthly Schedule' && isset($activity['status'])) {
+            elseif ($type === 'Monthly Schedule' && isset($activity['status']) && !empty($activity['status'])) {
                 $status = ucfirst(strtolower($activity['status']));
             }
-            // For Schedule requests, use status from DB
-            elseif ($type === 'Schedule' && isset($activity['status'])) {
-                $status = ucfirst(strtolower($activity['status']));
+            // For Schedule requests, use status from DB (prioritize DB status over message parsing)
+            elseif ($type === 'Schedule' && isset($activity['status']) && !empty(trim($activity['status']))) {
+                $status = ucfirst(strtolower(trim($activity['status'])));
             } else {
+                // Fallback: Extract status from message if not found in DB
                 preg_match('/\b(Approved|Rejected|Pending|Declined|Cancelled)\b/i', $msg, $statusMatch);
                 $status = ucfirst(strtolower($statusMatch[0] ?? 'Pending'));
             }
