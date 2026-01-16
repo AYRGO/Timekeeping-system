@@ -350,22 +350,66 @@ function getStatusBadge($status) {
                     pagDiv.innerHTML = '';
                     const totalPages = Math.ceil(filteredRequests.length / rowsPerPage);
                     if (totalPages <= 1) return;
+                    
+                    // Previous button
                     const prevBtn = document.createElement('button');
-                    prevBtn.textContent = 'Prev';
-                    prevBtn.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700';
+                    prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+                    prevBtn.className = `px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`;
                     prevBtn.disabled = currentPage === 1;
                     prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; updateTable(); } };
                     pagDiv.appendChild(prevBtn);
-                    for (let i = 1; i <= totalPages; i++) {
-                        const btn = document.createElement('button');
-                        btn.textContent = i;
-                        btn.className = `px-3 py-1 rounded ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
-                        btn.onclick = () => { currentPage = i; updateTable(); };
-                        pagDiv.appendChild(btn);
+                    
+                    // Smart pagination logic
+                    const pagesToShow = [];
+                    const delta = 2; // Number of pages to show on each side of current page
+                    
+                    // Always show first page
+                    pagesToShow.push(1);
+                    
+                    // Calculate range around current page
+                    const rangeStart = Math.max(2, currentPage - delta);
+                    const rangeEnd = Math.min(totalPages - 1, currentPage + delta);
+                    
+                    // Add ellipsis after first page if needed
+                    if (rangeStart > 2) {
+                        pagesToShow.push('...');
                     }
+                    
+                    // Add pages around current page
+                    for (let i = rangeStart; i <= rangeEnd; i++) {
+                        pagesToShow.push(i);
+                    }
+                    
+                    // Add ellipsis before last page if needed
+                    if (rangeEnd < totalPages - 1) {
+                        pagesToShow.push('...');
+                    }
+                    
+                    // Always show last page if there's more than 1 page
+                    if (totalPages > 1) {
+                        pagesToShow.push(totalPages);
+                    }
+                    
+                    // Render page buttons
+                    pagesToShow.forEach((page, index) => {
+                        if (page === '...') {
+                            const ellipsis = document.createElement('span');
+                            ellipsis.textContent = '...';
+                            ellipsis.className = 'px-3 py-1 text-gray-500';
+                            pagDiv.appendChild(ellipsis);
+                        } else {
+                            const btn = document.createElement('button');
+                            btn.textContent = page;
+                            btn.className = `px-3 py-1 rounded ${page === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+                            btn.onclick = () => { currentPage = page; updateTable(); };
+                            pagDiv.appendChild(btn);
+                        }
+                    });
+                    
+                    // Next button
                     const nextBtn = document.createElement('button');
-                    nextBtn.textContent = 'Next';
-                    nextBtn.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700';
+                    nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+                    nextBtn.className = `px-3 py-1 rounded ${currentPage === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`;
                     nextBtn.disabled = currentPage === totalPages;
                     nextBtn.onclick = () => { if (currentPage < totalPages) { currentPage++; updateTable(); } };
                     pagDiv.appendChild(nextBtn);
