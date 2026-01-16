@@ -205,6 +205,7 @@ function getStatusBadge($status) {
                     </table>
                 </div>
                 <script>
+                // Version: 2026-01-16-v2 - Compact pagination
                 let otRequests = <?php echo json_encode($overtime_requests); ?>;
                 const isHistoryView = <?php echo json_encode($isHistoryView); ?>;
                 const rowsPerPage = 10;
