@@ -370,22 +370,49 @@ function getLeaveTypeBadge($type) {
                     pagDiv.innerHTML = '';
                     const totalPages = Math.ceil(filteredRequests.length / rowsPerPage);
                     if (totalPages <= 1) return;
+                    
+                    // Previous button
                     const prevBtn = document.createElement('button');
-                    prevBtn.textContent = 'Prev';
-                    prevBtn.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700';
+                    prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+                    prevBtn.className = `px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`;
                     prevBtn.disabled = currentPage === 1;
                     prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; updateTable(); } };
                     pagDiv.appendChild(prevBtn);
-                    for (let i = 1; i <= totalPages; i++) {
-                        const btn = document.createElement('button');
-                        btn.textContent = i;
-                        btn.className = `px-3 py-1 rounded ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
-                        btn.onclick = () => { currentPage = i; updateTable(); };
-                        pagDiv.appendChild(btn);
-                    }
+                    
+                    // Page indicator with jump input
+                    const pageInfo = document.createElement('div');
+                    pageInfo.className = 'flex items-center space-x-2';
+                    pageInfo.innerHTML = `
+                        <span class="text-sm text-gray-600">Page</span>
+                        <input type="number" id="pageJump" value="${currentPage}" min="1" max="${totalPages}" 
+                               class="w-16 px-2 py-1 border rounded text-center text-sm focus:ring focus:ring-blue-200">
+                        <span class="text-sm text-gray-600">of ${totalPages}</span>
+                    `;
+                    pagDiv.appendChild(pageInfo);
+                    
+                    // Add event listener for page jump
+                    setTimeout(() => {
+                        const jumpInput = document.getElementById('pageJump');
+                        jumpInput.addEventListener('change', function() {
+                            let page = parseInt(this.value);
+                            if (page >= 1 && page <= totalPages) {
+                                currentPage = page;
+                                updateTable();
+                            } else {
+                                this.value = currentPage;
+                            }
+                        });
+                        jumpInput.addEventListener('keypress', function(e) {
+                            if (e.key === 'Enter') {
+                                this.blur();
+                            }
+                        });
+                    }, 0);
+                    
+                    // Next button
                     const nextBtn = document.createElement('button');
-                    nextBtn.textContent = 'Next';
-                    nextBtn.className = 'px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-gray-700';
+                    nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+                    nextBtn.className = `px-3 py-1 rounded ${currentPage === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`;
                     nextBtn.disabled = currentPage === totalPages;
                     nextBtn.onclick = () => { if (currentPage < totalPages) { currentPage++; updateTable(); } };
                     pagDiv.appendChild(nextBtn);

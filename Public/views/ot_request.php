@@ -211,7 +211,18 @@ function getStatusBadge($status) {
                 const rowsPerPage = 10;
                 let currentPage = 1;
                 let filteredRequests = otRequests;
-                otRequests = otRequests.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                
+                // Sort by created_at descending (newest first) for history view, or by ID for current view
+                if (isHistoryView) {
+                    otRequests = otRequests.sort((a, b) => {
+                        const dateA = new Date(a.created_at || 0);
+                        const dateB = new Date(b.created_at || 0);
+                        return dateB - dateA;
+                    });
+                } else {
+                    otRequests = otRequests.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                }
+                
                 function renderTable() {
                     const tbody = document.getElementById('otTableBody');
                     tbody.innerHTML = '';
