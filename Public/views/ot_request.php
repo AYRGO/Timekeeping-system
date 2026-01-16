@@ -359,52 +359,35 @@ function getStatusBadge($status) {
                     prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; updateTable(); } };
                     pagDiv.appendChild(prevBtn);
                     
-                    // Smart pagination logic
-                    const pagesToShow = [];
-                    const delta = 2; // Number of pages to show on each side of current page
+                    // Page indicator with jump input
+                    const pageInfo = document.createElement('div');
+                    pageInfo.className = 'flex items-center space-x-2';
+                    pageInfo.innerHTML = `
+                        <span class="text-sm text-gray-600">Page</span>
+                        <input type="number" id="pageJump" value="${currentPage}" min="1" max="${totalPages}" 
+                               class="w-16 px-2 py-1 border rounded text-center text-sm focus:ring focus:ring-blue-200">
+                        <span class="text-sm text-gray-600">of ${totalPages}</span>
+                    `;
+                    pagDiv.appendChild(pageInfo);
                     
-                    // Always show first page
-                    pagesToShow.push(1);
-                    
-                    // Calculate range around current page
-                    const rangeStart = Math.max(2, currentPage - delta);
-                    const rangeEnd = Math.min(totalPages - 1, currentPage + delta);
-                    
-                    // Add ellipsis after first page if needed
-                    if (rangeStart > 2) {
-                        pagesToShow.push('...');
-                    }
-                    
-                    // Add pages around current page
-                    for (let i = rangeStart; i <= rangeEnd; i++) {
-                        pagesToShow.push(i);
-                    }
-                    
-                    // Add ellipsis before last page if needed
-                    if (rangeEnd < totalPages - 1) {
-                        pagesToShow.push('...');
-                    }
-                    
-                    // Always show last page if there's more than 1 page
-                    if (totalPages > 1) {
-                        pagesToShow.push(totalPages);
-                    }
-                    
-                    // Render page buttons
-                    pagesToShow.forEach((page, index) => {
-                        if (page === '...') {
-                            const ellipsis = document.createElement('span');
-                            ellipsis.textContent = '...';
-                            ellipsis.className = 'px-3 py-1 text-gray-500';
-                            pagDiv.appendChild(ellipsis);
-                        } else {
-                            const btn = document.createElement('button');
-                            btn.textContent = page;
-                            btn.className = `px-3 py-1 rounded ${page === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
-                            btn.onclick = () => { currentPage = page; updateTable(); };
-                            pagDiv.appendChild(btn);
-                        }
-                    });
+                    // Add event listener for page jump
+                    setTimeout(() => {
+                        const jumpInput = document.getElementById('pageJump');
+                        jumpInput.addEventListener('change', function() {
+                            let page = parseInt(this.value);
+                            if (page >= 1 && page <= totalPages) {
+                                currentPage = page;
+                                updateTable();
+                            } else {
+                                this.value = currentPage;
+                            }
+                        });
+                        jumpInput.addEventListener('keypress', function(e) {
+                            if (e.key === 'Enter') {
+                                this.blur();
+                            }
+                        });
+                    }, 0);
                     
                     // Next button
                     const nextBtn = document.createElement('button');
