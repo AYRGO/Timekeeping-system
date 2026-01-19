@@ -108,7 +108,8 @@ try {
         
         // Check if there's already an active shift (AFTER cleanup) - but skip this check if we're resetting
         if ($is_incomplete !== '1') {
-            $checkActiveStmt = $pdo->prepare("SELECT id, log_date, time_in FROM time_logs WHERE employee_id = ? AND time_out IS NULL AND status = 'active'");
+            // Check for any open shift (not incomplete)
+            $checkActiveStmt = $pdo->prepare("SELECT id, log_date, time_in FROM time_logs WHERE employee_id = ? AND time_out IS NULL AND status != 'incomplete'");
             $checkActiveStmt->execute([$employee_id]);
             $activeShift = $checkActiveStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -145,8 +146,9 @@ try {
             // Handle completing previous incomplete shift
             
             // Find the open shift from the original date (yesterday)
+            // Include all non-incomplete status to handle rest day shifts
             $findStmt = $pdo->prepare("SELECT id, time_in, log_date FROM time_logs 
-                WHERE employee_id = ? AND time_out IS NULL AND log_date = ? AND (status IS NULL OR status = 'active')");
+                WHERE employee_id = ? AND time_out IS NULL AND log_date = ? AND status != 'incomplete'");
             $findStmt->execute([$employee_id, $original_log_date]);
             $openShift = $findStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -172,8 +174,9 @@ try {
             // Handle overnight shift completion
             
             // Find the open overnight shift
+            // Include all non-incomplete status to handle rest day shifts
             $findStmt = $pdo->prepare("SELECT id, time_in, log_date FROM time_logs 
-                WHERE employee_id = ? AND time_out IS NULL AND log_date = ? AND (status IS NULL OR status = 'active')");
+                WHERE employee_id = ? AND time_out IS NULL AND log_date = ? AND status != 'incomplete'");
             $findStmt->execute([$employee_id, $original_log_date]);
             $openShift = $findStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -199,8 +202,9 @@ try {
             // Handle regular time out
             
             // Find today's time in record
+            // Include all non-incomplete status to handle rest day shifts
             $findStmt = $pdo->prepare("SELECT id, time_in, log_date FROM time_logs 
-                WHERE employee_id = ? AND log_date = ? AND time_out IS NULL AND (status IS NULL OR status = 'active')");
+                WHERE employee_id = ? AND log_date = ? AND time_out IS NULL AND status != 'incomplete'");
             $findStmt->execute([$employee_id, $today]);
             $todayRecord = $findStmt->fetch(PDO::FETCH_ASSOC);
             
