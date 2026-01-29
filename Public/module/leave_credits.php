@@ -156,7 +156,7 @@ function getStatusBadge($status) {
                         <div class="text-center">
                             <div class="mb-3">
                                 <span class="text-3xl font-bold text-slate-800">
-                                    <?= number_format($balance, 1) ?>
+                                    <?= number_format($balance, 2) ?>
                                 </span>
                                 <span class="text-sm text-slate-500 ml-1">days</span>
                             </div>
@@ -164,7 +164,7 @@ function getStatusBadge($status) {
                             <?php if ($type === 'vacation' && $carry > 0): ?>
                                 <div class="text-xs text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full inline-block">
                                     <i class="fas fa-plus-circle mr-1"></i>
-                                    Carried: <?= number_format($carry, 1) ?> days
+                                    Carried: <?= number_format($carry, 2) ?> days
                                 </div>
                             <?php endif; ?>
                         </div>
