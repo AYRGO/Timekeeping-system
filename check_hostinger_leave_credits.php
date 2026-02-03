@@ -70,7 +70,6 @@ try {
             e.status,
             lc.balance,
             lc.carry_over,
-            lc.last_processed_month,
             lc.updated_at,
             lc.year
         FROM leave_credits lc
