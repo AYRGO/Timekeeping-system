@@ -1,8 +1,7 @@
 <?php
 /**
- * Check Hostinger Leave Credits - Diagnostic Script
- * This script connects to the Hostinger production database and checks
- * the current state of leave credits for Regular employees
+ * Check Hostinger Leave Credits - Diagnostic Script v2
+ * Fixed: Removed last_processed_month column reference
  */
 
 // Hostinger production settings
@@ -11,6 +10,7 @@ $dbname = 'u816220874_calendartype';
 $username = 'u816220874_calendartype';
 $password = 'Gr33n$$wRf';
 
+echo "<pre>";
 echo "===========================================\n";
 echo "HOSTINGER DATABASE LEAVE CREDITS CHECK\n";
 echo "Date: " . date('Y-m-d H:i:s') . "\n";
@@ -60,7 +60,7 @@ try {
     
     // 2. List specific Regular employees with 15 VL in 2026
     echo "\n\n📋 REGULAR EMPLOYEES WITH 15 VL IN 2026:\n";
-    echo str_repeat("-", 80) . "\n";
+    echo str_repeat("-", 90) . "\n";
     
     $stmt = $pdo->query("
         SELECT 
@@ -78,8 +78,8 @@ try {
         AND lc.year = 2026
         AND e.Emp_Type = 'Regular'
         AND lc.balance = 15
-        ORDER BY lc.updated_at DESC
-        LIMIT 30
+        ORDER BY e.fname, e.lname
+        LIMIT 50
     ");
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -98,18 +98,19 @@ try {
                 $row['updated_at'] ?? 'NULL'
             );
         }
+        echo "\nTotal: " . count($results) . " employees shown (max 50)\n";
     }
     
     // 3. Check all vacation leave credits for 2026 (summary)
     echo "\n\n📊 ALL VACATION LEAVE CREDITS SUMMARY FOR 2026:\n";
-    echo str_repeat("-", 60) . "\n";
+    echo str_repeat("-", 70) . "\n";
     
     $stmt = $pdo->query("
         SELECT 
             e.Emp_Type,
             e.status,
             COUNT(*) as total,
-            AVG(lc.balance) as avg_balance,
+            ROUND(AVG(lc.balance), 2) as avg_balance,
             MIN(lc.balance) as min_balance,
             MAX(lc.balance) as max_balance
         FROM leave_credits lc
@@ -131,15 +132,15 @@ try {
                 $row['Emp_Type'] ?? 'NULL',
                 $row['status'],
                 $row['total'],
-                number_format($row['avg_balance'], 2),
+                $row['avg_balance'],
                 $row['min_balance'],
                 $row['max_balance']
             );
         }
     }
     
-    // 4. Check when leave credits were last modified (to trace the issue)
-    echo "\n\n⏰ RECENT LEAVE CREDIT UPDATES (Last 7 days):\n";
+    // 4. Check when leave credits were last modified
+    echo "\n\n⏰ RECENT LEAVE CREDIT UPDATES (Last 30 days):\n";
     echo str_repeat("-", 80) . "\n";
     
     $stmt = $pdo->query("
@@ -149,14 +150,14 @@ try {
             COUNT(DISTINCT lc.employee_id) as unique_employees,
             GROUP_CONCAT(DISTINCT lc.leave_type) as leave_types
         FROM leave_credits lc
-        WHERE lc.updated_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        WHERE lc.updated_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
         GROUP BY DATE(lc.updated_at)
         ORDER BY update_date DESC
     ");
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     if (empty($results)) {
-        echo "No leave credit updates in the last 7 days.\n";
+        echo "No leave credit updates in the last 30 days.\n";
     } else {
         printf("%-12s %-18s %-18s %-30s\n", "Date", "Records Updated", "Unique Employees", "Leave Types");
         printf("%-12s %-18s %-18s %-30s\n", str_repeat("-", 12), str_repeat("-", 18), str_repeat("-", 18), str_repeat("-", 30));
@@ -170,36 +171,12 @@ try {
         }
     }
     
-    // 5. Check auto-accrual system settings
-    echo "\n\n⚙️ SYSTEM SETTINGS:\n";
-    echo str_repeat("-", 60) . "\n";
-    
-    $stmt = $pdo->query("
-        SELECT setting_key, setting_value, updated_at 
-        FROM system_settings 
-        WHERE setting_key IN ('auto_accrual_enabled', 'accrual_mode', 'last_auto_accrual_month', 'last_accrual_date')
-    ");
-    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    if (empty($results)) {
-        echo "No relevant system settings found.\n";
-    } else {
-        foreach ($results as $row) {
-            printf("%-30s = %-30s (Updated: %s)\n", 
-                $row['setting_key'],
-                $row['setting_value'],
-                $row['updated_at'] ?? 'N/A'
-            );
-        }
-    }
-    
     echo "\n\n===========================================\n";
     echo "CHECK COMPLETE\n";
     echo "===========================================\n";
     
 } catch (PDOException $e) {
     echo "❌ DATABASE ERROR: " . $e->getMessage() . "\n";
-    echo "\nNote: This script needs to be run on the Hostinger server to connect.\n";
-    echo "Copy this file to your Hostinger public_html folder and run it via browser.\n";
 }
+echo "</pre>";
 ?>
