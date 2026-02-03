@@ -48,17 +48,21 @@ try {
     $pdo->beginTransaction();
     
     // Calculate correct VL balance
-    // Since we're in February 2026 (month 2), employees should have:
-    // - If accrual started in January: 2 months × 1.25 = 2.50 VL
-    $currentMonth = (int)date('n'); // 2 for February
-    $correctBalance = $currentMonth * 1.25;
+    // Monthly accrual happens at END of month, so:
+    // - January 31, 2026: First accrual = 1.25 VL
+    // - February accrual won't happen until Feb 28/29
+    // Since we're early February, they should only have January's accrual: 1.25 VL
+    $monthsAccrued = 1; // Only January accrual has happened
+    $correctBalance = 1.25;
     
     echo "📊 CORRECTION DETAILS:\n";
-    echo "   Current month: " . date('F Y') . " (Month $currentMonth)\n";
+    echo "   Current date: " . date('F j, Y') . "\n";
+    echo "   Months accrued so far: $monthsAccrued (January only)\n";
     echo "   Correct VL balance: $correctBalance days\n";
-    echo "   (Calculation: $currentMonth months × 1.25 days/month)\n\n";
+    echo "   (Calculation: 1 month × 1.25 days/month = 1.25 VL)\n";
+    echo "   Note: February accrual happens at end of February\n\n";
     
-    // Get all Regular employees with 15 VL in 2026
+    // Get all Regular employees with incorrect VL in 2026 (balance > 1.25 means they got the wrong 15 VL)
     $stmt = $pdo->query("
         SELECT 
             lc.id as leave_credit_id,
@@ -74,7 +78,8 @@ try {
         AND lc.year = 2026
         AND e.Emp_Type = 'Regular'
         AND e.status = 'active'
-        AND lc.balance = 15
+        AND lc.balance > 1.25
+        AND lc.updated_at = '2026-01-31 23:47:12'
     ");
     
     $affectedEmployees = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -87,9 +92,9 @@ try {
     }
     
     echo "🔍 FOUND $totalAffected EMPLOYEES TO CORRECT:\n";
-    echo str_repeat("-", 80) . "\n";
-    printf("%-5s %-30s %-15s %-15s\n", "ID", "Name", "Current VL", "Corrected VL");
-    printf("%-5s %-30s %-15s %-15s\n", str_repeat("-", 5), str_repeat("-", 30), str_repeat("-", 15), str_repeat("-", 15));
+    echo str_repeat("-", 95) . "\n";
+    printf("%-5s %-30s %-12s %-12s %-10s %-12s\n", "ID", "Name", "Current VL", "VL Used", "Correct VL", "Final VL");
+    printf("%-5s %-30s %-12s %-12s %-10s %-12s\n", str_repeat("-", 5), str_repeat("-", 30), str_repeat("-", 12), str_repeat("-", 12), str_repeat("-", 10), str_repeat("-", 12));
     
     $updateStmt = $pdo->prepare("
         UPDATE leave_credits 
@@ -103,14 +108,24 @@ try {
     
     foreach ($affectedEmployees as $emp) {
         try {
-            // Update the balance
-            $updateStmt->execute([$correctBalance, $emp['leave_credit_id']]);
+            // Calculate VL already used: 15 (incorrect amount given) - current balance
+            $vlUsed = 15 - floatval($emp['current_balance']);
+            $vlUsed = max(0, $vlUsed); // Can't be negative
             
-            printf("%-5s %-30s %-15s %-15s\n", 
+            // Final balance = correct accrual - VL used
+            $finalBalance = $correctBalance - $vlUsed;
+            $finalBalance = max(0, $finalBalance); // Can't be negative
+            
+            // Update the balance
+            $updateStmt->execute([$finalBalance, $emp['leave_credit_id']]);
+            
+            printf("%-5s %-30s %-12s %-12s %-10s %-12s\n", 
                 $emp['employee_id'],
                 substr($emp['full_name'], 0, 28),
                 $emp['current_balance'],
-                $correctBalance
+                number_format($vlUsed, 2),
+                $correctBalance,
+                number_format($finalBalance, 2)
             );
             
             $correctedCount++;
@@ -137,7 +152,7 @@ try {
     
     if ($correctedCount > 0) {
         echo "✅ COMMIT CHANGES? This will permanently update the database.\n";
-        echo "   Balances changed: 15.00 VL → $correctBalance VL\n\n";
+        echo "   Wrong VL given: 15.00 VL → Correct VL: $correctBalance VL (minus any used)\n\n";
         
         // Commit the transaction
         $pdo->commit();
