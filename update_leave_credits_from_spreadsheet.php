@@ -33,7 +33,7 @@ $spreadsheetData = [
     ['name' => 'AGUILAR, IAN MYCO', 'vl' => 6.25, 'sl' => 4, 'spl' => null],
     ['name' => 'ALIMURONG, JOEL LUSUNG', 'vl' => 5.75, 'sl' => 5, 'spl' => null],
     ['name' => 'ALVAREZ, JOHN BRYAN', 'vl' => 5.75, 'sl' => 4, 'spl' => null],
-    ['name' => 'ANTONIO, VINCENT KEVIN SANTOS', 'vl' => 3.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'ANTONIO, VINCENT KEVIN SANTOS', 'vl' => 3.25, 'sl' => 4, 'spl' => null, 'db_lname' => 'Santos', 'db_fname' => 'Vincent Kevin'],
     ['name' => 'ANGELES, CHRISTINE', 'vl' => 1.75, 'sl' => 5, 'spl' => null],
     ['name' => 'ARNIGO, CEDRICK', 'vl' => 5.25, 'sl' => 4, 'spl' => null],
     ['name' => 'AUSTRIA, LOUIS FERNAND BALUYOT', 'vl' => 4.75, 'sl' => 5, 'spl' => null],
@@ -41,15 +41,15 @@ $spreadsheetData = [
     ['name' => 'BANSIL, KRISTIAN DAVID', 'vl' => 1.75, 'sl' => 1, 'spl' => null],
     ['name' => 'BAUTISTA, OLIVE SANTOS', 'vl' => 5.75, 'sl' => 5, 'spl' => 7.25],
     ['name' => 'BALDERAS, GLORY ANN GARCIA', 'vl' => 1.75, 'sl' => 5, 'spl' => null],
-    ['name' => 'BENALLA, RENNECA VILLAPAÑA', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'BENALLA, RENNECA VILLAPAÑA', 'vl' => 6.25, 'sl' => 5, 'spl' => null, 'db_lname' => 'Benalla', 'db_fname' => 'Reneeca'],
     ['name' => 'BONDOC, FRANCIS EUGENE AGUHAYON', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
     ['name' => 'BRIONES, JOHN MICHAEL', 'vl' => 3.25, 'sl' => 5, 'spl' => null],
-    ['name' => 'CAMERINO, YRIS GAELLE PARREÑAS', 'vl' => 5.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'CAMERINO, YRIS GAELLE PARREÑAS', 'vl' => 5.25, 'sl' => 4, 'spl' => null, 'db_lname' => 'Camerino', 'db_fname' => 'Yris Gaelle'],
     ['name' => 'CAPATI, ALLEN SOBREPENA', 'vl' => 2.50, 'sl' => 4, 'spl' => null],
     // CAPIRAL, GABRIEL - Probationary (skip)
     ['name' => 'CARAAN, SARAH', 'vl' => 5.75, 'sl' => 5, 'spl' => null],
     ['name' => 'CASTRO, AIZEL SANTOS', 'vl' => 6.25, 'sl' => 5, 'spl' => 6.25],
-    ['name' => 'CATOLOGO, MARNIE', 'vl' => 1.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'CATOLOGO, MARNIE', 'vl' => 1.75, 'sl' => 5, 'spl' => null, 'db_lname' => 'Catalogo', 'db_fname' => 'Marnie'],
     ['name' => 'CELESTE, LOVELAINE GUDOY', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
     ['name' => 'COLIS, REYMARK BRYAN SILVANO', 'vl' => 2.25, 'sl' => 5, 'spl' => null],
     ['name' => 'CRISANTO, ELRITZ T', 'vl' => 3.25, 'sl' => 5, 'spl' => null],
@@ -57,7 +57,7 @@ $spreadsheetData = [
     ['name' => 'DIMLA, JHOSUA', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
     ['name' => 'DELA CRUZ, JONAS', 'vl' => 5.50, 'sl' => 5, 'spl' => null],
     ['name' => 'DELA CRUZ, SHAINA DIMAYUGO', 'vl' => 2.00, 'sl' => 5, 'spl' => null],
-    ['name' => 'DOLLENTES, MARIA NINA', 'vl' => 4.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'DOLLENTES, MARIA NINA', 'vl' => 4.75, 'sl' => 5, 'spl' => null, 'db_lname' => 'Cruz', 'db_fname' => 'Maria'],
     ['name' => 'ESTANIO, ANGELICA ROSARIO', 'vl' => 7.50, 'sl' => 5, 'spl' => null],
     ['name' => 'FERNANDEZ, FRANCIS EMMANUEL VELOSO', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
     // FERNANDEZ, MARIANNE JAE - Terminated (skip)
@@ -67,18 +67,18 @@ $spreadsheetData = [
     ['name' => 'GUILLERMO, ALFIE', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
     ['name' => 'JABINAL, ADONIS DEL MUNDO', 'vl' => 3.50, 'sl' => 5, 'spl' => null],
     ['name' => 'JOSAFAT, RENALYN', 'vl' => 1.75, 'sl' => 4, 'spl' => null],
-    ['name' => 'LOZANO, ALDWIN JOHN', 'vl' => 3.75, 'sl' => 4, 'spl' => null],
+    ['name' => 'LOZANO, ALDWIN JOHN', 'vl' => 3.75, 'sl' => 4, 'spl' => null, 'db_lname' => 'Lozano', 'db_fname' => 'Aldwin John Arceo'],
     ['name' => 'MACAPAGAL, JEFFRY TUAZON', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
     ['name' => 'MACLANG, JULIE ANNE GUINTO', 'vl' => 4.75, 'sl' => 5, 'spl' => null],
     ['name' => 'MAKABENTA, ALTHEA', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
-    ['name' => 'MALINAO, ROGELIO DELA PENA', 'vl' => 3.00, 'sl' => 4, 'spl' => null],
+    ['name' => 'MALINAO, ROGELIO DELA PENA', 'vl' => 3.00, 'sl' => 4, 'spl' => null, 'db_lname' => 'Malinao', 'db_fname' => 'Rogelio'],
     ['name' => 'MANALILI, JOSHUA', 'vl' => 7.50, 'sl' => null, 'spl' => null],
-    ['name' => 'MATAGA, EDITH DAVID', 'vl' => 6.25, 'sl' => 2.5, 'spl' => null],
+    ['name' => 'MATAGA, EDITH DAVID', 'vl' => 6.25, 'sl' => 2.5, 'spl' => null, 'db_lname' => 'Mataga', 'db_fname' => 'Edith David'],
     ['name' => 'MAR, CHRISTIAN NIODA', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
     ['name' => 'MCGREGOR, TRISHA MAE', 'vl' => 1.75, 'sl' => 5, 'spl' => null],
     ['name' => 'MENDOZA, SEAN JUSTINE F', 'vl' => 5.50, 'sl' => 5, 'spl' => null],
     ['name' => 'MONIS, JOSHWEA MERCADO', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
-    ['name' => 'NAVALON, EVANEL CAACBAY', 'vl' => 1.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'NAVALON, EVANEL CAACBAY', 'vl' => 1.25, 'sl' => 4, 'spl' => null, 'db_lname' => 'Navalon', 'db_fname' => 'Evanel'],
     ['name' => 'NUÑEZ, IVY', 'vl' => 6.25, 'sl' => 4, 'spl' => null],
     ['name' => 'NUNEZA, DOU LESTER SABANDO', 'vl' => 5.75, 'sl' => 5, 'spl' => null],
     ['name' => 'OCAMPO, ALFRED NAGUIT', 'vl' => 2.75, 'sl' => 5, 'spl' => null],
@@ -121,12 +121,18 @@ try {
     echo "<tr style='background:#333; color:white;'><th>Name</th><th>Employee ID</th><th>VL (New)</th><th>SL (New)</th><th>SPL</th><th>Status</th></tr>";
     
     foreach ($spreadsheetData as $emp) {
-        $nameParts = explode(', ', $emp['name']);
-        $lastName = trim($nameParts[0]);
-        
-        // Handle first name with middle name
-        $firstNameParts = isset($nameParts[1]) ? explode(' ', trim($nameParts[1])) : [''];
-        $firstName = $firstNameParts[0];
+        // Check if we have explicit database names
+        if (isset($emp['db_lname']) && isset($emp['db_fname'])) {
+            $lastName = $emp['db_lname'];
+            $firstName = $emp['db_fname'];
+        } else {
+            $nameParts = explode(', ', $emp['name']);
+            $lastName = trim($nameParts[0]);
+            
+            // Handle first name with middle name
+            $firstNameParts = isset($nameParts[1]) ? explode(' ', trim($nameParts[1])) : [''];
+            $firstName = $firstNameParts[0];
+        }
         
         // Strategy 1: Exact match on last name, first word of first name
         $stmt = $pdo->prepare("
