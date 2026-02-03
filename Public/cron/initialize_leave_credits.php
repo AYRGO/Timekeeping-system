@@ -17,8 +17,9 @@ $leaveTypes = [
     'bereavement'   => 3 / 12,
 ];
 
-// Get all active employees
-$employees = $pdo->query("SELECT id FROM employees WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
+// Get ONLY PROBATIONARY active employees
+// Regular employees should use process_monthly_accrual.php for gradual monthly accrual
+$employees = $pdo->query("SELECT id, Emp_Type FROM employees WHERE status = 'active' AND Emp_Type = 'Probationary'")->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($employees as $emp) {
     $employee_id = $emp['id'];

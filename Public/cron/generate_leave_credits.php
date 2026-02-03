@@ -4,7 +4,8 @@ date_default_timezone_set('Asia/Manila');
 
 $currentYear = date('Y');
 
-// Define yearly leave credits
+// Define yearly leave credits FOR PROBATIONARY EMPLOYEES ONLY
+// Regular employees should use monthly accrual (process_monthly_accrual.php)
 $leaveTypes = [
     'sick'          => 5,
     'vacation'      => 15,
@@ -17,8 +18,9 @@ $leaveTypes = [
     'bereavement'   => 3
 ];
 
-// Fetch all active employees
-$employees = $pdo->query("SELECT id FROM employees WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
+// Fetch ONLY PROBATIONARY active employees
+// Regular employees should not get full year credits at once
+$employees = $pdo->query("SELECT id, Emp_Type FROM employees WHERE status = 'active' AND Emp_Type = 'Probationary'")->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($employees as $emp) {
     $employee_id = $emp['id'];

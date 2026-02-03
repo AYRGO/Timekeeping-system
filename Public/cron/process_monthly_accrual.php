@@ -54,8 +54,9 @@ try {
         $currentMonth = date('n'); // 1-12
         $monthName = date('F');
         
-        // Get all active employees
-        $stmt = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active'");
+        // Get all active REGULAR employees only
+        // Probationary employees get full year credits at once
+        $stmt = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active' AND Emp_Type = 'Regular'");
         $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $processedCount = 0;
