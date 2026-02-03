@@ -127,28 +127,43 @@ try {
         $firstNameParts = isset($nameParts[1]) ? explode(' ', trim($nameParts[1])) : [''];
         $firstName = $firstNameParts[0];
         
-        // Find employee by name (fuzzy match on last name and first name)
+        // Strategy 1: Exact match on last name, first word of first name
         $stmt = $pdo->prepare("
             SELECT id, fname, lname, CONCAT(fname, ' ', lname) as full_name 
             FROM employees 
-            WHERE UPPER(lname) LIKE UPPER(?) 
+            WHERE UPPER(lname) = UPPER(?) 
             AND UPPER(fname) LIKE UPPER(?)
             AND status = 'active'
             LIMIT 1
         ");
-        $stmt->execute([$lastName . '%', $firstName . '%']);
+        $stmt->execute([$lastName, $firstName . '%']);
         $employee = $stmt->fetch(PDO::FETCH_ASSOC);
         
+        // Strategy 2: Last name match, first name contains
         if (!$employee) {
-            // Try reverse search (first name, last name in different order)
             $stmt = $pdo->prepare("
                 SELECT id, fname, lname, CONCAT(fname, ' ', lname) as full_name 
                 FROM employees 
-                WHERE UPPER(CONCAT(lname, ', ', fname)) LIKE UPPER(?)
+                WHERE UPPER(lname) = UPPER(?) 
+                AND UPPER(fname) LIKE UPPER(?)
                 AND status = 'active'
                 LIMIT 1
             ");
-            $stmt->execute(['%' . $lastName . '%']);
+            $stmt->execute([$lastName, '%' . $firstName . '%']);
+            $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        // Strategy 3: Match on full name pattern (handles compound last names)
+        if (!$employee) {
+            $fullSearchName = str_replace(', ', ' ', $emp['name']);
+            $stmt = $pdo->prepare("
+                SELECT id, fname, lname, CONCAT(fname, ' ', lname) as full_name 
+                FROM employees 
+                WHERE UPPER(CONCAT(fname, ' ', lname)) LIKE UPPER(?)
+                AND status = 'active'
+                LIMIT 1
+            ");
+            $stmt->execute(['%' . $lastName . '%' . $firstName . '%']);
             $employee = $stmt->fetch(PDO::FETCH_ASSOC);
         }
         
