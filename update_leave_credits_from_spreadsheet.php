@@ -25,81 +25,82 @@ if (!isset($_GET['confirm']) || $_GET['confirm'] !== 'yes') {
     exit;
 }
 
-// Spreadsheet data - CORRECTED names from user's list
-// These are REGULAR employees only (yellow = Probationary, red = Terminated are skipped)
+// Spreadsheet data - EXACT values from user's final list
+// VL = Column 2, SL = Column 3
+// CAPIRAL GABRIEL = Probationary, PATAWARAN SHERRY & FERNANDEZ MARIANNE = Terminated (skip)
 $spreadsheetData = [
-    ['name' => 'AGAS, JILLIAN LAO', 'vl' => 6.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'AGUILAR, IAN MYCO', 'vl' => 6.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'ALIMURONG, JOEL LUSUNG', 'vl' => 5.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'ALVAREZ, JOHN BRYAN', 'vl' => 5.75, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'ANTONIO, VINCENT KEVIN SANTOS', 'vl' => 3.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'ANGELES, CHRISTINE', 'vl' => 1.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'ARNIGO, CEDRICK', 'vl' => 5.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'AUSTRIA, LOUIS FERNAND BALUYOT', 'vl' => 4.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'BACONGALLO, NIKA NUEVA', 'vl' => 2.00, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'BANSIL, KRISTIAN DAVID', 'vl' => 1.75, 'sl' => 2.25, 'spl' => null],
-    ['name' => 'BAUTISTA, OLIVE SANTOS', 'vl' => 5.75, 'sl' => 6.25, 'spl' => 7.25],
-    ['name' => 'BALDERAS, GLORY ANN GARCIA', 'vl' => 1.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'BENALLA, RENNECA VILLAPAÑA', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'BONDOC, FRANCIS EUGENE AGUHAYON', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'BRIONES, JOHN MICHAEL', 'vl' => 3.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'CAMERINO, YRIS GAELLE PARREÑAS', 'vl' => 5.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'CAPATI, ALLEN SOBREPEÑA', 'vl' => 2.50, 'sl' => 5.25, 'spl' => null],
-    // CAPIRAL, GABRIEL - Yellow (Probationary - skip)
-    ['name' => 'CARAAN, SARAH', 'vl' => 5.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'CASTRO, AIZEL SANTOS', 'vl' => 5.25, 'sl' => 6.25, 'spl' => 6.25],
-    ['name' => 'CATOLOGO, MARNIE', 'vl' => 1.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'CELESTE, LOVELAINE GUDOY', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'COLIS, REYMARK BRYAN SILVANO', 'vl' => 2.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'CRISANTO, ELRITZ T', 'vl' => 3.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'DAVID, RYAN ARWIN', 'vl' => 5.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'DIMLA, JHOSUA', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'DELA CRUZ, JONAS', 'vl' => 5.50, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'DELA CRUZ, SHAINA DIMAYUGO', 'vl' => 2.00, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'DOLLENTES, MARIA NINA', 'vl' => 4.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'ESTANIO, ANGELICA ROSARIO', 'vl' => 7.50, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'FERNANDEZ, FRANCIS EMMANUEL VELOSO', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    // FERNANDEZ, MARIANNE JAE - Red (Terminated - skip)
-    ['name' => 'GATBONTON, ANALIZA TALOBAN', 'vl' => 1.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'GATBONTON, BEVERLY TALOBAN', 'vl' => 2.00, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'GUECO, JOHANA ROSE PEREZ', 'vl' => 2.25, 'sl' => 6.25, 'spl' => 8.25],
-    ['name' => 'GUILLERMO, ALFIE', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'JABINAL, ADONIS DEL MUNDO', 'vl' => 3.50, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'JOSAFAT, RENALYN', 'vl' => 1.75, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'LOZANO, ALDWIN JOHN', 'vl' => 3.75, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'MACAPAGAL, JEFFRY TUAZON', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'MACLANG, JULIE ANNE GUINTO', 'vl' => 4.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'MAKABENTA, ALTHEA', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'MALINAO, ROGELIO DELA PENA', 'vl' => 3.00, 'sl' => 5.25, 'spl' => null],
+    ['name' => 'AGAS, JILLIAN LAO', 'vl' => 6.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'AGUILAR, IAN MYCO', 'vl' => 6.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'ALIMURONG, JOEL LUSUNG', 'vl' => 5.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'ALVAREZ, JOHN BRYAN', 'vl' => 5.75, 'sl' => 4, 'spl' => null],
+    ['name' => 'ANTONIO, VINCENT KEVIN SANTOS', 'vl' => 3.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'ANGELES, CHRISTINE', 'vl' => 1.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'ARNIGO, CEDRICK', 'vl' => 5.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'AUSTRIA, LOUIS FERNAND BALUYOT', 'vl' => 4.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'BACONGALLO, NIKA NUEVA', 'vl' => 2.00, 'sl' => 5, 'spl' => null],
+    ['name' => 'BANSIL, KRISTIAN DAVID', 'vl' => 1.75, 'sl' => 1, 'spl' => null],
+    ['name' => 'BAUTISTA, OLIVE SANTOS', 'vl' => 5.75, 'sl' => 5, 'spl' => 7.25],
+    ['name' => 'BALDERAS, GLORY ANN GARCIA', 'vl' => 1.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'BENALLA, RENNECA VILLAPAÑA', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'BONDOC, FRANCIS EUGENE AGUHAYON', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'BRIONES, JOHN MICHAEL', 'vl' => 3.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'CAMERINO, YRIS GAELLE PARREÑAS', 'vl' => 5.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'CAPATI, ALLEN SOBREPENA', 'vl' => 2.50, 'sl' => 4, 'spl' => null],
+    // CAPIRAL, GABRIEL - Probationary (skip)
+    ['name' => 'CARAAN, SARAH', 'vl' => 5.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'CASTRO, AIZEL SANTOS', 'vl' => 6.25, 'sl' => 5, 'spl' => 6.25],
+    ['name' => 'CATOLOGO, MARNIE', 'vl' => 1.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'CELESTE, LOVELAINE GUDOY', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'COLIS, REYMARK BRYAN SILVANO', 'vl' => 2.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'CRISANTO, ELRITZ T', 'vl' => 3.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'DAVID, RYAN ARWIN', 'vl' => 5.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'DIMLA, JHOSUA', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'DELA CRUZ, JONAS', 'vl' => 5.50, 'sl' => 5, 'spl' => null],
+    ['name' => 'DELA CRUZ, SHAINA DIMAYUGO', 'vl' => 2.00, 'sl' => 5, 'spl' => null],
+    ['name' => 'DOLLENTES, MARIA NINA', 'vl' => 4.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'ESTANIO, ANGELICA ROSARIO', 'vl' => 7.50, 'sl' => 5, 'spl' => null],
+    ['name' => 'FERNANDEZ, FRANCIS EMMANUEL VELOSO', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    // FERNANDEZ, MARIANNE JAE - Terminated (skip)
+    ['name' => 'GATBONTON, ANALIZA TALOBAN', 'vl' => 1.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'GATBONTON, BEVERLY TALOBAN', 'vl' => 2.00, 'sl' => 5, 'spl' => null],
+    ['name' => 'GUECO, JOHANA ROSE PEREZ', 'vl' => 2.25, 'sl' => 5, 'spl' => 8.25],
+    ['name' => 'GUILLERMO, ALFIE', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'JABINAL, ADONIS DEL MUNDO', 'vl' => 3.50, 'sl' => 5, 'spl' => null],
+    ['name' => 'JOSAFAT, RENALYN', 'vl' => 1.75, 'sl' => 4, 'spl' => null],
+    ['name' => 'LOZANO, ALDWIN JOHN', 'vl' => 3.75, 'sl' => 4, 'spl' => null],
+    ['name' => 'MACAPAGAL, JEFFRY TUAZON', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'MACLANG, JULIE ANNE GUINTO', 'vl' => 4.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'MAKABENTA, ALTHEA', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'MALINAO, ROGELIO DELA PENA', 'vl' => 3.00, 'sl' => 4, 'spl' => null],
     ['name' => 'MANALILI, JOSHUA', 'vl' => 7.50, 'sl' => null, 'spl' => null],
-    ['name' => 'MATAGA, EDITH DAVID', 'vl' => 6.25, 'sl' => 3.75, 'spl' => null],
-    ['name' => 'MAR, CHRISTIAN NIODA', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'MCGREGOR, TRISHA MAE', 'vl' => 1.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'MENDOZA, SEAN JUSTINE F', 'vl' => 5.50, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'MONIS, JOSHWEA MERCADO', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'NAVALON, EVANEL CAACBAY', 'vl' => 1.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'NUÑEZ, IVY', 'vl' => 6.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'NUNEZA, DOU LESTER SABANDO', 'vl' => 5.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'OCAMPO, ALFRED NAGUIT', 'vl' => 2.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'OCAMPO, GODWIN', 'vl' => 1.75, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'OTSUKA, SHIGERU CENTINA', 'vl' => 3.75, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'PANGAN, CRISTINA MIRANDA', 'vl' => 5.25, 'sl' => 6.25, 'spl' => null],
+    ['name' => 'MATAGA, EDITH DAVID', 'vl' => 6.25, 'sl' => 2.5, 'spl' => null],
+    ['name' => 'MAR, CHRISTIAN NIODA', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'MCGREGOR, TRISHA MAE', 'vl' => 1.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'MENDOZA, SEAN JUSTINE F', 'vl' => 5.50, 'sl' => 5, 'spl' => null],
+    ['name' => 'MONIS, JOSHWEA MERCADO', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'NAVALON, EVANEL CAACBAY', 'vl' => 1.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'NUÑEZ, IVY', 'vl' => 6.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'NUNEZA, DOU LESTER SABANDO', 'vl' => 5.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'OCAMPO, ALFRED NAGUIT', 'vl' => 2.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'OCAMPO, GODWIN', 'vl' => 1.75, 'sl' => 4, 'spl' => null],
+    ['name' => 'OTSUKA, SHIGERU CENTINA', 'vl' => 3.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'PANGAN, CRISTINA MIRANDA', 'vl' => 5.25, 'sl' => 5, 'spl' => null],
     ['name' => 'PANGILINAN, ROI DANE', 'vl' => 7.50, 'sl' => null, 'spl' => null],
-    // PATAWARAN, SHERRY - Red (Terminated - skip)
-    ['name' => 'YAP, APRYL', 'vl' => 1.75, 'sl' => 4.25, 'spl' => null],
-    ['name' => 'PATRIMONIO, RYAN REX', 'vl' => 2.25, 'sl' => 4.25, 'spl' => null],
-    ['name' => 'PINEDA, ERIKA SERIOSA', 'vl' => 2.50, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'PLATERO, MA. CHARISMA', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'QUIZON, SHIRMILEY', 'vl' => 5.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'RONQUILLO, RHEGENE INGAT', 'vl' => 5.75, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'SAMODIO, JHUNEL CARLO TRAFALGAR', 'vl' => 5.75, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'SOLAYAO, JANETH SEDON', 'vl' => 2.50, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'SINGH, RAY JINDER VILLENA', 'vl' => 3.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'SORIANO, MARY ANN VALLEJOS', 'vl' => 2.50, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'TAYAO, ALEXANDER', 'vl' => 1.25, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'TOLOMIA, RICA JOY VIRAY', 'vl' => 6.25, 'sl' => 6.25, 'spl' => null],
-    ['name' => 'TRINIDAD, JENNIFER M', 'vl' => 2.00, 'sl' => 5.25, 'spl' => null],
-    ['name' => 'YULO, BRITTANY', 'vl' => 1.50, 'sl' => 5.25, 'spl' => null],
+    // PATAWARAN, SHERRY - Terminated (skip)
+    ['name' => 'YAP, APRYL', 'vl' => 1.75, 'sl' => 3, 'spl' => null],
+    ['name' => 'PATRIMONIO, RYAN REX', 'vl' => 2.25, 'sl' => 3, 'spl' => null],
+    ['name' => 'PINEDA, ERIKA SERIOSA', 'vl' => 2.50, 'sl' => 4, 'spl' => null],
+    ['name' => 'PLATERO, MA. CHARISMA', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'QUIZON, SHIRMILEY', 'vl' => 5.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'RONQUILLO, RHEGENE INGAT', 'vl' => 5.75, 'sl' => 5, 'spl' => null],
+    ['name' => 'SAMODIO, JHUNEL CARLO TRAFALGAR', 'vl' => 5.75, 'sl' => 4, 'spl' => null],
+    ['name' => 'SOLAYAO, JANETH SEDON', 'vl' => 2.50, 'sl' => 4, 'spl' => null],
+    ['name' => 'SINGH, RAY JINDER VILLENA', 'vl' => 3.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'SORIANO, MARY ANN VALLEJOS', 'vl' => 2.50, 'sl' => 5, 'spl' => null],
+    ['name' => 'TAYAO, ALEXANDER', 'vl' => 1.25, 'sl' => 4, 'spl' => null],
+    ['name' => 'TOLOMIA, RICA JOY VIRAY', 'vl' => 6.25, 'sl' => 5, 'spl' => null],
+    ['name' => 'TRINIDAD, JENNIFER M', 'vl' => 2.00, 'sl' => 4, 'spl' => null],
+    ['name' => 'YULO, BRITTANY', 'vl' => 1.50, 'sl' => 4, 'spl' => null],
 ];
 
 try {
@@ -164,6 +165,34 @@ try {
                 LIMIT 1
             ");
             $stmt->execute(['%' . $lastName . '%' . $firstName . '%']);
+            $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        // Strategy 4: SURNAME ONLY match (if first name doesn't match)
+        if (!$employee) {
+            $stmt = $pdo->prepare("
+                SELECT id, fname, lname, CONCAT(fname, ' ', lname) as full_name 
+                FROM employees 
+                WHERE UPPER(lname) = UPPER(?)
+                AND status = 'active'
+                LIMIT 1
+            ");
+            $stmt->execute([$lastName]);
+            $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        // Strategy 5: Partial surname match (for compound names like DELA CRUZ)
+        if (!$employee && strpos($lastName, ' ') !== false) {
+            $lastNameParts = explode(' ', $lastName);
+            $lastPart = end($lastNameParts);
+            $stmt = $pdo->prepare("
+                SELECT id, fname, lname, CONCAT(fname, ' ', lname) as full_name 
+                FROM employees 
+                WHERE UPPER(lname) LIKE UPPER(?)
+                AND status = 'active'
+                LIMIT 1
+            ");
+            $stmt->execute(['%' . $lastPart . '%']);
             $employee = $stmt->fetch(PDO::FETCH_ASSOC);
         }
         
