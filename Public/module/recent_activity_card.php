@@ -1345,7 +1345,7 @@ function showActivityDetails(title, dataJson) {
                             `<label class=\"text-xs font-medium text-blue-600\">Duration (Editable)</label>`+
                             `<div class=\"text-right\">`+
                                 `<div class=\"text-xs text-gray-500\">Max OT: ${maxOTHours !== 'N/A' ? formatOvertimeDuration(parseFloat(maxOTHours)) : 'N/A'}</div>`+
-                                `<div class=\"text-xs text-blue-600\">Current: ${formatOvertimeDuration(durationHours)}</div>`+
+                                `<div class=\"text-xs font-semibold text-blue-700\">${durationHours.toFixed(2)} hrs <span class=\"text-gray-500\">(${wholeHours}h ${minutes}m)</span></div>`+
                             `</div>`+
                         `</div>`+
                         `<div class=\"flex items-center space-x-3\">`+
@@ -1369,9 +1369,13 @@ function showActivityDetails(title, dataJson) {
                     `</div>`);
                 } else {
                     // Static duration display for non-pending requests
+                    const durationHours = parseFloat(data.ot_duration) || 0;
+                    const wholeHours = Math.floor(durationHours);
+                    const minutes = Math.round((durationHours - wholeHours) * 60);
+                    
                     details.push(`<div class=\"bg-blue-50 p-3 rounded-md\">`+
                         `<label class=\"block text-xs font-medium text-blue-600 mb-1\">Duration</label>`+
-                        `<p class=\"text-blue-800 font-semibold\">${data.ot_duration} hours</p>`+
+                        `<p class=\"text-sm font-semibold text-blue-700\">${durationHours.toFixed(2)} hrs <span class=\"text-gray-500\">(${wholeHours}h ${minutes}m)</span></p>`+
                     `</div>`);
                 }
             }

@@ -18,14 +18,13 @@ function formatDurationPHP($hours) {
     $minutes = round(($totalHours - $wholeHours) * 60);
     
     if ($wholeHours == 0 && $minutes == 0) {
-        return '0 min';
-    } else if ($wholeHours == 0) {
-        return $minutes . ' min';
-    } else if ($minutes == 0) {
-        return $wholeHours . ($wholeHours > 1 ? ' hrs' : ' hr');
-    } else {
-        return $wholeHours . ($wholeHours > 1 ? ' hrs ' : ' hr ') . $minutes . ' min';
+        return '0.00 hrs (0h 0m)';
     }
+    
+    $decimalFormat = number_format($totalHours, 2) . ' hrs';
+    $timeFormat = $wholeHours . 'h ' . $minutes . 'm';
+    
+    return $decimalFormat . ' <span class="text-gray-500">(' . $timeFormat . ')</span>';
 }
 
 // Get filter parameters

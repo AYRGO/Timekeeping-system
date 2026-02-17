@@ -709,12 +709,15 @@ foreach ($pending_ot_results as $ot) {
     } else {
         $status = 'Pending';
     }
-    $duration = number_format((float)$ot['duration_hours'], 2);
+    $duration_decimal = number_format((float)$ot['duration_hours'], 2);
+    $wholeHours = floor($ot['duration_hours']);
+    $minutes = round(($ot['duration_hours'] - $wholeHours) * 60);
+    $duration = $duration_decimal . ' hrs (' . $wholeHours . 'h ' . $minutes . 'm)';
     $ot_type = 'Regular OT'; // Default for pending requests
     $created_at = $ot['created_at'];
 
     $notifications[] = [
-        'message' => "Overtime request for <strong>{$ot_type}</strong> ({$duration} hours) was <strong>{$status}</strong>.",
+        'message' => "Overtime request for <strong>{$ot_type}</strong> ({$duration}) was <strong>{$status}</strong>.",
         'created_at' => $created_at,
         'ot_status' => $status,
         'ot_reason' => $ot['reason'],
@@ -736,7 +739,7 @@ foreach ($pending_ot_results as $ot) {
     if (in_array($raw_status, ['approved', 'declined', 'rejected'])) {
         $subject = "Overtime Request {$status}";
         $date_str = date('F j, Y', strtotime($ot['date']));
-        $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$date_str}</strong> ({$duration} hours) was <strong>{$status}</strong>.</p>";
+        $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$date_str}</strong> ({$duration}) was <strong>{$status}</strong>.</p>";
 
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
             $body .= "<p><strong>Reason:</strong> " . nl2br(htmlspecialchars($ot['reason'])) . "</p>";
@@ -785,7 +788,7 @@ foreach ($pending_ot_results as $ot) {
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$date_str}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>OT Type:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$ot_type}</td></tr>
-                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Duration:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 700; font-size: 16px;'>{$duration} hours</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Duration:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 700; font-size: 16px;'>{$duration}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Request ID:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>#{$ot['id']}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Submitted:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . date('F j, Y g:i A', strtotime($ot['created_at'])) . "</td></tr>
                     </table>
@@ -845,7 +848,10 @@ foreach ($ot_results as $ot) {
     } else {
         $status = 'Pending';
     }
-    $duration = number_format($ot['ot_duration'], 2);
+    $duration_decimal = number_format($ot['ot_duration'], 2);
+    $wholeHours = floor($ot['ot_duration']);
+    $minutes = round(($ot['ot_duration'] - $wholeHours) * 60);
+    $duration = $duration_decimal . ' hrs (' . $wholeHours . 'h ' . $minutes . 'm)';
     $ot_type = $ot['ot_type'] ?? 'Regular OT';
     $created_at = $ot['approved_at'] ?? $ot['created_at'];
 
@@ -893,7 +899,7 @@ foreach ($ot_results as $ot) {
     }
 
     $notifications[] = [
-        'message' => "Overtime request for <strong>{$ot_type}</strong> ({$duration} hours) was <strong>{$status}</strong>.",
+        'message' => "Overtime request for <strong>{$ot_type}</strong> ({$duration}) was <strong>{$status}</strong>.",
         'created_at' => $created_at,
         'ot_status' => $status,
         'ot_reason' => $ot['reason'],
@@ -914,7 +920,7 @@ foreach ($ot_results as $ot) {
     if (in_array($raw_status, ['approved', 'declined', 'rejected']) && !$ot['notified']) {
         $subject = "Overtime Request {$status}";
         $date_str = $log_date ? date('F j, Y', strtotime($log_date)) : 'Unknown Date';
-        $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$ot_type}</strong> on <strong>{$date_str}</strong> ({$duration} hours) was <strong>{$status}</strong>.</p>";
+        $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$ot_type}</strong> on <strong>{$date_str}</strong> ({$duration}) was <strong>{$status}</strong>.</p>";
 
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {
             $body .= "<p><strong>Reason:</strong> " . nl2br(htmlspecialchars($ot['reason'])) . "</p>";
@@ -954,7 +960,7 @@ foreach ($ot_results as $ot) {
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Employee:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$employee['fname']} {$employee['lname']}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Date:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$date_str}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>OT Type:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>{$ot_type}</td></tr>
-                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Duration:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 700; font-size: 16px;'>{$duration} hours</td></tr>
+                        <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Duration:</td><td style='padding: 8px 0; color: #14b8a6; font-weight: 700; font-size: 16px;'>{$duration}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Request ID:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>#{$ot['id']}</td></tr>
                         <tr><td style='padding: 8px 0; color: #64748b; font-size: 14px;'>Processed:</td><td style='padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;'>" . date('F j, Y g:i A', strtotime($created_at)) . "</td></tr>
                     </table>

@@ -209,75 +209,165 @@ function getScheduleForDate($pdo, $employee_id, $date) {
 }
 
 // Function to build weekly schedule summary in format: "M-F; 7am-4pm | Sat-Sun; OFF"
-// ONLY uses calendar cache data from January 2026 onwards for accuracy
+// FIRST checks for latest approved monthly schedule request, then falls back to cache data
 function getWeeklyScheduleSummary($pdo, $employee_id, $startDate) {
     $days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     $dayAbbrev = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     
-    // Get schedule for each day of the week FROM CALENDAR CACHE ONLY
+    // STEP 1: Check for latest approved monthly schedule request for this employee
+    // This ensures we pick up recent schedule changes submitted via Monthly Schedule Requests
+    $monthYear = date('Y-m', strtotime($startDate));
+    list($year, $month) = explode('-', $monthYear);
+    
+    $monthlyScheduleStmt = $pdo->prepare("
+        SELECT 
+            sunday_schedule_id, sunday_is_rest_day,
+            monday_schedule_id, monday_is_rest_day,
+            tuesday_schedule_id, tuesday_is_rest_day,
+            wednesday_schedule_id, wednesday_is_rest_day,
+            thursday_schedule_id, thursday_is_rest_day,
+            friday_schedule_id, friday_is_rest_day,
+            saturday_schedule_id, saturday_is_rest_day,
+            processed_at
+        FROM month_weekly_schedule
+        WHERE employee_id = ? 
+          AND year = ?
+          AND month = ?
+          AND status = 'approved'
+        ORDER BY processed_at DESC, id DESC
+        LIMIT 1
+    ");
+    $monthlyScheduleStmt->execute([$employee_id, $year, $month]);
+    $monthlySchedule = $monthlyScheduleStmt->fetch(PDO::FETCH_ASSOC);
+    
+    // STEP 2: Build week schedule from monthly request if found
     $weekSchedule = [];
-    $checkDate = new DateTime($startDate);
     
-    // Ensure we're only using data from January 2026 onwards
-    $minDate = new DateTime('2026-01-01');
-    if ($checkDate < $minDate) {
-        $checkDate = clone $minDate;
-    }
-    
-    // Start from Monday (or the nearest Monday before/after startDate)
-    $dayOfWeek = $checkDate->format('w'); // 0=Sunday, 6=Saturday
-    if ($dayOfWeek != 1) { // If not Monday
-        $daysToSubtract = ($dayOfWeek == 0) ? 6 : ($dayOfWeek - 1);
-        $checkDate->modify("-{$daysToSubtract} days");
-    }
-    
-    // Ensure adjusted date is still >= Jan 2026
-    if ($checkDate < $minDate) {
-        $checkDate = clone $minDate;
-    }
-    
-    for ($i = 0; $i < 7; $i++) {
-        $date = $checkDate->format('Y-m-d');
+    if ($monthlySchedule) {
+        // Use the approved monthly schedule request data
+        $dayMapping = [
+            0 => ['schedule_id' => $monthlySchedule['sunday_schedule_id'], 'is_rest_day' => $monthlySchedule['sunday_is_rest_day']],
+            1 => ['schedule_id' => $monthlySchedule['monday_schedule_id'], 'is_rest_day' => $monthlySchedule['monday_is_rest_day']],
+            2 => ['schedule_id' => $monthlySchedule['tuesday_schedule_id'], 'is_rest_day' => $monthlySchedule['tuesday_is_rest_day']],
+            3 => ['schedule_id' => $monthlySchedule['wednesday_schedule_id'], 'is_rest_day' => $monthlySchedule['wednesday_is_rest_day']],
+            4 => ['schedule_id' => $monthlySchedule['thursday_schedule_id'], 'is_rest_day' => $monthlySchedule['thursday_is_rest_day']],
+            5 => ['schedule_id' => $monthlySchedule['friday_schedule_id'], 'is_rest_day' => $monthlySchedule['friday_is_rest_day']],
+            6 => ['schedule_id' => $monthlySchedule['saturday_schedule_id'], 'is_rest_day' => $monthlySchedule['saturday_is_rest_day']]
+        ];
         
-        // Fetch ONLY from calendar cache - this is what employee sees in their calendar
-        $stmt = $pdo->prepare("
-            SELECT 
-                schedule_date, work_schedule_id, is_rest_day, is_holiday,
-                schedule_name, time_in, time_out, source
-            FROM employee_daily_schedule_cache
-            WHERE employee_id = ? AND schedule_date = ?
-            LIMIT 1
-        ");
-        $stmt->execute([$employee_id, $date]);
-        $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+        foreach ($dayMapping as $dow => $dayInfo) {
+            if ($dayInfo['is_rest_day']) {
+                $weekSchedule[$dow] = [
+                    'is_rest_day' => 1,
+                    'is_holiday' => 0,
+                    'schedule_name' => 'OFF',
+                    'time_in' => null,
+                    'time_out' => null,
+                    'source' => 'approved_monthly_request'
+                ];
+            } elseif ($dayInfo['schedule_id']) {
+                // Get schedule details from work_schedules table
+                $schedStmt = $pdo->prepare("SELECT name, time_in, time_out FROM work_schedules WHERE id = ?");
+                $schedStmt->execute([$dayInfo['schedule_id']]);
+                $schedInfo = $schedStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($schedInfo) {
+                    $weekSchedule[$dow] = [
+                        'is_rest_day' => 0,
+                        'is_holiday' => 0,
+                        'schedule_name' => $schedInfo['name'],
+                        'time_in' => $schedInfo['time_in'],
+                        'time_out' => $schedInfo['time_out'],
+                        'source' => 'approved_monthly_request'
+                    ];
+                } else {
+                    // Schedule ID not found, treat as OFF
+                    $weekSchedule[$dow] = [
+                        'is_rest_day' => 1,
+                        'is_holiday' => 0,
+                        'schedule_name' => 'OFF',
+                        'time_in' => null,
+                        'time_out' => null,
+                        'source' => 'approved_monthly_request_missing_schedule'
+                    ];
+                }
+            } else {
+                // No schedule set, treat as OFF
+                $weekSchedule[$dow] = [
+                    'is_rest_day' => 1,
+                    'is_holiday' => 0,
+                    'schedule_name' => 'OFF',
+                    'time_in' => null,
+                    'time_out' => null,
+                    'source' => 'approved_monthly_request_not_set'
+                ];
+            }
+        }
+    } else {
+        // STEP 3: Fallback to calendar cache data if no monthly schedule found
+        $checkDate = new DateTime($startDate);
         
-        if ($cache && ($cache['is_rest_day'] || $cache['is_holiday'] || 
-            (!empty($cache['time_in']) && !empty($cache['time_out'])))) {
-            // Valid cache data found
-            $schedInfo = [
-                'is_rest_day' => $cache['is_rest_day'],
-                'is_holiday' => $cache['is_holiday'],
-                'schedule_name' => $cache['schedule_name'],
-                'time_in' => $cache['time_in'],
-                'time_out' => $cache['time_out'],
-                'source' => $cache['source']
-            ];
-        } else {
-            // No valid cache data - treat as OFF/unscheduled
-            $schedInfo = [
-                'is_rest_day' => 1,
-                'is_holiday' => 0,
-                'schedule_name' => 'OFF',
-                'time_in' => null,
-                'time_out' => null,
-                'source' => 'cache_missing'
-            ];
+        // Ensure we're only using data from January 2026 onwards
+        $minDate = new DateTime('2026-01-01');
+        if ($checkDate < $minDate) {
+            $checkDate = clone $minDate;
         }
         
-        $dow = $checkDate->format('w'); // 0=Sunday, 6=Saturday
-        $weekSchedule[$dow] = $schedInfo;
+        // Start from Monday (or the nearest Monday before/after startDate)
+        $dayOfWeek = $checkDate->format('w'); // 0=Sunday, 6=Saturday
+        if ($dayOfWeek != 1) { // If not Monday
+            $daysToSubtract = ($dayOfWeek == 0) ? 6 : ($dayOfWeek - 1);
+            $checkDate->modify("-{$daysToSubtract} days");
+        }
         
-        $checkDate->modify('+1 day');
+        // Ensure adjusted date is still >= Jan 2026
+        if ($checkDate < $minDate) {
+            $checkDate = clone $minDate;
+        }
+        
+        for ($i = 0; $i < 7; $i++) {
+            $date = $checkDate->format('Y-m-d');
+            
+            // Fetch ONLY from calendar cache - this is what employee sees in their calendar
+            $stmt = $pdo->prepare("
+                SELECT 
+                    schedule_date, work_schedule_id, is_rest_day, is_holiday,
+                    schedule_name, time_in, time_out, source
+                FROM employee_daily_schedule_cache
+                WHERE employee_id = ? AND schedule_date = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$employee_id, $date]);
+            $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($cache && ($cache['is_rest_day'] || $cache['is_holiday'] || 
+                (!empty($cache['time_in']) && !empty($cache['time_out'])))) {
+                // Valid cache data found
+                $schedInfo = [
+                    'is_rest_day' => $cache['is_rest_day'],
+                    'is_holiday' => $cache['is_holiday'],
+                    'schedule_name' => $cache['schedule_name'],
+                    'time_in' => $cache['time_in'],
+                    'time_out' => $cache['time_out'],
+                    'source' => $cache['source']
+                ];
+            } else {
+                // No valid cache data - treat as OFF/unscheduled
+                $schedInfo = [
+                    'is_rest_day' => 1,
+                    'is_holiday' => 0,
+                    'schedule_name' => 'OFF',
+                    'time_in' => null,
+                    'time_out' => null,
+                    'source' => 'cache_missing'
+                ];
+            }
+            
+            $dow = $checkDate->format('w'); // 0=Sunday, 6=Saturday
+            $weekSchedule[$dow] = $schedInfo;
+            
+            $checkDate->modify('+1 day');
+        }
     }
     
     // Group consecutive days with same schedule

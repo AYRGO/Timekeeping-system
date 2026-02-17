@@ -1910,13 +1910,18 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                                 <span class="font-medium text-blue-600">OT Schedule:</span>
                                                 <span><?= date('h:i A', strtotime($request['start_time'])) ?> - <?= date('h:i A', strtotime($request['end_time'])) ?></span>
                                                 <?php
-                                                // Calculate OT hours
+                                                // Calculate OT hours in both formats
                                                 $start = new DateTime($request['start_time']);
                                                 $end = new DateTime($request['end_time']);
                                                 $interval = $start->diff($end);
-                                                $hours = $interval->h + ($interval->i / 60);
+                                                $decimalHours = $interval->h + ($interval->i / 60);
+                                                $wholeHours = $interval->h;
+                                                $minutes = $interval->i;
                                                 ?>
-                                                <span class="text-xs text-gray-500">(<?= number_format($hours, 1) ?> hrs)</span>
+                                                <span class="text-xs font-semibold text-blue-700">
+                                                    <?= number_format($decimalHours, 2) ?> hrs
+                                                    <span class="text-gray-500">(<?= $wholeHours ?>h <?= $minutes ?>m)</span>
+                                                </span>
                                             </div>
                                         </td>
                                         <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
