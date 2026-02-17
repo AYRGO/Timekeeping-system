@@ -209,107 +209,96 @@ function getScheduleForDate($pdo, $employee_id, $date) {
 }
 
 // Function to build weekly schedule summary in format: "M-F; 7am-4pm | Sat-Sun; OFF"
-// FIRST checks for latest approved monthly schedule request, then falls back to cache data
+// READS FROM THE EXACT SAME SOURCE AS THE EMPLOYEE'S SCHEDULE CALENDAR
+// Priority: employee_daily_schedule_cache → employee_default_schedules → work_schedules via official_sched
 function getWeeklyScheduleSummary($pdo, $employee_id, $startDate) {
-    $days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     $dayAbbrev = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     
-    // STEP 1: Check for latest approved monthly schedule request for this employee
-    // This ensures we pick up recent schedule changes submitted via Monthly Schedule Requests
-    $monthYear = date('Y-m', strtotime($startDate));
-    list($year, $month) = explode('-', $monthYear);
+    // Determine the month we're generating the report for
+    $reportMonth = date('Y-m', strtotime($startDate));
+    $firstOfMonth = $reportMonth . '-01';
+    $lastOfMonth = date('Y-m-t', strtotime($firstOfMonth));
     
-    $monthlyScheduleStmt = $pdo->prepare("
-        SELECT 
-            sunday_schedule_id, sunday_is_rest_day,
-            monday_schedule_id, monday_is_rest_day,
-            tuesday_schedule_id, tuesday_is_rest_day,
-            wednesday_schedule_id, wednesday_is_rest_day,
-            thursday_schedule_id, thursday_is_rest_day,
-            friday_schedule_id, friday_is_rest_day,
-            saturday_schedule_id, saturday_is_rest_day,
-            processed_at
-        FROM month_weekly_schedule
-        WHERE employee_id = ? 
-          AND year = ?
-          AND month = ?
-          AND status = 'approved'
-        ORDER BY processed_at DESC, id DESC
-        LIMIT 1
+    // =================================================================
+    // STEP 1: Fetch ALL cache entries for this employee for this month
+    // This is THE SAME TABLE the Schedule Calendar reads from
+    // =================================================================
+    $cacheStmt = $pdo->prepare("
+        SELECT schedule_date, work_schedule_id, is_rest_day, is_holiday,
+               schedule_name, time_in, time_out, source
+        FROM employee_daily_schedule_cache
+        WHERE employee_id = ? AND schedule_date BETWEEN ? AND ?
+        ORDER BY schedule_date
     ");
-    $monthlyScheduleStmt->execute([$employee_id, $year, $month]);
-    $monthlySchedule = $monthlyScheduleStmt->fetch(PDO::FETCH_ASSOC);
+    $cacheStmt->execute([$employee_id, $firstOfMonth, $lastOfMonth]);
+    $cacheEntries = $cacheStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // STEP 2: Build week schedule from monthly request if found
-    $weekSchedule = [];
+    // Build a per-day-of-week schedule by sampling cache entries
+    // For each DOW (0-6), collect all non-holiday schedules and pick the most common one
+    $dowSchedules = []; // dow => [scheduleKey => [count, schedInfo]]
     
-    if ($monthlySchedule) {
-        // Use the approved monthly schedule request data
-        $dayMapping = [
-            0 => ['schedule_id' => $monthlySchedule['sunday_schedule_id'], 'is_rest_day' => $monthlySchedule['sunday_is_rest_day']],
-            1 => ['schedule_id' => $monthlySchedule['monday_schedule_id'], 'is_rest_day' => $monthlySchedule['monday_is_rest_day']],
-            2 => ['schedule_id' => $monthlySchedule['tuesday_schedule_id'], 'is_rest_day' => $monthlySchedule['tuesday_is_rest_day']],
-            3 => ['schedule_id' => $monthlySchedule['wednesday_schedule_id'], 'is_rest_day' => $monthlySchedule['wednesday_is_rest_day']],
-            4 => ['schedule_id' => $monthlySchedule['thursday_schedule_id'], 'is_rest_day' => $monthlySchedule['thursday_is_rest_day']],
-            5 => ['schedule_id' => $monthlySchedule['friday_schedule_id'], 'is_rest_day' => $monthlySchedule['friday_is_rest_day']],
-            6 => ['schedule_id' => $monthlySchedule['saturday_schedule_id'], 'is_rest_day' => $monthlySchedule['saturday_is_rest_day']]
-        ];
+    foreach ($cacheEntries as $entry) {
+        $dow = (int)date('w', strtotime($entry['schedule_date']));
         
-        foreach ($dayMapping as $dow => $dayInfo) {
-            if ($dayInfo['is_rest_day']) {
-                $weekSchedule[$dow] = [
-                    'is_rest_day' => 1,
-                    'is_holiday' => 0,
-                    'schedule_name' => 'OFF',
-                    'time_in' => null,
-                    'time_out' => null,
-                    'source' => 'approved_monthly_request'
-                ];
-            } elseif ($dayInfo['schedule_id']) {
-                // Get schedule details from work_schedules table
-                $schedStmt = $pdo->prepare("SELECT name, time_in, time_out FROM work_schedules WHERE id = ?");
-                $schedStmt->execute([$dayInfo['schedule_id']]);
-                $schedInfo = $schedStmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($schedInfo) {
-                    $weekSchedule[$dow] = [
-                        'is_rest_day' => 0,
-                        'is_holiday' => 0,
-                        'schedule_name' => $schedInfo['name'],
-                        'time_in' => $schedInfo['time_in'],
-                        'time_out' => $schedInfo['time_out'],
-                        'source' => 'approved_monthly_request'
-                    ];
-                } else {
-                    // Schedule ID not found, treat as OFF
-                    $weekSchedule[$dow] = [
-                        'is_rest_day' => 1,
-                        'is_holiday' => 0,
-                        'schedule_name' => 'OFF',
-                        'time_in' => null,
-                        'time_out' => null,
-                        'source' => 'approved_monthly_request_missing_schedule'
-                    ];
-                }
-            } else {
-                // No schedule set, treat as OFF
-                $weekSchedule[$dow] = [
-                    'is_rest_day' => 1,
-                    'is_holiday' => 0,
-                    'schedule_name' => 'OFF',
-                    'time_in' => null,
-                    'time_out' => null,
-                    'source' => 'approved_monthly_request_not_set'
-                ];
-            }
+        // Skip holidays - they don't represent the regular schedule
+        if ($entry['is_holiday']) continue;
+        
+        if ($entry['is_rest_day']) {
+            $key = 'REST';
+            $info = [
+                'is_rest_day' => 1, 'is_holiday' => 0,
+                'schedule_name' => 'OFF', 'time_in' => null, 'time_out' => null
+            ];
+        } elseif (!empty($entry['time_in']) && !empty($entry['time_out'])) {
+            $key = $entry['time_in'] . '-' . $entry['time_out'];
+            $info = [
+                'is_rest_day' => 0, 'is_holiday' => 0,
+                'schedule_name' => $entry['schedule_name'],
+                'time_in' => $entry['time_in'], 'time_out' => $entry['time_out']
+            ];
+        } else {
+            $key = 'REST';
+            $info = [
+                'is_rest_day' => 1, 'is_holiday' => 0,
+                'schedule_name' => 'OFF', 'time_in' => null, 'time_out' => null
+            ];
         }
-    } else {
-        // STEP 3: Fallback to employee_default_schedules (weekly pattern)
-        // This ensures we get the employee's actual schedule even without a monthly request
-        $dayMapping = [0, 1, 2, 3, 4, 5, 6]; // Sunday through Saturday
         
-        foreach ($dayMapping as $dow) {
-            // Check employee_default_schedules for this day of week
+        if (!isset($dowSchedules[$dow])) $dowSchedules[$dow] = [];
+        if (!isset($dowSchedules[$dow][$key])) {
+            $dowSchedules[$dow][$key] = ['count' => 0, 'info' => $info];
+        }
+        $dowSchedules[$dow][$key]['count']++;
+    }
+    
+    // =================================================================
+    // STEP 2: Build weekSchedule from cache (most common schedule per DOW)
+    // =================================================================
+    $weekSchedule = [];
+    $cacheHasData = false;
+    
+    for ($dow = 0; $dow <= 6; $dow++) {
+        if (!empty($dowSchedules[$dow])) {
+            $cacheHasData = true;
+            // Pick the most frequent schedule for this day-of-week
+            $bestKey = null;
+            $bestCount = 0;
+            foreach ($dowSchedules[$dow] as $key => $data) {
+                if ($data['count'] > $bestCount) {
+                    $bestCount = $data['count'];
+                    $bestKey = $key;
+                }
+            }
+            $weekSchedule[$dow] = $dowSchedules[$dow][$bestKey]['info'];
+        }
+    }
+    
+    // =================================================================
+    // STEP 3: If cache had no data, fall back to employee_default_schedules
+    // (Same fallback the calendar uses when cache is empty)
+    // =================================================================
+    if (!$cacheHasData) {
+        for ($dow = 0; $dow <= 6; $dow++) {
             $defaultStmt = $pdo->prepare("
                 SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
                 FROM employee_default_schedules edd
@@ -324,92 +313,100 @@ function getWeeklyScheduleSummary($pdo, $employee_id, $startDate) {
             $defaultStmt->execute([$employee_id, $dow, $startDate, $startDate]);
             $defaultSched = $defaultStmt->fetch(PDO::FETCH_ASSOC);
             
-            if ($defaultSched) {
-                if ($defaultSched['is_rest_day']) {
-                    $weekSchedule[$dow] = [
-                        'is_rest_day' => 1,
-                        'is_holiday' => 0,
-                        'schedule_name' => 'OFF',
-                        'time_in' => null,
-                        'time_out' => null,
-                        'source' => 'default_schedule'
-                    ];
-                } elseif ($defaultSched['work_schedule_id']) {
-                    $weekSchedule[$dow] = [
-                        'is_rest_day' => 0,
-                        'is_holiday' => 0,
-                        'schedule_name' => $defaultSched['name'],
-                        'time_in' => $defaultSched['time_in'],
-                        'time_out' => $defaultSched['time_out'],
-                        'source' => 'default_schedule'
-                    ];
-                } else {
-                    // No schedule set for this day
-                    $weekSchedule[$dow] = [
-                        'is_rest_day' => 1,
-                        'is_holiday' => 0,
-                        'schedule_name' => 'OFF',
-                        'time_in' => null,
-                        'time_out' => null,
-                        'source' => 'default_schedule_not_set'
-                    ];
-                }
-            } else {
-                // No default schedule found - treat as OFF
+            if ($defaultSched && $defaultSched['is_rest_day']) {
                 $weekSchedule[$dow] = [
-                    'is_rest_day' => 1,
-                    'is_holiday' => 0,
-                    'schedule_name' => 'OFF',
-                    'time_in' => null,
-                    'time_out' => null,
-                    'source' => 'no_default_schedule'
+                    'is_rest_day' => 1, 'is_holiday' => 0,
+                    'schedule_name' => 'OFF', 'time_in' => null, 'time_out' => null
                 ];
+            } elseif ($defaultSched && $defaultSched['work_schedule_id'] && !empty($defaultSched['time_in'])) {
+                $weekSchedule[$dow] = [
+                    'is_rest_day' => 0, 'is_holiday' => 0,
+                    'schedule_name' => $defaultSched['name'],
+                    'time_in' => $defaultSched['time_in'], 'time_out' => $defaultSched['time_out']
+                ];
+            } else {
+                // Still nothing — check official_sched from employees table
+                $weekSchedule[$dow] = null; // Will be filled in Step 4
             }
         }
     }
     
-    // Group consecutive days with same schedule
+    // =================================================================
+    // STEP 4: Final fallback — official_sched from employees table
+    // =================================================================
+    $allNull = true;
+    for ($dow = 0; $dow <= 6; $dow++) {
+        if (isset($weekSchedule[$dow])) {
+            $allNull = false;
+            break;
+        }
+    }
+    
+    if ($allNull) {
+        // Get official schedule from employees table
+        $empStmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+        $empStmt->execute([$employee_id]);
+        $empRow = $empStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($empRow && $empRow['official_sched']) {
+            $wsStmt = $pdo->prepare("SELECT name, time_in, time_out FROM work_schedules WHERE id = ?");
+            $wsStmt->execute([$empRow['official_sched']]);
+            $ws = $wsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($ws) {
+                // Apply across all weekdays, rest on weekends
+                for ($dow = 0; $dow <= 6; $dow++) {
+                    if ($dow == 0 || $dow == 6) { // Sun/Sat
+                        $weekSchedule[$dow] = [
+                            'is_rest_day' => 1, 'is_holiday' => 0,
+                            'schedule_name' => 'OFF', 'time_in' => null, 'time_out' => null
+                        ];
+                    } else {
+                        $weekSchedule[$dow] = [
+                            'is_rest_day' => 0, 'is_holiday' => 0,
+                            'schedule_name' => $ws['name'],
+                            'time_in' => $ws['time_in'], 'time_out' => $ws['time_out']
+                        ];
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fill any remaining null days as OFF
+    for ($dow = 0; $dow <= 6; $dow++) {
+        if (!isset($weekSchedule[$dow])) {
+            $weekSchedule[$dow] = [
+                'is_rest_day' => 1, 'is_holiday' => 0,
+                'schedule_name' => 'OFF', 'time_in' => null, 'time_out' => null
+            ];
+        }
+    }
+    
+    // =================================================================
+    // STEP 5: Group consecutive days with same schedule for display
+    // =================================================================
     $groups = [];
     $currentGroup = null;
-    
-    // Start from Monday (1) and go through Sunday (0 at the end)
     $order = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
     
     foreach ($order as $dow) {
         $sched = $weekSchedule[$dow];
         
-        if ($sched['is_rest_day']) {
-            $schedKey = 'OFF';
-        } elseif ($sched['is_holiday']) {
-            $schedKey = 'HOLIDAY';
-        } elseif (empty($sched['time_in']) || empty($sched['time_out'])) {
-            // Handle empty/null schedule times - treat as OFF/unscheduled
+        if ($sched['is_rest_day'] || empty($sched['time_in']) || empty($sched['time_out'])) {
             $schedKey = 'OFF';
         } else {
             $schedKey = $sched['time_in'] . '-' . $sched['time_out'];
         }
         
         if ($currentGroup === null || $currentGroup['key'] !== $schedKey) {
-            // Start new group
-            if ($currentGroup !== null) {
-                $groups[] = $currentGroup;
-            }
-            $currentGroup = [
-                'key' => $schedKey,
-                'start_dow' => $dow,
-                'end_dow' => $dow,
-                'schedule' => $sched
-            ];
+            if ($currentGroup !== null) $groups[] = $currentGroup;
+            $currentGroup = ['key' => $schedKey, 'start_dow' => $dow, 'end_dow' => $dow, 'schedule' => $sched];
         } else {
-            // Extend current group
             $currentGroup['end_dow'] = $dow;
         }
     }
-    
-    // Add last group
-    if ($currentGroup !== null) {
-        $groups[] = $currentGroup;
-    }
+    if ($currentGroup !== null) $groups[] = $currentGroup;
     
     // Format groups into display string
     $parts = [];
@@ -418,24 +415,15 @@ function getWeeklyScheduleSummary($pdo, $employee_id, $startDate) {
         $endDow = $group['end_dow'];
         $sched = $group['schedule'];
         
-        // Format day range
-        if ($startDow === $endDow) {
-            $dayRange = $dayAbbrev[$startDow];
-        } else {
-            $dayRange = $dayAbbrev[$startDow] . '-' . $dayAbbrev[$endDow];
-        }
+        $dayRange = ($startDow === $endDow) 
+            ? $dayAbbrev[$startDow] 
+            : $dayAbbrev[$startDow] . '-' . $dayAbbrev[$endDow];
         
-        // Format time
-        if ($sched['is_rest_day']) {
-            $parts[] = $dayRange . '; OFF';
-        } elseif ($sched['is_holiday']) {
-            $parts[] = $dayRange . '; HOLIDAY';
-        } elseif (empty($sched['time_in']) || empty($sched['time_out'])) {
-            // Handle empty/null schedule times
+        if ($sched['is_rest_day'] || empty($sched['time_in']) || empty($sched['time_out'])) {
             $parts[] = $dayRange . '; OFF';
         } else {
-            $timeIn = date('ga', strtotime($sched['time_in'])); // 7am
-            $timeOut = date('ga', strtotime($sched['time_out'])); // 4pm
+            $timeIn = date('ga', strtotime($sched['time_in']));
+            $timeOut = date('ga', strtotime($sched['time_out']));
             $parts[] = $dayRange . '; ' . $timeIn . '-' . $timeOut;
         }
     }
