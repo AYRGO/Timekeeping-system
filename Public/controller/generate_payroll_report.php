@@ -61,7 +61,7 @@ if (!empty($search)) {
     $params['search'] = "%$search%";
 }
 
-$sql .= " ORDER BY e.fname, e.lname, tl.log_date ASC";
+$sql .= " ORDER BY e.lname, e.fname, tl.log_date ASC";
 
 $logStmt = $pdo->prepare($sql);
 $logStmt->execute($params);
@@ -464,7 +464,7 @@ $employeesStmt = $pdo->prepare("
     JOIN time_logs tl ON e.id = tl.employee_id 
     WHERE tl.log_date BETWEEN :start AND :end" . 
     (!empty($search) ? " AND (e.fname LIKE :search OR e.lname LIKE :search OR e.company LIKE :search)" : "") . "
-    ORDER BY e.fname, e.lname
+    ORDER BY e.lname, e.fname
 ");
 
 $employeeParams = ['start' => $start, 'end' => $end];
@@ -477,9 +477,13 @@ $employees = $employeesStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Create attendance matrix for each employee
 $attendanceData = [];
-// Sort employees alphabetically by last name
+// Sort employees alphabetically by last name, then first name
 usort($employees, function($a, $b) {
-    return strcmp(strtolower($a['lname']), strtolower($b['lname']));
+    $lnameCompare = strcmp(strtolower($a['lname']), strtolower($b['lname']));
+    if ($lnameCompare === 0) {
+        return strcmp(strtolower($a['fname']), strtolower($b['fname']));
+    }
+    return $lnameCompare;
 });
 
 foreach ($employees as $employee) {

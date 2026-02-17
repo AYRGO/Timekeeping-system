@@ -61,7 +61,7 @@ $sortOrder = in_array($order, $validOrders) ? $order : 'asc';
 if ($sortColumn !== 'log_date') {
     $employeeQuery .= " ORDER BY $sortColumn $sortOrder";
 } else {
-    $employeeQuery .= " ORDER BY lname ASC";
+    $employeeQuery .= " ORDER BY lname ASC, fname ASC";
 }
 
 $stmt = $pdo->prepare($employeeQuery);
