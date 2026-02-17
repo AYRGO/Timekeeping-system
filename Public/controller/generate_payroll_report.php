@@ -304,69 +304,67 @@ function getWeeklyScheduleSummary($pdo, $employee_id, $startDate) {
             }
         }
     } else {
-        // STEP 3: Fallback to calendar cache data if no monthly schedule found
-        $checkDate = new DateTime($startDate);
+        // STEP 3: Fallback to employee_default_schedules (weekly pattern)
+        // This ensures we get the employee's actual schedule even without a monthly request
+        $dayMapping = [0, 1, 2, 3, 4, 5, 6]; // Sunday through Saturday
         
-        // Ensure we're only using data from January 2026 onwards
-        $minDate = new DateTime('2026-01-01');
-        if ($checkDate < $minDate) {
-            $checkDate = clone $minDate;
-        }
-        
-        // Start from Monday (or the nearest Monday before/after startDate)
-        $dayOfWeek = $checkDate->format('w'); // 0=Sunday, 6=Saturday
-        if ($dayOfWeek != 1) { // If not Monday
-            $daysToSubtract = ($dayOfWeek == 0) ? 6 : ($dayOfWeek - 1);
-            $checkDate->modify("-{$daysToSubtract} days");
-        }
-        
-        // Ensure adjusted date is still >= Jan 2026
-        if ($checkDate < $minDate) {
-            $checkDate = clone $minDate;
-        }
-        
-        for ($i = 0; $i < 7; $i++) {
-            $date = $checkDate->format('Y-m-d');
-            
-            // Fetch ONLY from calendar cache - this is what employee sees in their calendar
-            $stmt = $pdo->prepare("
-                SELECT 
-                    schedule_date, work_schedule_id, is_rest_day, is_holiday,
-                    schedule_name, time_in, time_out, source
-                FROM employee_daily_schedule_cache
-                WHERE employee_id = ? AND schedule_date = ?
+        foreach ($dayMapping as $dow) {
+            // Check employee_default_schedules for this day of week
+            $defaultStmt = $pdo->prepare("
+                SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
+                FROM employee_default_schedules edd
+                LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+                WHERE edd.employee_id = ? 
+                  AND edd.day_of_week = ?
+                  AND edd.effective_from <= ?
+                  AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+                ORDER BY edd.effective_from DESC
                 LIMIT 1
             ");
-            $stmt->execute([$employee_id, $date]);
-            $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+            $defaultStmt->execute([$employee_id, $dow, $startDate, $startDate]);
+            $defaultSched = $defaultStmt->fetch(PDO::FETCH_ASSOC);
             
-            if ($cache && ($cache['is_rest_day'] || $cache['is_holiday'] || 
-                (!empty($cache['time_in']) && !empty($cache['time_out'])))) {
-                // Valid cache data found
-                $schedInfo = [
-                    'is_rest_day' => $cache['is_rest_day'],
-                    'is_holiday' => $cache['is_holiday'],
-                    'schedule_name' => $cache['schedule_name'],
-                    'time_in' => $cache['time_in'],
-                    'time_out' => $cache['time_out'],
-                    'source' => $cache['source']
-                ];
+            if ($defaultSched) {
+                if ($defaultSched['is_rest_day']) {
+                    $weekSchedule[$dow] = [
+                        'is_rest_day' => 1,
+                        'is_holiday' => 0,
+                        'schedule_name' => 'OFF',
+                        'time_in' => null,
+                        'time_out' => null,
+                        'source' => 'default_schedule'
+                    ];
+                } elseif ($defaultSched['work_schedule_id']) {
+                    $weekSchedule[$dow] = [
+                        'is_rest_day' => 0,
+                        'is_holiday' => 0,
+                        'schedule_name' => $defaultSched['name'],
+                        'time_in' => $defaultSched['time_in'],
+                        'time_out' => $defaultSched['time_out'],
+                        'source' => 'default_schedule'
+                    ];
+                } else {
+                    // No schedule set for this day
+                    $weekSchedule[$dow] = [
+                        'is_rest_day' => 1,
+                        'is_holiday' => 0,
+                        'schedule_name' => 'OFF',
+                        'time_in' => null,
+                        'time_out' => null,
+                        'source' => 'default_schedule_not_set'
+                    ];
+                }
             } else {
-                // No valid cache data - treat as OFF/unscheduled
-                $schedInfo = [
+                // No default schedule found - treat as OFF
+                $weekSchedule[$dow] = [
                     'is_rest_day' => 1,
                     'is_holiday' => 0,
                     'schedule_name' => 'OFF',
                     'time_in' => null,
                     'time_out' => null,
-                    'source' => 'cache_missing'
+                    'source' => 'no_default_schedule'
                 ];
             }
-            
-            $dow = $checkDate->format('w'); // 0=Sunday, 6=Saturday
-            $weekSchedule[$dow] = $schedInfo;
-            
-            $checkDate->modify('+1 day');
         }
     }
     
