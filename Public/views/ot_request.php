@@ -59,8 +59,20 @@ function getCurrentScheduleForEmployee($employee_id, $log_date, $pdo, $schedule_
 
 // Fetch overtime requests with employee names and time logs
 if ($isHistoryView) {
-    // Fetch from post2_overtime_requests table (archived approved/declined requests)
-    $stmt = $pdo->query("SELECT DISTINCT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date FROM post2_overtime_requests por JOIN employees e ON por.employee_id = e.id LEFT JOIN time_logs tl ON por.time_log_id = tl.id ORDER BY por.created_at DESC");
+    // Fetch from post2_overtime_requests (approved/archived) PLUS any declined still in post_ot_requests
+    $stmt = $pdo->query("
+        SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
+        FROM post2_overtime_requests por
+        JOIN employees e ON por.employee_id = e.id
+        LEFT JOIN time_logs tl ON por.time_log_id = tl.id
+        UNION
+        SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
+        FROM post_ot_requests por
+        JOIN employees e ON por.employee_id = e.id
+        LEFT JOIN time_logs tl ON por.time_log_id = tl.id
+        WHERE por.status NOT IN ('Pending')
+        ORDER BY created_at DESC
+    ");
 } else {
     // Fetch from post_ot_requests table for pending requests only
     $stmt = $pdo->query("SELECT DISTINCT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date FROM post_ot_requests por JOIN employees e ON por.employee_id = e.id LEFT JOIN time_logs tl ON por.time_log_id = tl.id WHERE por.status = 'Pending' ORDER BY por.created_at DESC");
@@ -435,7 +447,7 @@ function getStatusBadge($status) {
 
                 <!-- Summary Cards -->
                 <?php if (!empty($overtime_requests)): ?>
-                <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-4">
                     <?php
                     $summary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'declined' => 0];
                     $totalHours = 0;
@@ -450,6 +462,7 @@ function getStatusBadge($status) {
                             $totalHours += $req['ot_duration'];
                         }
                     }
+                    $totalDeclined = $summary['declined'] + $summary['rejected'];
                     ?>
                     <div class="bg-white rounded-lg shadow p-4">
                         <div class="flex items-center">
@@ -481,6 +494,17 @@ function getStatusBadge($status) {
                             <div class="ml-3">
                                 <p class="text-sm font-medium text-gray-500">Approved</p>
                                 <p class="text-lg font-semibold text-gray-900"><?= $summary['approved'] ?></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-red-100 rounded-lg">
+                                <i class="fas fa-times text-red-600"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-500">Declined</p>
+                                <p class="text-lg font-semibold text-gray-900"><?= $totalDeclined ?></p>
                             </div>
                         </div>
                     </div>

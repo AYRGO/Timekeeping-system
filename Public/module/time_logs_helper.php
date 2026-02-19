@@ -53,6 +53,11 @@ function calculateActualHoursWorked($time_in, $time_out) {
     
     $timeIn = new DateTime($time_in);
     $timeOut = new DateTime($time_out);
+
+    // Fix night shifts stored on the same date (e.g. time_out 03:00 < time_in 19:00)
+    if ($timeOut < $timeIn) {
+        $timeOut->modify('+1 day');
+    }
     
     // Calculate total hours and include days span
     $interval = $timeIn->diff($timeOut);

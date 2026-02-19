@@ -55,6 +55,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
                 'id' => $request_id
             ]);
 
+            // Get the updated request so we can archive it
+            $selectStmt = $pdo->prepare("SELECT * FROM post_ot_requests WHERE id = ?");
+            $selectStmt->execute([$request_id]);
+            $updated_request = $selectStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($updated_request) {
+                // Archive to post2_overtime_requests (ignore duplicate if already there)
+                $arch = $pdo->prepare("
+                    INSERT IGNORE INTO post2_overtime_requests
+                    (id, employee_id, time_log_id, time_in, time_out, ot_duration, ot_type, attachment, reason, status, created_at, approved_at, approved_by, notified)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $arch->execute([
+                    $updated_request['id'],
+                    $updated_request['employee_id'],
+                    $updated_request['time_log_id'],
+                    $updated_request['time_in'],
+                    $updated_request['time_out'],
+                    $updated_request['ot_duration'],
+                    $updated_request['ot_type'],
+                    $updated_request['attachment'],
+                    $updated_request['reason'],
+                    $updated_request['status'],
+                    $updated_request['created_at'],
+                    $updated_request['approved_at'],
+                    $updated_request['approved_by'],
+                    $updated_request['notified'] ?? 0
+                ]);
+
+                // Remove from active table
+                $pdo->prepare("DELETE FROM post_ot_requests WHERE id = ?")->execute([$request_id]);
+            }
+
             $pdo->commit();
 
             $action_text = $action === 'approve' ? 'approved' : 'declined';

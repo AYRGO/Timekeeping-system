@@ -6,6 +6,18 @@ if (session_status() === PHP_SESSION_NONE) {
 include('../config/db.php');
 date_default_timezone_set('Asia/Manila');
 
+// Helper: fix night-shift time_out that is stored on the same date as time_in
+// For night shifts (e.g. 7PM-3AM), time_out may be stored as the SAME calendar date
+// as time_in (e.g. 2026-02-08 03:01:00 instead of 2026-02-09 03:01:00).
+// This causes a negative diff, making duration appear as ~15hrs instead of ~8hrs.
+function fixNightShiftTimeOut(DateTime $timeIn, DateTime $timeOut): DateTime {
+    if ($timeOut < $timeIn) {
+        // time_out is earlier than time_in on the same date — advance it by 1 day
+        $timeOut->modify('+1 day');
+    }
+    return $timeOut;
+}
+
 // Function to format duration in hours and minutes
 function formatDurationPHP($hours) {
     $totalHours = floatval($hours ?: 0);
@@ -152,16 +164,16 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
     return 0;
   }
   
-  //  Special handling for Restday OT - return total work hours minus lunch
+  //  Special handling for Restday OT - return total work hours (no lunch deduction for RDOT)
   if ($ot_type === 'Restday OT') {
     $timeIn = new DateTime($time_in);
     $timeOut = new DateTime($time_out);
+    $timeOut = fixNightShiftTimeOut($timeIn, $timeOut); // fix same-date night shifts
     $interval = $timeIn->diff($timeOut);
     $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
     $totalHours = $totalMinutes / 60;
-    $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours
     
-    return round($workHours, 2);
+    return round($totalHours, 2);
   }
   
   $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
@@ -215,19 +227,20 @@ function getOvertimeTimesAndHours($time_in, $time_out, $log_date, $employee_id, 
   if ($ot_type === 'Restday OT') {
     $actual_in_dt = new DateTime($time_in);
     $actual_out_dt = new DateTime($time_out);
+    $actual_out_dt = fixNightShiftTimeOut($actual_in_dt, $actual_out_dt); // fix same-date night shifts
     
-    // Calculate total minutes using timestamp difference (fixes midnight crossing for night shifts)
+    // Calculate total minutes using timestamp difference (handles midnight crossing)
     $diffSeconds = $actual_out_dt->getTimestamp() - $actual_in_dt->getTimestamp();
-    $totalMinutes = abs($diffSeconds) / 60; // Convert seconds to minutes
+    $totalMinutes = $diffSeconds / 60; // positive after fixNightShiftTimeOut
     $totalHours = $totalMinutes / 60;
-    $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours worked
+    // No lunch deduction for RDOT
     
     return [
       'start_ot' => $actual_in_dt->format('h:i A'),
       'end_ot' => $actual_out_dt->format('h:i A'),
-      'max_ot_hours' => round($workHours, 2),
+      'max_ot_hours' => round($totalHours, 2),
       'exact_ot_minutes' => round($totalMinutes),
-      'eligible' => $workHours >= 8,
+      'eligible' => $totalHours >= 8,
       'is_restday' => true
     ];
   }
@@ -237,14 +250,15 @@ function getOvertimeTimesAndHours($time_in, $time_out, $log_date, $employee_id, 
   $schedule_out = $scheduleInfo['time_out'];
   
   // Convert to DateTime objects
-  $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
-  $actual_out_dt = new DateTime($time_out);
-  
-  // If actual times are on different dates, adjust schedule time accordingly
-  $actual_date = $actual_out_dt->format('Y-m-d');
-  if ($actual_date !== $log_date) {
-    $schedule_out_dt = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_out)));
-  }
+  $actual_in_dt_reg  = new DateTime($time_in);
+  $schedule_out_dt   = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  $actual_out_dt     = new DateTime($time_out);
+
+  // Fix night-shift: time_out stored on same date as time_in but is actually next day
+  $actual_out_dt = fixNightShiftTimeOut($actual_in_dt_reg, $actual_out_dt);
+
+  // Fix night-shift: scheduled end (e.g. 03:00 AM) stored on log_date but is actually next day
+  $schedule_out_dt = fixNightShiftTimeOut($actual_in_dt_reg, $schedule_out_dt);
 
   // Calculate overtime minutes
   $ot_minutes = 0;
@@ -288,12 +302,12 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
   if ($ot_type === 'Restday OT') {
     $actual_in_dt = new DateTime($time_in);
     $actual_out_dt = new DateTime($time_out);
+    $actual_out_dt = fixNightShiftTimeOut($actual_in_dt, $actual_out_dt); // fix same-date night shifts
     
-    // Calculate actual hours worked (minus 1hr lunch)
+    // Calculate actual hours worked (no lunch deduction for RDOT)
     $actual_interval = $actual_in_dt->diff($actual_out_dt);
-    $actual_minutes = ($actual_interval->h * 60) + $actual_interval->i;
-    $actual_hours_with_lunch = round($actual_minutes / 60, 2);
-    $actual_hours = max(0, $actual_hours_with_lunch - 1); // Minus 1hr lunch
+    $actual_minutes = ($actual_interval->days * 24 * 60) + ($actual_interval->h * 60) + $actual_interval->i;
+    $actual_hours = round($actual_minutes / 60, 2);
     
     $eligible = $actual_hours >= 8; // 8+ hours for Restday OT
     
@@ -307,7 +321,7 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
       'actual' => [
         'in' => $actual_in_dt->format('H:i:s'),
         'out' => $actual_out_dt->format('H:i:s'),
-        'hours' => $actual_hours_with_lunch,
+        'hours' => $actual_hours,
         'hours_minus_lunch' => $actual_hours
       ],
       'overtime_minutes' => $actual_hours * 60,
@@ -316,13 +330,13 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
       'net_overtime_hours' => $actual_hours,
       'minimum_required' => 8, // hours for Restday OT
       'eligible' => $eligible,
-      'lunch_deducted' => true,
+      'lunch_deducted' => false,
       'is_restday_ot' => true
     ];
     
     $reason = $eligible 
-      ? "Eligible for {$actual_hours} hours of Restday OT (worked {$actual_hours_with_lunch}h total - 1h lunch)"
-      : "Need 8+ hours of work for Restday OT (worked only {$actual_hours}h after lunch deduction)";
+      ? "Eligible for {$actual_hours} hours of Restday OT (worked {$actual_hours}h total)"
+      : "Need 8+ hours of work for Restday OT (worked only {$actual_hours}h)";    
     
     return [
       'eligible' => $eligible,
@@ -336,27 +350,24 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
   $schedule_out = $scheduleInfo['time_out'];
   
   // Convert to DateTime objects
-  $schedule_in_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_in)));
+  $schedule_in_dt  = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_in)));
   $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
-  $actual_in_dt = new DateTime($time_in);
-  $actual_out_dt = new DateTime($time_out);
+  $actual_in_dt    = new DateTime($time_in);
+  $actual_out_dt   = new DateTime($time_out);
 
-  // If actual times are on different dates, adjust schedule times accordingly
-  $actual_date = $actual_out_dt->format('Y-m-d');
-  if ($actual_date !== $log_date) {
-    $schedule_in_dt = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_in)));
-    $schedule_out_dt = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_out)));
-  }
+  // Fix night-shift: times stored on same date but time_out is actually next day
+  $actual_out_dt   = fixNightShiftTimeOut($actual_in_dt, $actual_out_dt);
+  $schedule_out_dt = fixNightShiftTimeOut($schedule_in_dt, $schedule_out_dt);
 
   // Calculate scheduled hours (minus 1hr lunch)
   $scheduled_interval = $schedule_in_dt->diff($schedule_out_dt);
-  $scheduled_minutes = ($scheduled_interval->h * 60) + $scheduled_interval->i;
+  $scheduled_minutes = ($scheduled_interval->days * 24 * 60) + ($scheduled_interval->h * 60) + $scheduled_interval->i;
   $scheduled_hours_with_lunch = round($scheduled_minutes / 60, 2);
   $scheduled_hours = max(0, $scheduled_hours_with_lunch - 1); // Minus 1hr lunch
   
   // Calculate actual hours worked (minus 1hr lunch)
   $actual_interval = $actual_in_dt->diff($actual_out_dt);
-  $actual_minutes = ($actual_interval->h * 60) + $actual_interval->i;
+  $actual_minutes = ($actual_interval->days * 24 * 60) + ($actual_interval->h * 60) + $actual_interval->i;
   $actual_hours_with_lunch = round($actual_minutes / 60, 2);
   $actual_hours = max(0, $actual_hours_with_lunch - 1); // Minus 1hr lunch
   
@@ -1968,10 +1979,11 @@ function computeRDOTHrsFromHiddenFields() {
         const outDate = parseDateTime(timeOutStr);
         if (!inDate || !outDate) return 0;
         let diffMs = outDate.getTime() - inDate.getTime();
-        if (diffMs < 0) diffMs = Math.abs(diffMs);
+        // Night-shift: time_out is earlier than time_in on the same date — add one day
+        if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
         const diffHours = diffMs / (1000 * 60 * 60);
-        const workHours = diffHours >= 8 ? Math.max(0, diffHours - 1) : diffHours; // Only subtract 1 hour for lunch if 8+ hours
-        return Number.isFinite(workHours) ? workHours : 0;
+        // No lunch deduction for RDOT
+        return Number.isFinite(diffHours) ? diffHours : 0;
     } catch (e) {
         console.error('computeRDOTHrsFromHiddenFields error:', e);
         return 0;
@@ -2209,9 +2221,12 @@ function openRDOTModal(button) {
         // Parse as full timestamps to preserve date span
         const timeInDate = new Date(timeIn.replace(' ', 'T'));
         const timeOutDate = new Date(timeOut.replace(' ', 'T'));
-        const diffMs = timeOutDate.getTime() - timeInDate.getTime();
+        let diffMs = timeOutDate.getTime() - timeInDate.getTime();
+        // Night-shift: time_out stored on same date as time_in but is actually next day
+        if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
         const diffHours = diffMs / (1000 * 60 * 60);
-        workHours = diffHours >= 8 ? Math.max(0, diffHours - 1) : diffHours; // Only subtract 1 hour for lunch if 8+ hours
+        // No lunch deduction for RDOT
+        workHours = diffHours;
         isEligible = workHours >= 8; // Restday OT needs 8+ hours
     }
     
