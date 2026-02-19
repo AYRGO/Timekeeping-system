@@ -59,8 +59,7 @@ function getCurrentScheduleForEmployee($employee_id, $log_date, $pdo, $schedule_
 
 // Fetch overtime requests with employee names and time logs
 if ($isHistoryView) {
-    // First, try to fix any stale 'Pending' records in post2 that were actually processed
-    // This handles records archived before being approved/declined
+    // Fix any stale 'Pending' records in post2 that were actually processed
     try {
         $pdo->exec("
             UPDATE post2_overtime_requests p2
@@ -68,28 +67,19 @@ if ($isHistoryView) {
             SET p2.status = p1.status, p2.approved_at = p1.approved_at, p2.approved_by = p1.approved_by, p2.reason = p1.reason
             WHERE LOWER(p2.status) = 'pending' AND LOWER(p1.status) != 'pending'
         ");
-    } catch (Exception $e) {
-        // post2_overtime_requests table might not exist yet, that's okay
-    }
+    } catch (Exception $e) { /* table may not exist yet */ }
 
-    // Fetch only approved/declined/rejected from both tables — cast all columns to same collation
+    // Fetch approved/declined/rejected — cast ALL string columns to same collation to avoid UNION mismatch
     $stmt = $pdo->query("
         SELECT 
-            por.id, 
-            por.employee_id, 
-            por.time_log_id, 
-            por.time_in, 
-            por.time_out, 
-            por.ot_duration, 
-            CAST(por.ot_type AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as ot_type,
-            CAST(por.reason AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as reason,
-            CAST(por.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as status,
-            CAST(por.attachment AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as attachment,
-            por.created_at, 
-            por.approved_at, 
-            por.approved_by, 
-            e.fname, 
-            e.lname, 
+            por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration,
+            CONVERT(por.ot_type   USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ot_type,
+            CONVERT(por.reason    USING utf8mb4) COLLATE utf8mb4_unicode_ci AS reason,
+            CONVERT(por.status    USING utf8mb4) COLLATE utf8mb4_unicode_ci AS status,
+            CONVERT(por.attachment USING utf8mb4) COLLATE utf8mb4_unicode_ci AS attachment,
+            por.created_at, por.approved_at, por.approved_by,
+            CONVERT(e.fname USING utf8mb4) COLLATE utf8mb4_unicode_ci AS fname,
+            CONVERT(e.lname USING utf8mb4) COLLATE utf8mb4_unicode_ci AS lname,
             tl.log_date
         FROM post2_overtime_requests por
         JOIN employees e ON por.employee_id = e.id
@@ -97,21 +87,14 @@ if ($isHistoryView) {
         WHERE LOWER(por.status) != 'pending'
         UNION
         SELECT 
-            por.id, 
-            por.employee_id, 
-            por.time_log_id, 
-            por.time_in, 
-            por.time_out, 
-            por.ot_duration, 
-            CAST(por.ot_type AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as ot_type,
-            CAST(por.reason AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as reason,
-            CAST(por.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as status,
-            CAST(por.attachment AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as attachment,
-            por.created_at, 
-            por.approved_at, 
-            por.approved_by, 
-            e.fname, 
-            e.lname, 
+            por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration,
+            CONVERT(por.ot_type   USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ot_type,
+            CONVERT(por.reason    USING utf8mb4) COLLATE utf8mb4_unicode_ci AS reason,
+            CONVERT(por.status    USING utf8mb4) COLLATE utf8mb4_unicode_ci AS status,
+            CONVERT(por.attachment USING utf8mb4) COLLATE utf8mb4_unicode_ci AS attachment,
+            por.created_at, por.approved_at, por.approved_by,
+            CONVERT(e.fname USING utf8mb4) COLLATE utf8mb4_unicode_ci AS fname,
+            CONVERT(e.lname USING utf8mb4) COLLATE utf8mb4_unicode_ci AS lname,
             tl.log_date
         FROM post_ot_requests por
         JOIN employees e ON por.employee_id = e.id
@@ -120,8 +103,17 @@ if ($isHistoryView) {
         ORDER BY created_at DESC
     ");
 } else {
-    // Fetch from post_ot_requests table for pending requests only
-    $stmt = $pdo->query("SELECT DISTINCT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date FROM post_ot_requests por JOIN employees e ON por.employee_id = e.id LEFT JOIN time_logs tl ON por.time_log_id = tl.id WHERE por.status = 'Pending' ORDER BY por.created_at DESC");
+    // Fetch pending requests — use LOWER() to catch both 'Pending' and 'pending'
+    $stmt = $pdo->query("
+        SELECT DISTINCT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out,
+            por.ot_duration, por.ot_type, por.reason, por.status, por.attachment,
+            por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
+        FROM post_ot_requests por
+        JOIN employees e ON por.employee_id = e.id
+        LEFT JOIN time_logs tl ON por.time_log_id = tl.id
+        WHERE LOWER(por.status) = 'pending'
+        ORDER BY por.created_at DESC
+    ");
 }
 $overtime_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
