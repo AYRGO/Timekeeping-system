@@ -52,11 +52,12 @@ try {
         throw new Exception('Overtime request not found');
     }
     
-    // Move to archive table since status is now approved/declined
+    // Move to archive table since status is now approved/declined (upsert if already exists with stale status)
     $insertStmt = $pdo->prepare("
         INSERT INTO post2_overtime_requests 
         (id, employee_id, time_log_id, time_in, time_out, ot_duration, ot_type, attachment, reason, status, created_at, approved_at, approved_by, notified)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE status = VALUES(status), approved_at = VALUES(approved_at), approved_by = VALUES(approved_by), reason = VALUES(reason)
     ");
     
     $insertResult = $insertStmt->execute([

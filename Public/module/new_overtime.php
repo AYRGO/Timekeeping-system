@@ -1166,17 +1166,8 @@ button:hover {
                       </div>
                       <div>
                         <?php if ($hasLog): ?>
-                          <?php 
-                            // Calculate hours with lunch break deduction
-                            $timeIn = new DateTime($log['time_in']);
-                            $timeOut = new DateTime($log['time_out']);
-                            $interval = $timeIn->diff($timeOut);
-                            $totalMinutes = ($interval->h * 60) + $interval->i;
-                            $totalHours = round($totalMinutes / 60, 2);
-                            $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours
-                          ?>
                           <div class="text-lg font-bold text-gray-900">
-                            <?= formatDurationPHP($workHours) ?>
+                            <?= formatDurationPHP($actualHours) ?>
                           </div>
                         <?php else: ?>
                           <div class="text-lg font-bold text-gray-400">—</div>

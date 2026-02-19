@@ -61,11 +61,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
             $updated_request = $selectStmt->fetch(PDO::FETCH_ASSOC);
 
             if ($updated_request) {
-                // Archive to post2_overtime_requests (ignore duplicate if already there)
+                // Archive to post2_overtime_requests (upsert — update if already exists with stale status)
                 $arch = $pdo->prepare("
-                    INSERT IGNORE INTO post2_overtime_requests
+                    INSERT INTO post2_overtime_requests
                     (id, employee_id, time_log_id, time_in, time_out, ot_duration, ot_type, attachment, reason, status, created_at, approved_at, approved_by, notified)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE status = VALUES(status), approved_at = VALUES(approved_at), approved_by = VALUES(approved_by), reason = VALUES(reason)
                 ");
                 $arch->execute([
                     $updated_request['id'],
