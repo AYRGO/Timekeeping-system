@@ -59,24 +59,28 @@ function getCurrentScheduleForEmployee($employee_id, $log_date, $pdo, $schedule_
 
 // Fetch overtime requests with employee names and time logs
 if ($isHistoryView) {
-    // First, fix any stale 'Pending' records in post2 that were actually processed
+    // First, try to fix any stale 'Pending' records in post2 that were actually processed
     // This handles records archived before being approved/declined
-    $pdo->exec("
-        UPDATE post2_overtime_requests p2
-        INNER JOIN post_ot_requests p1 ON p2.id = p1.id
-        SET p2.status = p1.status, p2.approved_at = p1.approved_at, p2.approved_by = p1.approved_by, p2.reason = p1.reason
-        WHERE LOWER(p2.status) = 'pending' AND LOWER(p1.status) != 'pending'
-    ");
+    try {
+        $pdo->exec("
+            UPDATE post2_overtime_requests p2
+            INNER JOIN post_ot_requests p1 ON p2.id = p1.id
+            SET p2.status = p1.status, p2.approved_at = p1.approved_at, p2.approved_by = p1.approved_by, p2.reason = p1.reason
+            WHERE LOWER(p2.status) = 'pending' AND LOWER(p1.status) != 'pending'
+        ");
+    } catch (Exception $e) {
+        // post2_overtime_requests table might not exist yet, that's okay
+    }
 
-    // Fetch only approved/declined/rejected from both tables — case-insensitive filter
+    // Fetch only approved/declined/rejected from both tables — case-insensitive filter with collation fix
     $stmt = $pdo->query("
-        SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
+        SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, CAST(por.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
         FROM post2_overtime_requests por
         JOIN employees e ON por.employee_id = e.id
         LEFT JOIN time_logs tl ON por.time_log_id = tl.id
         WHERE LOWER(por.status) != 'pending'
         UNION
-        SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
+        SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, CAST(por.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
         FROM post_ot_requests por
         JOIN employees e ON por.employee_id = e.id
         LEFT JOIN time_logs tl ON por.time_log_id = tl.id
