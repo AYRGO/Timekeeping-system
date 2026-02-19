@@ -22,7 +22,7 @@ $allLogsStmt = $pdo->prepare("
         INNER JOIN (
             SELECT employee_id, log_date, MAX(id) AS latest_id 
             FROM post_time_adjustment_requests 
-            WHERE status = 'approved' 
+            WHERE LOWER(status) = 'approved' 
             GROUP BY employee_id, log_date
         ) r2 ON r1.id = r2.latest_id
     ) r ON t.employee_id = r.employee_id AND t.log_date = r.log_date
@@ -49,7 +49,7 @@ $otRequests = $otRequestsStmt->fetchAll(PDO::FETCH_ASSOC);
 $leaveRequestsStmt = $pdo->prepare("
     SELECT start_date, end_date, leave_type
     FROM post_leave_requests 
-    WHERE employee_id = ? AND status = 'approved'
+    WHERE employee_id = ? AND LOWER(status) = 'approved'
     AND end_date >= '2025-07-01'
 ");
 $leaveRequestsStmt->execute([$employee_id]);

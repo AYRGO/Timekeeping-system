@@ -146,13 +146,13 @@ function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_
   return $minutes_past_end >= 30;
 }
 
-// Calculate overtime hours: time worked past scheduled end time (with 1hr lunch deduction)
+// Calculate overtime hours: time worked past scheduled end time (NO lunch deduction for OT hours)
 function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $employee_id, $pdo, $ot_type = null) {
   if (empty($time_in) || empty($time_out)) {
     return 0;
   }
   
-  // Special handling for Restday OT - return total work hours minus lunch
+  //  Special handling for Restday OT - return total work hours minus lunch
   if ($ot_type === 'Restday OT') {
     $timeIn = new DateTime($time_in);
     $timeOut = new DateTime($time_out);
@@ -183,10 +183,11 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
   }
 
   // Calculate minutes worked past scheduled end time
+  // NOTE: This is purely OT time (past scheduled end), so NO lunch deduction should apply
   $past_end_interval = $schedule_out_dt->diff($actual_out_dt);
   $ot_minutes = ($past_end_interval->days * 24 * 60) + ($past_end_interval->h * 60) + $past_end_interval->i;
 
-  // Convert to hours and round to 2 decimals
+  // Convert to hours and round to 2 decimals (NO LUNCH DEDUCTION)
   return round($ot_minutes / 60, 2);
 }
 
@@ -359,6 +360,7 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
   $actual_hours = max(0, $actual_hours_with_lunch - 1); // Minus 1hr lunch
   
   // Calculate overtime: time worked past scheduled end time
+  // NOTE: OT hours should NOT have lunch deducted because lunch is only for the regular shift
   $ot_minutes = 0;
   if ($actual_out_dt > $schedule_out_dt) {
     $past_end_interval = $schedule_out_dt->diff($actual_out_dt);
