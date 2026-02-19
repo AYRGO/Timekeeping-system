@@ -216,16 +216,17 @@ function getOvertimeTimesAndHours($time_in, $time_out, $log_date, $employee_id, 
     $actual_in_dt = new DateTime($time_in);
     $actual_out_dt = new DateTime($time_out);
     
-    $interval = $actual_in_dt->diff($actual_out_dt);
-    $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
+    // Calculate total minutes using timestamp difference (fixes midnight crossing for night shifts)
+    $diffSeconds = $actual_out_dt->getTimestamp() - $actual_in_dt->getTimestamp();
+    $totalMinutes = abs($diffSeconds) / 60; // Convert seconds to minutes
     $totalHours = $totalMinutes / 60;
-    $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours
+    $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours worked
     
     return [
       'start_ot' => $actual_in_dt->format('h:i A'),
       'end_ot' => $actual_out_dt->format('h:i A'),
       'max_ot_hours' => round($workHours, 2),
-      'exact_ot_minutes' => round($workHours * 60),
+      'exact_ot_minutes' => round($totalMinutes),
       'eligible' => $workHours >= 8,
       'is_restday' => true
     ];
