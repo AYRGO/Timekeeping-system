@@ -84,7 +84,7 @@ if ($isHistoryView) {
         FROM post2_overtime_requests por
         JOIN employees e ON por.employee_id = e.id
         LEFT JOIN time_logs tl ON por.time_log_id = tl.id
-        WHERE LOWER(por.status) != 'pending'
+        WHERE LOWER(por.status) IN ('approved', 'rejected', 'declined')
         UNION
         SELECT 
             por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration,
@@ -99,7 +99,7 @@ if ($isHistoryView) {
         FROM post_ot_requests por
         JOIN employees e ON por.employee_id = e.id
         LEFT JOIN time_logs tl ON por.time_log_id = tl.id
-        WHERE LOWER(por.status) != 'pending'
+        WHERE LOWER(por.status) IN ('approved', 'rejected', 'declined')
         ORDER BY created_at DESC
     ");
 } else {
