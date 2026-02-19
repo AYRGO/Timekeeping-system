@@ -72,15 +72,47 @@ if ($isHistoryView) {
         // post2_overtime_requests table might not exist yet, that's okay
     }
 
-    // Fetch only approved/declined/rejected from both tables — case-insensitive filter with collation fix
+    // Fetch only approved/declined/rejected from both tables — cast all columns to same collation
     $stmt = $pdo->query("
-        SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, CAST(por.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
+        SELECT 
+            por.id, 
+            por.employee_id, 
+            por.time_log_id, 
+            por.time_in, 
+            por.time_out, 
+            por.ot_duration, 
+            CAST(por.ot_type AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as ot_type,
+            CAST(por.reason AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as reason,
+            CAST(por.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as status,
+            CAST(por.attachment AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as attachment,
+            por.created_at, 
+            por.approved_at, 
+            por.approved_by, 
+            e.fname, 
+            e.lname, 
+            tl.log_date
         FROM post2_overtime_requests por
         JOIN employees e ON por.employee_id = e.id
         LEFT JOIN time_logs tl ON por.time_log_id = tl.id
         WHERE LOWER(por.status) != 'pending'
         UNION
-        SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, CAST(por.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
+        SELECT 
+            por.id, 
+            por.employee_id, 
+            por.time_log_id, 
+            por.time_in, 
+            por.time_out, 
+            por.ot_duration, 
+            CAST(por.ot_type AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as ot_type,
+            CAST(por.reason AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as reason,
+            CAST(por.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as status,
+            CAST(por.attachment AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as attachment,
+            por.created_at, 
+            por.approved_at, 
+            por.approved_by, 
+            e.fname, 
+            e.lname, 
+            tl.log_date
         FROM post_ot_requests por
         JOIN employees e ON por.employee_id = e.id
         LEFT JOIN time_logs tl ON por.time_log_id = tl.id
