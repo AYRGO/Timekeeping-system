@@ -250,15 +250,14 @@ function getOvertimeTimesAndHours($time_in, $time_out, $log_date, $employee_id, 
   $schedule_out = $scheduleInfo['time_out'];
   
   // Convert to DateTime objects
-  $actual_in_dt_reg  = new DateTime($time_in);
-  $schedule_out_dt   = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
-  $actual_out_dt     = new DateTime($time_out);
+  $schedule_out_dt = new DateTime($log_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  $actual_out_dt   = new DateTime($time_out);
 
-  // Fix night-shift: time_out stored on same date as time_in but is actually next day
-  $actual_out_dt = fixNightShiftTimeOut($actual_in_dt_reg, $actual_out_dt);
-
-  // Fix night-shift: scheduled end (e.g. 03:00 AM) stored on log_date but is actually next day
-  $schedule_out_dt = fixNightShiftTimeOut($actual_in_dt_reg, $schedule_out_dt);
+  // If actual time-out is on a different date, move schedule_out to match
+  $actual_date = $actual_out_dt->format('Y-m-d');
+  if ($actual_date !== $log_date) {
+    $schedule_out_dt = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  }
 
   // Calculate overtime minutes
   $ot_minutes = 0;
@@ -355,9 +354,12 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
   $actual_in_dt    = new DateTime($time_in);
   $actual_out_dt   = new DateTime($time_out);
 
-  // Fix night-shift: times stored on same date but time_out is actually next day
-  $actual_out_dt   = fixNightShiftTimeOut($actual_in_dt, $actual_out_dt);
-  $schedule_out_dt = fixNightShiftTimeOut($schedule_in_dt, $schedule_out_dt);
+  // If actual time-out is on a different date, move schedule times to match
+  $actual_date = $actual_out_dt->format('Y-m-d');
+  if ($actual_date !== $log_date) {
+    $schedule_in_dt  = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_in)));
+    $schedule_out_dt = new DateTime($actual_date . ' ' . date('H:i:s', strtotime($schedule_out)));
+  }
 
   // Calculate scheduled hours (minus 1hr lunch)
   $scheduled_interval = $schedule_in_dt->diff($schedule_out_dt);

@@ -59,12 +59,13 @@ function getCurrentScheduleForEmployee($employee_id, $log_date, $pdo, $schedule_
 
 // Fetch overtime requests with employee names and time logs
 if ($isHistoryView) {
-    // Fetch from post2_overtime_requests (approved/archived) PLUS any declined still in post_ot_requests
+    // Fetch approved/declined from post2_overtime_requests PLUS any still in post_ot_requests — exclude Pending from both
     $stmt = $pdo->query("
         SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
         FROM post2_overtime_requests por
         JOIN employees e ON por.employee_id = e.id
         LEFT JOIN time_logs tl ON por.time_log_id = tl.id
+        WHERE por.status NOT IN ('Pending')
         UNION
         SELECT por.id, por.employee_id, por.time_log_id, por.time_in, por.time_out, por.ot_duration, por.ot_type, por.reason, por.status, por.attachment, por.created_at, por.approved_at, por.approved_by, e.fname, e.lname, tl.log_date
         FROM post_ot_requests por
