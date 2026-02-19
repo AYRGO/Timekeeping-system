@@ -100,6 +100,7 @@ if ($isHistoryView) {
         JOIN employees e ON por.employee_id = e.id
         LEFT JOIN time_logs tl ON por.time_log_id = tl.id
         WHERE LOWER(por.status) IN ('approved', 'rejected', 'declined')
+           OR (por.status = '' AND por.approved_at IS NOT NULL)
         ORDER BY created_at DESC
     ");
 } else {
@@ -143,8 +144,14 @@ function formatDurationPHP($hours) {
 }
 
 // Function to get status badge
-function getStatusBadge($status) {
-    $status = strtolower($status ?? 'pending');
+function getStatusBadge($status, $approved_at = null) {
+    $status = strtolower(trim($status ?? ''));
+    // Records with empty status but approved_at set are legacy declined records (enum mismatch)
+    if ($status === '' && $approved_at) {
+        $status = 'declined';
+    } elseif ($status === '') {
+        $status = 'pending';
+    }
     $classes = match($status) {
         'approved' => 'bg-green-100 text-green-800',
         'pending' => 'bg-yellow-100 text-yellow-800',
@@ -283,7 +290,7 @@ function getStatusBadge($status) {
                         return;
                     }
                     pageData.forEach(ot => {
-                        const statusBadge = getStatusBadgeJS(ot.status);
+                const statusBadge = getStatusBadgeJS(ot.status, ot.approved_at);
                         const otTypeBadge = getOtTypeBadgeJS(ot.ot_type);
                         const actionCell = renderActionCell(ot);
                         tbody.innerHTML += `
@@ -386,8 +393,14 @@ function getStatusBadge($status) {
                         return `${wholeHours} hr${wholeHours > 1 ? 's' : ''} ${minutes} min`;
                     }
                 }
-                function getStatusBadgeJS(status) {
-                    status = (status || 'pending').toLowerCase();
+                function getStatusBadgeJS(status, approved_at) {
+                    status = (status || '').toLowerCase().trim();
+                    // Legacy records with empty status but approved_at set were declined (enum mismatch)
+                    if (status === '' && approved_at) {
+                        status = 'declined';
+                    } else if (status === '') {
+                        status = 'pending';
+                    }
                     const classes = { 'approved': 'bg-green-100 text-green-800', 'pending': 'bg-yellow-100 text-yellow-800', 'rejected': 'bg-red-100 text-red-800', 'declined': 'bg-red-100 text-red-800', };
                     const icons = { 'approved': 'fas fa-check', 'pending': 'fas fa-clock', 'rejected': 'fas fa-times', 'declined': 'fas fa-times', };
                     const cls = classes[status] || 'bg-gray-100 text-gray-800';
@@ -490,7 +503,13 @@ function getStatusBadge($status) {
                     $summary = ['pending' => 0, 'approved' => 0, 'rejected' => 0, 'declined' => 0];
                     $totalHours = 0;
                     foreach ($overtime_requests as $req) {
-                        $status = strtolower($req['status'] ?? 'pending');
+                        $status = strtolower(trim($req['status'] ?? ''));
+                        // Legacy records with empty status but approved_at set are declined (enum mismatch)
+                        if ($status === '' && !empty($req['approved_at'])) {
+                            $status = 'declined';
+                        } elseif ($status === '') {
+                            $status = 'pending';
+                        }
                         if (isset($summary[$status])) {
                             $summary[$status]++;
                         }

@@ -26,14 +26,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
             }
 
             if ($action === 'approve') {
-                $new_status = 'Approved';
+                $new_status = 'approved';  // must match ENUM('pending','approved','declined')
                 $explanation = null;
             } elseif ($action === 'decline') {
                 $explanation = trim($_POST['explanation'] ?? '');
                 if (empty($explanation)) {
                     throw new Exception("Explanation is required for declining.");
                 }
-                $new_status = 'Rejected';
+                $new_status = 'declined';  // must match ENUM — 'Rejected' is NOT a valid enum value!
             }
 
             // Update the status in post_ot_requests table
