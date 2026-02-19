@@ -1,6 +1,7 @@
 <?php
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+session_start();
 include('../config/db.php');
 
 // Handle form submission
@@ -15,8 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
         try {
             $pdo->beginTransaction();
 
-            // Get the overtime request data from post_ot_requests
-            $stmt = $pdo->prepare("SELECT * FROM post_ot_requests WHERE id = :id AND status = 'Pending'");
+            // Get the overtime request data from post_ot_requests (case-insensitive status check)
+            $stmt = $pdo->prepare("SELECT * FROM post_ot_requests WHERE id = :id AND LOWER(status) = 'pending'");
             $stmt->execute(['id' => $request_id]);
             $overtime_request = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -36,24 +37,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
             }
 
             // Update the status in post_ot_requests table
-            $stmt = $pdo->prepare("
-                UPDATE post_ot_requests 
-                SET status = :status, 
-                    approved_at = NOW(), 
-                    approved_by = :approved_by,
-                    reason = CASE 
-                        WHEN :explanation IS NOT NULL THEN CONCAT(reason, ' [Admin Note: ', :explanation, ']')
-                        ELSE reason 
-                    END
-                WHERE id = :id
-            ");
+            // Use separate queries to avoid duplicate named parameter issue with PDO
+            $admin_id = $_SESSION['employee']['id'] ?? 1;
             
-            $stmt->execute([
-                'status' => $new_status,
-                'approved_by' => $_SESSION['employee']['id'] ?? 1, // Admin user ID
-                'explanation' => $explanation,
-                'id' => $request_id
-            ]);
+            if ($explanation) {
+                $stmt = $pdo->prepare("
+                    UPDATE post_ot_requests 
+                    SET status = :status, 
+                        approved_at = NOW(), 
+                        approved_by = :approved_by,
+                        reason = CONCAT(COALESCE(reason, ''), ' [Admin Note: ', :explanation, ']')
+                    WHERE id = :id
+                ");
+                $stmt->execute([
+                    'status' => $new_status,
+                    'approved_by' => $admin_id,
+                    'explanation' => $explanation,
+                    'id' => $request_id
+                ]);
+            } else {
+                $stmt = $pdo->prepare("
+                    UPDATE post_ot_requests 
+                    SET status = :status, 
+                        approved_at = NOW(), 
+                        approved_by = :approved_by
+                    WHERE id = :id
+                ");
+                $stmt->execute([
+                    'status' => $new_status,
+                    'approved_by' => $admin_id,
+                    'id' => $request_id
+                ]);
+            }
 
             // Get the updated request so we can archive it
             $selectStmt = $pdo->prepare("SELECT * FROM post_ot_requests WHERE id = ?");
@@ -104,21 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'], $_POST[
     $message = "Invalid form submission.";
 }
 
-// Optional: Display error if redirected without success
-if (!empty($message)) {
-    echo "<p style='color: red; font-weight: bold;'>$message</p>";
-    echo "<p><a href='ot_request.php'>← Back to OT Requests</a></p>";
-}
-?>
-            $pdo->rollBack();
-            $message = "Error processing request: " . $e->getMessage();
-        }
-    }
-} else {
-    $message = "Invalid form submission.";
-}
-
-// Optional: Display error if redirected without success
+// Display error if not redirected
 if (!empty($message)) {
     echo "<p style='color: red; font-weight: bold;'>$message</p>";
     echo "<p><a href='ot_request.php'>← Back to OT Requests</a></p>";
