@@ -27,16 +27,17 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Server-side mobile block removed - Allow all devices
-// function isMobileDevice() {
-//     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-//     return preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i', $ua);
-// }
+// Server-side mobile block
+function isMobileDevice() {
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    return preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i', $ua);
+}
 
-// $screenWidth = $_COOKIE['screen_width'] ?? 1200;
-// if (isMobileDevice() || $screenWidth < 1024) {
-//     die("<h2 style='text-align:center; padding-top:60px;'>Access denied on mobile devices.<br>Please use a desktop or laptop computer.</h2>");
-// }
+$screenWidth = $_COOKIE['screen_width'] ?? 1920;
+if (isMobileDevice() || (int)$screenWidth < 1024) {
+    http_response_code(403);
+    die("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Desktop Only</title><style>body{font-family:sans-serif;text-align:center;padding-top:80px;background:#f3f4f6;}</style></head><body><h2 style='color:#1e3a5f;'>Access Restricted</h2><p>This system is only accessible from a <strong>desktop or laptop computer</strong>.</p><p style='color:#6b7280;font-size:14px;'>Please switch to a desktop browser to continue.</p></body></html>");
+}
 
 // Brute-force protection
 $max_attempts = 5;
@@ -125,23 +126,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   <!-- Block mobile using screen width & user agent -->
   <script>
-    document.cookie = "screen_width=" + window.innerWidth + "; path=/";
+    // Set cookie so PHP can read screen width on next request
+    document.cookie = "screen_width=" + window.innerWidth + "; path=/; SameSite=Strict";
 
     function isProbablyMobile() {
       const ua = navigator.userAgent;
-      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      const isSmall = window.innerWidth <= 1024;
       const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-      return isMobileUA || isTouch || isSmall;
+      const isSmall = window.innerWidth < 1024;
+      return isMobileUA || isSmall;
     }
 
     if (isProbablyMobile()) {
-      document.documentElement.innerHTML = `
-        <div style="text-align:center;padding-top:60px;font-family:sans-serif;">
-          <h2>Access denied on mobile devices.</h2>
-          <p>Please use a desktop or laptop computer.</p>
-        </div>`;
-      throw new Error("Blocked mobile device");
+      document.open();
+      document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Desktop Only</title><style>body{font-family:sans-serif;text-align:center;padding-top:80px;background:#f3f4f6;}</style></head><body><h2 style="color:#1e3a5f;">Access Restricted</h2><p>This system is only accessible from a <strong>desktop or laptop computer</strong>.</p><p style="color:#6b7280;font-size:14px;">Please switch to a desktop browser to continue.</p></body></html>');
+      document.close();
+      // Block any further script execution
+      window.stop && window.stop();
     }
   </script>
 
