@@ -1614,7 +1614,7 @@ function closeEditModal() {
    style="
      position: fixed;
      bottom: 24px;
-     left: 24px;
+     right: 24px;
      z-index: 9999;
      width: 56px;
      height: 56px;
@@ -1638,7 +1638,7 @@ function closeEditModal() {
      style="
        position: fixed;
        bottom: 26px;
-       left: 90px;
+       right: 90px;
        z-index: 9998;
        background: #1f2937;
        color: #fff;
