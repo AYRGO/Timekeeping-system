@@ -48,6 +48,17 @@
 
            <hr class="border-t border-gray-300 w-full mt-4 mb-1">
 
+            <!-- Ticketing System Link (internal employees only) -->
+            <?php if (isset($employee_role) && $employee_role === 'internal'): ?>
+            <div class="px-3 py-2">
+                <a href="https://hdesk.resourcestaffonline.com" target="_blank" rel="noopener noreferrer"
+                   class="flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors w-full">
+                    <i class="fas fa-ticket-alt text-lg text-green-600"></i>
+                    <span class="text-base font-medium">Ticketing System</span>
+                </a>
+            </div>
+            <hr class="border-t border-gray-300 w-full mb-1">
+            <?php endif; ?>
 
             <!-- User Info -->
             <div class="px-4 py-3 flex items-center">

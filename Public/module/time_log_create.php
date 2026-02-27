@@ -1606,63 +1606,7 @@ function closeEditModal() {
         });
     }, 5000);
 </script>
-<?php if (isset($employee_role) && $employee_role === 'internal'): ?>
-<!-- Ticketing System Floating Button (internal employees only) -->
-<a href="https://hdesk.resourcestaffonline.com" target="_blank" rel="noopener noreferrer"
-   id="ticketing-btn"
-   title="Open Ticketing System"
-   style="
-     position: fixed;
-     bottom: 24px;
-     right: 24px;
-     z-index: 9999;
-     width: 56px;
-     height: 56px;
-     border-radius: 50%;
-     background: linear-gradient(135deg, #10B981, #059669);
-     color: #fff;
-     display: flex;
-     align-items: center;
-     justify-content: center;
-     box-shadow: 0 4px 16px rgba(16,185,129,0.5);
-     text-decoration: none;
-     transition: transform 0.2s ease, box-shadow 0.2s ease;
-   "
-   onmouseover="this.style.transform='scale(1.12)';this.style.boxShadow='0 6px 20px rgba(16,185,129,0.7)';"
-   onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 16px rgba(16,185,129,0.5)';"
->
-  <i class="fas fa-ticket-alt" style="font-size:22px;"></i>
-</a>
-<!-- Tooltip label -->
-<div id="ticketing-label"
-     style="
-       position: fixed;
-       bottom: 26px;
-       right: 90px;
-       z-index: 9998;
-       background: #1f2937;
-       color: #fff;
-       font-size: 13px;
-       font-weight: 600;
-       padding: 6px 12px;
-       border-radius: 8px;
-       pointer-events: none;
-       opacity: 0;
-       transition: opacity 0.2s ease;
-       white-space: nowrap;
-     "
->Submit a Ticket</div>
-<script>
-(function(){
-  var btn = document.getElementById('ticketing-btn');
-  var lbl = document.getElementById('ticketing-label');
-  if(btn && lbl){
-    btn.addEventListener('mouseenter', function(){ lbl.style.opacity = '1'; });
-    btn.addEventListener('mouseleave', function(){ lbl.style.opacity = '0'; });
-  }
-})();
-</script>
-<?php endif; ?>
+
 
 <script>
     // Hamburger menu toggle
