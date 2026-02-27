@@ -50,14 +50,13 @@
             <?php if (isset($employee_role) && $employee_role === 'internal'): ?>
             <div class="px-3 py-2">
                 <a href="https://hdesk.resourcestaffonline.com" target="_blank" rel="noopener noreferrer"
-                   class="flex items-center space-x-3 p-3 rounded-lg text-white transition-all duration-200 hover:opacity-90 hover:shadow-md w-full"
-                   style="background: linear-gradient(135deg, #10B981, #059669);">
-                    <i class="fas fa-headset text-lg"></i>
+                   class="flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-green-50 transition-all duration-200 w-full">
+                    <i class="fas fa-headset text-lg text-green-600"></i>
                     <div class="flex flex-col leading-tight">
                         <span class="text-sm font-semibold">Hdesk</span>
-                        <span class="text-xs opacity-80">Submit a support ticket</span>
+                        <span class="text-xs text-gray-400">Submit a support ticket</span>
                     </div>
-                    <i class="fas fa-external-link-alt text-xs ml-auto opacity-70"></i>
+                    <i class="fas fa-external-link-alt text-xs ml-auto text-gray-400"></i>
                 </a>
             </div>
             <hr class="border-t border-gray-300 w-full mb-1">
