@@ -34,7 +34,7 @@ $employeeQuery = "
         e.company,
         CONCAT(e.lname, ', ', e.fname) as employee_name
     FROM employees e
-    WHERE 1=1
+    WHERE e.status = 'active'
 ";
 
 $params = [];
