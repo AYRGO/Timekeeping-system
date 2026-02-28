@@ -44,11 +44,11 @@ foreach ($period as $dt) {
 }
 
 // Fetch employee list with optional search filter
-$employeeQuery = "SELECT id, fname, lname, company FROM employees";
+$employeeQuery = "SELECT id, fname, lname, company FROM employees WHERE status = 'active'";
 $params = [];
 
 if (!empty($search)) {
-    $employeeQuery .= " WHERE (fname LIKE :search OR lname LIKE :search OR company LIKE :search)";
+    $employeeQuery .= " AND (fname LIKE :search OR lname LIKE :search OR company LIKE :search)";
     $params['search'] = "%$search%";
 }
 

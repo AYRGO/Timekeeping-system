@@ -33,7 +33,7 @@ if ($startDate && $endDate) {
 }
 
 // Build SQL with optional search and sorting - include log_out_date and status
-$sql = "SELECT tl.*, e.fname, e.lname, e.company, e.official_sched FROM time_logs tl JOIN employees e ON tl.employee_id = e.id WHERE tl.log_date BETWEEN :start AND :end";
+$sql = "SELECT tl.*, e.fname, e.lname, e.company, e.official_sched FROM time_logs tl JOIN employees e ON tl.employee_id = e.id WHERE tl.log_date BETWEEN :start AND :end AND e.status = 'active'";
 $params = [
     'start' => $start,
     'end' => $end
