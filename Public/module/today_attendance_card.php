@@ -12,8 +12,9 @@ if (!$employee_id) {
     exit;
 }
 
-// Initialize CSRF protection
-init_csrf_protection();
+// Initialize CSRF protection with extended timeout for time logging page
+// Employees may keep this page open for extended periods (full shift)
+init_csrf_protection(28800); // 8 hours timeout
 
 // Get today's date
 $today = date('Y-m-d');
@@ -671,13 +672,15 @@ if ($is_overnight_shift && $time_out) {
             <input type="hidden" name="action" id="timeLogAction">
             <input type="hidden" name="original_log_date" value="<?= $original_log_date ?>">
             <input type="hidden" name="is_overnight" value="<?= $is_overnight_shift ? '1' : '0' ?>">
+            <input type="hidden" name="is_incomplete" value="<?= $is_incomplete_shift ? '1' : '0' ?>">
             <input type="hidden" name="has_incomplete_previous" value="<?= $has_incomplete_previous_shift ? '1' : '0' ?>">
+            <input type="hidden" name="client_time" id="clientTimeField" value="">
             <div class="flex justify-center gap-4">
                 <button type="button" onclick="hideConfirmationModal()"
                     class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium px-4 py-2 rounded">
                     Cancel
                 </button>
-                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded">
+                <button type="submit" id="confirmSubmitBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded">
                     Confirm
                 </button>
             </div>
@@ -686,14 +689,24 @@ if ($is_overnight_shift && $time_out) {
 </div>
 
 <script>
+// Double-submit prevention flag
+let isSubmitting = false;
+
 function showConfirmationModal(actionType) {
     const modal = document.getElementById('confirmTimeModal');
     const title = document.getElementById('confirmTimeTitle');
     const message = document.getElementById('confirmTimeMessage');
     const actionInput = document.getElementById('timeLogAction');
+    const confirmBtn = document.getElementById('confirmSubmitBtn');
     const isOvernight = <?= $is_overnight_shift ? 'true' : 'false' ?>;
     const isIncomplete = <?= $is_incomplete_shift ? 'true' : 'false' ?>;
     const hasIncompletePrevious = <?= $has_incomplete_previous_shift ? 'true' : 'false' ?>;
+
+    // Reset submit button state when opening modal
+    isSubmitting = false;
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
 
     if (actionType === 'time_in') {
         title.textContent = 'Confirm Time In';
@@ -730,5 +743,28 @@ function hideConfirmationModal() {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
 }
+
+// Capture the exact client time when the employee clicks Confirm
+// This is the time shown on the server-synced clock at the moment of click
+document.getElementById('timeLogForm').addEventListener('submit', function(e) {
+    // Double-submit prevention
+    if (isSubmitting) {
+        e.preventDefault();
+        return false;
+    }
+    isSubmitting = true;
+
+    // Capture the server-synced time at the moment the employee clicks Confirm
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('clientTimeField').value = hh + ':' + mm + ':' + ss;
+
+    const confirmBtn = document.getElementById('confirmSubmitBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Processing...';
+    confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+});
 </script>
 

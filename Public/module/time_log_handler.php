@@ -6,8 +6,8 @@ date_default_timezone_set('Asia/Manila');
 include_once('../config/csrf_helper.php');
 include_once('../config/db.php');
 
-// Initialize CSRF protection
-init_csrf_protection();
+// Initialize CSRF protection with extended timeout matching the time log page
+init_csrf_protection(28800); // 8 hours timeout to match time_log_create.php
 
 // Make sure user is logged in
 $employee_id = $_SESSION['employee']['id'] ?? null;
@@ -31,8 +31,48 @@ $original_log_date = $_POST['original_log_date'] ?? date('Y-m-d');
 $is_overnight = $_POST['is_overnight'] ?? '0';
 $is_incomplete = $_POST['is_incomplete'] ?? '0';
 $has_incomplete_previous = $_POST['has_incomplete_previous'] ?? '0';
-$current_time = date('H:i:s');
 $today = date('Y-m-d');
+
+// --- FIX: Eliminate 1-second clock delay causing wrong minute recording ---
+// The Harley system clock can be ~1 second behind Philippine Standard Time.
+// When an employee sees 3:00:00 PM and clicks Time Out, the server may record
+// 2:59:59 PM, which shows as 2:59 PM instead of 3:00 PM.
+//
+// Strategy: Round the server time to the nearest minute.
+// e.g., 14:59:31 -> 15:00:00, 14:59:29 -> 14:59:00, 15:00:01 -> 15:00:00
+// Also accept client_time from the browser (server-synced) as a cross-check.
+$raw_server_time = date('H:i:s');
+$server_seconds = (int)date('s');
+
+// Round to nearest minute
+if ($server_seconds >= 30) {
+    // Round up: add remaining seconds to get to next minute
+    $rounded_timestamp = strtotime($raw_server_time) + (60 - $server_seconds);
+} else {
+    // Round down: subtract current seconds
+    $rounded_timestamp = strtotime($raw_server_time) - $server_seconds;
+}
+$current_time = date('H:i:s', $rounded_timestamp);
+
+// If client sent a time (server-synced from browser), use it as cross-check
+$client_time = $_POST['client_time'] ?? '';
+if (!empty($client_time) && preg_match('/^\d{2}:\d{2}:\d{2}$/', $client_time)) {
+    $client_ts = strtotime($client_time);
+    $server_ts = strtotime($raw_server_time);
+    // Only trust client time if within 5 seconds of server time (prevents tampering)
+    if (abs($client_ts - $server_ts) <= 5) {
+        // Round client time to nearest minute too
+        $client_seconds = (int)date('s', $client_ts);
+        if ($client_seconds >= 30) {
+            $rounded_client = $client_ts + (60 - $client_seconds);
+        } else {
+            $rounded_client = $client_ts - $client_seconds;
+        }
+        $current_time = date('H:i:s', $rounded_client);
+    }
+}
+
+error_log("TIME LOG: Raw server=$raw_server_time, Client=$client_time, Recorded=$current_time (employee $employee_id)");
 
 try {
     $pdo->beginTransaction();

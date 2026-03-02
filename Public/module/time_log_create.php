@@ -1547,9 +1547,15 @@ document.addEventListener("DOMContentLoaded", function () {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // Clock updater for all clock elements
+    // Server-synced clock updater for all clock elements
+    // Calculate offset between server time and client time to eliminate drift
+    const serverTimeOnLoad = new Date('<?= date('Y-m-d\TH:i:s') ?>');
+    const clientTimeOnLoad = new Date();
+    const serverClientOffset = serverTimeOnLoad.getTime() - clientTimeOnLoad.getTime();
+
     function updateAllClocks() {
-        const now = new Date();
+        // Use server-synced time instead of raw client time
+        const now = new Date(Date.now() + serverClientOffset);
         let h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
         const ampm = h >= 12 ? 'PM' : 'AM';
         h = h % 12 || 12;
@@ -1562,6 +1568,29 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     updateAllClocks();
     setInterval(updateAllClocks, 1000);
+
+    // Auto-refresh CSRF token every 25 minutes to prevent token expiration
+    // This keeps the time-in/time-out forms functional for employees who keep the page open
+    setInterval(function() {
+        fetch('refresh_csrf_token.php', {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.csrf_token) {
+                // Update all CSRF token fields on the page
+                document.querySelectorAll('input[name="csrf_token"]').forEach(input => {
+                    input.value = data.csrf_token;
+                });
+                console.log('CSRF token refreshed successfully');
+            }
+        })
+        .catch(error => {
+            console.warn('CSRF token refresh failed (will retry):', error);
+        });
+    }, 25 * 60 * 1000); // Every 25 minutes
 });
 
 function openCommentsModal(announcementId) {
