@@ -602,21 +602,21 @@ function getAttendanceStatus($log, $leaveType, $scheduleInfo, $dayOfWeek) {
         $graceTimeIn = date('H:i:s', strtotime($scheduleIn . ' +15 minutes'));
         $earliestAllowedOut = date('H:i:s', strtotime($scheduleOut . ' -15 minutes'));
         
-        // Calculate late minutes
+        // Calculate late minutes (grace period only determines IF late, minutes counted from scheduled time)
         $lateMinutes = 0;
         $isLate = $actualTimeIn > $graceTimeIn;
         if ($isLate) {
-            $lateSeconds = strtotime($actualTimeIn) - strtotime($graceTimeIn);
+            $lateSeconds = strtotime($actualTimeIn) - strtotime($scheduleIn);
             $lateMinutes = round($lateSeconds / 60);
         }
         
-        // Calculate undertime minutes
+        // Calculate undertime minutes (grace period only determines IF undertime, minutes counted from scheduled time)
         $undertimeMinutes = 0;
         $isUndertime = false;
         if (!($log['log_out_date'] && $log['log_out_date'] !== $log['log_date'])) {
             $isUndertime = $actualTimeOut < $earliestAllowedOut;
             if ($isUndertime) {
-                $undertimeSeconds = strtotime($earliestAllowedOut) - strtotime($actualTimeOut);
+                $undertimeSeconds = strtotime($scheduleOut) - strtotime($actualTimeOut);
                 $undertimeMinutes = round($undertimeSeconds / 60);
             }
         }

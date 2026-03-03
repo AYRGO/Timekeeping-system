@@ -68,38 +68,70 @@ $stmt = $pdo->prepare($employeeQuery);
 $stmt->execute($params);
 $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// No longer needed since we're using post_ot_requests table directly
+// Fetch approved overtime requests from ALL OT tables to ensure complete data
+// Table 1: post2_overtime_requests (archived/moved approved OT)
+// Table 2: post_ot_requests (recently approved, not yet moved by cron)
+// Table 3: post_overtime_requests (old approval flow)
 
-// Fetch approved overtime requests from post2_overtime_requests table
-$otQuery = "
+$otRecords = [];
+
+// --- Source 1: post2_overtime_requests (archive table) ---
+$otQuery1 = "
     SELECT pot.employee_id, pot.ot_duration, pot.ot_type, tl.log_date, e.fname, e.lname
     FROM post2_overtime_requests pot
     LEFT JOIN time_logs tl ON pot.time_log_id = tl.id
     LEFT JOIN employees e ON pot.employee_id = e.id
-    WHERE pot.status = 'approved' AND tl.log_date BETWEEN :start_date AND :end_date
+    WHERE LOWER(pot.status) = 'approved' AND tl.log_date BETWEEN :start_date AND :end_date
 ";
-
-$otParams = [
-    'start_date' => $startDate,
-    'end_date' => $endDate
-];
-
-// Add search filter for overtime records if specified
+$otParams1 = ['start_date' => $startDate, 'end_date' => $endDate];
 if (!empty($search)) {
-    $otQuery .= " AND (e.fname LIKE :search OR e.lname LIKE :search OR e.company LIKE :search)";
-    $otParams['search'] = "%$search%";
+    $otQuery1 .= " AND (e.fname LIKE :search OR e.lname LIKE :search OR e.company LIKE :search)";
+    $otParams1['search'] = "%$search%";
+}
+$otStmt1 = $pdo->prepare($otQuery1);
+$otStmt1->execute($otParams1);
+$otRecords = array_merge($otRecords, $otStmt1->fetchAll(PDO::FETCH_ASSOC));
+
+// --- Source 2: post_ot_requests (recently approved, not yet archived) ---
+try {
+    $otQuery2 = "
+        SELECT pot.employee_id, pot.ot_duration, pot.ot_type, tl.log_date, e.fname, e.lname
+        FROM post_ot_requests pot
+        LEFT JOIN time_logs tl ON pot.time_log_id = tl.id
+        LEFT JOIN employees e ON pot.employee_id = e.id
+        WHERE LOWER(pot.status) = 'approved' AND tl.log_date BETWEEN :start_date AND :end_date
+    ";
+    $otParams2 = ['start_date' => $startDate, 'end_date' => $endDate];
+    if (!empty($search)) {
+        $otQuery2 .= " AND (e.fname LIKE :search OR e.lname LIKE :search OR e.company LIKE :search)";
+        $otParams2['search'] = "%$search%";
+    }
+    $otStmt2 = $pdo->prepare($otQuery2);
+    $otStmt2->execute($otParams2);
+    $otRecords = array_merge($otRecords, $otStmt2->fetchAll(PDO::FETCH_ASSOC));
+} catch (PDOException $e) {
+    // Table may not exist, continue without it
 }
 
-// Add sorting for overtime records
-if ($sortColumn === 'log_date') {
-    $otQuery .= " ORDER BY tl.log_date $sortOrder";
-} else {
-    $otQuery .= " ORDER BY e.$sortColumn $sortOrder, tl.log_date ASC";
+// --- Source 3: post_overtime_requests (old approval flow — different schema) ---
+try {
+    $otQuery3 = "
+        SELECT pot.employee_id, pot.duration_hours AS ot_duration, 'Regular OT' AS ot_type, pot.date AS log_date, e.fname, e.lname
+        FROM post_overtime_requests pot
+        LEFT JOIN employees e ON pot.employee_id = e.id
+        WHERE LOWER(pot.status) = 'approved' AND pot.date BETWEEN :start_date AND :end_date
+    ";
+    $otParams3 = ['start_date' => $startDate, 'end_date' => $endDate];
+    if (!empty($search)) {
+        $otQuery3 .= " AND (e.fname LIKE :search OR e.lname LIKE :search OR e.company LIKE :search)";
+        $otParams3['search'] = "%$search%";
+    }
+    $otStmt3 = $pdo->prepare($otQuery3);
+    $otStmt3->execute($otParams3);
+    $otRecords = array_merge($otRecords, $otStmt3->fetchAll(PDO::FETCH_ASSOC));
+} catch (PDOException $e) {
+    // Table may not exist, continue without it
 }
-
-$otStmt = $pdo->prepare($otQuery);
-$otStmt->execute($otParams);
-$otRecords = $otStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Process approved overtime requests
 $otMap = [];

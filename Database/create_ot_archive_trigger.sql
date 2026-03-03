@@ -7,8 +7,8 @@ CREATE TRIGGER move_completed_ot_requests
 AFTER UPDATE ON post_ot_requests
 FOR EACH ROW
 BEGIN
-    -- Check if status was changed to approved or declined
-    IF NEW.status IN ('approved', 'declined') AND OLD.status = 'pending' THEN
+    -- Check if status was changed to approved, declined, or rejected
+    IF NEW.status IN ('approved', 'declined', 'rejected') AND OLD.status = 'pending' THEN
         -- Insert into archive table
         INSERT INTO post2_overtime_requests 
         (id, employee_id, time_log_id, time_in, time_out, ot_duration, ot_type, attachment, reason, status, created_at, approved_at, approved_by, notified)

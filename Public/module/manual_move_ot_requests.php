@@ -21,10 +21,10 @@ function moveCompletedOTRequests($pdo) {
         // Start transaction
         $pdo->beginTransaction();
         
-        // Get all approved or declined requests from post_ot_requests
+        // Get all approved, declined, or rejected requests from post_ot_requests
         $selectStmt = $pdo->prepare("
             SELECT * FROM post_ot_requests 
-            WHERE status IN ('approved', 'declined')
+            WHERE LOWER(status) IN ('approved', 'declined', 'rejected')
         ");
         $selectStmt->execute();
         $completedRequests = $selectStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -61,7 +61,7 @@ function moveCompletedOTRequests($pdo) {
             // Delete moved requests from original table
             $deleteStmt = $pdo->prepare("
                 DELETE FROM post_ot_requests 
-                WHERE status IN ('approved', 'declined')
+                WHERE LOWER(status) IN ('approved', 'declined', 'rejected')
             ");
             $deleteStmt->execute();
             
