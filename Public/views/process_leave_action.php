@@ -52,23 +52,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leave_id'], $_POST['a
                 $credit_type = $leave_type; // Default to same type
                 
                 // Map halfday and special types to their base credit types
-                switch ($leave_type) {
+                $leave_type_lower = strtolower($leave_type);
+                switch ($leave_type_lower) {
                     case 'halfday':
                         $credit_type = 'vacation';
-                        $restoration_amount = 0.5 * $requested_days;
+                        $restoration_amount = 0.5; // Always exactly 0.5 for half day
                         break;
                     case 'halfday_sick':
                         $credit_type = 'sick';
-                        $restoration_amount = 0.5 * $requested_days;
+                        $restoration_amount = 0.5; // Always exactly 0.5 for half day
                         break;
                     case 'lwop':
                         // LWOP doesn't affect credits
                         $restoration_amount = 0;
                         $credit_type = null;
                         break;
+                    case 'bereavement':
+                    case 'paternity':
+                    case 'maternity':
+                        $credit_type = $leave_type_lower;
+                        $restoration_amount = $requested_days;
+                        break;
                     default:
-                        // Full day leave types (sick, vacation, paternity, maternity, solo_parent, bereavement)
-                        $credit_type = $leave_type;
+                        // sick, vacation, solo_parent
+                        $credit_type = $leave_type_lower;
                         $restoration_amount = $requested_days;
                         break;
                 }
@@ -119,23 +126,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['leave_id'], $_POST['a
                 $requested_days = $start_date->diff($end_date)->days + 1;
                 
                 // Map halfday and special types to their base credit types
-                switch ($leave_type) {
+                $leave_type_lower = strtolower($leave_type);
+                switch ($leave_type_lower) {
                     case 'halfday':
                         $credit_type = 'vacation';
-                        $deduction_amount = 0.5 * $requested_days;
+                        $deduction_amount = 0.5; // Always exactly 0.5 for half day
                         break;
                     case 'halfday_sick':
                         $credit_type = 'sick';
-                        $deduction_amount = 0.5 * $requested_days;
+                        $deduction_amount = 0.5; // Always exactly 0.5 for half day
                         break;
                     case 'lwop':
                         // LWOP doesn't deduct from any credits
                         $deduction_amount = 0;
                         $credit_type = null;
                         break;
+                    case 'bereavement':
+                    case 'paternity':
+                    case 'maternity':
+                        // These have separate entitlements, deduct from their own credit type
+                        $credit_type = $leave_type_lower;
+                        $deduction_amount = $requested_days;
+                        break;
                     default:
-                        // Full day leave types (sick, vacation, paternity, maternity, solo_parent, bereavement)
-                        $credit_type = $leave_type;
+                        // sick, vacation, solo_parent
+                        $credit_type = $leave_type_lower;
                         $deduction_amount = $requested_days;
                         break;
                 }

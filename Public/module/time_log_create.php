@@ -216,11 +216,11 @@ try {
                 'sick'         => 'sick',
                 'vacation'     => 'vacation',
                 'paternity'    => 'paternity',
-                'maternity'    => 'Maternity',
+                'maternity'    => 'maternity',
                 'solo_parent'  => 'solo_parent',
                 'halfday'      => 'halfday',
                 'halfday_sick' => 'halfday_sick',
-                'lwop'         => 'LWOP',
+                'lwop'         => 'lwop',
                 'bereavement'  => 'bereavement'
             ];
 
