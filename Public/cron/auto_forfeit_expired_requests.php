@@ -23,6 +23,44 @@ try {
     $today = date('Y-m-d');
     $totalForfeited = 0;
     
+    // ===== SCHEMA MIGRATION: Ensure status columns support 'Forfeited' and 'Cancelled' =====
+    // These ALTER TABLEs are idempotent — safe to run repeatedly
+    try {
+        // Check if schedule_change_requests status column needs updating
+        $colInfo = $pdo->query("SHOW COLUMNS FROM schedule_change_requests LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
+        if ($colInfo && strpos($colInfo['Type'], 'Forfeited') === false) {
+            $pdo->exec("ALTER TABLE schedule_change_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'Pending'");
+            // Fix any records that were corrupted by previous enum constraint (empty strings from failed 'Forfeited' writes)
+            $pdo->exec("UPDATE schedule_change_requests SET status = 'Pending' WHERE status = '' OR status IS NULL");
+            $logMigration = "[" . date('Y-m-d H:i:s') . "] MIGRATION: schedule_change_requests.status changed from ENUM to VARCHAR(50), fixed empty status records\n";
+            $logFile = __DIR__ . '/../../logs/forfeit_log.txt';
+            $logDir = dirname($logFile);
+            if (!is_dir($logDir)) mkdir($logDir, 0755, true);
+            file_put_contents($logFile, $logMigration, FILE_APPEND);
+        }
+        
+        // Check if schedule_switch_requests status column needs updating
+        $colInfo = $pdo->query("SHOW COLUMNS FROM schedule_switch_requests LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
+        if ($colInfo && strpos($colInfo['Type'], 'forfeited') === false) {
+            $pdo->exec("ALTER TABLE schedule_switch_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending'");
+            $pdo->exec("UPDATE schedule_switch_requests SET status = 'pending' WHERE status = '' OR status IS NULL");
+        }
+        
+        // Check if month_weekly_schedule status column needs updating
+        $colInfo = $pdo->query("SHOW COLUMNS FROM month_weekly_schedule LIKE 'status'")->fetch(PDO::FETCH_ASSOC);
+        if ($colInfo && strpos($colInfo['Type'], 'forfeited') === false) {
+            $pdo->exec("ALTER TABLE month_weekly_schedule MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending'");
+            $pdo->exec("UPDATE month_weekly_schedule SET status = 'pending' WHERE status = '' OR status IS NULL");
+        }
+    } catch (Exception $migrationError) {
+        // Log migration error but continue with forfeit logic
+        $logFile = __DIR__ . '/../../logs/forfeit_log.txt';
+        $logDir = dirname($logFile);
+        if (!is_dir($logDir)) mkdir($logDir, 0755, true);
+        file_put_contents($logFile, "[" . date('Y-m-d H:i:s') . "] MIGRATION ERROR: " . $migrationError->getMessage() . "\n", FILE_APPEND);
+    }
+    // ===== END SCHEMA MIGRATION =====
+    
     // 1. Forfeit expired schedule_change_requests
     $stmt = $pdo->prepare("
         UPDATE schedule_change_requests 

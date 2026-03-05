@@ -73,10 +73,10 @@ if ($isMonthlyView) {
     $stmt->execute();
     $swap_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else if ($isHistoryView) {
-    // Count total history requests (processed + expired/cancelled/declined)
+    // Count total history requests (processed + all non-pending from pending table)
     $totalHistoryCount = $pdo->query("
         SELECT (SELECT COUNT(*) FROM post_schedule_change_requests) + 
-               (SELECT COUNT(*) FROM schedule_change_requests WHERE status IN ('Forfeited', 'Cancelled', 'Declined', 'Rejected'))
+               (SELECT COUNT(*) FROM schedule_change_requests WHERE LOWER(TRIM(status)) != 'pending')
     ")->fetchColumn();
     $totalHistoryPages = ceil($totalHistoryCount / $records_per_page);
     
@@ -99,7 +99,7 @@ if ($isMonthlyView) {
         FROM schedule_change_requests sr
         JOIN employees e ON sr.employee_id = e.id
         LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
-        WHERE sr.status IN ('Forfeited', 'Cancelled', 'Declined', 'Rejected'))
+        WHERE LOWER(TRIM(sr.status)) != 'pending')
         ORDER BY created_at DESC
         LIMIT :limit OFFSET :offset
     ");
@@ -110,7 +110,7 @@ if ($isMonthlyView) {
     // Count only pending single day requests (expired/cancelled/declined moved to History tab)
     $totalSingleCount = $pdo->query("
         SELECT COUNT(*) FROM schedule_change_requests 
-        WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')
+        WHERE LOWER(TRIM(status)) = 'pending'
     ")->fetchColumn();
     $totalSinglePages = ceil($totalSingleCount / $records_per_page);
     
@@ -124,7 +124,7 @@ if ($isMonthlyView) {
         FROM schedule_change_requests sr
         JOIN employees e ON sr.employee_id = e.id
         LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
-        WHERE sr.status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')
+        WHERE LOWER(TRIM(sr.status)) = 'pending'
         ORDER BY sr.created_at DESC
         LIMIT :limit OFFSET :offset
     ");
@@ -137,7 +137,7 @@ $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Get pending counts for each tab
 $pendingCurrentCount = $pdo->query("
     SELECT COUNT(*) FROM schedule_change_requests 
-    WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')
+    WHERE LOWER(TRIM(status)) = 'pending'
 ")->fetchColumn();
 
 $pendingMonthlyCount = $pdo->query("
@@ -150,10 +150,10 @@ $pendingSwapCount = $pdo->query("
     WHERE LOWER(status) = 'pending'
 ")->fetchColumn();
 
-// Count for history tab badge (processed + expired + cancelled + declined)
+// Count for history tab badge (processed + expired + cancelled + declined + any non-pending)
 $historyTabCount = $pdo->query("
     SELECT (SELECT COUNT(*) FROM post_schedule_change_requests) + 
-           (SELECT COUNT(*) FROM schedule_change_requests WHERE status IN ('Forfeited', 'Cancelled', 'Declined', 'Rejected'))
+           (SELECT COUNT(*) FROM schedule_change_requests WHERE LOWER(TRIM(status)) != 'pending')
 ")->fetchColumn();
 
 // Function to get schedule time display
