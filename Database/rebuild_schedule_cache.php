@@ -74,12 +74,24 @@ foreach ($employees as $employee) {
             $scheduleByDay[$sched['day_of_week']] = $sched;
         }
         
+        // Prepare statement to check for approved schedule change requests
+        $approvedRequestStmt = $pdo->prepare("
+            SELECT psr.work_schedule_id, psr.is_rest_day, ws.name as schedule_name, ws.time_in, ws.time_out
+            FROM post_schedule_change_requests psr
+            LEFT JOIN work_schedules ws ON psr.work_schedule_id = ws.id
+            WHERE psr.employee_id = ? 
+              AND psr.status = 'Approved'
+              AND ? BETWEEN psr.start_date AND psr.end_date
+            ORDER BY psr.created_at DESC
+            LIMIT 1
+        ");
+        
         // Generate cache entries for each day
         $insertStmt = $pdo->prepare("
             INSERT INTO employee_daily_schedule_cache 
             (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, 
              schedule_name, time_in, time_out, holiday_name, source, source_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'weekly_default', NULL, NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW())
         ");
         
         $currentDate = $startDate;
@@ -88,17 +100,36 @@ foreach ($employees as $employee) {
         while ($currentDate <= $endDate) {
             $dayOfWeek = date('w', strtotime($currentDate)); // 0 (Sunday) to 6 (Saturday)
             
-            // Get default schedule for this day of week
-            if (isset($scheduleByDay[$dayOfWeek])) {
+            // Check if it's a company holiday
+            $holidayStmt = $pdo->prepare("SELECT holiday_name FROM company_holidays WHERE holiday_date = ?");
+            $holidayStmt->execute([$currentDate]);
+            $holiday = $holidayStmt->fetch(PDO::FETCH_ASSOC);
+            
+            $isHoliday = $holiday ? 1 : 0;
+            $holidayName = $holiday ? $holiday['holiday_name'] : null;
+            
+            // PRIORITY 1: Check for approved schedule change requests
+            $approvedRequestStmt->execute([$employeeId, $currentDate]);
+            $approvedRequest = $approvedRequestStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($approvedRequest) {
+                // Use approved request schedule
+                $insertStmt->execute([
+                    $employeeId,
+                    $currentDate,
+                    $approvedRequest['work_schedule_id'],
+                    $approvedRequest['is_rest_day'] ?? 0,
+                    $isHoliday,
+                    $approvedRequest['schedule_name'],
+                    $approvedRequest['time_in'],
+                    $approvedRequest['time_out'],
+                    $holidayName,
+                    'approved_request'
+                ]);
+                $daysInserted++;
+            } elseif (isset($scheduleByDay[$dayOfWeek])) {
+                // PRIORITY 2: Use default weekly schedule
                 $defaultSched = $scheduleByDay[$dayOfWeek];
-                
-                // Check if it's a company holiday
-                $holidayStmt = $pdo->prepare("SELECT holiday_name FROM company_holidays WHERE holiday_date = ?");
-                $holidayStmt->execute([$currentDate]);
-                $holiday = $holidayStmt->fetch(PDO::FETCH_ASSOC);
-                
-                $isHoliday = $holiday ? 1 : 0;
-                $holidayName = $holiday ? $holiday['holiday_name'] : null;
                 
                 // Insert cache entry
                 $insertStmt->execute([
@@ -110,7 +141,8 @@ foreach ($employees as $employee) {
                     $defaultSched['schedule_name'],
                     $defaultSched['time_in'],
                     $defaultSched['time_out'],
-                    $holidayName
+                    $holidayName,
+                    'weekly_default'
                 ]);
                 
                 $daysInserted++;

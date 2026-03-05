@@ -383,11 +383,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $weeklySchedules[$row['day_of_week']] = $row;
         }
         
+        // Prepare statement to check for approved schedule change requests
+        $approvedReqStmt = $pdo->prepare("
+            SELECT psr.work_schedule_id, psr.is_rest_day, ws.name as schedule_name, ws.time_in, ws.time_out
+            FROM post_schedule_change_requests psr
+            LEFT JOIN work_schedules ws ON psr.work_schedule_id = ws.id
+            WHERE psr.employee_id = ? 
+              AND psr.status = 'Approved'
+              AND ? BETWEEN psr.start_date AND psr.end_date
+            ORDER BY psr.created_at DESC
+            LIMIT 1
+        ");
+        
         // Prepare batch insert statement
         $cacheStmt = $pdo->prepare("
             INSERT INTO employee_daily_schedule_cache 
             (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, schedule_name, time_in, time_out, holiday_name, source, source_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'weekly_default', NULL, NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW())
         ");
         
         // Build cache day by day
@@ -395,7 +407,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         while ($currentDate <= $endDate) {
             $dayOfWeek = date('w', strtotime($currentDate)); // 0 (Sunday) to 6 (Saturday)
             
-            if (isset($weeklySchedules[$dayOfWeek])) {
+            // PRIORITY 1: Check for approved schedule change requests
+            $approvedReqStmt->execute([$employeeId, $currentDate]);
+            $approvedReq = $approvedReqStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($approvedReq) {
+                $cacheStmt->execute([
+                    $employeeId,
+                    $currentDate,
+                    $approvedReq['work_schedule_id'],
+                    $approvedReq['is_rest_day'] ?? 0,
+                    0,
+                    $approvedReq['schedule_name'],
+                    $approvedReq['time_in'],
+                    $approvedReq['time_out'],
+                    null,
+                    'approved_request'
+                ]);
+            } elseif (isset($weeklySchedules[$dayOfWeek])) {
+                // PRIORITY 2: Use default weekly schedule
                 $defaultSched = $weeklySchedules[$dayOfWeek];
                 $cacheStmt->execute([
                     $employeeId,
@@ -406,7 +436,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $defaultSched['schedule_name'],
                     $defaultSched['time_in'],
                     $defaultSched['time_out'],
-                    null // holiday_name
+                    null, // holiday_name
+                    'weekly_default'
                 ]);
             }
             

@@ -936,6 +936,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                                 'pending' => 'bg-yellow-100 text-yellow-800',
                                                 'rejected', 'declined' => 'bg-red-100 text-red-800',
                                                 'forfeited' => 'bg-gray-100 text-gray-600',
+                                                'cancelled' => 'bg-orange-100 text-orange-800',
                                                 default => 'bg-gray-100 text-gray-800'
                                             };
                                             ?>
