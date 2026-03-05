@@ -86,19 +86,23 @@ if ($isMonthlyView) {
                psr.work_schedule_id, psr.current_work_schedule_id, psr.attachment_scr, psr.explanation,
                psr.created_at as approved_at, psr.employee_id, psr.is_rest_day,
                e.fname, e.lname,
-               ws.time_in, ws.time_out
+               ws.time_in, ws.time_out,
+               cws.time_in as current_time_in, cws.time_out as current_time_out
         FROM post_schedule_change_requests psr
         JOIN employees e ON psr.employee_id = e.id
-        LEFT JOIN work_schedules ws ON psr.work_schedule_id = ws.id)
+        LEFT JOIN work_schedules ws ON psr.work_schedule_id = ws.id
+        LEFT JOIN work_schedules cws ON psr.current_work_schedule_id = cws.id)
         UNION ALL
         (SELECT sr.id, sr.reason, sr.status, sr.start_date, sr.end_date, sr.created_at,
                sr.work_schedule_id, sr.current_work_schedule_id, sr.attachment_scr, sr.explanation,
                sr.created_at as approved_at, sr.employee_id, sr.is_rest_day,
                e.fname, e.lname,
-               ws.time_in, ws.time_out
+               ws.time_in, ws.time_out,
+               cws.time_in as current_time_in, cws.time_out as current_time_out
         FROM schedule_change_requests sr
         JOIN employees e ON sr.employee_id = e.id
         LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
+        LEFT JOIN work_schedules cws ON sr.current_work_schedule_id = cws.id
         WHERE LOWER(TRIM(sr.status)) != 'pending')
         ORDER BY created_at DESC
         LIMIT :limit OFFSET :offset
@@ -120,10 +124,12 @@ if ($isMonthlyView) {
                sr.work_schedule_id, sr.current_work_schedule_id, sr.attachment_scr, sr.explanation,
                sr.employee_id, sr.is_rest_day,
                e.fname, e.lname,
-               ws.time_in, ws.time_out
+               ws.time_in, ws.time_out,
+               cws.time_in as current_time_in, cws.time_out as current_time_out
         FROM schedule_change_requests sr
         JOIN employees e ON sr.employee_id = e.id
         LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
+        LEFT JOIN work_schedules cws ON sr.current_work_schedule_id = cws.id
         WHERE LOWER(TRIM(sr.status)) = 'pending'
         ORDER BY sr.created_at DESC
         LIMIT :limit OFFSET :offset
@@ -890,8 +896,23 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                         }
                                     }
                                     
-                                    // Get current schedule from cache for the start date of the request
-                                    $current_sched = getCurrentScheduleForEmployee($sr['employee_id'], $pdo, $sr['start_date']);
+                                    // Get current schedule - use stored current_work_schedule_id from the request record
+                                    if (!empty($sr['current_work_schedule_id'])) {
+                                        $currentSchedTime = getScheduleTime($sr['current_work_schedule_id']);
+                                        if ($currentSchedTime === 'N/A' && !empty($sr['current_time_in']) && !empty($sr['current_time_out'])) {
+                                            $currentSchedTime = date('g:i A', strtotime($sr['current_time_in'])) . ' – ' . date('g:i A', strtotime($sr['current_time_out']));
+                                        }
+                                        $current_sched = [
+                                            'id' => $sr['current_work_schedule_id'],
+                                            'display' => $currentSchedTime
+                                        ];
+                                    } else {
+                                        // No stored current schedule - check if it was a rest day (current was OFF)
+                                        $current_sched = [
+                                            'id' => '',
+                                            'display' => 'OFF'
+                                        ];
+                                    }
                                     // Calculate period duration
                                     $start = new DateTime($sr['start_date']);
                                     $end = new DateTime($sr['end_date']);
