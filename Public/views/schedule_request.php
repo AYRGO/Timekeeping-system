@@ -930,18 +930,26 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                         </td>
                                         <td class="px-6 py-4 text-sm">
                                             <?php
-                                            $status = strtolower($sr['status']);
+                                            $status = strtolower(trim($sr['status']));
                                             $statusClass = match($status) {
-                                                'approved' => 'bg-green-100 text-green-800',
-                                                'pending' => 'bg-yellow-100 text-yellow-800',
-                                                'rejected', 'declined' => 'bg-red-100 text-red-800',
-                                                'forfeited' => 'bg-gray-100 text-gray-600',
-                                                'cancelled' => 'bg-orange-100 text-orange-800',
-                                                default => 'bg-gray-100 text-gray-800'
+                                                'approved' => 'bg-green-100 text-green-800 border border-green-200',
+                                                'pending' => 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+                                                'rejected', 'declined' => 'bg-red-100 text-red-800 border border-red-200',
+                                                'forfeited' => 'bg-amber-100 text-amber-800 border border-amber-200',
+                                                'cancelled' => 'bg-orange-100 text-orange-800 border border-orange-200',
+                                                default => 'bg-gray-200 text-gray-700 border border-gray-300'
+                                            };
+                                            $statusLabel = match($status) {
+                                                'approved' => 'Approved',
+                                                'pending' => 'Pending',
+                                                'rejected', 'declined' => 'Declined',
+                                                'forfeited' => 'Forfeited',
+                                                'cancelled' => 'Cancelled',
+                                                default => ($status ? ucfirst($status) : 'Unknown')
                                             };
                                             ?>
-                                            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full <?= $statusClass ?>">
-                                                <?= htmlspecialchars(ucfirst($sr['status'])) ?>
+                                            <span class="inline-flex px-2.5 py-1 text-xs font-semibold rounded-full <?= $statusClass ?>">
+                                                <?= htmlspecialchars($statusLabel) ?>
                                             </span>
                                         </td>
                                         <td class="px-6 py-4 text-sm text-gray-500">
@@ -957,7 +965,7 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                         </td>
                                         <?php if (!$isHistoryView): ?>
                                         <td class="px-6 py-4 text-sm text-gray-900">
-                                            <?php if (strtolower($sr['status']) === 'pending'): ?>
+                                            <?php if (strtolower(trim($sr['status'])) === 'pending'): ?>
                                                 <div class="flex space-x-2">
                                                     <form method="post" action="process_schedule_action.php" class="inline-block">
                                                         <input type="hidden" name="request_id" value="<?= $sr['id'] ?>">
@@ -975,8 +983,20 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                                     </button>
                                                 </div>
                                             <?php else: ?>
-                                                <span class="text-gray-500 italic">
-                                                    <i class="fas fa-check-circle mr-1"></i>Done
+                                                <span class="text-gray-400 text-xs italic">
+                                                    <?php 
+                                                    $actionStatus = strtolower(trim($sr['status']));
+                                                    if ($actionStatus === 'approved'): ?>
+                                                        <i class="fas fa-check-circle text-green-500 mr-1"></i>Approved
+                                                    <?php elseif ($actionStatus === 'forfeited'): ?>
+                                                        <i class="fas fa-hourglass-end text-amber-500 mr-1"></i>Expired
+                                                    <?php elseif ($actionStatus === 'cancelled'): ?>
+                                                        <i class="fas fa-ban text-orange-500 mr-1"></i>Cancelled
+                                                    <?php elseif (in_array($actionStatus, ['declined', 'rejected'])): ?>
+                                                        <i class="fas fa-times-circle text-red-500 mr-1"></i>Declined
+                                                    <?php else: ?>
+                                                        <i class="fas fa-minus-circle mr-1"></i>Processed
+                                                    <?php endif; ?>
                                                 </span>
                                             <?php endif; ?>
                                         </td>
