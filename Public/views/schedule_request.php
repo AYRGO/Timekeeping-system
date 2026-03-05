@@ -73,32 +73,48 @@ if ($isMonthlyView) {
     $stmt->execute();
     $swap_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else if ($isHistoryView) {
-    // Count total history requests
-    $totalHistoryCount = $pdo->query("SELECT COUNT(*) FROM post_schedule_change_requests")->fetchColumn();
+    // Count total history requests (processed + expired/cancelled/declined)
+    $totalHistoryCount = $pdo->query("
+        SELECT (SELECT COUNT(*) FROM post_schedule_change_requests) + 
+               (SELECT COUNT(*) FROM schedule_change_requests WHERE status IN ('Forfeited', 'Cancelled', 'Declined', 'Rejected'))
+    ")->fetchColumn();
     $totalHistoryPages = ceil($totalHistoryCount / $records_per_page);
     
-    // Fetch from post_schedule_change_requests table (history) with pagination
+    // Fetch combined history: approved/processed + expired/cancelled/declined
     $stmt = $pdo->prepare("
-        SELECT psr.id, psr.reason, psr.status, psr.start_date, psr.end_date, psr.created_at,
+        (SELECT psr.id, psr.reason, psr.status, psr.start_date, psr.end_date, psr.created_at,
                psr.work_schedule_id, psr.current_work_schedule_id, psr.attachment_scr, psr.explanation,
                psr.created_at as approved_at, psr.employee_id, psr.is_rest_day,
                e.fname, e.lname,
                ws.time_in, ws.time_out
         FROM post_schedule_change_requests psr
         JOIN employees e ON psr.employee_id = e.id
-        LEFT JOIN work_schedules ws ON psr.work_schedule_id = ws.id
-        ORDER BY psr.created_at DESC
+        LEFT JOIN work_schedules ws ON psr.work_schedule_id = ws.id)
+        UNION ALL
+        (SELECT sr.id, sr.reason, sr.status, sr.start_date, sr.end_date, sr.created_at,
+               sr.work_schedule_id, sr.current_work_schedule_id, sr.attachment_scr, sr.explanation,
+               sr.created_at as approved_at, sr.employee_id, sr.is_rest_day,
+               e.fname, e.lname,
+               ws.time_in, ws.time_out
+        FROM schedule_change_requests sr
+        JOIN employees e ON sr.employee_id = e.id
+        LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
+        WHERE sr.status IN ('Forfeited', 'Cancelled', 'Declined', 'Rejected'))
+        ORDER BY created_at DESC
         LIMIT :limit OFFSET :offset
     ");
     $stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
     $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
 } else {
-    // Count total single day requests
-    $totalSingleCount = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests")->fetchColumn();
+    // Count only pending single day requests (expired/cancelled/declined moved to History tab)
+    $totalSingleCount = $pdo->query("
+        SELECT COUNT(*) FROM schedule_change_requests 
+        WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')
+    ")->fetchColumn();
     $totalSinglePages = ceil($totalSingleCount / $records_per_page);
     
-    // Fetch from schedule_change_requests table (single day requests) with pagination
+    // Fetch only pending single day requests with pagination
     $stmt = $pdo->prepare("
         SELECT sr.id, sr.reason, sr.status, sr.start_date, sr.end_date, sr.created_at,
                sr.work_schedule_id, sr.current_work_schedule_id, sr.attachment_scr, sr.explanation,
@@ -108,9 +124,8 @@ if ($isMonthlyView) {
         FROM schedule_change_requests sr
         JOIN employees e ON sr.employee_id = e.id
         LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
-        ORDER BY 
-            CASE WHEN sr.status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled') THEN 0 ELSE 1 END,
-            sr.created_at DESC
+        WHERE sr.status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')
+        ORDER BY sr.created_at DESC
         LIMIT :limit OFFSET :offset
     ");
     $stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
@@ -133,6 +148,12 @@ $pendingMonthlyCount = $pdo->query("
 $pendingSwapCount = $pdo->query("
     SELECT COUNT(*) FROM schedule_switch_requests 
     WHERE LOWER(status) = 'pending'
+")->fetchColumn();
+
+// Count for history tab badge (processed + expired + cancelled + declined)
+$historyTabCount = $pdo->query("
+    SELECT (SELECT COUNT(*) FROM post_schedule_change_requests) + 
+           (SELECT COUNT(*) FROM schedule_change_requests WHERE status IN ('Forfeited', 'Cancelled', 'Declined', 'Rejected'))
 ")->fetchColumn();
 
 // Function to get schedule time display
@@ -320,6 +341,11 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                             <a href="?view=history" 
                                class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors <?= $isHistoryView ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?>">
                                 <i class="fas fa-history mr-2"></i>History
+                                <?php if ($historyTabCount > 0): ?>
+                                    <span class="ml-2 px-2 py-0.5 text-xs font-bold rounded-full <?= $isHistoryView ? 'bg-white text-green-600' : 'bg-green-100 text-green-700' ?>">
+                                        <?= $historyTabCount ?>
+                                    </span>
+                                <?php endif; ?>
                             </a>
                         </div>
                     </div>
@@ -1005,9 +1031,9 @@ function getCurrentScheduleForEmployee($employee_id, $pdo, $date = null) {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="<?= $isHistoryView ? '9' : '10' ?>" class="text-center text-sm py-8 text-gray-500">
+                                    <td colspan="<?= $isHistoryView ? '8' : '9' ?>" class="text-center text-sm py-8 text-gray-500">
                                         <i class="fas fa-calendar-times text-4xl text-gray-300 mb-2"></i>
-                                        <div><?= $isHistoryView ? 'No processed schedule changes or day off requests found.' : 'No schedule change or day off requests found.' ?></div>
+                                        <div><?= $isHistoryView ? 'No processed or expired schedule requests found.' : 'No pending schedule change requests. Expired and processed requests are in the <a href="?view=history" class="text-blue-600 hover:underline">History</a> tab.' ?></div>
                                     </td>
                                 </tr>
                             <?php endif; ?>
