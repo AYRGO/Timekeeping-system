@@ -522,25 +522,45 @@ $stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
 $stmt->execute([$employeeId]);
 $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Fetch all employee requests
+// Fetch all employee requests (from both pending and processed/archived tables)
 // Leave Requests
-$stmt = $pdo->prepare("SELECT * FROM leave_requests WHERE employee_id = ? ORDER BY created_at DESC");
-$stmt->execute([$employeeId]);
+$stmt = $pdo->prepare("
+    SELECT *, 'pending' as source FROM leave_requests WHERE employee_id = ?
+    UNION ALL
+    SELECT *, 'processed' as source FROM post_leave_requests WHERE employee_id = ?
+    ORDER BY created_at DESC
+");
+$stmt->execute([$employeeId, $employeeId]);
 $leaveRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Schedule Change Requests
-$stmt = $pdo->prepare("SELECT * FROM schedule_change_requests WHERE employee_id = ? ORDER BY created_at DESC");
-$stmt->execute([$employeeId]);
+$stmt = $pdo->prepare("
+    SELECT *, 'pending' as source FROM schedule_change_requests WHERE employee_id = ?
+    UNION ALL
+    SELECT *, 'processed' as source FROM post_schedule_change_requests WHERE employee_id = ?
+    ORDER BY created_at DESC
+");
+$stmt->execute([$employeeId, $employeeId]);
 $scheduleRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Overtime Requests
-$stmt = $pdo->prepare("SELECT * FROM overtime_requests WHERE employee_id = ? ORDER BY created_at DESC");
-$stmt->execute([$employeeId]);
+// Overtime Requests (from active and archived tables)
+$stmt = $pdo->prepare("
+    SELECT *, 'active' as source FROM post_ot_requests WHERE employee_id = ?
+    UNION ALL
+    SELECT *, 'archived' as source FROM post2_overtime_requests WHERE employee_id = ?
+    ORDER BY created_at DESC
+");
+$stmt->execute([$employeeId, $employeeId]);
 $overtimeRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Time Adjustment Requests
-$stmt = $pdo->prepare("SELECT * FROM time_adjustment_requests WHERE employee_id = ? ORDER BY created_at DESC");
-$stmt->execute([$employeeId]);
+$stmt = $pdo->prepare("
+    SELECT *, 'pending' as source FROM time_adjustment_requests WHERE employee_id = ?
+    UNION ALL
+    SELECT *, 'processed' as source FROM post_time_adjustment_requests WHERE employee_id = ?
+    ORDER BY created_at DESC
+");
+$stmt->execute([$employeeId, $employeeId]);
 $timeAdjustmentRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch all schedules from work_schedules table

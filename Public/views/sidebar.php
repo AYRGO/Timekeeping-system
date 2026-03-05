@@ -13,7 +13,7 @@ try {
     $pendingLeaveCount = $stmt->fetchColumn();
 
     // Schedule Change Requests - Sum all pending from single, monthly, and swap requests
-    $pendingSingleSchedule = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited')")->fetchColumn();
+    $pendingSingleSchedule = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')")->fetchColumn();
     $pendingMonthlySchedule = $pdo->query("SELECT COUNT(*) FROM month_weekly_schedule WHERE LOWER(status) = 'pending'")->fetchColumn();
     $pendingSwapSchedule = $pdo->query("SELECT COUNT(*) FROM schedule_switch_requests WHERE LOWER(status) = 'pending'")->fetchColumn();
     $pendingScheduleCount = $pendingSingleSchedule + $pendingMonthlySchedule + $pendingSwapSchedule;

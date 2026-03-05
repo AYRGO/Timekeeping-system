@@ -672,23 +672,27 @@ foreach ($adjust_results as $adjustment) {
     }
 }
 
-// --- Overtime Requests (from both tables) ---
-// First get pending overtime requests
+// --- Overtime Requests (from all tables) ---
+// Get pending overtime requests from post_ot_requests (current system) + legacy overtime_requests
 $pending_ot_stmt = $pdo->prepare("
-    SELECT id, employee_id, date, start_time, end_time, reason, duration_hours, status, created_at, attachment_ot as attachment, 'pending' as source_table
+    SELECT id, employee_id, time_in as start_time, time_out as end_time, reason, ot_duration as duration_hours, status, created_at, attachment, ot_type, 'post_ot_requests' as source_table
+    FROM post_ot_requests
+    WHERE employee_id = ? AND LOWER(status) = 'pending'
+    UNION ALL
+    SELECT id, employee_id, start_time, end_time, reason, duration_hours, status, created_at, attachment_ot as attachment, 'Regular OT' as ot_type, 'overtime_requests' as source_table
     FROM overtime_requests
     WHERE employee_id = ?
     ORDER BY created_at DESC
     LIMIT 10
 ");
-$pending_ot_stmt->execute([$current_user_id]);
+$pending_ot_stmt->execute([$current_user_id, $current_user_id]);
 $pending_ot_results = $pending_ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Then get processed overtime requests from both post tables
 $ot_stmt = $pdo->prepare("
     SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, attachment, 'post_ot_requests' as source_table
     FROM post_ot_requests
-    WHERE employee_id = ?
+    WHERE employee_id = ? AND LOWER(status) != 'pending'
     UNION ALL
     SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, attachment, 'post2_overtime_requests' as source_table
     FROM post2_overtime_requests
@@ -713,7 +717,7 @@ foreach ($pending_ot_results as $ot) {
     $wholeHours = floor($ot['duration_hours']);
     $minutes = round(($ot['duration_hours'] - $wholeHours) * 60);
     $duration = $duration_decimal . ' hrs (' . $wholeHours . 'h ' . $minutes . 'm)';
-    $ot_type = 'Regular OT'; // Default for pending requests
+    $ot_type = $ot['ot_type'] ?? 'Regular OT';
     $created_at = $ot['created_at'];
 
     $notifications[] = [
@@ -727,18 +731,17 @@ foreach ($pending_ot_results as $ot) {
         'end_ot' => $ot['end_time'] ?? null,
         'ot_duration' => $ot['duration_hours'],
         'ot_type' => $ot_type,
-        'ot_date' => $ot['date'],
+        'ot_date' => $ot['created_at'],
         'attachment' => $ot['attachment'] ?? '',
         'request_id' => $ot['id'],
-        'table_name' => 'overtime_requests',
+        'table_name' => $ot['source_table'],
         'source_table' => 'pending'
     ];
 
     // Send email notifications for overtime requests that haven't been notified
-    // Note: overtime_requests table doesn't have a 'notified' column, so we'll check if it exists first
     if (in_array($raw_status, ['approved', 'declined', 'rejected'])) {
         $subject = "Overtime Request {$status}";
-        $date_str = date('F j, Y', strtotime($ot['date']));
+        $date_str = date('F j, Y', strtotime($ot['created_at']));
         $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$date_str}</strong> ({$duration}) was <strong>{$status}</strong>.</p>";
 
         if (($raw_status === 'declined' || $raw_status === 'rejected') && !empty($ot['reason'])) {

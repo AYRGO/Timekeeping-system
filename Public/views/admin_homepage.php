@@ -26,8 +26,8 @@ $totalEmployees = $pdo->query("SELECT COUNT(*) FROM employees")->fetchColumn();
 $activeEmployees = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'Active'")->fetchColumn();
 $inactiveEmployees = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'Inactive'")->fetchColumn();
 $pendingLeaves = $pdo->query("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'")->fetchColumn();
-$pendingSchedules = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE status = 'pending'")->fetchColumn();
-$pendingOT = $pdo->query("SELECT COUNT(*) FROM overtime_requests WHERE status = 'Pending'")->fetchColumn();
+$pendingSchedules = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')")->fetchColumn();
+$pendingOT = $pdo->query("SELECT COUNT(*) FROM post_ot_requests WHERE LOWER(status) = 'pending'")->fetchColumn();
 $pendingTimeAdjustments = $pdo->query("SELECT COUNT(*) FROM time_adjustment_requests WHERE status = 'pending'")->fetchColumn();
 
 // Get auto-accrual status

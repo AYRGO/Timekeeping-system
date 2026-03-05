@@ -109,7 +109,7 @@ if ($isMonthlyView) {
         JOIN employees e ON sr.employee_id = e.id
         LEFT JOIN work_schedules ws ON sr.work_schedule_id = ws.id
         ORDER BY 
-            CASE WHEN sr.status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited') THEN 0 ELSE 1 END,
+            CASE WHEN sr.status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled') THEN 0 ELSE 1 END,
             sr.created_at DESC
         LIMIT :limit OFFSET :offset
     ");
@@ -122,7 +122,7 @@ $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Get pending counts for each tab
 $pendingCurrentCount = $pdo->query("
     SELECT COUNT(*) FROM schedule_change_requests 
-    WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited')
+    WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')
 ")->fetchColumn();
 
 $pendingMonthlyCount = $pdo->query("
