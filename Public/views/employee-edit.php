@@ -554,21 +554,21 @@ $stmt->execute([$employeeId]);
 $checklist = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Fetch all employee requests (from both pending and processed/archived tables)
-// Leave Requests
+// Leave Requests - use explicit columns since tables have different column counts
 $stmt = $pdo->prepare("
-    SELECT *, 'pending' as source FROM leave_requests WHERE employee_id = ?
+    SELECT id, employee_id, leave_type, start_date, end_date, reason, status, created_at, attachment_lr, notified, explanation, 'pending' as source FROM leave_requests WHERE employee_id = ?
     UNION ALL
-    SELECT *, 'processed' as source FROM post_leave_requests WHERE employee_id = ?
+    SELECT id, employee_id, leave_type, start_date, end_date, reason, status, created_at, attachment_lr, notified, explanation, 'processed' as source FROM post_leave_requests WHERE employee_id = ?
     ORDER BY created_at DESC
 ");
 $stmt->execute([$employeeId, $employeeId]);
 $leaveRequests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Schedule Change Requests
+// Schedule Change Requests - use explicit columns since tables have different column counts
 $stmt = $pdo->prepare("
-    SELECT *, 'pending' as source FROM schedule_change_requests WHERE employee_id = ?
+    SELECT id, employee_id, reason, status, created_at, start_date, end_date, work_schedule_id, current_work_schedule_id, attachment_scr, notified, explanation, is_rest_day, 'pending' as source FROM schedule_change_requests WHERE employee_id = ?
     UNION ALL
-    SELECT *, 'processed' as source FROM post_schedule_change_requests WHERE employee_id = ?
+    SELECT id, employee_id, reason, status, created_at, start_date, end_date, work_schedule_id, current_work_schedule_id, attachment_scr, notified, explanation, is_rest_day, 'processed' as source FROM post_schedule_change_requests WHERE employee_id = ?
     ORDER BY created_at DESC
 ");
 $stmt->execute([$employeeId, $employeeId]);
