@@ -26,25 +26,52 @@ $schedule_times = [
 
 // Function to get current schedule for an employee on a specific date
 function getCurrentScheduleForEmployee($employee_id, $log_date, $pdo, $schedule_times) {
-    // Get employee's default schedule
-    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
-    $stmt->execute([$employee_id]);
-    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-    $default_schedule_id = $employee['official_sched'] ?? 4;
-    
-    // Check for active approved schedule changes on that date
+    // PRIORITY 1: Check employee_daily_schedule_cache (what the calendar actually shows)
     $stmt = $pdo->prepare("
-        SELECT work_schedule_id 
-        FROM post_schedule_change_requests 
-        WHERE employee_id = ? AND status = 'Approved' 
-        AND ? BETWEEN start_date AND end_date 
-        ORDER BY created_at DESC 
+        SELECT work_schedule_id, time_in, time_out 
+        FROM employee_daily_schedule_cache 
+        WHERE employee_id = ? AND schedule_date = ? AND is_rest_day = 0
         LIMIT 1
     ");
     $stmt->execute([$employee_id, $log_date]);
-    $activeRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+    $cachedSchedule = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    $schedule_id = $activeRequest ? ($activeRequest['work_schedule_id'] ?? $default_schedule_id) : $default_schedule_id;
+    if ($cachedSchedule && $cachedSchedule['time_in'] && $cachedSchedule['time_out']) {
+        return [
+            'schedule_id' => $cachedSchedule['work_schedule_id'],
+            'time_in' => date('g:i A', strtotime($cachedSchedule['time_in'])),
+            'time_out' => date('g:i A', strtotime($cachedSchedule['time_out']))
+        ];
+    }
+    
+    // PRIORITY 2: Check employee_default_schedules (weekly default)
+    $dayOfWeek = date('w', strtotime($log_date));
+    $stmt = $pdo->prepare("
+        SELECT work_schedule_id 
+        FROM employee_default_schedules 
+        WHERE employee_id = ? AND day_of_week = ? AND is_rest_day = 0
+        LIMIT 1
+    ");
+    $stmt->execute([$employee_id, $dayOfWeek]);
+    $weeklySchedule = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($weeklySchedule) {
+        $schedule_id = $weeklySchedule['work_schedule_id'];
+        $sched_time_in_24h = $schedule_times[$schedule_id]['in'] ?? '07:00:00';
+        $sched_time_out_24h = $schedule_times[$schedule_id]['out'] ?? '16:00:00';
+        
+        return [
+            'schedule_id' => $schedule_id,
+            'time_in' => date('g:i A', strtotime($sched_time_in_24h)),
+            'time_out' => date('g:i A', strtotime($sched_time_out_24h))
+        ];
+    }
+    
+    // PRIORITY 3: Fall back to employee's official schedule
+    $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+    $stmt->execute([$employee_id]);
+    $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+    $schedule_id = $employee['official_sched'] ?? 4;
     
     // Get schedule times
     $sched_time_in_24h = $schedule_times[$schedule_id]['in'] ?? '07:00:00';
