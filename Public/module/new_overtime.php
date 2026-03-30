@@ -1011,6 +1011,15 @@ button:hover {
                   $hasDate = !empty($log['log_date']);
                   $hasLog = !empty($log['time_in']) && !empty($log['time_out']);
                   if ($hasLog) {
+                    // Get schedule info for this date FIRST (needed for accurate hours calculation)
+                    $scheduleForCalc = getScheduleForDate($employee_id, $log['log_date'], $pdo);
+                    $scheduleInTime = $scheduleForCalc['time_in'] ?? null;
+                    // Convert schedule time to 24h format if it's in 12h format
+                    if ($scheduleInTime && !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $scheduleInTime)) {
+                        $scheduleInTime = date('H:i:s', strtotime($scheduleInTime));
+                    }
+                    $isRestDayCalc = ($scheduleForCalc['is_rest_day'] ?? 0) == 1;
+                    
                     // Use the corrected detailed calculation for eligibility
                     $detailedCalc = getOvertimeCalculationDetails($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
                     $isOTEligible = $detailedCalc['eligible'];
@@ -1028,7 +1037,11 @@ button:hover {
                         $overtimeHours = 0;
                     }
                     
-                    $actualHours = calculateActualHoursWorked($log['time_in'], $log['time_out']);
+                    // Calculate actual hours worked - pass schedule info to prevent early arrivals from inflating hours
+                    // For Rest Days, don't adjust by schedule (all hours count as OT)
+                    $actualHours = $isRestDayCalc 
+                        ? calculateActualHoursWorked($log['time_in'], $log['time_out']) 
+                        : calculateActualHoursWorked($log['time_in'], $log['time_out'], $scheduleInTime, $log['log_date']);
                     $requestStatus = hasExistingOTRequest($log['id']); // Returns status or false
                     $hasRequest = ($requestStatus !== false); // True if any request exists
                     $timeIn = new DateTime($log['time_in']);
@@ -1238,6 +1251,13 @@ button:hover {
                         </span>
                       </div>
                     <?php elseif ($requestStatus === 'declined' || !$hasRequest): ?>
+                      <?php 
+                      // Check if OT is actually eligible (30+ minutes for Regular OT, 8+ hours for Restday OT)
+                      $canFileOT = $isOTEligible && isset($otDetails['max_ot_hours']) && $otDetails['max_ot_hours'] >= 0.5;
+                      $isRestDayOT = isset($otDetails['is_restday']) && $otDetails['is_restday'];
+                      
+                      if ($canFileOT): 
+                      ?>
                       <button onclick="openOvertimeModal(this)"
                               data-log-date="<?= $hasDate ? $log['log_date'] : '' ?>"
                               data-time-log-id="<?= $hasLog ? $log['id'] : '' ?>"
@@ -1245,6 +1265,14 @@ button:hover {
                         <i class="fas fa-plus mr-2 group-hover:rotate-90 transition-transform duration-200"></i>
                         OT Request
                       </button>
+                      <?php else: ?>
+                      <div class="flex items-center justify-center w-full">
+                        <span class="inline-flex items-center px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-sm font-medium border border-gray-200" title="<?= $isRestDayOT ? 'Need 8+ hours worked for Restday OT' : 'Need 30+ minutes past scheduled time for Regular OT' ?>">
+                          <i class="fas fa-ban mr-2"></i>
+                          Not Eligible
+                        </span>
+                      </div>
+                      <?php endif; ?>
                     <?php endif; ?>
                   </td>
                 </tr>
