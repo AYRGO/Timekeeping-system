@@ -2022,16 +2022,36 @@ function initializeTimePicker(maxHours) {
             hiddenInput.value = '';
             validationInfo.textContent = 'Select approved OT hours';
             validationInfo.className = 'mt-0.5 text-xs text-gray-500 truncate';
+            toggleSubmitButton(false, 'Select OT hours');
         } else if (totalHours > maxHours) {
             hiddenInput.value = totalHours.toFixed(2);
             validationInfo.textContent = 'Exceeds available OT time';
             validationInfo.className = 'mt-0.5 text-xs text-red-500 truncate';
+            toggleSubmitButton(false, 'Exceeds available OT');
         } else {
             hiddenInput.value = totalHours.toFixed(2);
             
             // Show selected hours
             validationInfo.textContent = `Selected: ${formatDuration(totalHours)}`;
             validationInfo.className = 'mt-0.5 text-xs text-emerald-600 truncate';
+            toggleSubmitButton(true);
+        }
+    }
+    
+    // Helper to enable/disable submit button
+    function toggleSubmitButton(enabled, reason = '') {
+        const submitBtn = document.querySelector('#overtimeForm button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = !enabled;
+            if (enabled) {
+                submitBtn.classList.remove('bg-gray-400', 'cursor-not-allowed', 'opacity-60');
+                submitBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                submitBtn.title = '';
+            } else {
+                submitBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                submitBtn.classList.add('bg-gray-400', 'cursor-not-allowed', 'opacity-60');
+                submitBtn.title = reason || 'Cannot submit';
+            }
         }
     }
     
@@ -2827,6 +2847,20 @@ function submitOvertimeForm(form) {
     if (!attachment) {
         alert('Error: Please upload a supporting document.');
         form.querySelector('#attachment')?.focus();
+        return;
+    }
+    
+    // Validate that requested OT hours don't exceed available OT time
+    const maxOtHours = parseFloat(form.querySelector('#max_ot_hours')?.value) || 0;
+    const requestedHours = parseFloat(overtimeHours) || 0;
+    
+    // For Regular OT, check if requested hours exceed max available
+    if (otType !== 'Restday OT' && requestedHours > maxOtHours) {
+        const maxMinutes = Math.round(maxOtHours * 60);
+        alert('⚠️ Cannot submit OT request.\n\nYou have requested more overtime hours than available.\n\n' +
+              '• Maximum available: ' + maxMinutes + ' minutes (' + maxOtHours.toFixed(2) + ' hrs)\n' +
+              '• You requested: ' + Math.round(requestedHours * 60) + ' minutes (' + requestedHours.toFixed(2) + ' hrs)\n\n' +
+              'Please adjust your OT hours to be within the available time.');
         return;
     }
     
