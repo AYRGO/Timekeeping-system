@@ -13,11 +13,40 @@ session_start();
 include('../config/db.php');
 include('../config/csrf_helper.php');
 
+// Configure usernames that are allowed to access the system on mobile devices.
+// Keep all values lowercase for predictable matching.
+function getMobileAccessAllowlist() {
+  return [
+    'kiras001',
+    'shirmiley.quizon'
+  ];
+}
+
+function isMobileAccessAllowedForUsername($username) {
+  $normalizedUsername = strtolower(trim((string)$username));
+  if ($normalizedUsername === '') {
+    return false;
+  }
+
+  return in_array($normalizedUsername, getMobileAccessAllowlist(), true);
+}
+
 // Initialize CSRF protection
 init_csrf_protection();
 
+// Detect mobile clients from user-agent and the screen width cookie set by JavaScript.
+$screenWidth = $_COOKIE['screen_width'] ?? 1920;
+$isMobileRequest = isMobileDevice() || (int)$screenWidth < 1024;
+
 // Check if user is already logged in - redirect them away from login page
 if (isset($_SESSION['employee']['id'])) {
+  if ($isMobileRequest) {
+    $sessionUsername = $_SESSION['employee']['username'] ?? '';
+    if (!isMobileAccessAllowedForUsername($sessionUsername)) {
+      http_response_code(403);
+      die("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Desktop Only</title><style>body{font-family:sans-serif;text-align:center;padding-top:80px;background:#f3f4f6;}</style></head><body><h2 style='color:#1e3a5f;'>Access Restricted</h2><p>Mobile access is disabled for your account.</p><p style='color:#6b7280;font-size:14px;'>Please use a desktop browser to continue.</p></body></html>");
+    }
+  }
     header("Location: ../module/time_log_create.php");
     exit;
 }
@@ -31,12 +60,6 @@ if (empty($_SESSION['csrf_token'])) {
 function isMobileDevice() {
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
     return preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i', $ua);
-}
-
-$screenWidth = $_COOKIE['screen_width'] ?? 1920;
-if (isMobileDevice() || (int)$screenWidth < 1024) {
-    http_response_code(403);
-    die("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Desktop Only</title><style>body{font-family:sans-serif;text-align:center;padding-top:80px;background:#f3f4f6;}</style></head><body><h2 style='color:#1e3a5f;'>Access Restricted</h2><p>This system is only accessible from a <strong>desktop or laptop computer</strong>.</p><p style='color:#6b7280;font-size:14px;'>Please switch to a desktop browser to continue.</p></body></html>");
 }
 
 // Brute-force protection
@@ -83,6 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($user && $password_valid) {
+      if ($isMobileRequest && !isMobileAccessAllowedForUsername($user['username'] ?? '')) {
+        $error = "Mobile access is not enabled for this account. Please use a desktop browser.";
+      } else {
         // Success
         unset($_SESSION['login_attempts'][$username]);
         session_regenerate_id(true);
@@ -92,6 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $_SESSION['employee'] = [
             'id'       => $user['id'],
+          'username' => $user['username'],
             'fname'    => $user['fname'],
             'lname'    => $user['lname'],
             'position' => $user['position'],
@@ -103,6 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         header("Location: ../module/time_log_create.php");
         exit;
+        }
     } else {
         // Failed login
         $_SESSION['login_attempts'][$username] = [
@@ -128,21 +156,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <script>
     // Set cookie so PHP can read screen width on next request
     document.cookie = "screen_width=" + window.innerWidth + "; path=/; SameSite=Strict";
-
-    function isProbablyMobile() {
-      const ua = navigator.userAgent;
-      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-      const isSmall = window.innerWidth < 1024;
-      return isMobileUA || isSmall;
-    }
-
-    if (isProbablyMobile()) {
-      document.open();
-      document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Desktop Only</title><style>body{font-family:sans-serif;text-align:center;padding-top:80px;background:#f3f4f6;}</style></head><body><h2 style="color:#1e3a5f;">Access Restricted</h2><p>This system is only accessible from a <strong>desktop or laptop computer</strong>.</p><p style="color:#6b7280;font-size:14px;">Please switch to a desktop browser to continue.</p></body></html>');
-      document.close();
-      // Block any further script execution
-      window.stop && window.stop();
-    }
   </script>
 
   <style>
