@@ -1,12 +1,13 @@
 -- ===================================================================
 -- CREATE LEAVE CREDIT AUDIT/HISTORY TABLE
 -- Purpose: Track all changes to leave credits for auditing purposes
+-- Run this on production ONCE to enable leave credit tracking
 -- ===================================================================
 
 -- Create the audit table
 CREATE TABLE IF NOT EXISTS `leave_credits_history` (
   `history_id` INT(11) NOT NULL AUTO_INCREMENT,
-  `leave_credit_id` INT(11) NOT NULL,
+  `leave_credit_id` INT(11) DEFAULT NULL,
   `employee_id` INT(11) NOT NULL,
   `leave_type` VARCHAR(50) NOT NULL,
   `old_balance` DECIMAL(5,2) DEFAULT NULL,
@@ -16,7 +17,7 @@ CREATE TABLE IF NOT EXISTS `leave_credits_history` (
   `new_monthly_increment` DECIMAL(5,2) DEFAULT NULL,
   `old_last_processed_month` INT(11) DEFAULT NULL,
   `new_last_processed_month` INT(11) DEFAULT NULL,
-  `change_type` VARCHAR(50) DEFAULT NULL COMMENT 'ACCRUAL, DEDUCTION, ADJUSTMENT, CARRY_OVER, FORFEITURE',
+  `change_type` VARCHAR(50) DEFAULT NULL COMMENT 'ACCRUAL, DEDUCTION, ADMIN_INCREASE, ADMIN_DECREASE, LEAVE_USED, CARRY_OVER, FORFEITURE, ADJUSTMENT',
   `change_reason` TEXT DEFAULT NULL,
   `changed_by` VARCHAR(100) DEFAULT NULL COMMENT 'System or admin username',
   `changed_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -26,76 +27,15 @@ CREATE TABLE IF NOT EXISTS `leave_credits_history` (
   KEY `idx_leave_type` (`leave_type`),
   KEY `idx_changed_at` (`changed_at`),
   KEY `idx_change_type` (`change_type`),
-  KEY `idx_leave_credit_id` (`leave_credit_id`)
+  KEY `idx_leave_credit_id` (`leave_credit_id`),
+  KEY `idx_year` (`year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ===================================================================
--- CREATE TRIGGER TO AUTOMATICALLY LOG UPDATES
+-- NOTE: The PHP code in employee-edit.php handles audit logging directly
+-- This gives better control over change types (ADMIN_INCREASE, ADMIN_DECREASE, etc.)
+-- No database trigger needed - the PHP code inserts into leave_credits_history
 -- ===================================================================
-
-DELIMITER $$
-
-DROP TRIGGER IF EXISTS `leave_credits_update_audit`$$
-
-CREATE TRIGGER `leave_credits_update_audit`
-AFTER UPDATE ON `leave_credits`
-FOR EACH ROW
-BEGIN
-    DECLARE v_change_type VARCHAR(50);
-    DECLARE v_change_reason TEXT;
-    
-    -- Determine the type of change
-    IF NEW.last_processed_month <> OLD.last_processed_month OR (NEW.last_processed_month IS NOT NULL AND OLD.last_processed_month IS NULL) THEN
-        SET v_change_type = 'ACCRUAL';
-        SET v_change_reason = CONCAT('Monthly accrual processed for month ', NEW.last_processed_month);
-    ELSEIF NEW.balance < OLD.balance THEN
-        SET v_change_type = 'DEDUCTION';
-        SET v_change_reason = 'Leave credit used/deducted';
-    ELSEIF NEW.balance > OLD.balance AND (NEW.last_processed_month = OLD.last_processed_month OR NEW.last_processed_month IS NULL) THEN
-        SET v_change_type = 'ADJUSTMENT';
-        SET v_change_reason = 'Manual adjustment or correction';
-    ELSE
-        SET v_change_type = 'UPDATE';
-        SET v_change_reason = 'Leave credit updated';
-    END IF;
-    
-    -- Insert audit record
-    INSERT INTO leave_credits_history (
-        leave_credit_id,
-        employee_id,
-        leave_type,
-        old_balance,
-        new_balance,
-        balance_change,
-        old_monthly_increment,
-        new_monthly_increment,
-        old_last_processed_month,
-        new_last_processed_month,
-        change_type,
-        change_reason,
-        changed_by,
-        changed_at,
-        year
-    ) VALUES (
-        NEW.id,
-        NEW.employee_id,
-        NEW.leave_type,
-        OLD.balance,
-        NEW.balance,
-        (NEW.balance - OLD.balance),
-        OLD.monthly_increment,
-        NEW.monthly_increment,
-        OLD.last_processed_month,
-        NEW.last_processed_month,
-        v_change_type,
-        v_change_reason,
-        COALESCE(@current_user, CURRENT_USER()),
-        NOW(),
-        NEW.year
-    );
-END$$
-
-DELIMITER ;
 
 -- ===================================================================
 -- QUERIES TO VIEW AUDIT HISTORY

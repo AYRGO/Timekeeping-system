@@ -310,10 +310,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Update leave credits
     if (isset($_POST['update_credits']) && isset($_POST['credits'])) {
+        // Get admin username for audit trail
+        $adminUser = $_SESSION['username'] ?? $_SESSION['admin_username'] ?? 'Admin';
+        
         foreach ($_POST['credits'] as $leaveType => $data) {
             $balance = is_numeric($data['balance']) ? floatval($data['balance']) : null;
             $monthlyIncrement = is_numeric($data['monthly_increment']) ? floatval($data['monthly_increment']) : null;
             $carryOver = isset($data['carry_over']) && is_numeric($data['carry_over']) ? floatval($data['carry_over']) : null;
+
+            // Get current values for audit logging
+            $currentStmt = $pdo->prepare("SELECT id, balance, monthly_increment, carry_over FROM leave_credits WHERE employee_id = ? AND year = ? AND leave_type = ?");
+            $currentStmt->execute([$employeeId, date('Y'), $leaveType]);
+            $currentCredit = $currentStmt->fetch(PDO::FETCH_ASSOC);
 
             // Make sure a record exists (insert if not)
             $check = $pdo->prepare("SELECT COUNT(*) FROM leave_credits WHERE employee_id = ? AND year = ? AND leave_type = ?");
@@ -321,6 +329,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($check->fetchColumn() == 0) {
                 $insert = $pdo->prepare("INSERT INTO leave_credits (employee_id, leave_type, year) VALUES (?, ?, ?)");
                 $insert->execute([$employeeId, $leaveType, date('Y')]);
+                
+                // Get the new ID
+                $currentStmt->execute([$employeeId, date('Y'), $leaveType]);
+                $currentCredit = $currentStmt->fetch(PDO::FETCH_ASSOC);
+            }
+
+            // Calculate changes for audit
+            $oldBalance = $currentCredit['balance'] ?? 0;
+            $balanceChange = $balance - $oldBalance;
+            
+            // Determine change type
+            if ($balanceChange > 0) {
+                $changeType = 'ADMIN_INCREASE';
+                $changeReason = "Admin manually increased balance by " . abs($balanceChange);
+            } elseif ($balanceChange < 0) {
+                $changeType = 'ADMIN_DECREASE';
+                $changeReason = "Admin manually decreased balance by " . abs($balanceChange);
+            } else {
+                $changeType = 'ADMIN_UPDATE';
+                $changeReason = "Admin updated leave credit settings";
             }
 
             // Update with new values
@@ -333,6 +361,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 date('Y'),
                 $leaveType
             ]);
+            
+            // Log to audit table if balance changed or any value changed
+            if ($balanceChange != 0 || $monthlyIncrement != ($currentCredit['monthly_increment'] ?? 0)) {
+                try {
+                    $auditStmt = $pdo->prepare("INSERT INTO leave_credits_history 
+                        (leave_credit_id, employee_id, leave_type, old_balance, new_balance, balance_change, 
+                         old_monthly_increment, new_monthly_increment, change_type, change_reason, changed_by, year)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $auditStmt->execute([
+                        $currentCredit['id'],
+                        $employeeId,
+                        $leaveType,
+                        $oldBalance,
+                        $balance,
+                        $balanceChange,
+                        $currentCredit['monthly_increment'] ?? 0,
+                        $monthlyIncrement,
+                        $changeType,
+                        $changeReason,
+                        $adminUser,
+                        date('Y')
+                    ]);
+                } catch (PDOException $e) {
+                    // Audit table might not exist yet - continue without error
+                    error_log("Leave credit audit logging failed: " . $e->getMessage());
+                }
+            }
         }
 
         echo "<script>alert('Leave credits updated successfully!'); window.location.href = 'employee-edit.php?id=$employeeId';</script>";
@@ -1561,7 +1616,12 @@ uasort($sortedScheduleOptions, function($a, $b) {
             <!-- Leave Credits Tab -->
             <div id="leave-credits" class="tab-content">
                 <div class="bg-white rounded-lg shadow-md p-6">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-6">Leave Credits (<?= date('Y') ?>)</h2>
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">Leave Credits (<?= date('Y') ?>)</h2>
+                        <button type="button" onclick="toggleHistoryPanel()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md transition text-sm">
+                            <i class="fas fa-history mr-2"></i>View History
+                        </button>
+                    </div>
 
                     <form method="post">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1629,6 +1689,162 @@ uasort($sortedScheduleOptions, function($a, $b) {
                             </button>
                         </div>
                     </form>
+                </div>
+                
+                <!-- Leave Credit History Panel (Hidden by default) -->
+                <div id="leaveHistoryPanel" class="bg-white rounded-lg shadow-md p-6 mt-6" style="display: none;">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">
+                            <i class="fas fa-history mr-2 text-blue-600"></i>Leave Credit History
+                        </h3>
+                        <button type="button" onclick="toggleHistoryPanel()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <?php
+                    // Fetch leave credit history for this employee
+                    $historyData = [];
+                    try {
+                        $historyStmt = $pdo->prepare("
+                            SELECT h.*, 
+                                   DATE_FORMAT(h.changed_at, '%b %d, %Y %h:%i %p') as formatted_date
+                            FROM leave_credits_history h
+                            WHERE h.employee_id = ? AND h.year = ?
+                            ORDER BY h.changed_at DESC
+                            LIMIT 50
+                        ");
+                        $historyStmt->execute([$employeeId, date('Y')]);
+                        $historyData = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
+                    } catch (PDOException $e) {
+                        // Table might not exist yet
+                        $historyData = [];
+                    }
+                    ?>
+                    
+                    <?php if (empty($historyData)): ?>
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-clipboard-list text-4xl mb-4 opacity-50"></i>
+                            <p>No leave credit history found for <?= date('Y') ?></p>
+                            <p class="text-xs mt-2">History tracking starts from the first update after enabling this feature.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="w-full table-auto text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Leave Type</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Change</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Old → New</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">By</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <?php foreach ($historyData as $history): 
+                                        $changeColor = 'text-gray-600';
+                                        $changeIcon = 'fa-minus';
+                                        $change = floatval($history['balance_change']);
+                                        
+                                        if ($change > 0) {
+                                            $changeColor = 'text-green-600';
+                                            $changeIcon = 'fa-arrow-up';
+                                        } elseif ($change < 0) {
+                                            $changeColor = 'text-red-600';
+                                            $changeIcon = 'fa-arrow-down';
+                                        }
+                                        
+                                        // Badge colors by change type
+                                        $typeBadge = 'bg-gray-100 text-gray-800';
+                                        switch($history['change_type']) {
+                                            case 'ACCRUAL':
+                                                $typeBadge = 'bg-blue-100 text-blue-800';
+                                                break;
+                                            case 'DEDUCTION':
+                                            case 'LEAVE_USED':
+                                                $typeBadge = 'bg-red-100 text-red-800';
+                                                break;
+                                            case 'ADMIN_INCREASE':
+                                            case 'ADJUSTMENT':
+                                                $typeBadge = 'bg-green-100 text-green-800';
+                                                break;
+                                            case 'ADMIN_DECREASE':
+                                                $typeBadge = 'bg-orange-100 text-orange-800';
+                                                break;
+                                            case 'CARRY_OVER':
+                                                $typeBadge = 'bg-purple-100 text-purple-800';
+                                                break;
+                                            case 'FORFEITURE':
+                                                $typeBadge = 'bg-red-100 text-red-800';
+                                                break;
+                                        }
+                                    ?>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">
+                                            <?= $history['formatted_date'] ?>
+                                        </td>
+                                        <td class="px-3 py-2 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                                                <?= ucwords(str_replace('_', ' ', $history['leave_type'])) ?>
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2 whitespace-nowrap <?= $changeColor ?> font-semibold">
+                                            <i class="fas <?= $changeIcon ?> mr-1"></i>
+                                            <?= $change >= 0 ? '+' : '' ?><?= number_format($change, 2) ?>
+                                        </td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">
+                                            <?= number_format($history['old_balance'] ?? 0, 2) ?> → <?= number_format($history['new_balance'] ?? 0, 2) ?>
+                                        </td>
+                                        <td class="px-3 py-2 whitespace-nowrap">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium <?= $typeBadge ?>">
+                                                <?= str_replace('_', ' ', $history['change_type']) ?>
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2 text-gray-600 max-w-xs truncate" title="<?= htmlspecialchars($history['change_reason'] ?? '') ?>">
+                                            <?= htmlspecialchars($history['change_reason'] ?? '-') ?>
+                                        </td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-gray-500">
+                                            <?= htmlspecialchars($history['changed_by'] ?? 'System') ?>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- History Summary -->
+                        <div class="mt-4 pt-4 border-t border-gray-200">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                <?php
+                                $summaryCounts = ['ACCRUAL' => 0, 'DEDUCTION' => 0, 'ADMIN_INCREASE' => 0, 'ADMIN_DECREASE' => 0];
+                                foreach ($historyData as $h) {
+                                    $type = $h['change_type'];
+                                    if (isset($summaryCounts[$type])) {
+                                        $summaryCounts[$type]++;
+                                    }
+                                }
+                                ?>
+                                <div>
+                                    <div class="text-lg font-semibold text-blue-600"><?= $summaryCounts['ACCRUAL'] ?></div>
+                                    <div class="text-xs text-gray-500">Accruals</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-semibold text-red-600"><?= $summaryCounts['DEDUCTION'] ?></div>
+                                    <div class="text-xs text-gray-500">Deductions</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-semibold text-green-600"><?= $summaryCounts['ADMIN_INCREASE'] ?></div>
+                                    <div class="text-xs text-gray-500">Admin Increases</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-semibold text-orange-600"><?= $summaryCounts['ADMIN_DECREASE'] ?></div>
+                                    <div class="text-xs text-gray-500">Admin Decreases</div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -2587,6 +2803,17 @@ function deleteSchedule(scheduleId) {
         `;
         document.body.appendChild(form);
         form.submit();
+    }
+}
+
+// Toggle leave credit history panel
+function toggleHistoryPanel() {
+    const panel = document.getElementById('leaveHistoryPanel');
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        panel.style.display = 'none';
     }
 }
 
