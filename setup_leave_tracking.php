@@ -7,7 +7,11 @@
  * Add ?confirm=yes to actually create the table
  */
 
-require_once __DIR__ . '/src/config/database.php';
+// Hostinger production settings
+$host = 'localhost';
+$dbname = 'u816220874_calendartype';
+$username = 'u816220874_calendartype';
+$password = 'Gr33n$$wRf';
 
 echo "<pre>";
 echo "=======================================================\n";
@@ -17,9 +21,9 @@ echo "=======================================================\n\n";
 
 try {
     $pdo = new PDO(
-        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
-        DB_USER,
-        DB_PASS,
+        "mysql:host=$host;dbname=$dbname;charset=utf8mb4",
+        $username,
+        $password,
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
     echo "✅ Connected to database\n\n";
