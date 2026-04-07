@@ -427,33 +427,32 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 
                             // Check if date is a holiday first (from cache, not hardcoded array)
                             if ($isHoliday) {
-                                // It's a holiday - show holiday type if available
+                                // It's a holiday - show in status column
                                 if ($timeIn) {
                                     // Employee worked on holiday - show specific holiday type
                                     if ($holidayType) {
                                         switch ($holidayType) {
                                             case 'regular':
-                                                $status = 'RH (Worked)'; // Regular Holiday
+                                                $status = 'RH'; // Regular Holiday (Worked)
                                                 break;
                                             case 'special_non_working':
-                                                $status = 'SNWH (Worked)'; // Special Non-Working Holiday
+                                                $status = 'SNWH'; // Special Non-Working Holiday (Worked)
                                                 break;
                                             case 'special_working':
-                                                $status = 'SWH (Worked)'; // Special Working Holiday
+                                                $status = 'SWH'; // Special Working Holiday (Worked)
                                                 break;
                                             default:
-                                                $status = $holidayName ? $holidayName . ' (Worked)' : 'Holiday (Worked)';
+                                                $status = $holidayName ?? 'Holiday';
                                         }
                                     } else {
-                                        // Fallback if holiday_type not available
-                                        $status = $holidayName ? $holidayName . ' (Worked)' : 'Holiday (Worked)';
+                                        // Fallback - show holiday name if type not available
+                                        $status = $holidayName ?? 'Holiday';
                                     }
-                                    $badgeClass = 'bg-indigo-100 text-indigo-800';
                                 } else {
-                                    // Holiday not worked
+                                    // Holiday not worked - show holiday name
                                     $status = $holidayName ?? 'Holiday';
-                                    $badgeClass = 'bg-indigo-100 text-indigo-800';
                                 }
+                                $badgeClass = 'bg-indigo-100 text-indigo-800';
                             } elseif ($leaveType) {
                                 // Employee is on approved leave
                                 $status = 'On Leave';
