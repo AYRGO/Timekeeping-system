@@ -43,12 +43,13 @@ try {
     }
 }
 
-// Insert Philippine holidays for 2025-2026
-echo "\nAdding Philippine holidays...\n";
+// Insert company holidays for 2025-2026 (Philippines + Australia)
+echo "\nAdding company holidays (Philippines & Australia)...\n";
 
 $holidays = [
-    // 2025 Regular Holidays
+    // 2025 Holidays
     ['2025-01-01', 'New Year\'s Day', 'regular', 1],
+    ['2025-01-26', 'Australia Day', 'regular', 1],
     ['2025-04-09', 'Araw ng Kagitingan (Day of Valor)', 'regular', 1],
     ['2025-04-17', 'Maundy Thursday', 'regular', 0],
     ['2025-04-18', 'Good Friday', 'regular', 0],
@@ -58,27 +59,34 @@ $holidays = [
     ['2025-08-31', 'National Heroes Day', 'regular', 0],
     ['2025-11-01', 'All Saints\' Day', 'special_non_working', 1],
     ['2025-11-30', 'Bonifacio Day', 'regular', 1],
+    ['2025-12-24', 'Christmas Eve', 'special_non_working', 1],
     ['2025-12-25', 'Christmas Day', 'regular', 1],
+    ['2025-12-26', 'Boxing Day', 'regular', 1],
     ['2025-12-30', 'Rizal Day', 'regular', 1],
+    ['2025-12-31', 'New Year\'s Eve', 'special_non_working', 1],
     
-    // 2026 Regular Holidays
+    // 2026 Holidays
     ['2026-01-01', 'New Year\'s Day', 'regular', 1],
+    ['2026-01-26', 'Australia Day', 'regular', 1],
     ['2026-04-02', 'Maundy Thursday', 'regular', 0],
     ['2026-04-03', 'Good Friday', 'regular', 0],
-    ['2026-04-09', 'Araw ng Kagitingan (Day of Valor)', 'regular', 1],
+    ['2026-04-04', 'Easter Saturday', 'regular', 0],
+    ['2026-04-05', 'Easter Sunday', 'regular', 0],
+    ['2026-04-06', 'Easter Monday', 'regular', 0],
+    ['2026-04-09', 'Araw ng Kagitingan', 'regular', 1],
+    ['2026-04-25', 'ANZAC Day', 'regular', 1],
     ['2026-05-01', 'Labor Day', 'regular', 1],
+    ['2026-06-08', 'King\'s Birthday', 'regular', 1],
     ['2026-06-12', 'Independence Day', 'regular', 1],
-    ['2026-08-25', 'Ninoy Aquino Day', 'special_non_working', 1],
     ['2026-08-31', 'National Heroes Day', 'regular', 0],
+    ['2026-10-05', 'Labour Day', 'regular', 1],
     ['2026-11-01', 'All Saints\' Day', 'special_non_working', 1],
     ['2026-11-30', 'Bonifacio Day', 'regular', 1],
-    ['2026-12-25', 'Christmas Day', 'regular', 1],
-    ['2026-12-30', 'Rizal Day', 'regular', 1],
-    
-    // Additional special days
-    ['2025-12-24', 'Christmas Eve', 'special_non_working', 1],
-    ['2025-12-31', 'New Year\'s Eve', 'special_non_working', 1],
     ['2026-12-24', 'Christmas Eve', 'special_non_working', 1],
+    ['2026-12-25', 'Christmas Day', 'regular', 1],
+    ['2026-12-26', 'Boxing Day', 'regular', 1],
+    ['2026-12-28', 'Boxing Day (observed)', 'regular', 0],
+    ['2026-12-30', 'Rizal Day', 'regular', 1],
     ['2026-12-31', 'New Year\'s Eve', 'special_non_working', 1],
 ];
 
