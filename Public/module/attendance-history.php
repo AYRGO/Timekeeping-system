@@ -61,7 +61,10 @@ foreach ($otRequests as $otRequest) {
     $otStatusMap[$otRequest['log_date']] = $otRequest['ot_status'];
 }
 
-// 2026 Holidays array
+// Legacy hardcoded holidays array - NO LONGER USED
+// Now using company_holidays table via employee_daily_schedule_cache
+// Kept for reference only
+/*
 $holidays2026 = [
     '2026-01-01' => 'New Year\'s Day',
     '2026-01-26' => 'Australia Day',
@@ -88,6 +91,7 @@ $holidays2026 = [
 function isHoliday($checkDate, $holidays) {
     return isset($holidays[$checkDate]) ? $holidays[$checkDate] : false;
 }
+*/
 
 // Function to check if a date is within approved leave period
 function isOnApprovedLeave($checkDate, $approvedLeaves) {
@@ -251,6 +255,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                     time_in,
                                     time_out,
                                     holiday_name,
+                                    holiday_type,
                                     source
                                 FROM employee_daily_schedule_cache
                                 WHERE employee_id = ? AND schedule_date = ?
@@ -262,6 +267,8 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             // Initialize default values
                             $isRestDay = false;
                             $isHoliday = false;
+                            $holidayType = null;
+                            $holidayName = null;
                             $schedule_in_24h = null;
                             $schedule_out_24h = null;
                             $scheduleName = null;
@@ -271,6 +278,8 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             if ($scheduleCache) {
                                 $isRestDay = ($scheduleCache['is_rest_day'] == 1);
                                 $isHoliday = ($scheduleCache['is_holiday'] == 1);
+                                $holidayType = $scheduleCache['holiday_type'] ?? null;
+                                $holidayName = $scheduleCache['holiday_name'] ?? null;
                                 $scheduleSource = $scheduleCache['source'];
                                 $scheduleName = $scheduleCache['schedule_name'];
                                 
@@ -416,12 +425,35 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                             $status = '-';
                             $badgeClass = 'bg-gray-100 text-gray-800';
 
-                            // Check if date is a holiday first
-                            $holidayName = isHoliday($logDate, $holidays2026);
-                            if ($holidayName) {
-                                // It's a holiday
-                                $status = $holidayName;
-                                $badgeClass = 'bg-indigo-100 text-indigo-800';
+                            // Check if date is a holiday first (from cache, not hardcoded array)
+                            if ($isHoliday) {
+                                // It's a holiday - show holiday type if available
+                                if ($timeIn) {
+                                    // Employee worked on holiday - show specific holiday type
+                                    if ($holidayType) {
+                                        switch ($holidayType) {
+                                            case 'regular':
+                                                $status = 'RH (Worked)'; // Regular Holiday
+                                                break;
+                                            case 'special_non_working':
+                                                $status = 'SNWH (Worked)'; // Special Non-Working Holiday
+                                                break;
+                                            case 'special_working':
+                                                $status = 'SWH (Worked)'; // Special Working Holiday
+                                                break;
+                                            default:
+                                                $status = $holidayName ? $holidayName . ' (Worked)' : 'Holiday (Worked)';
+                                        }
+                                    } else {
+                                        // Fallback if holiday_type not available
+                                        $status = $holidayName ? $holidayName . ' (Worked)' : 'Holiday (Worked)';
+                                    }
+                                    $badgeClass = 'bg-indigo-100 text-indigo-800';
+                                } else {
+                                    // Holiday not worked
+                                    $status = $holidayName ?? 'Holiday';
+                                    $badgeClass = 'bg-indigo-100 text-indigo-800';
+                                }
                             } elseif ($leaveType) {
                                 // Employee is on approved leave
                                 $status = 'On Leave';
