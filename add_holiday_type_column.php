@@ -4,12 +4,12 @@
  * and update existing records
  */
 
-// Direct database connection
-try {
-    $pdo = new PDO('mysql:host=localhost;dbname=u816220874_calendartype', 'root', '');
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
+// Use the application's database configuration
+require_once 'Public/config/db.php';
+
+// Check if database connection is available
+if (!isset($pdo)) {
+    die("Database connection not available. Please check your database configuration.");
 }
 
 echo "<pre>";
