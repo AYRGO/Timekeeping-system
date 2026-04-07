@@ -111,19 +111,30 @@ foreach ($scheduleChanges as $change) {
 // This ensures payroll report shows EXACTLY what the employee sees in their calendar
 function getScheduleForDate($pdo, $employee_id, $date) {
     // Query the pre-computed cache table - THIS IS THE EMPLOYEE'S PERSONAL CALENDAR DATA
+    // Check if holiday_type column exists (for backward compatibility)
+    static $hasHolidayTypeColumn = null;
+    if ($hasHolidayTypeColumn === null) {
+        $checkStmt = $pdo->query("SHOW COLUMNS FROM employee_daily_schedule_cache LIKE 'holiday_type'");
+        $hasHolidayTypeColumn = $checkStmt->rowCount() > 0;
+    }
+    
+    // Build query based on whether holiday_type column exists
+    $selectFields = "
+        schedule_date,
+        employee_id,
+        work_schedule_id,
+        is_rest_day,
+        is_holiday,
+        schedule_name,
+        time_in,
+        time_out,
+        holiday_name,
+        " . ($hasHolidayTypeColumn ? "holiday_type," : "") . "
+        source
+    ";
+    
     $stmt = $pdo->prepare("
-        SELECT 
-            schedule_date,
-            employee_id,
-            work_schedule_id,
-            is_rest_day,
-            is_holiday,
-            schedule_name,
-            time_in,
-            time_out,
-            holiday_name,
-            holiday_type,
-            source
+        SELECT $selectFields
         FROM employee_daily_schedule_cache
         WHERE employee_id = ? AND schedule_date = ?
         LIMIT 1
@@ -567,25 +578,30 @@ function getAttendanceStatus($log, $leaveType, $scheduleInfo, $dayOfWeek) {
     // If this is a holiday
     if (isset($scheduleInfo['is_holiday']) && $scheduleInfo['is_holiday'] == 1) {
         if ($log && $log['time_in']) {
-            // Employee worked on holiday - show holiday type
-            $holidayType = $scheduleInfo['holiday_type'] ?? 'regular';
+            // Employee worked on holiday - show holiday type if available
+            $holidayType = isset($scheduleInfo['holiday_type']) ? $scheduleInfo['holiday_type'] : null;
             
-            // Format holiday type for display
-            switch ($holidayType) {
-                case 'regular':
-                    $typeDisplay = 'RH'; // Regular Holiday
-                    break;
-                case 'special_non_working':
-                    $typeDisplay = 'SNWH'; // Special Non-Working Holiday
-                    break;
-                case 'special_working':
-                    $typeDisplay = 'SWH'; // Special Working Holiday
-                    break;
-                default:
-                    $typeDisplay = 'HOL';
+            // If holiday_type is available, display specific type
+            if ($holidayType) {
+                // Format holiday type for display
+                switch ($holidayType) {
+                    case 'regular':
+                        $typeDisplay = 'RH'; // Regular Holiday
+                        break;
+                    case 'special_non_working':
+                        $typeDisplay = 'SNWH'; // Special Non-Working Holiday
+                        break;
+                    case 'special_working':
+                        $typeDisplay = 'SWH'; // Special Working Holiday
+                        break;
+                    default:
+                        $typeDisplay = 'HOL';
+                }
+                return ['status' => $typeDisplay, 'details' => $scheduleInfo['holiday_name'] ?? 'Holiday Work'];
+            } else {
+                // Fallback if holiday_type column doesn't exist yet
+                return ['status' => 'P', 'details' => 'Holiday Work'];
             }
-            
-            return ['status' => $typeDisplay, 'details' => $scheduleInfo['holiday_name'] ?? 'Holiday Work'];
         }
         return ['status' => 'HOL', 'details' => $scheduleInfo['holiday_name'] ?? ''];
     }
