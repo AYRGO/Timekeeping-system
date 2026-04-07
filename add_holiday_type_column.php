@@ -34,18 +34,27 @@ try {
     }
 }
 
-// Update existing records with holiday types
-try {
-    $stmt = $pdo->exec("
-        UPDATE employee_daily_schedule_cache edc
-        INNER JOIN company_holidays ch ON edc.holiday_name = ch.holiday_name
-        SET edc.holiday_type = ch.holiday_type
-        WHERE edc.is_holiday = 1 AND edc.holiday_name IS NOT NULL
-    ");
-    echo "✓ Updated $stmt existing cache records with holiday types\n";
-} catch (PDOException $e) {
-    echo "❌ Error updating records: " . $e->getMessage() . "\n";
-    exit(1);
+// Check if company_holidays table exists
+$tableCheck = $pdo->query("SHOW TABLES LIKE 'company_holidays'")->rowCount();
+
+if ($tableCheck > 0) {
+    // Update existing records with holiday types
+    try {
+        $stmt = $pdo->exec("
+            UPDATE employee_daily_schedule_cache edc
+            INNER JOIN company_holidays ch ON edc.holiday_name = ch.holiday_name
+            SET edc.holiday_type = ch.holiday_type
+            WHERE edc.is_holiday = 1 AND edc.holiday_name IS NOT NULL
+        ");
+        echo "✓ Updated $stmt existing cache records with holiday types\n";
+    } catch (PDOException $e) {
+        echo "⚠️  Warning: Could not update existing records: " . $e->getMessage() . "\n";
+        echo "   This is OK - holiday types will be populated when cache is rebuilt.\n";
+    }
+} else {
+    echo "⚠️  Warning: company_holidays table does not exist yet\n";
+    echo "   Holiday types will be populated when cache is rebuilt.\n";
+    echo "   Note: You may need to create the company_holidays table first.\n";
 }
 
 echo "\n========================================\n";
