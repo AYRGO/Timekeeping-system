@@ -122,6 +122,7 @@ function getScheduleForDate($pdo, $employee_id, $date) {
             time_in,
             time_out,
             holiday_name,
+            holiday_type,
             source
         FROM employee_daily_schedule_cache
         WHERE employee_id = ? AND schedule_date = ?
@@ -566,7 +567,25 @@ function getAttendanceStatus($log, $leaveType, $scheduleInfo, $dayOfWeek) {
     // If this is a holiday
     if (isset($scheduleInfo['is_holiday']) && $scheduleInfo['is_holiday'] == 1) {
         if ($log && $log['time_in']) {
-            return ['status' => 'P', 'details' => 'Holiday Work'];
+            // Employee worked on holiday - show holiday type
+            $holidayType = $scheduleInfo['holiday_type'] ?? 'regular';
+            
+            // Format holiday type for display
+            switch ($holidayType) {
+                case 'regular':
+                    $typeDisplay = 'RH'; // Regular Holiday
+                    break;
+                case 'special_non_working':
+                    $typeDisplay = 'SNWH'; // Special Non-Working Holiday
+                    break;
+                case 'special_working':
+                    $typeDisplay = 'SWH'; // Special Working Holiday
+                    break;
+                default:
+                    $typeDisplay = 'HOL';
+            }
+            
+            return ['status' => $typeDisplay, 'details' => $scheduleInfo['holiday_name'] ?? 'Holiday Work'];
         }
         return ['status' => 'HOL', 'details' => $scheduleInfo['holiday_name'] ?? ''];
     }
@@ -834,6 +853,10 @@ $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(14); // Increased
 $row++;
 $legendItems = [
     ['P', 'Present (Complete - No Late/Undertime)', false],
+    ['RH', 'Regular Holiday (Worked)', false],
+    ['SNWH', 'Special Non-Working Holiday (Worked)', false],
+    ['SWH', 'Special Working Holiday (Worked)', false],
+    ['HOL', 'Holiday (Not Worked)', false],
     ['SL/VL/EL', 'Leave Types (Sick/Vacation/Emergency)', false], 
     ['OFF', 'Scheduled Day Off', true], // Keep color for OFF
     ['240', 'Late/Undertime Minutes (Total)', false],

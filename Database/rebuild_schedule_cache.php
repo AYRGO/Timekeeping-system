@@ -90,8 +90,8 @@ foreach ($employees as $employee) {
         $insertStmt = $pdo->prepare("
             INSERT INTO employee_daily_schedule_cache 
             (employee_id, schedule_date, work_schedule_id, is_rest_day, is_holiday, 
-             schedule_name, time_in, time_out, holiday_name, source, source_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW())
+             schedule_name, time_in, time_out, holiday_name, holiday_type, source, source_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW())
         ");
         
         $currentDate = $startDate;
@@ -101,12 +101,13 @@ foreach ($employees as $employee) {
             $dayOfWeek = date('w', strtotime($currentDate)); // 0 (Sunday) to 6 (Saturday)
             
             // Check if it's a company holiday
-            $holidayStmt = $pdo->prepare("SELECT holiday_name FROM company_holidays WHERE holiday_date = ?");
+            $holidayStmt = $pdo->prepare("SELECT holiday_name, holiday_type FROM company_holidays WHERE holiday_date = ?");
             $holidayStmt->execute([$currentDate]);
             $holiday = $holidayStmt->fetch(PDO::FETCH_ASSOC);
             
             $isHoliday = $holiday ? 1 : 0;
             $holidayName = $holiday ? $holiday['holiday_name'] : null;
+            $holidayType = $holiday ? $holiday['holiday_type'] : null;
             
             // PRIORITY 1: Check for approved schedule change requests
             $approvedRequestStmt->execute([$employeeId, $currentDate]);
@@ -124,6 +125,7 @@ foreach ($employees as $employee) {
                     $approvedRequest['time_in'],
                     $approvedRequest['time_out'],
                     $holidayName,
+                    $holidayType,
                     'approved_request'
                 ]);
                 $daysInserted++;
@@ -142,6 +144,7 @@ foreach ($employees as $employee) {
                     $defaultSched['time_in'],
                     $defaultSched['time_out'],
                     $holidayName,
+                    $holidayType,
                     'weekly_default'
                 ]);
                 
