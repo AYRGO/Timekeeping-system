@@ -30,6 +30,27 @@ function normalize_name(string $value): string
     return trim($ascii);
 }
 
+function tokenize_name(string $value): array
+{
+    $normalized = normalize_name($value);
+    if ($normalized === '') {
+        return [];
+    }
+
+    $tokens = preg_split('/\s+/', $normalized) ?: [];
+    $stopWords = ['jr', 'sr', 'ii', 'iii', 'iv'];
+
+    $filtered = [];
+    foreach ($tokens as $token) {
+        if ($token === '' || in_array($token, $stopWords, true)) {
+            continue;
+        }
+        $filtered[] = $token;
+    }
+
+    return array_values(array_unique($filtered));
+}
+
 function parse_employee_name(string $value): array
 {
     $parts = explode(',', $value, 2);
@@ -48,14 +69,31 @@ function parse_employee_name(string $value): array
 
 function score_candidate(string $needle, string $candidate): int
 {
-    $needle = normalize_name($needle);
-    $candidate = normalize_name($candidate);
+    $needleNormalized = normalize_name($needle);
+    $candidateNormalized = normalize_name($candidate);
 
-    if ($needle === $candidate) {
+    if ($needleNormalized === $candidateNormalized) {
         return 0;
     }
 
-    return levenshtein($needle, $candidate);
+    $needleTokens = tokenize_name($needle);
+    $candidateTokens = tokenize_name($candidate);
+
+    if (!$needleTokens || !$candidateTokens) {
+        return levenshtein($needleNormalized, $candidateNormalized);
+    }
+
+    $commonTokens = array_intersect($needleTokens, $candidateTokens);
+    $missingTokens = array_diff($needleTokens, $candidateTokens);
+    $extraTokens = array_diff($candidateTokens, $needleTokens);
+
+    $score = (count($missingTokens) * 12) + (count($extraTokens) * 2) + levenshtein($needleNormalized, $candidateNormalized);
+
+    if ($commonTokens) {
+        $score -= (count($commonTokens) * 8);
+    }
+
+    return max(0, $score);
 }
 
 function find_best_employee(PDO $pdo, string $displayName): ?array
@@ -74,10 +112,12 @@ function find_best_employee(PDO $pdo, string $displayName): ?array
     $bestScore = PHP_INT_MAX;
 
     foreach ($employees as $employee) {
+        $employeeFullName = $employee['fname'] . ' ' . $employee['lname'];
+        $employeeReversedName = $employee['lname'] . ', ' . $employee['fname'];
         $candidates = [
             $employee['display_name'],
-            $employee['fname'] . ' ' . $employee['lname'],
-            $employee['lname'] . ', ' . $employee['fname'],
+            $employeeFullName,
+            $employeeReversedName,
             $employee['fname'],
             $employee['lname'],
         ];
@@ -94,9 +134,20 @@ function find_best_employee(PDO $pdo, string $displayName): ?array
                 }
             }
         }
+
+        $employeeTokens = tokenize_name($employeeFullName);
+        $searchTokens = tokenize_name($displayName);
+        if ($employeeTokens && $searchTokens) {
+            $tokenOverlap = count(array_intersect($employeeTokens, $searchTokens));
+            $tokenScore = (count($employeeTokens) + count($searchTokens)) - (2 * $tokenOverlap);
+            if ($tokenOverlap >= 2 && $tokenScore < $bestScore) {
+                $bestScore = $tokenScore;
+                $bestMatch = $employee;
+            }
+        }
     }
 
-    return ($bestMatch && $bestScore <= 6) ? $bestMatch : null;
+    return ($bestMatch && $bestScore <= 10) ? $bestMatch : null;
 }
 
 function ensure_table(PDO $pdo, string $sql): void
