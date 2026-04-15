@@ -79,6 +79,11 @@ class EmployeeHolidayProfiles
         return $resolved;
     }
 
+    public function getCurrentProfileForEmployee(int $employeeId): ?array
+    {
+        return $this->getActiveProfileForEmployeeDate($employeeId, date('Y-m-d'));
+    }
+
     public function getActiveProfileForEmployeeDate(int $employeeId, string $date): ?array
     {
         $cacheKey = $employeeId . '|' . $date;

@@ -9,7 +9,7 @@
  * The script is safe to run in dry-run mode first.
  */
 
-require_once 'Public/config/db.php';
+require_once __DIR__ . '/Public/config/db.php';
 
 if (!isset($pdo)) {
     die("Database connection not available.");

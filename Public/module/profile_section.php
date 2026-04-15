@@ -1,3 +1,16 @@
+<?php
+if (!isset($holidayProfileLabel) && isset($employee_id) && isset($pdo)) {
+  require_once __DIR__ . '/../config/EmployeeHolidayProfiles.php';
+  try {
+    $holidayResolver = new EmployeeHolidayProfiles($pdo);
+    $holidayProfile = $holidayResolver->getCurrentProfileForEmployee((int)$employee_id);
+    $holidayProfileLabel = $holidayProfile['profile_name'] ?? $holidayProfile['profile_code'] ?? 'Company Holidays';
+  } catch (Throwable $e) {
+    $holidayProfileLabel = 'Company Holidays';
+  }
+}
+?>
+
 <!-- Profile Section -->
 
 <div id="profileView" class="hidden min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-100">
@@ -45,6 +58,10 @@
               <p class="text-lg font-bold">EMP-<?= str_pad($employee_id ?? '001', 3, '0', STR_PAD_LEFT) ?></p>
             </div>
             <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg px-4 py-2">
+              <span class="text-sm font-medium">Holiday Profile</span>
+              <p class="text-lg font-bold"><?= htmlspecialchars($holidayProfileLabel ?? 'Company Holidays') ?></p>
+            </div>
+            <div class="bg-white bg-opacity-20 backdrop-blur-sm rounded-lg px-4 py-2">
               <span class="text-sm font-medium">Status</span>
               <p class="text-lg font-bold text-green-300">Active</p>
             </div>
@@ -90,7 +107,8 @@
                   'Email Address' => ['value' => $email, 'icon' => 'fas fa-envelope'],
                   'Mobile Number' => ['value' => $contact, 'icon' => 'fas fa-phone'],
                   'Position' => ['value' => $position, 'icon' => 'fas fa-briefcase'],
-                  'Company' => ['value' => $company, 'icon' => 'fas fa-building']
+                  'Company' => ['value' => $company, 'icon' => 'fas fa-building'],
+                  'Holiday Profile' => ['value' => $holidayProfileLabel ?? 'Company Holidays', 'icon' => 'fas fa-calendar-check']
                 ];
                 foreach ($fields as $label => $data):
               ?>
