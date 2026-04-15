@@ -372,20 +372,21 @@ foreach ($profiles as $profile) {
 
     if ($isConfirm) {
         $profileStmt->execute([$profile['profile_code'], $profile['profile_name'], $profile['description']]);
-    }
-
-    $profileLookupStmt->execute([$profile['profile_code']]);
-    $profileId = (int)($profileLookupStmt->fetchColumn() ?: 0);
-
-    if (!$profileId) {
-        echo "  ! Missing profile row\n";
-        continue;
+        $profileLookupStmt->execute([$profile['profile_code']]);
+        $profileId = (int)($profileLookupStmt->fetchColumn() ?: 0);
+        if (!$profileId) {
+            echo "  ! Missing profile row\n";
+            continue;
+        }
+    } else {
+        $profileId = null;
+        echo "  Would create profile row\n";
     }
 
     echo "  Holidays: " . count($profile['holidays']) . "\n";
     foreach ($profile['holidays'] as $holiday) {
         echo "    - {$holiday[0]} | {$holiday[1]} | {$holiday[2]}\n";
-        if ($isConfirm) {
+        if ($isConfirm && $profileId) {
             $holidayStmt->execute([$profileId, $holiday[0], $holiday[1], $holiday[2]]);
         }
     }
@@ -402,7 +403,7 @@ foreach ($profiles as $profile) {
         $matchedName = $match['display_name'];
         echo "    - {$employeeName} => {$matchedName} (ID: {$match['id']})\n";
 
-        if ($isConfirm) {
+        if ($isConfirm && $profileId) {
             $assignmentStmt->execute([
                 $match['id'],
                 $profileId,
