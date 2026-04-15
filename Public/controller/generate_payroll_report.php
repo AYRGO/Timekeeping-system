@@ -575,35 +575,20 @@ function getAttendanceStatus($log, $leaveType, $scheduleInfo, $dayOfWeek) {
         }
     }
     
-    // If this is a holiday
+    // If this is a holiday:
+    // - HOL = holiday off (no complete work log)
+    // - P   = worked holiday (must have both time-in and time-out)
     if (isset($scheduleInfo['is_holiday']) && $scheduleInfo['is_holiday'] == 1) {
-        if ($log && $log['time_in']) {
-            // Employee worked on holiday - show holiday type if available
-            $holidayType = isset($scheduleInfo['holiday_type']) ? $scheduleInfo['holiday_type'] : null;
-            
-            // If holiday_type is available, display specific type
-            if ($holidayType) {
-                // Format holiday type for display
-                switch ($holidayType) {
-                    case 'regular':
-                        $typeDisplay = 'RH'; // Regular Holiday
-                        break;
-                    case 'special_non_working':
-                        $typeDisplay = 'SNWH'; // Special Non-Working Holiday
-                        break;
-                    case 'special_working':
-                        $typeDisplay = 'SWH'; // Special Working Holiday
-                        break;
-                    default:
-                        $typeDisplay = 'HOL';
-                }
-                return ['status' => $typeDisplay, 'details' => $scheduleInfo['holiday_name'] ?? 'Holiday Work'];
-            } else {
-                // Fallback if holiday_type column doesn't exist yet
-                return ['status' => 'P', 'details' => 'Holiday Work'];
-            }
+        $hasCompleteHolidayLog = $log
+            && !empty($log['time_in'])
+            && !empty($log['time_out'])
+            && $log['time_out'] !== 'INC';
+
+        if ($hasCompleteHolidayLog) {
+            return ['status' => 'P', 'details' => 'Holiday Work'];
         }
-        return ['status' => 'HOL', 'details' => $scheduleInfo['holiday_name'] ?? ''];
+
+        return ['status' => 'HOL', 'details' => $scheduleInfo['holiday_name'] ?? 'Holiday Off'];
     }
     
     // If this is a rest day/off day
@@ -803,7 +788,12 @@ foreach ($attendanceData as $employeeId => $data) {
         // Apply cell formatting based on status and details
         $cellStyle = $sheet->getStyle($currentColLetter . $row);
         
-        if ($status === 'OFF') {
+        if ($status === 'P' && !empty($dayData['is_holiday'])) {
+            // Holiday worked and complete log - green background
+            $cellStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFC6EFCE');
+            $cellStyle->getFont()->getColor()->setARGB('FF006100');
+            $cellStyle->getFont()->setBold(true);
+        } elseif ($status === 'OFF') {
             // Day off - Dark gray background (keep this color)
             $cellStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF6C757D');
             $cellStyle->getFont()->getColor()->setARGB('FFFFFFFF');
@@ -868,11 +858,8 @@ $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(14); // Increased
 
 $row++;
 $legendItems = [
-    ['P', 'Present (Complete - No Late/Undertime)', false],
-    ['RH', 'Regular Holiday (Worked)', false],
-    ['SNWH', 'Special Non-Working Holiday (Worked)', false],
-    ['SWH', 'Special Working Holiday (Worked)', false],
-    ['HOL', 'Holiday (Not Worked)', false],
+    ['P', 'Present (Holiday worked cells are highlighted in green)', false],
+    ['HOL', 'Holiday Off (No complete time in/out)', false],
     ['SL/VL/EL', 'Leave Types (Sick/Vacation/Emergency)', false], 
     ['OFF', 'Scheduled Day Off', true], // Keep color for OFF
     ['240', 'Late/Undertime Minutes (Total)', false],
