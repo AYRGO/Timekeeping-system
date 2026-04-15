@@ -6,6 +6,7 @@
  */
 
 require_once '../Public/config/db.php';
+require_once '../Public/config/EmployeeHolidayProfiles.php';
 
 // Output formatting for web browser
 if (php_sapi_name() != 'cli') {
@@ -21,11 +22,12 @@ $endDate = date('Y-m-d', strtotime('+6 months')); // 6 months ahead
 echo "Rebuilding schedule cache...\n";
 echo "Date range: $startDate to $endDate\n\n";
 
+$holidayResolver = new EmployeeHolidayProfiles($pdo);
+
 // Get all employees with default schedules
 $employeesStmt = $pdo->query("
-    SELECT DISTINCT employee_id, CONCAT(e.fname, ' ', e.lname) as full_name
-    FROM employee_default_schedules eds
-    INNER JOIN employees e ON eds.employee_id = e.id
+    SELECT e.id AS employee_id, CONCAT(e.fname, ' ', e.lname) as full_name
+    FROM employees e
     WHERE e.status = 'active'
     ORDER BY e.fname, e.lname
 ");
@@ -100,14 +102,11 @@ foreach ($employees as $employee) {
         while ($currentDate <= $endDate) {
             $dayOfWeek = date('w', strtotime($currentDate)); // 0 (Sunday) to 6 (Saturday)
             
-            // Check if it's a company holiday
-            $holidayStmt = $pdo->prepare("SELECT holiday_name, holiday_type FROM company_holidays WHERE holiday_date = ?");
-            $holidayStmt->execute([$currentDate]);
-            $holiday = $holidayStmt->fetch(PDO::FETCH_ASSOC);
-            
-            $isHoliday = $holiday ? 1 : 0;
-            $holidayName = $holiday ? $holiday['holiday_name'] : null;
-            $holidayType = $holiday ? $holiday['holiday_type'] : null;
+            $holiday = $holidayResolver->resolveHolidayForEmployeeDate((int)$employeeId, $currentDate);
+            $isHoliday = $holiday['is_holiday'] ?? 0;
+            $holidayName = $holiday['holiday_name'] ?? null;
+            $holidayType = $holiday['holiday_type'] ?? null;
+            $holidaySource = $holiday['source'] ?? null;
             
             // PRIORITY 1: Check for approved schedule change requests
             $approvedRequestStmt->execute([$employeeId, $currentDate]);
@@ -126,7 +125,7 @@ foreach ($employees as $employee) {
                     $approvedRequest['time_out'],
                     $holidayName,
                     $holidayType,
-                    'approved_request'
+                    $holidaySource ? $holidaySource . '|approved_request' : 'approved_request'
                 ]);
                 $daysInserted++;
             } elseif (isset($scheduleByDay[$dayOfWeek])) {
@@ -145,7 +144,7 @@ foreach ($employees as $employee) {
                     $defaultSched['time_out'],
                     $holidayName,
                     $holidayType,
-                    'weekly_default'
+                    $holidaySource ? $holidaySource . '|weekly_default' : 'weekly_default'
                 ]);
                 
                 $daysInserted++;
