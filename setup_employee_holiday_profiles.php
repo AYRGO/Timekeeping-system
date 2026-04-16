@@ -228,7 +228,6 @@ $profiles = [
             ['2026-12-31', 'New Year\'s Eve', 'special_non_working'],
         ],
         'employees' => [
-            'Bansil, Kristian David',
             'Dela Cruz, Jonas',
             'Fernandez, Marianne Jae Andrada',
             'Gonzales, Cherry',
@@ -397,6 +396,7 @@ $profiles = [
             ['2026-12-28', 'Boxing Day (Observed)', 'regular'],
         ],
         'employees' => [
+            'Bansil, Kristian David',
             'Manalili, Joshua Manaloto',
             'Pangilinan, Roi Dane Dela Pena',
             'Bautista, Russell Rudolf Cura',
