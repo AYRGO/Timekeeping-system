@@ -120,7 +120,7 @@ function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_
     return false;
   }
   
-  // Special handling for Restday OT - only needs 8+ hours
+  // Special handling for Restday OT - minimum 30 minutes (0.5 hours)
   if ($ot_type === 'Restday OT') {
     $timeIn = new DateTime($time_in);
     $timeOut = new DateTime($time_out);
@@ -129,7 +129,7 @@ function isOvertimeEligibleBySchedule($time_in, $time_out, $log_date, $employee_
     $totalHours = $totalMinutes / 60;
     $workHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours; // Only minus 1hr lunch if 8+ hours
     
-    return $workHours >= 8; // 8+ hours for Restday OT
+    return $workHours >= 0.5; // 30+ minutes for Restday OT
   }
   
   $scheduleInfo = getScheduleForDate($employee_id, $log_date, $pdo);
@@ -307,8 +307,9 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
     $actual_interval = $actual_in_dt->diff($actual_out_dt);
     $actual_minutes = ($actual_interval->days * 24 * 60) + ($actual_interval->h * 60) + $actual_interval->i;
     $actual_hours = round($actual_minutes / 60, 2);
+    $minimum_hours = 0.5; // 30 minutes
     
-    $eligible = $actual_hours >= 8; // 8+ hours for Restday OT
+    $eligible = $actual_hours >= $minimum_hours; // 30+ minutes for Restday OT
     
     $details = [
       'schedule' => [
@@ -327,7 +328,7 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
       'overtime_hours' => $actual_hours,
       'net_overtime_minutes' => $actual_hours * 60,
       'net_overtime_hours' => $actual_hours,
-      'minimum_required' => 8, // hours for Restday OT
+      'minimum_required' => $minimum_hours, // hours for Restday OT
       'eligible' => $eligible,
       'lunch_deducted' => false,
       'is_restday_ot' => true
@@ -335,7 +336,7 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
     
     $reason = $eligible 
       ? "Eligible for {$actual_hours} hours of Restday OT (worked {$actual_hours}h total)"
-      : "Need 8+ hours of work for Restday OT (worked only {$actual_hours}h)";    
+      : "Need at least 0.5 hours (30 minutes) of work for Restday OT (worked only {$actual_hours}h)";    
     
     return [
       'eligible' => $eligible,
