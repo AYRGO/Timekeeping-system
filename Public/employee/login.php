@@ -18,7 +18,8 @@ include('../config/csrf_helper.php');
 function getMobileAccessAllowlist() {
   return [
     'kiras001',
-    'shirmiley.quizon'
+    'shirmiley.quizon',
+    'gener.rosario'
   ];
 }
 
@@ -58,8 +59,21 @@ if (empty($_SESSION['csrf_token'])) {
 
 // Server-side mobile block
 function isMobileDevice() {
-    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    return preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i', $ua);
+  $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+  $secUaMobile = $_SERVER['HTTP_SEC_CH_UA_MOBILE'] ?? '';
+  $secUaPlatform = $_SERVER['HTTP_SEC_CH_UA_PLATFORM'] ?? '';
+
+  // Client hints are the most reliable signal when available.
+  if (trim($secUaMobile) === '?1') {
+    return true;
+  }
+
+  if (preg_match('/iOS|iPadOS|Android/i', $secUaPlatform)) {
+    return true;
+  }
+
+  // Covers common mobile/tablet browsers including iPadOS desktop-mode Safari.
+  return (bool)preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Windows Phone|Mobile|Tablet|Silk|Kindle|CriOS|FxiOS/i', $ua);
 }
 
 // Brute-force protection
