@@ -175,6 +175,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['success' => true]);
         exit;
     }
+
+    if (isset($_POST['action']) && $_POST['action'] === 'update_holiday_profile') {
+        $selectedProfile = $_POST['holiday_profile_id'] ?? 'company';
+        $effectiveFromInput = $_POST['effective_from'] ?? date('Y-m-d');
+        $effectiveDate = DateTime::createFromFormat('Y-m-d', $effectiveFromInput) ?: new DateTime();
+        $effectiveFrom = $effectiveDate->format('Y-m-d');
+        $effectiveUntil = (clone $effectiveDate)->modify('-1 day')->format('Y-m-d');
+
+        try {
+            $pdo->beginTransaction();
+
+            $deactivateStmt = $pdo->prepare("UPDATE employee_holiday_profile_assignments
+                SET is_active = 0, effective_until = ?, updated_at = NOW()
+                WHERE employee_id = ? AND is_active = 1");
+            $deactivateStmt->execute([$effectiveUntil, $employeeId]);
+
+            if ($selectedProfile !== 'company' && ctype_digit((string)$selectedProfile)) {
+                $profileId = (int)$selectedProfile;
+                $assignmentStmt = $pdo->prepare("INSERT INTO employee_holiday_profile_assignments
+                    (employee_id, profile_id, effective_from, effective_until, is_active, notes)
+                    VALUES (?, ?, ?, NULL, 1, ?)
+                    ON DUPLICATE KEY UPDATE
+                        profile_id = VALUES(profile_id),
+                        effective_from = VALUES(effective_from),
+                        effective_until = VALUES(effective_until),
+                        is_active = VALUES(is_active),
+                        notes = VALUES(notes),
+                        updated_at = CURRENT_TIMESTAMP
+                ");
+                $assignmentStmt->execute([
+                    $employeeId,
+                    $profileId,
+                    $effectiveFrom,
+                    'Manual update from employee profile'
+                ]);
+            }
+
+            $pdo->commit();
+            $_SESSION['success_message'] = 'Holiday profile updated successfully!';
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $_SESSION['success_message'] = 'Failed to update holiday profile.';
+        }
+
+        header("Location: employee-edit.php?id={$employeeId}");
+        exit;
+    }
     
     // Profile Update
     if (isset($_POST['update_profile'])) {
@@ -607,15 +656,25 @@ if (!$employee) die("Employee not found");
 require_once __DIR__ . '/../config/EmployeeHolidayProfiles.php';
 $holidayProfileLabel = 'Company Holidays';
 $holidayProfileCode = null;
+$holidayProfileId = null;
 try {
     $holidayResolver = new EmployeeHolidayProfiles($pdo);
     $holidayProfile = $holidayResolver->getCurrentProfileForEmployee($employeeId);
     if ($holidayProfile) {
         $holidayProfileLabel = $holidayProfile['profile_name'] ?? $holidayProfile['profile_code'] ?? 'Company Holidays';
         $holidayProfileCode = $holidayProfile['profile_code'] ?? null;
+        $holidayProfileId = $holidayProfile['profile_id'] ?? null;
     }
 } catch (Throwable $e) {
     $holidayProfileLabel = 'Company Holidays';
+}
+
+$holidayProfiles = [];
+try {
+    $holidayProfilesStmt = $pdo->query("SELECT id, profile_code, profile_name FROM employee_holiday_profiles WHERE is_active = 1 ORDER BY profile_name");
+    $holidayProfiles = $holidayProfilesStmt ? $holidayProfilesStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+} catch (Throwable $e) {
+    $holidayProfiles = [];
 }
 
 $stmt = $pdo->prepare("SELECT * FROM employee_checklist WHERE employee_id = ?");
@@ -809,11 +868,41 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 <p class="font-medium">EMP-<?= str_pad($employee['id'], 5, '0', STR_PAD_LEFT) ?></p>
                             </div>
                             <div class="bg-gray-50 p-3 rounded-lg">
-                                <p class="text-sm text-gray-500">Holiday Profile</p>
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm text-gray-500">Holiday Profile</p>
+                                    <button type="button" onclick="toggleHolidayProfileEdit()" class="text-xs text-blue-600 hover:text-blue-800">Edit</button>
+                                </div>
                                 <p class="font-medium text-gray-800"><?= htmlspecialchars($holidayProfileLabel) ?></p>
                                 <?php if (!empty($holidayProfileCode)): ?>
                                     <p class="text-xs text-gray-500"><?= htmlspecialchars($holidayProfileCode) ?></p>
                                 <?php endif; ?>
+                                <form id="holidayProfileEdit" class="hidden mt-2 space-y-2" method="post" action="employee-edit.php?id=<?= $employeeId ?>">
+                                    <input type="hidden" name="action" value="update_holiday_profile">
+                                    <input type="hidden" name="employee_id" value="<?= $employeeId ?>">
+                                    <div>
+                                        <label class="block text-xs text-gray-500 mb-1">Available Holidays</label>
+                                        <select name="holiday_profile_id" class="w-full px-2 py-1 border border-gray-300 rounded-md text-sm">
+                                            <option value="company" <?= $holidayProfileId ? '' : 'selected' ?>>Company Holidays (Default)</option>
+                                            <?php foreach ($holidayProfiles as $profile): ?>
+                                                <option value="<?= (int)$profile['id'] ?>" <?= ($holidayProfileId === (int)$profile['id']) ? 'selected' : '' ?>>
+                                                    <?= htmlspecialchars($profile['profile_name']) ?> (<?= htmlspecialchars($profile['profile_code']) ?>)
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-500 mb-1">Effective From</label>
+                                        <input type="date" name="effective_from" value="<?= date('Y-m-d') ?>" class="w-full px-2 py-1 border border-gray-300 rounded-md text-sm">
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button type="submit" class="px-3 py-1 bg-green-600 text-white text-xs rounded-md hover:bg-green-700">
+                                            Save
+                                        </button>
+                                        <button type="button" onclick="toggleHolidayProfileEdit(false)" class="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded-md hover:bg-gray-300">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
                             <div class="bg-gray-50 p-3 rounded-lg">
                                 <p class="text-sm text-gray-500">Email</p>
@@ -2619,6 +2708,21 @@ uasort($sortedScheduleOptions, function($a, $b) {
             </div>
 
 <script>
+function toggleHolidayProfileEdit(forceShow) {
+    const form = document.getElementById('holidayProfileEdit');
+    if (!form) return;
+
+    const shouldShow = forceShow === true
+        ? true
+        : (forceShow === false ? false : form.classList.contains('hidden'));
+
+    if (shouldShow) {
+        form.classList.remove('hidden');
+    } else {
+        form.classList.add('hidden');
+    }
+}
+
 function toggleEditMode() {
     const editForm = document.getElementById('editForm');
     const editButton = document.getElementById('editButton');
