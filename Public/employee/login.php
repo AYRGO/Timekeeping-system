@@ -20,7 +20,7 @@ function getMobileAccessAllowlist() {
     'kiras001',
     'shirmiley.quizon',
     'gener.rosario',
-    'nica.bacongallo'
+    'nika.bacongallo'
   ];
 }
 
