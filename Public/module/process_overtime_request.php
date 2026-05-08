@@ -46,20 +46,25 @@ try {
         exit;
     }
     
-    // Validate overtime hours numerically; then for RDOT compute server-side for source of truth
+    // Validate overtime hours numerically; for RDOT, keep selected hours and verify against actual worked hours
     $overtime_hours_num = is_null($overtime_hours) ? null : floatval($overtime_hours);
+    if (is_null($overtime_hours_num) || $overtime_hours_num <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Valid overtime hours are required']);
+        exit;
+    }
     if ($ot_type === 'Restday OT') {
-        // Compute RDOT hours on server (actual worked minus 1h lunch)
+        // Compute RDOT hours on server (actual worked minus 1h lunch if 8+ hours)
         require_once 'time_logs_helper.php';
         $computed_rdot_hours = calculateOvertimeHours($time_in, $time_out, 'Restday OT');
-        $overtime_hours_num = round(max(0, (float)$computed_rdot_hours), 2);
-        error_log("Computed RDOT hours (server): {$overtime_hours_num} for time_in={$time_in} time_out={$time_out}");
-    } else {
-        // Non-RDOT: ensure provided hours is a positive number
-        if (is_null($overtime_hours_num) || $overtime_hours_num <= 0) {
-            echo json_encode(['success' => false, 'message' => 'Valid overtime hours are required']);
+        $max_rdot_hours = round(max(0, (float)$computed_rdot_hours), 2);
+        if ($overtime_hours_num > $max_rdot_hours) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Requested overtime hours exceed the actual hours worked. Max: ' . number_format($max_rdot_hours, 2) . ' hrs'
+            ]);
             exit;
         }
+        error_log("RDOT hours (requested={$overtime_hours_num}, max={$max_rdot_hours}) for time_in={$time_in} time_out={$time_out}");
     }
     
     if (empty($reason_trimmed)) {

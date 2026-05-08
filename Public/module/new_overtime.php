@@ -164,7 +164,7 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
     return 0;
   }
   
-  //  Special handling for Restday OT - return total work hours (no lunch deduction for RDOT)
+  //  Special handling for Restday OT - return total work hours (apply lunch deduction if 8+ hours)
   if ($ot_type === 'Restday OT') {
     $timeIn = new DateTime($time_in);
     $timeOut = new DateTime($time_out);
@@ -172,6 +172,9 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
     $interval = $timeIn->diff($timeOut);
     $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
     $totalHours = $totalMinutes / 60;
+    if ($totalHours >= 8) {
+      $totalHours = max(0, $totalHours - 1);
+    }
     
     return round($totalHours, 2);
   }
@@ -233,13 +236,13 @@ function getOvertimeTimesAndHours($time_in, $time_out, $log_date, $employee_id, 
     $diffSeconds = $actual_out_dt->getTimestamp() - $actual_in_dt->getTimestamp();
     $totalMinutes = $diffSeconds / 60; // positive after fixNightShiftTimeOut
     $totalHours = $totalMinutes / 60;
-    // No lunch deduction for RDOT
+    $netHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours;
     
     return [
       'start_ot' => $actual_in_dt->format('h:i A'),
       'end_ot' => $actual_out_dt->format('h:i A'),
-      'max_ot_hours' => round($totalHours, 2),
-      'exact_ot_minutes' => round($totalMinutes),
+      'max_ot_hours' => round($netHours, 2),
+      'exact_ot_minutes' => round($netHours * 60),
       'eligible' => $totalHours >= 8,
       'is_restday' => true
     ];
@@ -303,10 +306,11 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
     $actual_out_dt = new DateTime($time_out);
     $actual_out_dt = fixNightShiftTimeOut($actual_in_dt, $actual_out_dt); // fix same-date night shifts
     
-    // Calculate actual hours worked (no lunch deduction for RDOT)
+    // Calculate actual hours worked (apply lunch deduction if 8+ hours)
     $actual_interval = $actual_in_dt->diff($actual_out_dt);
     $actual_minutes = ($actual_interval->days * 24 * 60) + ($actual_interval->h * 60) + $actual_interval->i;
     $actual_hours = round($actual_minutes / 60, 2);
+    $net_hours = $actual_hours >= 8 ? max(0, $actual_hours - 1) : $actual_hours;
     $minimum_hours = 0.5; // 30 minutes
     
     $eligible = $actual_hours >= $minimum_hours; // 30+ minutes for Restday OT
@@ -322,20 +326,20 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
         'in' => $actual_in_dt->format('H:i:s'),
         'out' => $actual_out_dt->format('H:i:s'),
         'hours' => $actual_hours,
-        'hours_minus_lunch' => $actual_hours
+        'hours_minus_lunch' => $net_hours
       ],
-      'overtime_minutes' => $actual_hours * 60,
-      'overtime_hours' => $actual_hours,
-      'net_overtime_minutes' => $actual_hours * 60,
-      'net_overtime_hours' => $actual_hours,
+      'overtime_minutes' => $net_hours * 60,
+      'overtime_hours' => $net_hours,
+      'net_overtime_minutes' => $net_hours * 60,
+      'net_overtime_hours' => $net_hours,
       'minimum_required' => $minimum_hours, // hours for Restday OT
       'eligible' => $eligible,
-      'lunch_deducted' => false,
+      'lunch_deducted' => $actual_hours >= 8,
       'is_restday_ot' => true
     ];
     
     $reason = $eligible 
-      ? "Eligible for {$actual_hours} hours of Restday OT (worked {$actual_hours}h total)"
+      ? "Eligible for {$net_hours} hours of Restday OT (worked {$actual_hours}h total)"
       : "Need at least 0.5 hours (30 minutes) of work for Restday OT (worked only {$actual_hours}h)";    
     
     return [
@@ -396,7 +400,7 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
       'in' => $actual_in_dt->format('H:i:s'),
       'out' => $actual_out_dt->format('H:i:s'),
       'hours' => $actual_hours_with_lunch,
-      'hours_minus_lunch' => $actual_hours
+      'hours_minus_lunch' => $net_hours
     ],
     'overtime_minutes' => $ot_minutes,
     'overtime_hours' => $ot_hours,
@@ -1954,12 +1958,11 @@ function computeRDOTHrsFromStartToEnd() {
         }
 
         let diffMs = endOT.getTime() - startOT.getTime();
-        if (diffMs < 0) diffMs = Math.abs(diffMs);
+        if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
         const diffHours = diffMs / (1000 * 60 * 60);
         
-        // For Restday OT, calculate hours from Start OT to End OT
-        // Typically no lunch deduction since it's already the specific OT period
-        const workHours = diffHours;
+        // For Restday OT, apply lunch deduction only when 8+ hours
+        const workHours = diffHours >= 8 ? Math.max(0, diffHours - 1) : diffHours;
         return Number.isFinite(workHours) ? workHours : 0;
     } catch (e) {
         console.error('computeRDOTHrsFromStartToEnd error:', e);
@@ -2004,8 +2007,8 @@ function computeRDOTHrsFromHiddenFields() {
         // Night-shift: time_out is earlier than time_in on the same date — add one day
         if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
         const diffHours = diffMs / (1000 * 60 * 60);
-        // No lunch deduction for RDOT
-        return Number.isFinite(diffHours) ? diffHours : 0;
+        const workHours = diffHours >= 8 ? Math.max(0, diffHours - 1) : diffHours;
+        return Number.isFinite(workHours) ? workHours : 0;
     } catch (e) {
         console.error('computeRDOTHrsFromHiddenFields error:', e);
         return 0;
@@ -2035,7 +2038,7 @@ function initializeTimePicker(maxHours) {
     const isRestdayOT = otTypeSelect && otTypeSelect.value === 'Restday OT';
     
     if (isRestdayOT) {
-        rangeInfo.innerHTML = `Maximum available: ${formatDuration(maxHours)} <span class="text-orange-600 font-semibold">(1hr lunch deduction applies)</span>`;
+        rangeInfo.innerHTML = `Maximum available: ${formatDuration(maxHours)} <span class="text-orange-600 font-semibold">(1hr lunch deduction applied)</span>`;
     } else {
         rangeInfo.textContent = `Maximum available: ${formatDuration(maxHours)}`;
     }
@@ -2267,9 +2270,10 @@ function openRDOTModal(button) {
         // Night-shift: time_out stored on same date as time_in but is actually next day
         if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
         const diffHours = diffMs / (1000 * 60 * 60);
-        // No lunch deduction for RDOT
-        workHours = diffHours;
-        isEligible = workHours >= 8; // Restday OT needs 8+ hours
+        const rawHours = diffHours;
+        const netHours = rawHours >= 8 ? Math.max(0, rawHours - 1) : rawHours;
+        workHours = netHours;
+        isEligible = rawHours >= 8; // Restday OT needs 8+ hours
     }
     
     // Populate form fields
@@ -2908,13 +2912,7 @@ function submitOvertimeForm(form) {
     formData.append('ot_type', otType);
     formData.append('reason', reason);
     
-    // For Restday OT, automatically subtract 1 hour for lunch break
-    let finalOvertimeHours = parseFloat(overtimeHours) || 0;
-    if (otType === 'Restday OT') {
-        finalOvertimeHours = Math.max(0, finalOvertimeHours - 1);
-        console.log('Restday OT detected - Original hours:', overtimeHours, 'After lunch deduction:', finalOvertimeHours);
-    }
-    
+    const finalOvertimeHours = parseFloat(overtimeHours) || 0;
     formData.append('overtime_hours', finalOvertimeHours.toFixed(2));
     formData.append('time_in', timeIn);
     formData.append('time_out', timeOut);
