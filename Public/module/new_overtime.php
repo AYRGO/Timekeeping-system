@@ -400,7 +400,7 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
       'in' => $actual_in_dt->format('H:i:s'),
       'out' => $actual_out_dt->format('H:i:s'),
       'hours' => $actual_hours_with_lunch,
-      'hours_minus_lunch' => $net_hours
+      'hours_minus_lunch' => $actual_hours
     ],
     'overtime_minutes' => $ot_minutes,
     'overtime_hours' => $ot_hours,
