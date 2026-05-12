@@ -16,9 +16,9 @@ function isOvertimeEligible($time_in, $time_out, $ot_type = null) {
     // Only subtract 1 hour for lunch break if total hours is 8 or above
     $actualWorkedHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours;
     
-    // For Restday OT, allow filing for any positive worked hours (after lunch)
+    // For Restday OT, allow filing for any positive worked hours (no lunch deduction)
     if ($ot_type === 'Restday OT') {
-        return $actualWorkedHours > 0;
+        return $totalHours > 0;
     }
     
     // For regular OT, require 8.5 hours (8hrs 30mins)
@@ -42,9 +42,9 @@ function calculateOvertimeHours($time_in, $time_out, $ot_type = null) {
     // Only subtract 1 hour for lunch break if total hours is 8 or above
     $actualWorkedHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours;
     
-    // For Restday OT, return all worked hours (minus lunch), even if < 8 hours
+    // For Restday OT, return all worked hours (no lunch deduction)
     if ($ot_type === 'Restday OT') {
-        return $actualWorkedHours;
+        return $totalHours;
     }
     
     // Calculate overtime (anything over 8 hours of actual work)

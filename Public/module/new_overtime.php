@@ -164,7 +164,7 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
     return 0;
   }
   
-  //  Special handling for Restday OT - return total work hours (apply lunch deduction if 8+ hours)
+  //  Special handling for Restday OT - return total work hours (no lunch deduction)
   if ($ot_type === 'Restday OT') {
     $timeIn = new DateTime($time_in);
     $timeOut = new DateTime($time_out);
@@ -172,9 +172,6 @@ function calculateOvertimeHoursBySchedule($time_in, $time_out, $log_date, $emplo
     $interval = $timeIn->diff($timeOut);
     $totalMinutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
     $totalHours = $totalMinutes / 60;
-    if ($totalHours >= 8) {
-      $totalHours = max(0, $totalHours - 1);
-    }
     
     return round($totalHours, 2);
   }
@@ -236,13 +233,12 @@ function getOvertimeTimesAndHours($time_in, $time_out, $log_date, $employee_id, 
     $diffSeconds = $actual_out_dt->getTimestamp() - $actual_in_dt->getTimestamp();
     $totalMinutes = $diffSeconds / 60; // positive after fixNightShiftTimeOut
     $totalHours = $totalMinutes / 60;
-    $netHours = $totalHours >= 8 ? max(0, $totalHours - 1) : $totalHours;
     
     return [
       'start_ot' => $actual_in_dt->format('h:i A'),
       'end_ot' => $actual_out_dt->format('h:i A'),
-      'max_ot_hours' => round($netHours, 2),
-      'exact_ot_minutes' => round($netHours * 60),
+      'max_ot_hours' => round($totalHours, 2),
+      'exact_ot_minutes' => round($totalMinutes),
       'eligible' => $totalHours >= 8,
       'is_restday' => true
     ];
@@ -306,11 +302,10 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
     $actual_out_dt = new DateTime($time_out);
     $actual_out_dt = fixNightShiftTimeOut($actual_in_dt, $actual_out_dt); // fix same-date night shifts
     
-    // Calculate actual hours worked (apply lunch deduction if 8+ hours)
+    // Calculate actual hours worked (no lunch deduction for RDOT)
     $actual_interval = $actual_in_dt->diff($actual_out_dt);
     $actual_minutes = ($actual_interval->days * 24 * 60) + ($actual_interval->h * 60) + $actual_interval->i;
     $actual_hours = round($actual_minutes / 60, 2);
-    $net_hours = $actual_hours >= 8 ? max(0, $actual_hours - 1) : $actual_hours;
     $minimum_hours = 0.5; // 30 minutes
     
     $eligible = $actual_hours >= $minimum_hours; // 30+ minutes for Restday OT
@@ -326,20 +321,20 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
         'in' => $actual_in_dt->format('H:i:s'),
         'out' => $actual_out_dt->format('H:i:s'),
         'hours' => $actual_hours,
-        'hours_minus_lunch' => $net_hours
+        'hours_minus_lunch' => $actual_hours
       ],
-      'overtime_minutes' => $net_hours * 60,
-      'overtime_hours' => $net_hours,
-      'net_overtime_minutes' => $net_hours * 60,
-      'net_overtime_hours' => $net_hours,
+      'overtime_minutes' => $actual_hours * 60,
+      'overtime_hours' => $actual_hours,
+      'net_overtime_minutes' => $actual_hours * 60,
+      'net_overtime_hours' => $actual_hours,
       'minimum_required' => $minimum_hours, // hours for Restday OT
       'eligible' => $eligible,
-      'lunch_deducted' => $actual_hours >= 8,
+      'lunch_deducted' => false,
       'is_restday_ot' => true
     ];
     
     $reason = $eligible 
-      ? "Eligible for {$net_hours} hours of Restday OT (worked {$actual_hours}h total)"
+      ? "Eligible for {$actual_hours} hours of Restday OT (worked {$actual_hours}h total)"
       : "Need at least 0.5 hours (30 minutes) of work for Restday OT (worked only {$actual_hours}h)";    
     
     return [
@@ -1961,8 +1956,8 @@ function computeRDOTHrsFromStartToEnd() {
         if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
         const diffHours = diffMs / (1000 * 60 * 60);
         
-        // For Restday OT, apply lunch deduction only when 8+ hours
-        const workHours = diffHours >= 8 ? Math.max(0, diffHours - 1) : diffHours;
+        // For Restday OT, use full worked hours
+        const workHours = diffHours;
         return Number.isFinite(workHours) ? workHours : 0;
     } catch (e) {
         console.error('computeRDOTHrsFromStartToEnd error:', e);
