@@ -17,6 +17,7 @@
 
 require '../../vendor/autoload.php';
 require '../config/db.php';
+require_once __DIR__ . '/../config/EmployeeHolidayProfiles.php';
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -106,10 +107,33 @@ foreach ($scheduleChanges as $change) {
     $scheduleChangeMap[$change['employee_id']][] = $change;
 }
 
+// Resolve holidays directly as a safeguard for cache rows created by older refresh paths.
+function resolvePayrollHoliday($pdo, $employee_id, $date) {
+    static $holidayResolver = null;
+
+    if ($holidayResolver === null) {
+        $holidayResolver = new EmployeeHolidayProfiles($pdo);
+    }
+
+    try {
+        return $holidayResolver->resolveHolidayForEmployeeDate((int)$employee_id, $date);
+    } catch (Exception $e) {
+        error_log("Payroll holiday resolve failed for employee {$employee_id} on {$date}: " . $e->getMessage());
+        return [
+            'is_holiday' => 0,
+            'holiday_name' => null,
+            'holiday_type' => null,
+            'source' => null
+        ];
+    }
+}
+
 // Function to get employee's schedule for a specific date from PERSONAL CALENDAR CACHE
 // This uses employee_daily_schedule_cache - THE EXACT SAME SOURCE as the employee's personal calendar
 // This ensures payroll report shows EXACTLY what the employee sees in their calendar
 function getScheduleForDate($pdo, $employee_id, $date) {
+    $resolvedHoliday = resolvePayrollHoliday($pdo, $employee_id, $date);
+
     // Query the pre-computed cache table - THIS IS THE EMPLOYEE'S PERSONAL CALENDAR DATA
     // Check if holiday_type column exists (for backward compatibility)
     static $hasHolidayTypeColumn = null;
@@ -147,13 +171,16 @@ function getScheduleForDate($pdo, $employee_id, $date) {
         // If cache has valid schedule data, use it
         if ($cache['is_rest_day'] || $cache['is_holiday'] || 
             (!empty($cache['time_in']) && !empty($cache['time_out']))) {
+            $isHoliday = (int)$cache['is_holiday'] === 1 || (int)($resolvedHoliday['is_holiday'] ?? 0) === 1;
+
             return [
                 'is_rest_day' => $cache['is_rest_day'],
-                'is_holiday' => $cache['is_holiday'],
+                'is_holiday' => $isHoliday ? 1 : 0,
                 'schedule_name' => $cache['schedule_name'],
                 'time_in' => $cache['time_in'],
                 'time_out' => $cache['time_out'],
-                'holiday_name' => $cache['holiday_name'] ?? null,
+                'holiday_name' => $cache['holiday_name'] ?? $resolvedHoliday['holiday_name'] ?? null,
+                'holiday_type' => $cache['holiday_type'] ?? $resolvedHoliday['holiday_type'] ?? null,
                 'source' => $cache['source']
             ];
         }
@@ -179,19 +206,23 @@ function getScheduleForDate($pdo, $employee_id, $date) {
         if ($weekly['is_rest_day']) {
             return [
                 'is_rest_day' => 1,
-                'is_holiday' => 0,
+                'is_holiday' => $resolvedHoliday['is_holiday'] ?? 0,
                 'schedule_name' => 'OFF',
                 'time_in' => null,
                 'time_out' => null,
+                'holiday_name' => $resolvedHoliday['holiday_name'] ?? null,
+                'holiday_type' => $resolvedHoliday['holiday_type'] ?? null,
                 'source' => 'weekly_default'
             ];
         } elseif ($weekly['work_schedule_id']) {
             return [
                 'is_rest_day' => 0,
-                'is_holiday' => 0,
+                'is_holiday' => $resolvedHoliday['is_holiday'] ?? 0,
                 'schedule_name' => $weekly['name'],
                 'time_in' => $weekly['time_in'],
                 'time_out' => $weekly['time_out'],
+                'holiday_name' => $resolvedHoliday['holiday_name'] ?? null,
+                'holiday_type' => $resolvedHoliday['holiday_type'] ?? null,
                 'source' => 'weekly_default'
             ];
         }
@@ -201,10 +232,12 @@ function getScheduleForDate($pdo, $employee_id, $date) {
     if ($dayOfWeek == 0 || $dayOfWeek == 6) {
         return [
             'is_rest_day' => 1,
-            'is_holiday' => 0,
+            'is_holiday' => $resolvedHoliday['is_holiday'] ?? 0,
             'schedule_name' => 'OFF',
             'time_in' => null,
             'time_out' => null,
+            'holiday_name' => $resolvedHoliday['holiday_name'] ?? null,
+            'holiday_type' => $resolvedHoliday['holiday_type'] ?? null,
             'source' => 'weekend'
         ];
     }
@@ -212,10 +245,12 @@ function getScheduleForDate($pdo, $employee_id, $date) {
     // Absolute fallback: return default schedule
     return [
         'is_rest_day' => 0,
-        'is_holiday' => 0,
+        'is_holiday' => $resolvedHoliday['is_holiday'] ?? 0,
         'schedule_name' => 'Day shift',
         'time_in' => '07:00:00',
         'time_out' => '16:00:00',
+        'holiday_name' => $resolvedHoliday['holiday_name'] ?? null,
+        'holiday_type' => $resolvedHoliday['holiday_type'] ?? null,
         'source' => 'default'
     ];
 }
@@ -575,9 +610,19 @@ function getAttendanceStatus($log, $leaveType, $scheduleInfo, $dayOfWeek) {
         }
     }
     
-    // If this is a holiday:
-    // - HOL = holiday off (no complete work log)
-    // - P   = worked holiday (must have both time-in and time-out)
+    // Rest day takes priority over holiday and time logs for payroll display.
+    // Work rendered on a rest day, including a holiday rest day, should stay OFF
+    // and be filed/processed through Rest Day OT instead of being marked present.
+    if (isset($scheduleInfo['is_rest_day']) && $scheduleInfo['is_rest_day'] == 1) {
+        if ($log && $log['time_in']) {
+            return ['status' => 'OFF', 'details' => 'Rest Day OT'];
+        }
+        return ['status' => 'OFF', 'details' => ''];
+    }
+
+    // If this is a holiday on a scheduled work day:
+    // - HOLIDAY OFF = holiday off / no complete work log
+    // - P           = worked holiday / complete time-in and time-out
     if (isset($scheduleInfo['is_holiday']) && $scheduleInfo['is_holiday'] == 1) {
         $hasCompleteHolidayLog = $log
             && !empty($log['time_in'])
@@ -588,15 +633,7 @@ function getAttendanceStatus($log, $leaveType, $scheduleInfo, $dayOfWeek) {
             return ['status' => 'P', 'details' => 'Holiday Work'];
         }
 
-        return ['status' => 'HOL', 'details' => $scheduleInfo['holiday_name'] ?? 'Holiday Off'];
-    }
-    
-    // If this is a rest day/off day
-    if (isset($scheduleInfo['is_rest_day']) && $scheduleInfo['is_rest_day'] == 1) {
-        if ($log && $log['time_in']) {
-            return ['status' => 'P', 'details' => 'Rest Day Work'];
-        }
-        return ['status' => 'OFF', 'details' => ''];
+        return ['status' => 'HOLIDAY OFF', 'details' => $scheduleInfo['holiday_name'] ?? 'Holiday Off'];
     }
     
     // If no time log exists at all and it's a work day
@@ -788,8 +825,8 @@ foreach ($attendanceData as $employeeId => $data) {
         // Apply cell formatting based on status and details
         $cellStyle = $sheet->getStyle($currentColLetter . $row);
         
-        if ($status === 'P' && !empty($dayData['is_holiday'])) {
-            // Holiday worked and complete log - green background
+        if (($status === 'P' && !empty($dayData['is_holiday'])) || $status === 'HOLIDAY OFF') {
+            // Scheduled work-day holiday: worked holidays and holiday off are highlighted in green
             $cellStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFC6EFCE');
             $cellStyle->getFont()->getColor()->setARGB('FF006100');
             $cellStyle->getFont()->setBold(true);
@@ -858,10 +895,10 @@ $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(14); // Increased
 
 $row++;
 $legendItems = [
-    ['P', 'Present (Holiday worked cells are highlighted in green)', false],
-    ['HOL', 'Holiday Off (No complete time in/out)', false],
+    ['P', 'Present / worked scheduled holiday', false],
+    ['HOLIDAY OFF', 'Holiday off on a scheduled work day', false],
     ['SL/VL/EL', 'Leave Types (Sick/Vacation/Emergency)', false], 
-    ['OFF', 'Scheduled Day Off', true], // Keep color for OFF
+    ['OFF', 'Scheduled day off / rest day, including rest-day holiday or rest-day work filed as OT', true],
     ['240', 'Late/Undertime Minutes (Total)', false],
     ['(Blank)', 'Absent/Incomplete', false]
 ];
