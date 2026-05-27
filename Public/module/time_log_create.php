@@ -1188,6 +1188,14 @@ document.addEventListener('DOMContentLoaded', function() {
     </form>
   <?php endif; ?>
 
+    <?php if (!empty($_SESSION['demo_mode'])): ?>
+        <a href="../../demo/admin/" 
+             class="flex items-center w-full px-4 py-3 text-indigo-600 hover:bg-indigo-50 transition duration-150 ease-in-out border-b border-gray-100">
+            <i class="fas fa-user-shield mr-3 text-indigo-500 w-4 text-center"></i>
+            <span>Open Admin Demo</span>
+        </a>
+    <?php endif; ?>
+
   <!-- Logout Form -->
   <form method="POST" class="w-full">
     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">

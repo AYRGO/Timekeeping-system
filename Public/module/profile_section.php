@@ -139,19 +139,21 @@ if (!isset($holidayProfileLabel) && isset($employee_id) && isset($pdo)) {
           </div>
           <?php
             $completedFields = 0;
-            $totalFields = 6;
+            $totalFields = count($fields);
             foreach ($fields as $field) {
               if (!empty($field['value'])) $completedFields++;
             }
-            $completionPercentage = ($completedFields / $totalFields) * 100;
+            $completionPercentage = $totalFields > 0 ? ($completedFields / $totalFields) * 100 : 0;
+            $progressWidth = min(100, max(0, $completionPercentage));
+            $completionDisplay = min(100, round($completionPercentage));
           ?>
           <div class="mb-4">
             <div class="flex justify-between items-center mb-2">
               <span class="text-sm font-medium text-gray-600">Completed</span>
-              <span class="text-sm font-bold text-gray-900"><?= round($completionPercentage) ?>%</span>
+              <span class="text-sm font-bold text-gray-900"><?= $completionDisplay ?>%</span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-3">
-              <div class="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-300" style="width: <?= $completionPercentage ?>%"></div>
+              <div class="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-300" style="width: <?= $progressWidth ?>%"></div>
             </div>
           </div>
           <p class="text-sm text-gray-600"><?= $completedFields ?> of <?= $totalFields ?> fields completed</p>
