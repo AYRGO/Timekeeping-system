@@ -91,6 +91,13 @@ try {
                     </div>
                     <span class="font-medium">Employee Directory</span>
                 </a>
+                <a href="holiday_management.php"
+                   class="group flex items-center px-3 py-3 rounded-xl transition-all duration-200 <?= (basename($_SERVER['PHP_SELF']) === 'holiday_management.php') ? 'bg-white bg-opacity-5 border border-gray-700' : 'hover:bg-gray-800 hover:shadow-md' ?>">
+                    <div class="w-8 h-8 rounded-lg bg-cyan-500 bg-opacity-20 flex items-center justify-center mr-3 group-hover:bg-opacity-30 transition-all">
+                        <i class="fas fa-calendar-day text-cyan-300 text-sm"></i>
+                    </div>
+                    <span class="font-medium">Holidays</span>
+                </a>
             </div>
 
             <!-- Pending Approvals Section -->

@@ -2,9 +2,92 @@
 
 $current_user_id = $_SESSION['employee']['id'] ?? null;
 
+function newsFeedTableExists(PDO $pdo, string $table): bool {
+    static $tableCache = [];
+
+    if (!array_key_exists($table, $tableCache)) {
+        try {
+            $stmt = $pdo->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$table]);
+            $tableCache[$table] = $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            error_log("Unable to inspect table $table for news feed: " . $e->getMessage());
+            $tableCache[$table] = false;
+        }
+    }
+
+    return $tableCache[$table];
+}
+
+function newsFeedTableColumnExists(PDO $pdo, string $table, string $column): bool {
+    static $columnsByTable = [];
+
+    if (!isset($columnsByTable[$table])) {
+        $columnsByTable[$table] = [];
+        try {
+            $safeTable = str_replace('`', '``', $table);
+            $stmt = $pdo->query("SHOW COLUMNS FROM `$safeTable`");
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $columnsByTable[$table][$row['Field']] = true;
+            }
+        } catch (PDOException $e) {
+            error_log("Unable to inspect $table columns for news feed: " . $e->getMessage());
+        }
+    }
+
+    return isset($columnsByTable[$table][$column]);
+}
+
 // Fetch announcements
 $stmt = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDER BY created_at DESC");
 $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$upcomingEvents = [];
+$today = date('Y-m-d');
+$endDate = date('Y-m-d', strtotime('+90 days'));
+
+try {
+    if ($current_user_id && newsFeedTableExists($pdo, 'employee_daily_schedule_cache')) {
+        $cacheTable = 'employee_daily_schedule_cache';
+        $hasHolidayName = newsFeedTableColumnExists($pdo, $cacheTable, 'holiday_name');
+        $holidayNameSelect = $hasHolidayName ? 'holiday_name' : "'Holiday' AS holiday_name";
+        $holidayTypeSelect = newsFeedTableColumnExists($pdo, $cacheTable, 'holiday_type') ? 'holiday_type' : "NULL AS holiday_type";
+        $isHolidayWhere = newsFeedTableColumnExists($pdo, $cacheTable, 'is_holiday') ? 'AND is_holiday = 1' : '';
+        $holidayNameWhere = $hasHolidayName ? 'AND holiday_name IS NOT NULL' : '';
+
+        $eventStmt = $pdo->prepare("
+            SELECT schedule_date, $holidayNameSelect, $holidayTypeSelect
+            FROM employee_daily_schedule_cache
+            WHERE employee_id = ?
+              AND schedule_date BETWEEN ? AND ?
+              $isHolidayWhere
+              $holidayNameWhere
+            ORDER BY schedule_date ASC
+            LIMIT 3
+        ");
+        $eventStmt->execute([$current_user_id, $today, $endDate]);
+        $upcomingEvents = $eventStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (PDOException $e) {
+    error_log("Unable to load employee upcoming holidays for news feed: " . $e->getMessage());
+    $upcomingEvents = [];
+}
+
+if (empty($upcomingEvents) && newsFeedTableExists($pdo, 'company_holidays')) {
+    try {
+        $fallbackEventStmt = $pdo->prepare("
+            SELECT holiday_date AS schedule_date, holiday_name, holiday_type
+            FROM company_holidays
+            WHERE holiday_date BETWEEN ? AND ?
+            ORDER BY holiday_date ASC
+            LIMIT 3
+        ");
+        $fallbackEventStmt->execute([$today, $endDate]);
+        $upcomingEvents = $fallbackEventStmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Unable to load fallback company holidays for news feed: " . $e->getMessage());
+    }
+}
 ?>
 
 <meta charset="UTF-8">
@@ -183,30 +266,406 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
         align-items: center;
         gap: 4px;
     }
+
+    .news-feed-shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 18px;
+        align-items: start;
+        max-width: 1460px;
+        margin: 0 auto;
+        color: #111827;
+    }
+
+    .feed-main {
+        min-width: 0;
+    }
+
+    .feed-panel,
+    .widget-card,
+    .facebook-post {
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .feed-panel {
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .feed-section-header {
+        min-height: 48px;
+        padding: 14px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #eef2f7;
+    }
+
+    .feed-heading {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .feed-heading-icon {
+        display: inline-flex;
+        width: 22px;
+        height: 22px;
+        align-items: center;
+        justify-content: center;
+        color: #2563eb;
+        font-size: 13px;
+    }
+
+    .feed-link-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 0;
+        background: transparent;
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .trending-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.42fr) minmax(280px, 0.78fr);
+        grid-template-rows: repeat(2, 138px);
+        gap: 14px;
+        padding: 14px 16px 16px;
+    }
+
+    .news-image-card {
+        min-height: 164px;
+        border-radius: 8px;
+        box-shadow: none;
+        border: 0;
+    }
+
+    .news-image-card img {
+        height: 100%;
+    }
+
+    .news-image-card.is-featured {
+        grid-row: span 2;
+        min-height: 290px;
+    }
+
+    .news-image-card.is-featured .news-image-title {
+        font-size: 22px;
+        line-height: 1.1;
+        max-width: 90%;
+    }
+
+    .news-image-card.is-compact {
+        min-height: 138px;
+    }
+
+    .news-image-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+        border-color: transparent;
+    }
+
+    .news-image-overlay {
+        padding: 48px 14px 38px;
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.88));
+    }
+
+    .news-image-title {
+        font-size: 14px;
+        line-height: 1.18;
+        text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    .news-image-source {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.86);
+    }
+
+    .news-category-badge {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 6px;
+        background: #2563eb;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        padding: 4px 8px;
+        text-transform: uppercase;
+        box-shadow: 0 10px 20px rgba(15, 23, 42, 0.18);
+    }
+
+    .news-image-card:not(.is-featured) .news-category-badge {
+        background: rgba(255, 255, 255, 0.92);
+        color: #1d4ed8;
+    }
+
+    .news-image-card .upvote-indicator {
+        top: auto;
+        bottom: 12px;
+        left: 14px;
+        border-radius: 999px;
+        padding: 2px 0;
+        color: #fff;
+        background: transparent;
+        box-shadow: none;
+        backdrop-filter: none;
+        font-size: 11px;
+    }
+
+    .news-image-card .comment-indicator {
+        position: absolute;
+        bottom: 12px;
+        left: 72px;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    #news-feed-container {
+        padding-right: 4px;
+    }
+
+    .facebook-post {
+        border-radius: 10px;
+        margin-bottom: 12px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    }
+
+    .facebook-post:hover {
+        transform: none;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    .post-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: #fff;
+        box-shadow: 0 8px 16px rgba(37, 99, 235, 0.22);
+    }
+
+    .admin-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #2563eb;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 3px 7px;
+        margin-left: 8px;
+    }
+
+    .post-title {
+        font-size: 18px;
+        line-height: 1.25;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .post-body {
+        color: #1f2937;
+        font-size: 13px;
+        line-height: 1.75;
+    }
+
+    .post-action-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .reaction-button {
+        min-height: 36px;
+        font-size: 12px;
+    }
+
+    .widget-sidebar {
+        width: 100%;
+        position: sticky;
+        top: 88px;
+    }
+
+    .widget-card {
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        margin-bottom: 12px;
+        padding: 16px;
+    }
+
+    .widget-card:hover {
+        transform: none;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    .widget-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .widget-refresh {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        color: #64748b;
+    }
+
+    .widget-refresh:hover {
+        background: #f8fafc;
+        color: #2563eb;
+    }
+
+    .news-item {
+        padding: 9px 0;
+    }
+
+    .news-item:hover {
+        padding: 9px 10px;
+        margin: 0 -10px;
+    }
+
+    .event-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .event-item {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+    }
+
+    .event-date {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+        text-align: center;
+        background: #fff;
+    }
+
+    .event-month {
+        display: block;
+        background: #eff6ff;
+        color: #2563eb;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 18px;
+        text-transform: uppercase;
+    }
+
+    .event-day {
+        display: block;
+        color: #111827;
+        font-size: 16px;
+        font-weight: 900;
+        line-height: 24px;
+    }
+
+    .event-title {
+        color: #111827;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    .event-time {
+        color: #6b7280;
+        font-size: 11px;
+        margin-top: 2px;
+    }
+
+    .inspiration-card {
+        background:
+            linear-gradient(145deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.96)),
+            #fff;
+    }
+
+    @media (max-width: 1180px) {
+        .news-feed-shell {
+            grid-template-columns: 1fr;
+        }
+
+        .widget-sidebar {
+            position: static;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+    }
+
+    @media (max-width: 820px) {
+        .trending-grid,
+        .widget-sidebar {
+            grid-template-columns: 1fr;
+        }
+
+        .trending-grid {
+            grid-template-rows: auto;
+        }
+
+        .news-image-card.is-featured {
+            grid-row: auto;
+            min-height: 240px;
+        }
+
+        .post-action-row {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
 </style>
 
         
-<div class="flex gap-6">
+<div class="news-feed-shell">
     <!-- Main Content -->
-    <div class="flex-1">
+    <div class="feed-main">
         
         <!-- Reddit-style News Images Section -->
-        <div class="mb-6">
-            <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <div class="flex items-center justify-between p-4 border-b border-gray-200">
-                    <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                        <span class="mr-2">🖼️</span> Trending News
+        <div class="mb-4">
+            <div class="feed-panel">
+                <div class="feed-section-header">
+                    <h2 class="feed-heading">
+                        <span class="feed-heading-icon"><i class="fas fa-chart-line"></i></span>
+                        Featured News
                     </h2>
                     <div class="flex items-center gap-2">
-                        <button onclick="refreshNewsImages()" class="text-gray-500 hover:text-gray-700 transition-colors">
+                        <button onclick="refreshNewsImages()" class="feed-link-button" title="Refresh trending news">
                             <i class="fas fa-sync-alt"></i>
                         </button>
-                        <button onclick="nextNewsImages()" class="text-gray-500 hover:text-blue-600 transition-colors" title="Next news">
+                        <button onclick="nextNewsImages()" class="feed-link-button" title="Next news">
+                            <span>View all</span>
                             <i class="fas fa-chevron-right"></i>
                         </button>
                     </div>
                 </div>
-                <div id="news-images-container" class="grid grid-cols-3 gap-4 p-4">
+                <div id="news-images-container" class="trending-grid">
                     <!-- Loading placeholder -->
                     <div class="flex items-center justify-center col-span-full py-8">
                         <div class="loading-spinner mx-auto"></div>
@@ -307,13 +766,24 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <div class="p-4 pb-0">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-3">
-                                    <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                    <div class="post-avatar">
                                         <i class="fas fa-user text-white"></i>
                                     </div>
                                     <div>
-                                        <h3 class="font-semibold text-gray-900"><?= htmlspecialchars($a['admin_name']) ?></h3>
-                                        <p class="text-sm text-gray-500"><?= date('F j, Y \a\t g:i A', strtotime($a['created_at'])) ?></p>
+                                        <h3 class="font-semibold text-gray-900 text-sm">
+                                            <?= htmlspecialchars($a['admin_name']) ?>
+                                            <span class="admin-badge">Administrator</span>
+                                        </h3>
+                                        <p class="text-xs text-gray-500"><?= date('M j, Y \a\t g:i A', strtotime($a['created_at'])) ?></p>
                                     </div>
+                                </div>
+                                <div class="flex items-center gap-3 text-gray-400">
+                                    <button type="button" class="hover:text-blue-600" title="Pin announcement">
+                                        <i class="fas fa-thumbtack"></i>
+                                    </button>
+                                    <button type="button" class="hover:text-gray-700" title="More options">
+                                        <i class="fas fa-ellipsis-h"></i>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -321,20 +791,20 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Post Content -->
                         <div class="px-4 py-3">
                             <?php if (!empty($a['title'])): ?>
-                                <h2 class="text-xl font-bold text-gray-900 mb-2"><?= htmlspecialchars($a['title']) ?></h2>
+                                <h2 class="post-title mb-2"><?= htmlspecialchars($a['title']) ?></h2>
                             <?php endif; ?>
                             
                             <!-- Content with See More/Less -->
                             <div id="content-<?= $aid ?>">
-                                <div id="preview-<?= $aid ?>" class="text-gray-800 leading-relaxed <?= $isLongContent ? '' : 'hidden' ?>">
+                                <div id="preview-<?= $aid ?>" class="post-body <?= $isLongContent ? '' : 'hidden' ?>">
                                     <?= nl2br(htmlspecialchars($previewContent)) ?>
                                     <?php if ($isLongContent): ?>
                                         <button onclick="toggleContent(<?= $aid ?>, true)" class="text-blue-600 hover:text-blue-700 font-medium ml-2">
-                                            See more
+                                            Read more
                                         </button>
                                     <?php endif; ?>
                                 </div>
-                                <div id="full-<?= $aid ?>" class="text-gray-800 leading-relaxed <?= $isLongContent ? 'hidden' : '' ?>">
+                                <div id="full-<?= $aid ?>" class="post-body <?= $isLongContent ? 'hidden' : '' ?>">
                                     <?= nl2br(htmlspecialchars($content)) ?>
                                     <?php if ($isLongContent): ?>
                                         <button onclick="toggleContent(<?= $aid ?>, false)" class="text-blue-600 hover:text-blue-700 font-medium ml-2">
@@ -527,7 +997,7 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                        <!-- Action Buttons -->
                         <div class="px-4 py-2 border-t border-gray-100">
-                            <div class="flex items-center justify-around">
+                            <div class="post-action-row">
                                 <!-- Like Button with Reaction Menu -->
                                 <div class="relative" onmouseenter="showReactions(<?= $aid ?>)" onmouseleave="hideReactions(<?= $aid ?>)">
                                     <?php 
@@ -559,9 +1029,9 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     }
                                     ?>
                                     
-                                    <button id="react-btn-<?= $aid ?>" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center <?= $reaction_color ?>" <?= !$current_user_id ? 'disabled title="Please log in to react"' : '' ?>>
+                                    <button id="react-btn-<?= $aid ?>" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg w-full justify-center <?= $reaction_color ?>" <?= !$current_user_id ? 'disabled title="Please log in to react"' : '' ?>>
                                         <span class="text-lg" id="react-emoji-<?= $aid ?>"><?= $user_reaction ?: '👍' ?></span>
-                                        <span class="font-medium" id="react-text-<?= $aid ?>"><?= $reaction_text ?></span>
+                                        <span class="font-semibold" id="react-text-<?= $aid ?>"><?= $reaction_text ?></span>
                                     </button>
                                     <?php if ($current_user_id): ?>
                                     <div class="reaction-menu" id="reaction-menu-<?= $aid ?>">
@@ -576,16 +1046,12 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
 
                                 <!-- Comment Button -->
-                                <button onclick="toggleComments(<?= $aid ?>)" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
+                                <button onclick="toggleComments(<?= $aid ?>)" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg w-full justify-center text-gray-600">
                                     <i class="far fa-comment"></i>
-                                    <span class="font-medium">Comment</span>
+                                    <span class="font-semibold">Comment</span>
                                 </button>
 
-                                <!-- Share Button -->
-                                <button class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
-                                    <i class="far fa-share"></i>
-                                    <span class="font-medium">Share</span>
-                                </button>
+                                <span class="text-xs text-gray-400 justify-self-end hidden sm:inline" id="comments-count-inline-<?= $aid ?>"><?= $commentCount ?> comment<?= $commentCount !== 1 ? 's' : '' ?></span>
                             </div>
                         </div>
 
@@ -652,15 +1118,15 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 
     <!-- Sidebar with Widgets -->
-    <div class="w-80 space-y-4">
+    <div class="widget-sidebar">
         <!-- Weather Widget -->
         <div class="widget-card" id="weather-widget">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <h3 class="widget-title flex items-center">
                     <i class="fas fa-cloud-sun text-blue-500 mr-2"></i>
                     Weather
                 </h3>
-                <button onclick="refreshWeather()" class="text-gray-500 hover:text-gray-700">
+                <button onclick="refreshWeather()" class="widget-refresh" title="Refresh weather">
                     <i class="fas fa-sync-alt"></i>
                 </button>
             </div>
@@ -670,32 +1136,56 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
 
-        <!-- Daily Quote Widget -->
-        <div class="widget-card" id="quote-widget">
+        <!-- Upcoming Events Widget -->
+        <div class="widget-card" id="events-widget">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-                    <i class="fas fa-quote-left text-purple-500 mr-2"></i>
-                    Daily Quote
+                <h3 class="widget-title flex items-center">
+                    <i class="fas fa-calendar-day text-red-500 mr-2"></i>
+                    Upcoming Events
                 </h3>
-                <button onclick="refreshQuote()" class="text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-sync-alt"></i>
+                <button type="button" class="feed-link-button" title="View all events">
+                    <span>View all</span>
                 </button>
             </div>
-            <div id="quote-content">
-                <div class="loading-spinner mx-auto"></div>
-                <p class="text-center text-gray-500 mt-2">Loading quote...</p>
+            <div class="event-list">
+                <?php if (!empty($upcomingEvents)): ?>
+                    <?php foreach ($upcomingEvents as $event): ?>
+                        <?php
+                            $eventDate = $event['schedule_date'];
+                            $holidayType = $event['holiday_type'] ?? '';
+                            $holidayTypeLabels = [
+                                'regular' => 'Regular Holiday',
+                                'special_non_working' => 'Special Non-Working Holiday',
+                                'special_working' => 'Special Working Holiday'
+                            ];
+                            $eventLabel = $holidayTypeLabels[$holidayType] ?? 'Employee Holiday';
+                        ?>
+                        <div class="event-item">
+                            <div class="event-date">
+                                <span class="event-month"><?= htmlspecialchars(date('M', strtotime($eventDate))) ?></span>
+                                <span class="event-day"><?= htmlspecialchars(date('d', strtotime($eventDate))) ?></span>
+                            </div>
+                            <div>
+                                <div class="event-title"><?= htmlspecialchars($event['holiday_name'] ?? 'Holiday') ?></div>
+                                <div class="event-time"><?= htmlspecialchars($eventLabel) ?></div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="text-sm text-gray-500 py-2">No upcoming employee holidays found.</div>
+                <?php endif; ?>
             </div>
         </div>
 
         <!-- News Widget -->
         <div class="widget-card" id="news-widget">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <h3 class="widget-title flex items-center">
                     <i class="fas fa-newspaper text-red-500 mr-2"></i>
-                    Latest News
+                    Latest Headlines
                 </h3>
-                <button onclick="refreshNews()" class="text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-sync-alt"></i>
+                <button onclick="refreshNews()" class="feed-link-button" title="Refresh latest news">
+                    <span>View all</span>
                 </button>
             </div>
             <div id="news-content">
@@ -704,20 +1194,20 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
 
-        <!-- Fun Facts Widget -->
-        <div class="widget-card" id="facts-widget">
+        <!-- Daily Quote Widget -->
+        <div class="widget-card inspiration-card" id="quote-widget">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-                    <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
-                    Fun Fact
+                <h3 class="widget-title flex items-center">
+                    <i class="fas fa-quote-left text-blue-500 mr-2"></i>
+                    Daily Inspiration
                 </h3>
-                <button onclick="refreshFact()" class="text-gray-500 hover:text-gray-700">
+                <button onclick="refreshQuote()" class="widget-refresh" title="Refresh quote">
                     <i class="fas fa-sync-alt"></i>
                 </button>
             </div>
-            <div id="fact-content">
+            <div id="quote-content">
                 <div class="loading-spinner mx-auto"></div>
-                <p class="text-center text-gray-500 mt-2">Loading fact...</p>
+                <p class="text-center text-gray-500 mt-2">Loading quote...</p>
             </div>
         </div>
     </div>
@@ -726,203 +1216,248 @@ $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <script>
 let reactionTimeouts = {};
+let featuredNewsCursor = Number(sessionStorage.getItem('featuredNewsCursor') || (new Date().getDate() % 6));
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    }[char]));
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, {
+            signal: controller.signal,
+            cache: 'no-store'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        return await response.json();
+    } finally {
+        clearTimeout(timeout);
+    }
+}
 
 async function loadWeather() {
     try {
-        // Visual Crossing Weather API for Clark, Pampanga
-        const apiKey = 'WGNTPH8KPCN49BMK8GHNJKYVA';
-        const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/Clark%2C%20Pampanga?unitGroup=metric&key=${apiKey}&contentType=json`;
-
-        console.log('Fetching weather from:', url);
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error(`Weather API error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Weather data received:', data);
-
-        // Get today's weather
-        const today = data.days && data.days.length > 0 ? data.days[0] : null;
-        if (!today) throw new Error('No weather data for today');
-
-        const temp = Math.round(today.temp);
-        const condition = today.conditions || 'Partly Cloudy';
-        const humidity = today.humidity || '--';
-        const wind = Math.round(today.windspeed || 0);
-        const location = `${data.resolvedAddress || 'Clark, Pampanga'}`;
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=15.185&longitude=120.539&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=Asia%2FManila';
+        const data = await fetchJsonWithTimeout(url);
+        const current = data.current || {};
+        const temp = Math.round(current.temperature_2m ?? 29);
+        const condition = getWeatherCondition(current.weather_code);
+        const humidity = Math.round(current.relative_humidity_2m ?? 75);
+        const wind = Math.round(current.wind_speed_10m ?? 12);
+        const location = 'Clark, Philippines';
+        const updatedLabel = current.time ? `Updated ${new Date(current.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Updated just now';
 
         document.getElementById('weather-content').innerHTML = `
-            <div class="text-center">
-                <div class="weather-icon text-4xl mb-2">${getWeatherIcon(condition)}</div>
-                <h4 class="text-xl font-bold text-gray-800">${temp}°C</h4>
-                <p class="text-gray-600 capitalize">${condition}</p>
-                <p class="text-sm text-gray-500 mt-1">${location}</p>
-                <div class="flex justify-between mt-3 text-sm">
-                    <span>💧 ${humidity}%</span>
-                    <span>💨 ${wind} km/h</span>
+            <div>
+                <div class="flex items-center justify-center gap-5 mb-4">
+                    <div class="weather-icon text-5xl">${getWeatherIcon(condition)}</div>
+                    <div class="text-left">
+                        <p class="text-xs text-gray-500 mb-1"><i class="fas fa-map-marker-alt text-blue-500 mr-1"></i>${location}</p>
+                        <h4 class="text-3xl font-extrabold text-gray-900 leading-none">${temp}°C</h4>
+                        <p class="text-sm font-semibold text-gray-600 capitalize mt-1">${condition}</p>
+                    </div>
                 </div>
+                <div class="grid grid-cols-2 gap-3 text-xs text-gray-600 pt-3 border-t border-gray-100">
+                    <span class="flex items-center justify-center gap-2"><i class="fas fa-tint text-blue-400"></i>${humidity}%</span>
+                    <span class="flex items-center justify-center gap-2"><i class="fas fa-wind text-slate-400"></i>${wind} km/h</span>
+                </div>
+                <p class="text-[10px] text-gray-400 text-center mt-4">${updatedLabel}</p>
             </div>
         `;
     } catch (error) {
         console.error('Weather loading error:', error);
-        // Fallback weather data for Clark, Pampanga
         document.getElementById('weather-content').innerHTML = `
-            <div class="text-center">
-                <div class="weather-icon text-4xl mb-2">🌤️</div>
-                <h4 class="text-xl font-bold text-gray-800">29°C</h4>
-                <p class="text-gray-600">Partly Cloudy</p>
-                <p class="text-sm text-gray-500 mt-1">Clark, Philippines</p>
-                <div class="flex justify-between mt-3 text-sm">
-                    <span>💧 75%</span>
-                    <span>💨 12 km/h</span>
+            <div>
+                <div class="flex items-center justify-center gap-5 mb-4">
+                    <div class="weather-icon text-5xl">🌤️</div>
+                    <div class="text-left">
+                        <p class="text-xs text-gray-500 mb-1"><i class="fas fa-map-marker-alt text-blue-500 mr-1"></i>Clark, Philippines</p>
+                        <h4 class="text-3xl font-extrabold text-gray-900 leading-none">29°C</h4>
+                        <p class="text-sm font-semibold text-gray-600 mt-1">Partly Cloudy</p>
+                    </div>
                 </div>
-                <p class="text-xs text-red-500 mt-2">Unable to fetch live data</p>
+                <div class="grid grid-cols-2 gap-3 text-xs text-gray-600 pt-3 border-t border-gray-100">
+                    <span class="flex items-center justify-center gap-2"><i class="fas fa-tint text-blue-400"></i>75%</span>
+                    <span class="flex items-center justify-center gap-2"><i class="fas fa-wind text-slate-400"></i>12 km/h</span>
+                </div>
+                <p class="text-[10px] text-gray-400 text-center mt-4">Showing saved estimate</p>
             </div>
         `;
     }
 }
 
 async function loadQuote() {
+    const fallbackQuotes = [
+        { content: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+        { content: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
+        { content: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+        { content: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+        { content: "Excellence is never an accident. It is always the result of high intention, sincere effort, and intelligent execution.", author: "Aristotle" }
+    ];
+
     try {
-        const response = await fetch('https://api.quotable.io/random?minLength=50&maxLength=150');
-        
-        if (!response.ok) {
-            throw new Error('Quote service unavailable');
-        }
-        
-        const data = await response.json();
+        const data = await fetchJsonWithTimeout('https://api.quotable.io/random?minLength=50&maxLength=150', 5000);
         document.getElementById('quote-content').innerHTML = `
-            <div class="text-center">
-                <p class="quote-text text-gray-700 mb-3">"${data.content}"</p>
-                <p class="text-sm text-gray-500">— ${data.author}</p>
+            <div class="pl-1">
+                <p class="quote-text text-gray-800 text-sm mb-4">"${escapeHtml(data.content)}"</p>
+                <p class="text-xs text-gray-500 text-center">— ${escapeHtml(data.author)}</p>
             </div>
         `;
     } catch (error) {
         console.error('Quote loading error:', error);
-        // Fallback quotes
-        const fallbackQuotes = [
-            { content: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
-            { content: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
-            { content: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
-            { content: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
-            { content: "Excellence is never an accident. It is always the result of high intention, sincere effort, and intelligent execution.", author: "Aristotle" }
-        ];
-        
-        const randomQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+        const randomQuote = fallbackQuotes[new Date().getDate() % fallbackQuotes.length];
         document.getElementById('quote-content').innerHTML = `
-            <div class="text-center">
-                <p class="quote-text text-gray-700 mb-3">"${randomQuote.content}"</p>
-                <p class="text-sm text-gray-500">— ${randomQuote.author}</p>
+            <div class="pl-1">
+                <p class="quote-text text-gray-800 text-sm mb-4">"${escapeHtml(randomQuote.content)}"</p>
+                <p class="text-xs text-gray-500 text-center">— ${escapeHtml(randomQuote.author)}</p>
             </div>
         `;
     }
 }
 
 async function loadNews() {
+    const fallbackHeadlines = [
+        { title: 'Philippine Economy Shows Steady Growth in Q3', source: 'Business World', date: 'Today', url: 'https://www.bworldonline.com/' },
+        { title: 'Clark Freeport Zone Expands Tech Infrastructure', source: 'Tech News PH', date: 'Today', url: 'https://technews.ph/' },
+        { title: 'Education Department Launches Digital Learning Initiative', source: 'DepEd Official', date: 'Yesterday', url: 'https://www.deped.gov.ph/' },
+        { title: 'Health Ministry Reports Improved Healthcare Access', source: 'DOH Philippines', date: 'Yesterday', url: 'https://www.doh.gov.ph/' },
+        { title: 'Central Bank Announces New Digital Payment Guidelines', source: 'BSP', date: '2 days ago', url: 'https://www.bsp.gov.ph/' }
+    ];
+
+    const renderHeadlines = (items) => {
+        document.getElementById('news-content').innerHTML = items.slice(0, 5).map(item => `
+            <div class="news-item" onclick="window.open('${escapeHtml(item.url)}', '_blank')">
+                <h5 class="font-semibold text-gray-800 text-xs leading-tight mb-1">${escapeHtml(item.title)}</h5>
+                <p class="text-xs text-gray-500">${escapeHtml(item.source)} • ${escapeHtml(item.date)}</p>
+            </div>
+        `).join('');
+    };
+
     try {
-        // Note: NewsAPI requires a valid API key for production
-        // For demo purposes, we'll use fallback news
-        throw new Error('Using fallback news for demo');
-        
+        const rssUrl = encodeURIComponent('https://news.google.com/rss/search?q=Philippines%20business%20Clark%20Pampanga&hl=en-PH&gl=PH&ceid=PH:en');
+        const data = await fetchJsonWithTimeout(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`, 7000);
+
+        if (!data.items || !data.items.length) {
+            throw new Error('No RSS items returned');
+        }
+
+        renderHeadlines(data.items.map(item => ({
+            title: item.title,
+            source: item.author || 'Google News',
+            date: item.pubDate ? new Date(item.pubDate).toLocaleDateString() : 'Today',
+            url: item.link
+        })));
     } catch (error) {
-        console.log('Using fallback news data');
-        // Fallback news with realistic Philippine content
-        document.getElementById('news-content').innerHTML = `
-            <div class="news-item" onclick="window.open('https://www.bworldonline.com/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Philippine Economy Shows Steady Growth in Q3</h5>
-                <p class="text-xs text-gray-500">Business World • ${new Date().toLocaleDateString()}</p>
-            </div>
-            <div class="news-item" onclick="window.open('https://technews.ph/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Clark Freeport Zone Expands Tech Infrastructure</h5>
-                <p class="text-xs text-gray-500">Tech News PH • ${new Date().toLocaleDateString()}</p>
-            </div>
-            <div class="news-item" onclick="window.open('https://www.deped.gov.ph/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Education Department Launches Digital Learning Initiative</h5>
-                <p class="text-xs text-gray-500">DepEd Official • Yesterday</p>
-            </div>
-            <div class="news-item" onclick="window.open('https://www.doh.gov.ph/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Health Ministry Reports Improved Healthcare Access</h5>
-                <p class="text-xs text-gray-500">DOH Philippines • Yesterday</p>
-            </div>
-            <div class="news-item" onclick="window.open('https://www.bsp.gov.ph/', '_blank')">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Central Bank Announces New Digital Payment Guidelines</h5>
-                <p class="text-xs text-gray-500">BSP • 2 days ago</p>
-            </div>
-        `;
+        console.log('Using fallback news data', error);
+        renderHeadlines(fallbackHeadlines);
     }
 }
 
 // Reddit-style News Images Loader
 async function loadNewsImages() {
     try {
-        // For demo purposes, we'll use curated fallback news with realistic images
-        // In production, you can integrate with NewsAPI or other news services
         const fallbackNewsImages = [
             {
+                id: 'market',
                 title: "Philippine Stock Exchange Reaches New Heights in Technology Sector",
                 image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=300&fit=crop&auto=format",
                 source: "Business World",
                 url: "https://www.bworldonline.com/",
                 upvotes: Math.floor(Math.random() * 500) + 100,
+                comments: 18,
+                category: "Business",
                 timeAgo: "2 hours ago"
             },
             {
+                id: 'airport',
                 title: "Clark International Airport Expansion Project Shows Significant Progress",
                 image: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400&h=300&fit=crop&auto=format",
                 source: "Philippine News Agency",
                 url: "https://www.pna.gov.ph/",
                 upvotes: Math.floor(Math.random() * 400) + 150,
+                comments: 18,
+                category: "Business",
                 timeAgo: "4 hours ago"
             },
             {
+                id: 'digital',
                 title: "New Digital Infrastructure Initiative Launched in Metro Manila",
                 image: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop&auto=format",
                 source: "Tech News PH",
                 url: "https://technews.ph/",
                 upvotes: Math.floor(Math.random() * 600) + 200,
+                comments: 31,
+                category: "Technology",
                 timeAgo: "6 hours ago"
             },
             {
+                id: 'energy',
                 title: "Renewable Energy Projects Boost Philippines' Sustainability Goals",
                 image: "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=400&h=300&fit=crop&auto=format",
                 source: "Environmental News",
                 url: "https://www.doe.gov.ph/",
                 upvotes: Math.floor(Math.random() * 350) + 80,
+                comments: 24,
+                category: "Environment",
                 timeAgo: "8 hours ago"
             },
             {
+                id: 'healthcare',
                 title: "Healthcare Digitization Program Improves Patient Services Nationwide",
                 image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop&auto=format",
                 source: "DOH Philippines",
                 url: "https://www.doh.gov.ph/",
                 upvotes: Math.floor(Math.random() * 450) + 120,
+                comments: 16,
+                category: "Health",
                 timeAgo: "12 hours ago"
             },
             {
+                id: 'education',
                 title: "Education Technology Integration Shows Promising Results in Public Schools",
                 image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=300&fit=crop&auto=format",
                 source: "DepEd Official",
                 url: "https://www.deped.gov.ph/",
                 upvotes: Math.floor(Math.random() * 300) + 90,
+                comments: 12,
+                category: "Education",
                 timeAgo: "1 day ago"
             }
         ];
 
-        // Shuffle and select random articles for variety
-        const shuffled = fallbackNewsImages.sort(() => 0.5 - Math.random());
-        const selectedNews = shuffled.slice(0, 3); // Show 3 news items
+        const selectedNews = [0, 1, 2].map(offset => fallbackNewsImages[(featuredNewsCursor + offset) % fallbackNewsImages.length]);
+        sessionStorage.setItem('featuredNewsCursor', String(featuredNewsCursor));
 
         let newsHtml = '';
-        selectedNews.forEach(news => {
+        selectedNews.forEach((news, index) => {
+            const sizeClass = index === 0 ? 'is-featured' : 'is-compact';
+            const badge = index === 0 ? 'Featured' : news.category;
+            const imageUrl = `${news.image}&sig=${encodeURIComponent(news.id)}`;
             newsHtml += `
-                <div class="news-image-card" onclick="openNewsArticle('${news.url}', '${news.title.replace(/'/g, "\\'")}')">
+                <div class="news-image-card ${sizeClass}" onclick="openNewsArticle(event, '${news.url}', '${news.title.replace(/'/g, "\\'")}')">
+                    <div class="news-category-badge">${badge}</div>
                     <div class="upvote-indicator">
-                        <i class="fas fa-arrow-up"></i>
+                        <i class="fas fa-thumbs-up"></i>
                         ${news.upvotes}
                     </div>
-                    <img src="${news.image}" alt="${news.title}" onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=300&fit=crop&auto=format'">
+                    <div class="comment-indicator">
+                        <i class="far fa-comment"></i>
+                        ${news.comments}
+                    </div>
+                    <img src="${imageUrl}" alt="${news.title}" onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=300&fit=crop&auto=format'">
                     <div class="news-image-overlay">
                         <h3 class="news-image-title">${news.title}</h3>
                         <div class="news-image-source">
@@ -947,7 +1482,7 @@ async function loadNewsImages() {
 }
 
 // Function to handle news article clicks
-function openNewsArticle(url, title) {
+function openNewsArticle(event, url, title) {
     // Add click animation
     const clickedCard = event.currentTarget;
     clickedCard.style.transform = 'scale(0.95)';
@@ -964,6 +1499,7 @@ function openNewsArticle(url, title) {
 
 // Refresh function for news images
 function refreshNewsImages() {
+    featuredNewsCursor = (featuredNewsCursor + 3) % 6;
     document.getElementById('news-images-container').innerHTML = `
         <div class="flex items-center justify-center col-span-full py-8">
             <div class="loading-spinner mx-auto"></div>
@@ -978,6 +1514,7 @@ function refreshNewsImages() {
 
 // Next news function for navigation
 function nextNewsImages() {
+    featuredNewsCursor = (featuredNewsCursor + 1) % 6;
     document.getElementById('news-images-container').innerHTML = `
         <div class="flex items-center justify-center col-span-full py-8">
             <div class="loading-spinner mx-auto"></div>
@@ -990,42 +1527,29 @@ function nextNewsImages() {
     }, 800); // Slightly faster than refresh for better UX
 }
 
-async function loadFact() {
-    try {
-        const response = await fetch('https://uselessfacts.jsph.pl/random.json?language=en');
-        
-        if (!response.ok) {
-            throw new Error('Facts service unavailable');
-        }
-        
-        const data = await response.json();
-        document.getElementById('fact-content').innerHTML = `
-            <div class="text-center">
-                <p class="text-gray-700 leading-relaxed">${data.text}</p>
-            </div>
-        `;
-    } catch (error) {
-        console.error('Fact loading error:', error);
-        // Fallback facts
-        const fallbackFacts = [
-            "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly edible.",
-            "Octopuses have three hearts and blue blood. Two hearts pump blood to the gills, while the third pumps blood to the rest of the body.",
-            "A group of flamingos is called a 'flamboyance', which perfectly describes their vibrant pink appearance.",
-            "Bananas are technically berries, but strawberries aren't. Botanically speaking, berries have seeds inside their flesh.",
-            "The shortest war in history lasted only 38-45 minutes between Britain and Zanzibar in 1896.",
-            "Philippines has over 7,640 islands, but only about 2,000 are inhabited by people.",
-            "A single cloud can weigh more than a million pounds, yet it floats in the sky due to air density differences.",
-            "Wombat droppings are cube-shaped, making them the only known animal to produce square feces.",
-            "The human brain uses about 20% of the body's total energy, despite weighing only about 2% of body weight."
-        ];
-        
-        const randomFact = fallbackFacts[Math.floor(Math.random() * fallbackFacts.length)];
-        document.getElementById('fact-content').innerHTML = `
-            <div class="text-center">
-                <p class="text-gray-700 leading-relaxed">${randomFact}</p>
-            </div>
-        `;
-    }
+function getWeatherCondition(code) {
+    const weatherCodes = {
+        0: 'Clear',
+        1: 'Mostly Clear',
+        2: 'Partly Cloudy',
+        3: 'Cloudy',
+        45: 'Fog',
+        48: 'Fog',
+        51: 'Drizzle',
+        53: 'Drizzle',
+        55: 'Drizzle',
+        61: 'Rain',
+        63: 'Rain',
+        65: 'Heavy Rain',
+        80: 'Rain Showers',
+        81: 'Rain Showers',
+        82: 'Heavy Rain Showers',
+        95: 'Thunderstorm',
+        96: 'Thunderstorm',
+        99: 'Thunderstorm'
+    };
+
+    return weatherCodes[Number(code)] || 'Partly Cloudy';
 }
 
 function getWeatherIcon(condition) {
@@ -1057,11 +1581,6 @@ function refreshNews() {
     loadNews();
 }
 
-function refreshFact() {
-    document.getElementById('fact-content').innerHTML = '<div class="loading-spinner mx-auto"></div><p class="text-center text-gray-500 mt-2">Loading fact...</p>';
-    loadFact();
-}
-
 function toggleComments(announcementId) {
     const comments = document.getElementById('comments-' + announcementId);
     comments.classList.toggle('hidden');
@@ -1072,7 +1591,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadWeather();
     loadQuote();
     loadNews();
-    loadFact();
     loadNewsImages(); // Load the Reddit-style news images
     
     // Auto-refresh every 30 minutes for weather and news
@@ -1083,11 +1601,10 @@ document.addEventListener('DOMContentLoaded', function() {
         loadNewsImages(); // Also refresh news images
     }, 30 * 60 * 1000);
     
-    // Refresh quote and fact every hour
+    // Refresh quote every hour
     setInterval(() => {
-        console.log('Auto-refreshing quote and fact...');
+        console.log('Auto-refreshing quote...');
         loadQuote();
-        loadFact();
     }, 60 * 60 * 1000);
 });
 
@@ -1256,6 +1773,11 @@ function submitComment(event, announcementId) {
                 const currentCount = parseInt(commentCountElement.textContent.match(/\d+/)[0]) || 0;
                 const newCount = currentCount + 1;
                 commentCountElement.textContent = `${newCount} comment${newCount !== 1 ? 's' : ''}`;
+
+                const inlineCommentCount = document.getElementById(`comments-count-inline-${announcementId}`);
+                if (inlineCommentCount) {
+                    inlineCommentCount.textContent = `${newCount} comment${newCount !== 1 ? 's' : ''}`;
+                }
             }
             
             // Show the reaction summary if it was hidden

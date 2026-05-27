@@ -119,6 +119,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
 
 // Fetch announcements
 $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+
+$upcomingEvents = [];
+$today = date('Y-m-d');
+$endDate = date('Y-m-d', strtotime('+90 days'));
+
+try {
+    $tableStmt = $pdo->prepare("SHOW TABLES LIKE ?");
+    $tableStmt->execute(['company_holidays']);
+
+    if ($tableStmt->rowCount() > 0) {
+        $eventStmt = $pdo->prepare("
+            SELECT holiday_date AS schedule_date, holiday_name, holiday_type
+            FROM company_holidays
+            WHERE holiday_date BETWEEN ? AND ?
+            ORDER BY holiday_date ASC
+            LIMIT 3
+        ");
+        $eventStmt->execute([$today, $endDate]);
+        $upcomingEvents = $eventStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (PDOException $e) {
+    error_log("Unable to load admin upcoming holidays: " . $e->getMessage());
+    $upcomingEvents = [];
+}
 ?>
 
 <!DOCTYPE html>
@@ -222,6 +246,344 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .admin-news-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 340px;
+            gap: 22px;
+            align-items: start;
+            max-width: 1500px;
+            margin: 0 auto;
+        }
+
+        .admin-feed-main {
+            min-width: 0;
+        }
+
+        .feed-panel,
+        .widget-card,
+        .facebook-post {
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .facebook-post {
+            border-radius: 10px;
+        }
+
+        .feed-panel {
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .feed-section-header {
+            min-height: 48px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #eef2f7;
+        }
+
+        .feed-heading,
+        .widget-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            font-weight: 800;
+            color: #111827;
+        }
+
+        .feed-heading-icon {
+            display: inline-flex;
+            width: 22px;
+            height: 22px;
+            align-items: center;
+            justify-content: center;
+            color: #2563eb;
+            font-size: 13px;
+        }
+
+        .feed-link-button,
+        .widget-refresh {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: 0;
+            background: transparent;
+            color: #2563eb;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .widget-refresh {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            color: #64748b;
+        }
+
+        .widget-refresh:hover {
+            background: #f8fafc;
+            color: #2563eb;
+        }
+
+        .trending-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.42fr) minmax(280px, 0.78fr);
+            grid-template-rows: repeat(2, 138px);
+            gap: 14px;
+            padding: 14px 16px 16px;
+        }
+
+        .news-image-card {
+            min-height: 138px;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            background: #111827;
+        }
+
+        .news-image-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .news-image-card:hover img {
+            transform: scale(1.05);
+        }
+
+        .news-image-card.is-featured {
+            grid-row: span 2;
+            min-height: 290px;
+        }
+
+        .news-image-overlay {
+            position: absolute;
+            inset: auto 0 0;
+            padding: 48px 14px 38px;
+            color: #fff;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.88));
+        }
+
+        .news-image-title {
+            font-weight: 800;
+            font-size: 14px;
+            line-height: 1.18;
+            text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+        }
+
+        .news-image-card.is-featured .news-image-title {
+            font-size: 22px;
+            line-height: 1.1;
+            max-width: 90%;
+        }
+
+        .news-image-source {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.86);
+            margin-top: 5px;
+        }
+
+        .news-category-badge {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            z-index: 2;
+            border-radius: 6px;
+            background: #2563eb;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            padding: 4px 8px;
+            text-transform: uppercase;
+        }
+
+        .news-image-card:not(.is-featured) .news-category-badge {
+            background: rgba(255, 255, 255, 0.92);
+            color: #1d4ed8;
+        }
+
+        .upvote-indicator,
+        .comment-indicator {
+            position: absolute;
+            bottom: 12px;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .upvote-indicator {
+            left: 14px;
+        }
+
+        .comment-indicator {
+            left: 72px;
+        }
+
+        .post-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+            box-shadow: 0 8px 16px rgba(37, 99, 235, 0.22);
+        }
+
+        .admin-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #2563eb;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 3px 7px;
+            margin-left: 8px;
+        }
+
+        .post-title {
+            font-size: 18px;
+            line-height: 1.25;
+            font-weight: 800;
+            color: #111827;
+        }
+
+        .post-body {
+            color: #1f2937;
+            font-size: 13px;
+            line-height: 1.75;
+        }
+
+        .post-action-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .widget-sidebar {
+            width: 100%;
+            position: sticky;
+            top: 88px;
+        }
+
+        .widget-card {
+            border-radius: 10px;
+            margin-bottom: 12px;
+            padding: 16px;
+        }
+
+        .widget-card:hover {
+            transform: none;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+        }
+
+        .event-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .event-item {
+            display: grid;
+            grid-template-columns: 42px minmax(0, 1fr);
+            gap: 10px;
+            align-items: center;
+        }
+
+        .event-date {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            text-align: center;
+            background: #fff;
+        }
+
+        .event-month {
+            display: block;
+            background: #eff6ff;
+            color: #2563eb;
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 18px;
+            text-transform: uppercase;
+        }
+
+        .event-day {
+            display: block;
+            color: #111827;
+            font-size: 16px;
+            font-weight: 900;
+            line-height: 24px;
+        }
+
+        .event-title {
+            color: #111827;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .event-time {
+            color: #6b7280;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .inspiration-card {
+            background:
+                linear-gradient(145deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.96)),
+                #fff;
+        }
+
+        @media (max-width: 1180px) {
+            .admin-news-shell {
+                grid-template-columns: 1fr;
+            }
+
+            .widget-sidebar {
+                position: static;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 14px;
+            }
+        }
+
+        @media (max-width: 820px) {
+            .trending-grid,
+            .widget-sidebar {
+                grid-template-columns: 1fr;
+            }
+
+            .trending-grid {
+                grid-template-rows: auto;
+            }
+
+            .news-image-card.is-featured {
+                grid-row: auto;
+                min-height: 240px;
+            }
+
+            .post-action-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -233,20 +595,37 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
         <?php include('header.php'); ?>
         
         <main class="flex-1 p-6 overflow-y-auto">
-            <!-- Container with max width for centering -->
-            <div class="max-w-10xl mx-auto">
-                <div class="flex gap-6 justify-center">
-                    <!-- Left Spacer (hidden on smaller screens) -->
-                    <div class="w-70 hidden xl:block"></div>
-
-                    <!-- Main Content - Centered -->
-                    <div class="flex-1 max-w-2xl">
+            <div class="admin-news-shell">
+                    <div class="admin-feed-main">
+                        <div class="feed-panel">
+                            <div class="feed-section-header">
+                                <h2 class="feed-heading">
+                                    <span class="feed-heading-icon"><i class="fas fa-chart-line"></i></span>
+                                    Featured News
+                                </h2>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="refreshNewsImages()" class="feed-link-button" title="Refresh featured news">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                    <button onclick="nextNewsImages()" class="feed-link-button" title="Next news">
+                                        <span>View all</span>
+                                        <i class="fas fa-chevron-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="news-images-container" class="trending-grid">
+                                <div class="flex items-center justify-center col-span-full py-8">
+                                    <div class="loading-spinner mx-auto"></div>
+                                    <p class="text-center text-gray-500 ml-3">Loading trending news...</p>
+                                </div>
+                            </div>
+                        </div>
                         
                         <!-- Create Post -->
                         <div class="facebook-post mb-6">
                             <div class="p-4">
                                 <div class="flex items-center space-x-3 mb-4">
-                                    <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                    <div class="post-avatar">
                                         <i class="fas fa-user text-white"></i>
                                     </div>
                                     <div>
@@ -367,12 +746,12 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                     <div class="p-4 pb-0">
                                         <div class="flex items-center justify-between">
                                             <div class="flex items-center space-x-3">
-                                                <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                                <div class="post-avatar">
                                                     <i class="fas fa-user text-white"></i>
                                                 </div>
                                                 <div>
-                                                    <h3 class="font-semibold text-gray-900">Admin</h3>
-                                                    <p class="text-sm text-gray-500"><?= date('F j, Y \a\t g:i A', strtotime($a['created_at'])) ?></p>
+                                                    <h3 class="font-semibold text-gray-900 text-sm">Admin <span class="admin-badge">Administrator</span></h3>
+                                                    <p class="text-xs text-gray-500"><?= date('M j, Y \a\t g:i A', strtotime($a['created_at'])) ?></p>
                                                 </div>
                                             </div>
                                             
@@ -396,12 +775,12 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                     <!-- Post Content -->
                                     <div class="px-4 py-3">
                                         <?php if (!empty($a['title'])): ?>
-                                            <h2 class="text-xl font-bold text-gray-900 mb-2"><?= htmlspecialchars($a['title']) ?></h2>
+                                            <h2 class="post-title mb-2"><?= htmlspecialchars($a['title']) ?></h2>
                                         <?php endif; ?>
                                         
                                         <!-- Content with See More/Less -->
                                         <div id="content-<?= $aid ?>">
-                                            <div id="preview-<?= $aid ?>" class="text-gray-800 leading-relaxed <?= $isLongContent ? '' : 'hidden' ?>">
+                                            <div id="preview-<?= $aid ?>" class="post-body <?= $isLongContent ? '' : 'hidden' ?>">
                                                 <?= nl2br(htmlspecialchars($previewContent)) ?>
                                                 <?php if ($isLongContent): ?>
                                                     <button onclick="toggleContent(<?= $aid ?>, true)" class="text-blue-600 hover:text-blue-700 font-medium ml-2">
@@ -409,7 +788,7 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                                     </button>
                                                 <?php endif; ?>
                                             </div>
-                                            <div id="full-<?= $aid ?>" class="text-gray-800 leading-relaxed <?= $isLongContent ? 'hidden' : '' ?>">
+                                            <div id="full-<?= $aid ?>" class="post-body <?= $isLongContent ? 'hidden' : '' ?>">
                                                 <?= nl2br(htmlspecialchars($content)) ?>
                                                 <?php if ($isLongContent): ?>
                                                     <button onclick="toggleContent(<?= $aid ?>, false)" class="text-blue-600 hover:text-blue-700 font-medium ml-2">
@@ -525,7 +904,7 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
 
                                     <!-- Action Buttons -->
                                     <div class="px-4 py-2 border-t border-gray-100">
-                                        <div class="flex items-center justify-around">
+                                        <div class="post-action-row">
                                             <!-- Like Button -->
                                             <div class="relative" onmouseenter="showReactions(<?= $aid ?>)" onmouseleave="hideReactions(<?= $aid ?>)">
                                                 <?php 
@@ -557,7 +936,7 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                                 }
                                                 ?>
                                                 
-                                                <button id="react-btn-<?= $aid ?>" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center <?= $reaction_color ?>" <?= !$current_user_id ? 'disabled title="Please log in to react"' : '' ?>>
+                                                <button id="react-btn-<?= $aid ?>" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg w-full justify-center <?= $reaction_color ?>" <?= !$current_user_id ? 'disabled title="Please log in to react"' : '' ?>>
                                                     <span class="text-lg" id="react-emoji-<?= $aid ?>"><?= $user_reaction ?: '👍' ?></span>
                                                     <span class="font-medium" id="react-text-<?= $aid ?>"><?= $reaction_text ?></span>
                                                 </button>
@@ -573,16 +952,12 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                                                 <?php endif; ?>
                                             </div>
                                             <!-- Comment Button -->
-                                            <button onclick="toggleComments(<?= $aid ?>)" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
+                                            <button onclick="toggleComments(<?= $aid ?>)" class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg w-full justify-center text-gray-600">
                                                 <i class="far fa-comment"></i>
                                                 <span class="font-medium">Comment</span>
                                             </button>
 
-                                            <!-- Share Button -->
-                                            <button class="reaction-button flex items-center space-x-2 px-4 py-2 rounded-lg flex-1 justify-center text-gray-600">
-                                                <i class="far fa-share"></i>
-                                                <span class="font-medium">Share</span>
-                                            </button>
+                                            <span class="text-xs text-gray-400 justify-self-end hidden sm:inline"><?= $commentCount ?> comment<?= $commentCount !== 1 ? 's' : '' ?></span>
                                         </div>
                                     </div>
 
@@ -654,15 +1029,15 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                     </div>
 
                     <!-- Sidebar with Widgets -->
-                    <div class="w-80 space-y-4">
+                    <div class="widget-sidebar">
                         <!-- Weather Widget -->
                         <div class="widget-card" id="weather-widget">
                             <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                <h3 class="widget-title flex items-center">
                                     <i class="fas fa-cloud-sun text-blue-500 mr-2"></i>
                                     Weather
                                 </h3>
-                                <button onclick="refreshWeather()" class="text-gray-500 hover:text-gray-700">
+                                <button onclick="refreshWeather()" class="widget-refresh" title="Refresh weather">
                                     <i class="fas fa-sync-alt"></i>
                                 </button>
                             </div>
@@ -672,32 +1047,56 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                             </div>
                         </div>
 
-                        <!-- Daily Quote Widget -->
-                        <div class="widget-card" id="quote-widget">
+                        <!-- Upcoming Events Widget -->
+                        <div class="widget-card" id="events-widget">
                             <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-                                    <i class="fas fa-quote-left text-purple-500 mr-2"></i>
-                                    Daily Quote
+                                <h3 class="widget-title flex items-center">
+                                    <i class="fas fa-calendar-day text-red-500 mr-2"></i>
+                                    Upcoming Events
                                 </h3>
-                                <button onclick="refreshQuote()" class="text-gray-500 hover:text-gray-700">
-                                    <i class="fas fa-sync-alt"></i>
+                                <button type="button" class="feed-link-button" title="View all events">
+                                    <span>View all</span>
                                 </button>
                             </div>
-                            <div id="quote-content">
-                                <div class="loading-spinner mx-auto"></div>
-                                <p class="text-center text-gray-500 mt-2">Loading quote...</p>
+                            <div class="event-list">
+                                <?php if (!empty($upcomingEvents)): ?>
+                                    <?php foreach ($upcomingEvents as $event): ?>
+                                        <?php
+                                            $eventDate = $event['schedule_date'];
+                                            $holidayType = $event['holiday_type'] ?? '';
+                                            $holidayTypeLabels = [
+                                                'regular' => 'Regular Holiday',
+                                                'special_non_working' => 'Special Non-Working Holiday',
+                                                'special_working' => 'Special Working Holiday'
+                                            ];
+                                            $eventLabel = $holidayTypeLabels[$holidayType] ?? 'Company Holiday';
+                                        ?>
+                                        <div class="event-item">
+                                            <div class="event-date">
+                                                <span class="event-month"><?= htmlspecialchars(date('M', strtotime($eventDate))) ?></span>
+                                                <span class="event-day"><?= htmlspecialchars(date('d', strtotime($eventDate))) ?></span>
+                                            </div>
+                                            <div>
+                                                <div class="event-title"><?= htmlspecialchars($event['holiday_name'] ?? 'Holiday') ?></div>
+                                                <div class="event-time"><?= htmlspecialchars($eventLabel) ?></div>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <div class="text-sm text-gray-500 py-2">No upcoming company holidays found.</div>
+                                <?php endif; ?>
                             </div>
                         </div>
 
                         <!-- News Widget -->
                         <div class="widget-card" id="news-widget">
                             <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                                <h3 class="widget-title flex items-center">
                                     <i class="fas fa-newspaper text-red-500 mr-2"></i>
-                                    Latest News
+                                    Latest Headlines
                                 </h3>
-                                <button onclick="refreshNews()" class="text-gray-500 hover:text-gray-700">
-                                    <i class="fas fa-sync-alt"></i>
+                                <button onclick="refreshNews()" class="feed-link-button" title="Refresh latest news">
+                                    <span>View all</span>
                                 </button>
                             </div>
                             <div id="news-content">
@@ -706,202 +1105,301 @@ $announcements = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDE
                             </div>
                         </div>
 
-                        <!-- Fun Facts Widget -->
-                        <div class="widget-card" id="facts-widget">
+                        <!-- Daily Quote Widget -->
+                        <div class="widget-card inspiration-card" id="quote-widget">
                             <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-semibold text-gray-800 flex items-center">
-                                    <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
-                                    Fun Fact
+                                <h3 class="widget-title flex items-center">
+                                    <i class="fas fa-quote-left text-blue-500 mr-2"></i>
+                                    Daily Inspiration
                                 </h3>
-                                <button onclick="refreshFact()" class="text-gray-500 hover:text-gray-700">
+                                <button onclick="refreshQuote()" class="widget-refresh" title="Refresh quote">
                                     <i class="fas fa-sync-alt"></i>
                                 </button>
                             </div>
-                            <div id="fact-content">
+                            <div id="quote-content">
                                 <div class="loading-spinner mx-auto"></div>
-                                <p class="text-center text-gray-500 mt-2">Loading fact...</p>
+                                <p class="text-center text-gray-500 mt-2">Loading quote...</p>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
         </main>
     </div>
 </div>
 
 <script>
 let reactionTimeouts = {};
+let featuredNewsCursor = Number(sessionStorage.getItem('adminFeaturedNewsCursor') || (new Date().getDate() % 6));
 
-// API functions
-async function loadWeather() {
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    }[char]));
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
-        // Visual Crossing Weather API for Clark, Pampanga
-        const apiKey = 'WGNTPH8KPCN49BMK8GHNJKYVA';
-        const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/Clark%2C%20Pampanga?unitGroup=metric&key=${apiKey}&contentType=json`;
-
-        console.log('Fetching weather from:', url);
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            signal: controller.signal,
+            cache: 'no-store'
+        });
 
         if (!response.ok) {
-            throw new Error(`Weather API error: ${response.status} ${response.statusText}`);
+            throw new Error(`HTTP ${response.status}`);
         }
 
-        const data = await response.json();
-        console.log('Weather data received:', data);
+        return await response.json();
+    } finally {
+        clearTimeout(timeout);
+    }
+}
 
-        // Get today's weather
-        const today = data.days && data.days.length > 0 ? data.days[0] : null;
-        if (!today) throw new Error('No weather data for today');
-
-        const temp = Math.round(today.temp);
-        const condition = today.conditions || 'Partly Cloudy';
-        const humidity = today.humidity || '--';
-        const wind = Math.round(today.windspeed || 0);
-        const location = `${data.resolvedAddress || 'Clark, Pampanga'}`;
+async function loadWeather() {
+    try {
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=15.185&longitude=120.539&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=Asia%2FManila';
+        const data = await fetchJsonWithTimeout(url);
+        const current = data.current || {};
+        const temp = Math.round(current.temperature_2m ?? 29);
+        const condition = getWeatherCondition(current.weather_code);
+        const humidity = Math.round(current.relative_humidity_2m ?? 75);
+        const wind = Math.round(current.wind_speed_10m ?? 12);
+        const updatedLabel = current.time ? `Updated ${new Date(current.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Updated just now';
 
         document.getElementById('weather-content').innerHTML = `
-            <div class="text-center">
-                <div class="weather-icon text-4xl mb-2">${getWeatherIcon(condition)}</div>
-                <h4 class="text-xl font-bold text-gray-800">${temp}°C</h4>
-                <p class="text-gray-600 capitalize">${condition}</p>
-                <p class="text-sm text-gray-500 mt-1">${location}</p>
-                <div class="flex justify-between mt-3 text-sm">
-                    <span>💧 ${humidity}%</span>
-                    <span>💨 ${wind} km/h</span>
+            <div>
+                <div class="flex items-center justify-center gap-5 mb-4">
+                    <div class="weather-icon text-5xl">${getWeatherIcon(condition)}</div>
+                    <div class="text-left">
+                        <p class="text-xs text-gray-500 mb-1"><i class="fas fa-map-marker-alt text-blue-500 mr-1"></i>Clark, Philippines</p>
+                        <h4 class="text-3xl font-extrabold text-gray-900 leading-none">${temp}°C</h4>
+                        <p class="text-sm font-semibold text-gray-600 capitalize mt-1">${condition}</p>
+                    </div>
                 </div>
+                <div class="grid grid-cols-2 gap-3 text-xs text-gray-600 pt-3 border-t border-gray-100">
+                    <span class="flex items-center justify-center gap-2"><i class="fas fa-tint text-blue-400"></i>${humidity}%</span>
+                    <span class="flex items-center justify-center gap-2"><i class="fas fa-wind text-slate-400"></i>${wind} km/h</span>
+                </div>
+                <p class="text-xs text-gray-400 text-center mt-4">${updatedLabel}</p>
             </div>
         `;
     } catch (error) {
         console.error('Weather loading error:', error);
-        // Fallback weather data for Clark, Pampanga
         document.getElementById('weather-content').innerHTML = `
-            <div class="text-center">
-                <div class="weather-icon text-4xl mb-2">🌤️</div>
-                <h4 class="text-xl font-bold text-gray-800">29°C</h4>
-                <p class="text-gray-600">Partly Cloudy</p>
-                <p class="text-sm text-gray-500 mt-1">Clark, Philippines</p>
-                <div class="flex justify-between mt-3 text-sm">
-                    <span>💧 75%</span>
-                    <span>💨 12 km/h</span>
+            <div>
+                <div class="flex items-center justify-center gap-5 mb-4">
+                    <div class="weather-icon text-5xl">🌤️</div>
+                    <div class="text-left">
+                        <p class="text-xs text-gray-500 mb-1"><i class="fas fa-map-marker-alt text-blue-500 mr-1"></i>Clark, Philippines</p>
+                        <h4 class="text-3xl font-extrabold text-gray-900 leading-none">29°C</h4>
+                        <p class="text-sm font-semibold text-gray-600 mt-1">Partly Cloudy</p>
+                    </div>
                 </div>
-                <p class="text-xs text-red-500 mt-2">Unable to fetch live data</p>
+                <div class="grid grid-cols-2 gap-3 text-xs text-gray-600 pt-3 border-t border-gray-100">
+                    <span class="flex items-center justify-center gap-2"><i class="fas fa-tint text-blue-400"></i>75%</span>
+                    <span class="flex items-center justify-center gap-2"><i class="fas fa-wind text-slate-400"></i>12 km/h</span>
+                </div>
+                <p class="text-xs text-gray-400 text-center mt-4">Showing saved estimate</p>
             </div>
         `;
     }
 }
 
-
 async function loadQuote() {
+    const fallbackQuotes = [
+        { content: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+        { content: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
+        { content: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+        { content: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+        { content: "Excellence is never an accident. It is always the result of high intention, sincere effort, and intelligent execution.", author: "Aristotle" }
+    ];
+
     try {
-        const response = await fetch('https://api.quotable.io/random?minLength=50&maxLength=150');
-        
-        if (!response.ok) {
-            throw new Error('Quote service unavailable');
-        }
-        
-        const data = await response.json();
+        const data = await fetchJsonWithTimeout('https://api.quotable.io/random?minLength=50&maxLength=150', 5000);
         document.getElementById('quote-content').innerHTML = `
-            <div class="text-center">
-                <p class="quote-text text-gray-700 mb-3">"${data.content}"</p>
-                <p class="text-sm text-gray-500">— ${data.author}</p>
+            <div class="pl-1">
+                <p class="quote-text text-gray-800 text-sm mb-4">"${escapeHtml(data.content)}"</p>
+                <p class="text-xs text-gray-500 text-center">— ${escapeHtml(data.author)}</p>
             </div>
         `;
     } catch (error) {
-        // Fallback quotes
-        const fallbackQuotes = [
-            { content: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
-            { content: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
-            { content: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
-            { content: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" }
-        ];
-        
-        const randomQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+        console.error('Quote loading error:', error);
+        const randomQuote = fallbackQuotes[new Date().getDate() % fallbackQuotes.length];
         document.getElementById('quote-content').innerHTML = `
-            <div class="text-center">
-                <p class="quote-text text-gray-700 mb-3">"${randomQuote.content}"</p>
-                <p class="text-sm text-gray-500">— ${randomQuote.author}</p>
+            <div class="pl-1">
+                <p class="quote-text text-gray-800 text-sm mb-4">"${escapeHtml(randomQuote.content)}"</p>
+                <p class="text-xs text-gray-500 text-center">— ${escapeHtml(randomQuote.author)}</p>
             </div>
         `;
     }
 }
 
 async function loadNews() {
+    const fallbackHeadlines = [
+        { title: 'Philippine Economy Shows Steady Growth in Q3', source: 'Business World', date: 'Today', url: 'https://www.bworldonline.com/' },
+        { title: 'Clark Freeport Zone Expands Tech Infrastructure', source: 'Tech News PH', date: 'Today', url: 'https://technews.ph/' },
+        { title: 'Education Department Launches Digital Learning Initiative', source: 'DepEd Official', date: 'Yesterday', url: 'https://www.deped.gov.ph/' },
+        { title: 'Health Ministry Reports Improved Healthcare Access', source: 'DOH Philippines', date: 'Yesterday', url: 'https://www.doh.gov.ph/' },
+        { title: 'Central Bank Announces New Digital Payment Guidelines', source: 'BSP', date: '2 days ago', url: 'https://www.bsp.gov.ph/' }
+    ];
+
+    const renderHeadlines = (items) => {
+        document.getElementById('news-content').innerHTML = items.slice(0, 5).map(item => `
+            <div class="news-item" onclick="window.open('${escapeHtml(item.url)}', '_blank')">
+                <h5 class="font-semibold text-gray-800 text-xs leading-tight mb-1">${escapeHtml(item.title)}</h5>
+                <p class="text-xs text-gray-500">${escapeHtml(item.source)} • ${escapeHtml(item.date)}</p>
+            </div>
+        `).join('');
+    };
+
     try {
-        // Using NewsAPI or similar - you'll need an API key
-        // For demo, using a free news service
-        const response = await fetch('https://newsapi.org/v2/top-headlines?country=ph&pageSize=5&apiKey=demo');
-        
-        if (!response.ok) {
-            throw new Error('News service unavailable');
+        const rssUrl = encodeURIComponent('https://news.google.com/rss/search?q=Philippines%20business%20Clark%20Pampanga&hl=en-PH&gl=PH&ceid=PH:en');
+        const data = await fetchJsonWithTimeout(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`, 7000);
+
+        if (!data.items || !data.items.length) {
+            throw new Error('No RSS items returned');
         }
-        
-        const data = await response.json();
-        let newsHtml = '';
-        
-        data.articles.slice(0, 5).forEach(article => {
-            newsHtml += `
-                <div class="news-item" onclick="window.open('${article.url}', '_blank')">
-                    <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">${article.title}</h5>
-                    <p class="text-xs text-gray-500">${article.source.name} • ${new Date(article.publishedAt).toLocaleDateString()}</p>
-                </div>
-            `;
-        });
-        
-        document.getElementById('news-content').innerHTML = newsHtml;
+
+        renderHeadlines(data.items.map(item => ({
+            title: item.title,
+            source: item.author || 'Google News',
+            date: item.pubDate ? new Date(item.pubDate).toLocaleDateString() : 'Today',
+            url: item.link
+        })));
     } catch (error) {
-        // Fallback news
-        document.getElementById('news-content').innerHTML = `
-            <div class="news-item">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Philippine Economy Shows Strong Growth</h5>
-                <p class="text-xs text-gray-500">Business World • Today</p>
-            </div>
-            <div class="news-item">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">New Technology Hub Opens in Pampanga</h5>
-                <p class="text-xs text-gray-500">Tech News • Today</p>
-            </div>
-            <div class="news-item">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Education Reforms Announced</h5>
-                <p class="text-xs text-gray-500">Education Today • Yesterday</p>
-            </div>
-            <div class="news-item">
-                <h5 class="font-medium text-gray-800 text-sm leading-tight mb-1">Climate Change Initiative Launched</h5>
-                <p class="text-xs text-gray-500">Environmental News • Yesterday</p>
-            </div>
-        `;
+        console.log('Using fallback news data', error);
+        renderHeadlines(fallbackHeadlines);
     }
 }
 
-async function loadFact() {
-    try {
-        const response = await fetch('https://uselessfacts.jsph.pl/random.json?language=en');
-        
-        if (!response.ok) {
-            throw new Error('Facts service unavailable');
+async function loadNewsImages() {
+    const fallbackNewsImages = [
+        {
+            id: 'market',
+            title: "Philippine Stock Exchange Reaches New Heights in Technology Sector",
+            image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=900&h=520&fit=crop&auto=format",
+            source: "Business World",
+            url: "https://www.bworldonline.com/",
+            upvotes: Math.floor(Math.random() * 500) + 100,
+            comments: 18,
+            category: "Business",
+            timeAgo: "2 hours ago"
+        },
+        {
+            id: 'airport',
+            title: "Clark International Airport Expansion Project Shows Significant Progress",
+            image: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=900&h=520&fit=crop&auto=format",
+            source: "Philippine News Agency",
+            url: "https://www.pna.gov.ph/",
+            upvotes: Math.floor(Math.random() * 400) + 150,
+            comments: 18,
+            category: "Business",
+            timeAgo: "4 hours ago"
+        },
+        {
+            id: 'digital',
+            title: "New Digital Infrastructure Initiative Launched in Metro Manila",
+            image: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=900&h=520&fit=crop&auto=format",
+            source: "Tech News PH",
+            url: "https://technews.ph/",
+            upvotes: Math.floor(Math.random() * 600) + 200,
+            comments: 31,
+            category: "Technology",
+            timeAgo: "6 hours ago"
+        },
+        {
+            id: 'energy',
+            title: "Renewable Energy Projects Boost Philippines' Sustainability Goals",
+            image: "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=900&h=520&fit=crop&auto=format",
+            source: "Environmental News",
+            url: "https://www.doe.gov.ph/",
+            upvotes: Math.floor(Math.random() * 350) + 80,
+            comments: 24,
+            category: "Environment",
+            timeAgo: "8 hours ago"
+        },
+        {
+            id: 'healthcare',
+            title: "Healthcare Digitization Program Improves Patient Services Nationwide",
+            image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=900&h=520&fit=crop&auto=format",
+            source: "DOH Philippines",
+            url: "https://www.doh.gov.ph/",
+            upvotes: Math.floor(Math.random() * 450) + 120,
+            comments: 16,
+            category: "Health",
+            timeAgo: "12 hours ago"
+        },
+        {
+            id: 'education',
+            title: "Education Technology Integration Shows Promising Results in Public Schools",
+            image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=900&h=520&fit=crop&auto=format",
+            source: "DepEd Official",
+            url: "https://www.deped.gov.ph/",
+            upvotes: Math.floor(Math.random() * 300) + 90,
+            comments: 12,
+            category: "Education",
+            timeAgo: "1 day ago"
         }
-        
-        const data = await response.json();
-        document.getElementById('fact-content').innerHTML = `
-            <div class="text-center">
-                <p class="text-gray-700 leading-relaxed">${data.text}</p>
+    ];
+
+    const selectedNews = [0, 1, 2].map(offset => fallbackNewsImages[(featuredNewsCursor + offset) % fallbackNewsImages.length]);
+    sessionStorage.setItem('adminFeaturedNewsCursor', String(featuredNewsCursor));
+
+    document.getElementById('news-images-container').innerHTML = selectedNews.map((news, index) => {
+        const sizeClass = index === 0 ? 'is-featured' : 'is-compact';
+        const badge = index === 0 ? 'Featured' : news.category;
+        const imageUrl = `${news.image}&sig=${encodeURIComponent(news.id)}-${featuredNewsCursor}`;
+        return `
+            <div class="news-image-card ${sizeClass}" onclick="openNewsArticle(event, '${escapeHtml(news.url)}', '${escapeHtml(news.title)}')">
+                <div class="news-category-badge">${escapeHtml(badge)}</div>
+                <div class="upvote-indicator"><i class="fas fa-thumbs-up"></i>${news.upvotes}</div>
+                <div class="comment-indicator"><i class="far fa-comment"></i>${news.comments}</div>
+                <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(news.title)}" onerror="this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=900&h=520&fit=crop&auto=format'">
+                <div class="news-image-overlay">
+                    <h3 class="news-image-title">${escapeHtml(news.title)}</h3>
+                    <div class="news-image-source"><i class="fas fa-newspaper"></i> ${escapeHtml(news.source)} • ${escapeHtml(news.timeAgo)}</div>
+                </div>
             </div>
         `;
-    } catch (error) {
-        // Fallback facts
-        const fallbackFacts = [
-            "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly edible.",
-            "Octopuses have three hearts and blue blood.",
-            "A group of flamingos is called a 'flamboyance'.",
-            "Bananas are berries, but strawberries aren't.",
-            "The shortest war in history lasted only 38-45 minutes between Britain and Zanzibar in 1896."
-        ];
-        
-        const randomFact = fallbackFacts[Math.floor(Math.random() * fallbackFacts.length)];
-        document.getElementById('fact-content').innerHTML = `
-            <div class="text-center">
-                <p class="text-gray-700 leading-relaxed">${randomFact}</p>
-            </div>
-        `;
-    }
+    }).join('');
+}
+
+function openNewsArticle(event, url, title) {
+    const clickedCard = event.currentTarget;
+    clickedCard.style.transform = 'scale(0.98)';
+    setTimeout(() => {
+        clickedCard.style.transform = '';
+    }, 150);
+    window.open(url, '_blank');
+    console.log(`Clicked news article: ${title}`);
+}
+
+function refreshNewsImages() {
+    featuredNewsCursor = (featuredNewsCursor + 3) % 6;
+    document.getElementById('news-images-container').innerHTML = `
+        <div class="flex items-center justify-center col-span-full py-8">
+            <div class="loading-spinner mx-auto"></div>
+            <p class="text-center text-gray-500 ml-3">Refreshing news...</p>
+        </div>
+    `;
+    setTimeout(loadNewsImages, 500);
+}
+
+function nextNewsImages() {
+    featuredNewsCursor = (featuredNewsCursor + 1) % 6;
+    document.getElementById('news-images-container').innerHTML = `
+        <div class="flex items-center justify-center col-span-full py-8">
+            <div class="loading-spinner mx-auto"></div>
+            <p class="text-center text-gray-500 ml-3">Loading next news...</p>
+        </div>
+    `;
+    setTimeout(loadNewsImages, 350);
 }
 
 function getWeatherIcon(condition) {
@@ -909,10 +1407,35 @@ function getWeatherIcon(condition) {
     if (condition.includes('sunny') || condition.includes('clear')) return '☀️';
     if (condition.includes('cloud')) return '☁️';
     if (condition.includes('rain')) return '🌧️';
-    if (condition.includes('storm')) return '⛈️';
+    if (condition.includes('storm') || condition.includes('thunder')) return '⛈️';
     if (condition.includes('snow')) return '❄️';
     if (condition.includes('fog') || condition.includes('mist')) return '🌫️';
     return '🌤️';
+}
+
+function getWeatherCondition(code) {
+    const weatherCodes = {
+        0: 'Clear',
+        1: 'Mostly Clear',
+        2: 'Partly Cloudy',
+        3: 'Cloudy',
+        45: 'Fog',
+        48: 'Fog',
+        51: 'Drizzle',
+        53: 'Drizzle',
+        55: 'Drizzle',
+        61: 'Rain',
+        63: 'Rain',
+        65: 'Heavy Rain',
+        80: 'Rain Showers',
+        81: 'Rain Showers',
+        82: 'Heavy Rain Showers',
+        95: 'Thunderstorm',
+        96: 'Thunderstorm',
+        99: 'Thunderstorm'
+    };
+
+    return weatherCodes[Number(code)] || 'Partly Cloudy';
 }
 
 // Refresh functions
@@ -931,17 +1454,12 @@ function refreshNews() {
     loadNews();
 }
 
-function refreshFact() {
-    document.getElementById('fact-content').innerHTML = '<div class="loading-spinner mx-auto"></div><p class="text-center text-gray-500 mt-2">Loading fact...</p>';
-    loadFact();
-}
-
 // Load all widgets when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    loadNewsImages();
     loadWeather();
     loadQuote();
     loadNews();
-    loadFact();
     
     // Auto-refresh every 30 minutes
     setInterval(() => {
@@ -949,10 +1467,9 @@ document.addEventListener('DOMContentLoaded', function() {
         loadNews();
     }, 30 * 60 * 1000);
     
-    // Refresh quote and fact every hour
+    // Refresh quote every hour
     setInterval(() => {
         loadQuote();
-        loadFact();
     }, 60 * 60 * 1000);
 });
 
@@ -1106,8 +1623,16 @@ function toggleDropdown(announcementId) {
 }
 
 // File preview functionality
-document.getElementById('attachmentUpload').addEventListener('change', handleFilePreview);
-document.getElementById('documentUpload').addEventListener('change', handleFilePreview);
+const attachmentUpload = document.getElementById('attachmentUpload');
+const documentUpload = document.getElementById('documentUpload');
+
+if (attachmentUpload) {
+    attachmentUpload.addEventListener('change', handleFilePreview);
+}
+
+if (documentUpload) {
+    documentUpload.addEventListener('change', handleFilePreview);
+}
 
 function handleFilePreview(e) {
     const files = e.target.files;

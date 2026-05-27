@@ -7,13 +7,66 @@ include('../config/db.php');
 
 $employee_id = $_SESSION['employee']['id'] ?? null;
 
+function attendanceHistoryTimeLogColumnExists(PDO $pdo, string $column): bool {
+    static $columns = null;
+
+    if ($columns === null) {
+        $columns = [];
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM time_logs");
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $columns[$row['Field']] = true;
+            }
+        } catch (PDOException $e) {
+            error_log("Unable to inspect time_logs columns for attendance history: " . $e->getMessage());
+        }
+    }
+
+    return isset($columns[$column]);
+}
+
+function attendanceHistoryTableColumnExists(PDO $pdo, string $table, string $column): bool {
+    static $columnsByTable = [];
+
+    if (!isset($columnsByTable[$table])) {
+        $columnsByTable[$table] = [];
+        try {
+            $safeTable = str_replace('`', '``', $table);
+            $stmt = $pdo->query("SHOW COLUMNS FROM `$safeTable`");
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $columnsByTable[$table][$row['Field']] = true;
+            }
+        } catch (PDOException $e) {
+            error_log("Unable to inspect $table columns for attendance history: " . $e->getMessage());
+        }
+    }
+
+    return isset($columnsByTable[$table][$column]);
+}
+
+$has_time_log_status = attendanceHistoryTimeLogColumnExists($pdo, 'status');
+$has_log_out_date = attendanceHistoryTimeLogColumnExists($pdo, 'log_out_date');
+$time_log_status_select = $has_time_log_status ? "t.status" : "NULL AS status";
+$time_log_out_date_select = $has_log_out_date ? "t.log_out_date" : "NULL AS log_out_date";
+
+$cacheTable = 'employee_daily_schedule_cache';
+$cache_work_schedule_id_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'work_schedule_id') ? "work_schedule_id" : "NULL AS work_schedule_id";
+$cache_is_rest_day_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'is_rest_day') ? "is_rest_day" : "0 AS is_rest_day";
+$cache_is_holiday_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'is_holiday') ? "is_holiday" : "0 AS is_holiday";
+$cache_schedule_name_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'schedule_name') ? "schedule_name" : "NULL AS schedule_name";
+$cache_time_in_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'time_in') ? "time_in" : "NULL AS time_in";
+$cache_time_out_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'time_out') ? "time_out" : "NULL AS time_out";
+$cache_holiday_name_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'holiday_name') ? "holiday_name" : "NULL AS holiday_name";
+$cache_holiday_type_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'holiday_type') ? "holiday_type" : "NULL AS holiday_type";
+$cache_source_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'source') ? "source" : "'none' AS source";
+
 // Removed: Fetching employee's default schedule and hardcoded schedule_times array
 // Now using employee_daily_schedule_cache for all schedule lookups
 
 // Fetch all logs for July 1, 2025 onwards - Updated to include status and log_out_date columns
 $allLogsStmt = $pdo->prepare("
     SELECT 
-        t.log_date, t.time_in, t.time_out, t.log_out_date, t.status,
+        t.log_date, t.time_in, t.time_out, $time_log_out_date_select, $time_log_status_select,
         r.requested_time_in, r.requested_time_out, r.status AS request_status
     FROM time_logs t
     LEFT JOIN (
@@ -248,15 +301,15 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
                                 SELECT 
                                     schedule_date,
                                     employee_id,
-                                    work_schedule_id,
-                                    is_rest_day,
-                                    is_holiday,
-                                    schedule_name,
-                                    time_in,
-                                    time_out,
-                                    holiday_name,
-                                    holiday_type,
-                                    source
+                                    $cache_work_schedule_id_select,
+                                    $cache_is_rest_day_select,
+                                    $cache_is_holiday_select,
+                                    $cache_schedule_name_select,
+                                    $cache_time_in_select,
+                                    $cache_time_out_select,
+                                    $cache_holiday_name_select,
+                                    $cache_holiday_type_select,
+                                    $cache_source_select
                                 FROM employee_daily_schedule_cache
                                 WHERE employee_id = ? AND schedule_date = ?
                                 LIMIT 1

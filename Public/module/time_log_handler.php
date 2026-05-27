@@ -6,6 +6,24 @@ date_default_timezone_set('Asia/Manila');
 include_once('../config/csrf_helper.php');
 include_once('../config/db.php');
 
+function timeLogHandlerColumnExists(PDO $pdo, string $column): bool {
+    static $columns = null;
+
+    if ($columns === null) {
+        $columns = [];
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM time_logs");
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $columns[$row['Field']] = true;
+            }
+        } catch (PDOException $e) {
+            error_log("Unable to inspect time_logs columns: " . $e->getMessage());
+        }
+    }
+
+    return isset($columns[$column]);
+}
+
 // Initialize CSRF protection with extended timeout matching the time log page
 init_csrf_protection(28800); // 8 hours timeout to match time_log_create.php
 
@@ -32,6 +50,9 @@ $is_overnight = $_POST['is_overnight'] ?? '0';
 $is_incomplete = $_POST['is_incomplete'] ?? '0';
 $has_incomplete_previous = $_POST['has_incomplete_previous'] ?? '0';
 $today = date('Y-m-d');
+$has_time_log_status = timeLogHandlerColumnExists($pdo, 'status');
+$has_log_out_date = timeLogHandlerColumnExists($pdo, 'log_out_date');
+$time_log_status_filter = $has_time_log_status ? "AND status != 'incomplete'" : "";
 
 // --- FIX: Eliminate 1-second clock delay causing wrong minute recording ---
 // The Harley system clock can be ~1 second behind Philippine Standard Time.
@@ -86,7 +107,7 @@ try {
         }
         
         // SECOND: If this is an incomplete shift reset, completely clean up ALL records for this employee
-        if ($is_incomplete === '1') {
+        if ($is_incomplete === '1' && $has_time_log_status) {
             // Delete ALL incomplete records for this employee
             $cleanupAllIncompleteStmt = $pdo->prepare("DELETE FROM time_logs WHERE employee_id = ? AND status = 'incomplete'");
             $cleanupAllIncompleteStmt->execute([$employee_id]);
@@ -99,21 +120,23 @@ try {
         }
         
         // Auto-mark and clean up any OTHER shifts that should be incomplete (older than 14 hours)
-        $autoMarkIncompleteStmt = $pdo->prepare("
-            UPDATE time_logs 
-            SET time_out = NULL, status = 'incomplete' 
-            WHERE employee_id = ? 
-            AND time_out IS NULL 
-            AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) >= 14
-            AND status != 'incomplete'
-        ");
-        $autoMarkIncompleteStmt->execute([$employee_id]);
-        
-        if ($autoMarkIncompleteStmt->rowCount() > 0) {
-            // Delete these newly marked incomplete ones too
-            $deleteNewlyIncomplete = $pdo->prepare("DELETE FROM time_logs WHERE employee_id = ? AND status = 'incomplete'");
-            $deleteNewlyIncomplete->execute([$employee_id]);
-            error_log("Auto-marked and deleted " . $autoMarkIncompleteStmt->rowCount() . " old incomplete shifts for employee $employee_id");
+        if ($has_time_log_status) {
+            $autoMarkIncompleteStmt = $pdo->prepare("
+                UPDATE time_logs
+                SET time_out = NULL, status = 'incomplete'
+                WHERE employee_id = ?
+                AND time_out IS NULL
+                AND TIMESTAMPDIFF(HOUR, CONCAT(log_date, ' ', time_in), NOW()) >= 14
+                AND status != 'incomplete'
+            ");
+            $autoMarkIncompleteStmt->execute([$employee_id]);
+
+            if ($autoMarkIncompleteStmt->rowCount() > 0) {
+                // Delete these newly marked incomplete ones too
+                $deleteNewlyIncomplete = $pdo->prepare("DELETE FROM time_logs WHERE employee_id = ? AND status = 'incomplete'");
+                $deleteNewlyIncomplete->execute([$employee_id]);
+                error_log("Auto-marked and deleted " . $autoMarkIncompleteStmt->rowCount() . " old incomplete shifts for employee $employee_id");
+            }
         }
         
         // Check for 8-hour restriction from previous shift completion (only if table exists)
@@ -149,7 +172,7 @@ try {
         // Check if there's already an active shift (AFTER cleanup) - but skip this check if we're resetting
         if ($is_incomplete !== '1') {
             // Check for any open shift (not incomplete)
-            $checkActiveStmt = $pdo->prepare("SELECT id, log_date, time_in FROM time_logs WHERE employee_id = ? AND time_out IS NULL AND status != 'incomplete'");
+            $checkActiveStmt = $pdo->prepare("SELECT id, log_date, time_in FROM time_logs WHERE employee_id = ? AND time_out IS NULL $time_log_status_filter");
             $checkActiveStmt->execute([$employee_id]);
             $activeShift = $checkActiveStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -160,7 +183,8 @@ try {
         
         // Check if there's already a completed log for today (but allow reset)
         if ($is_incomplete !== '1') {
-            $todayCheckStmt = $pdo->prepare("SELECT id FROM time_logs WHERE employee_id = ? AND log_date = ? AND time_out IS NOT NULL AND status = 'completed'");
+            $completedStatusWhere = $has_time_log_status ? "AND status = 'completed'" : "";
+            $todayCheckStmt = $pdo->prepare("SELECT id FROM time_logs WHERE employee_id = ? AND log_date = ? AND time_out IS NOT NULL $completedStatusWhere");
             $todayCheckStmt->execute([$employee_id, $today]);
             
             if ($todayCheckStmt->fetch()) {
@@ -169,7 +193,11 @@ try {
         }
         
         // NOW: Create a completely NEW record with TODAY's date and current time
-        $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out, status) VALUES (?, ?, ?, NULL, 'active')");
+        if ($has_time_log_status) {
+            $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out, status) VALUES (?, ?, ?, NULL, 'active')");
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO time_logs (employee_id, log_date, time_in, time_out) VALUES (?, ?, ?, NULL)");
+        }
         $stmt->execute([$employee_id, $today, $current_time]);
         
         $newRecordId = $pdo->lastInsertId();
@@ -188,7 +216,7 @@ try {
             // Find the open shift from the original date (yesterday)
             // Include all non-incomplete status to handle rest day shifts
             $findStmt = $pdo->prepare("SELECT id, time_in, log_date FROM time_logs 
-                WHERE employee_id = ? AND time_out IS NULL AND log_date = ? AND status != 'incomplete'");
+                WHERE employee_id = ? AND time_out IS NULL AND log_date = ? $time_log_status_filter");
             $findStmt->execute([$employee_id, $original_log_date]);
             $openShift = $findStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -197,8 +225,18 @@ try {
             }
             
             // Update the existing record with time out and log_out_date (today since completing previous shift today)
-            $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ?, log_out_date = ?, status = 'completed' WHERE id = ?");
-            $updateStmt->execute([$current_time, $today, $openShift['id']]);
+            $updateFields = ["time_out = ?"];
+            $updateValues = [$current_time];
+            if ($has_log_out_date) {
+                $updateFields[] = "log_out_date = ?";
+                $updateValues[] = $today;
+            }
+            if ($has_time_log_status) {
+                $updateFields[] = "status = 'completed'";
+            }
+            $updateValues[] = $openShift['id'];
+            $updateStmt = $pdo->prepare("UPDATE time_logs SET " . implode(', ', $updateFields) . " WHERE id = ?");
+            $updateStmt->execute($updateValues);
             
             $formatted_date = date('F j, Y', strtotime($original_log_date));
             $formatted_out_date = date('F j, Y', strtotime($today));
@@ -216,7 +254,7 @@ try {
             // Find the open overnight shift
             // Include all non-incomplete status to handle rest day shifts
             $findStmt = $pdo->prepare("SELECT id, time_in, log_date FROM time_logs 
-                WHERE employee_id = ? AND time_out IS NULL AND log_date = ? AND status != 'incomplete'");
+                WHERE employee_id = ? AND time_out IS NULL AND log_date = ? $time_log_status_filter");
             $findStmt->execute([$employee_id, $original_log_date]);
             $openShift = $findStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -225,8 +263,18 @@ try {
             }
             
             // Update the existing record with time out and log_out_date (today since completing overnight shift today)
-            $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ?, log_out_date = ?, status = 'completed' WHERE id = ?");
-            $updateStmt->execute([$current_time, $today, $openShift['id']]);
+            $updateFields = ["time_out = ?"];
+            $updateValues = [$current_time];
+            if ($has_log_out_date) {
+                $updateFields[] = "log_out_date = ?";
+                $updateValues[] = $today;
+            }
+            if ($has_time_log_status) {
+                $updateFields[] = "status = 'completed'";
+            }
+            $updateValues[] = $openShift['id'];
+            $updateStmt = $pdo->prepare("UPDATE time_logs SET " . implode(', ', $updateFields) . " WHERE id = ?");
+            $updateStmt->execute($updateValues);
             
             $formatted_date = date('F j, Y', strtotime($original_log_date));
             $formatted_out_date = date('F j, Y', strtotime($today));
@@ -244,7 +292,7 @@ try {
             // Find today's time in record
             // Include all non-incomplete status to handle rest day shifts
             $findStmt = $pdo->prepare("SELECT id, time_in, log_date FROM time_logs 
-                WHERE employee_id = ? AND log_date = ? AND time_out IS NULL AND status != 'incomplete'");
+                WHERE employee_id = ? AND log_date = ? AND time_out IS NULL $time_log_status_filter");
             $findStmt->execute([$employee_id, $today]);
             $todayRecord = $findStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -267,8 +315,18 @@ try {
             // For normal shifts or shifts that don't cross midnight, use same day
             
             // Update with time out and log_out_date
-            $updateStmt = $pdo->prepare("UPDATE time_logs SET time_out = ?, log_out_date = ?, status = 'completed' WHERE id = ?");
-            $updateStmt->execute([$current_time, $log_out_date, $todayRecord['id']]);
+            $updateFields = ["time_out = ?"];
+            $updateValues = [$current_time];
+            if ($has_log_out_date) {
+                $updateFields[] = "log_out_date = ?";
+                $updateValues[] = $log_out_date;
+            }
+            if ($has_time_log_status) {
+                $updateFields[] = "status = 'completed'";
+            }
+            $updateValues[] = $todayRecord['id'];
+            $updateStmt = $pdo->prepare("UPDATE time_logs SET " . implode(', ', $updateFields) . " WHERE id = ?");
+            $updateStmt->execute($updateValues);
             
             $message = "Time Out logged successfully at " . date('h:i A', strtotime($current_time));
         }

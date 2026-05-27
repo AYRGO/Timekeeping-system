@@ -22,6 +22,24 @@ $yesterday = date('Y-m-d', strtotime('-1 day'));
 
 include_once('../config/db.php');
 
+function todayAttendanceTimeLogColumnExists(PDO $pdo, string $column): bool {
+    static $columns = null;
+
+    if ($columns === null) {
+        $columns = [];
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM time_logs");
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $columns[$row['Field']] = true;
+            }
+        } catch (PDOException $e) {
+            error_log("Unable to inspect time_logs columns: " . $e->getMessage());
+        }
+    }
+
+    return isset($columns[$column]);
+}
+
 // Initialize variables
 $time_in = null;
 $time_out = null;
@@ -32,6 +50,11 @@ $shift_status = null;
 $has_incomplete_previous_shift = false;
 $incomplete_shift_date = null;
 $incomplete_shift_time_in = null;
+$has_time_log_status = todayAttendanceTimeLogColumnExists($pdo, 'status');
+$has_log_out_date = todayAttendanceTimeLogColumnExists($pdo, 'log_out_date');
+$time_log_status_filter = $has_time_log_status ? "AND status != 'incomplete'" : "";
+$time_log_status_select = $has_time_log_status ? ", status" : "";
+$time_log_out_date_select = $has_log_out_date ? ", log_out_date" : "";
 
 // Check if this is a reset request (cache busting parameter)
 $is_reset_request = isset($_GET['reset']);
@@ -45,7 +68,7 @@ $incompleteCheckStmt = $pdo->prepare("
     AND log_date = ? 
     AND time_in IS NOT NULL 
     AND time_out IS NULL 
-    AND status != 'incomplete'
+    $time_log_status_filter
     LIMIT 1
 ");
 $incompleteCheckStmt->execute([$employee_id, $yesterday]);
@@ -111,7 +134,7 @@ if ($has_incomplete_previous_shift) {
     // No incomplete shift from yesterday - check today's logs normally
     
     // Priority 1: Check for today's regular time log (exclude incomplete ones)
-    $stmt = $pdo->prepare("SELECT time_in, time_out, log_date, log_out_date, status FROM time_logs WHERE employee_id = ? AND log_date = ? AND status != 'incomplete' ORDER BY id DESC LIMIT 1");
+    $stmt = $pdo->prepare("SELECT time_in, time_out, log_date $time_log_out_date_select $time_log_status_select FROM time_logs WHERE employee_id = ? AND log_date = ? $time_log_status_filter ORDER BY id DESC LIMIT 1");
     $stmt->execute([$employee_id, $today]);
     $todayLog = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -121,7 +144,7 @@ if ($has_incomplete_previous_shift) {
         $time_out = $todayLog['time_out'];
         $original_log_date = $todayLog['log_date'];
         $log_out_date = $todayLog['log_out_date'] ?? null;
-        $shift_status = $todayLog['status'] ?? 'active';
+        $shift_status = $todayLog['status'] ?? ($time_out ? 'completed' : 'active');
         error_log("Found today's log for employee $employee_id: time_in=$time_in, time_out=$time_out, log_out_date=$log_out_date, status=$shift_status");
     }
     // If no logs found, all variables remain null for fresh start
@@ -221,7 +244,8 @@ if (isset($shift_status) && $shift_status === 'incomplete') {
 // Override: If we just reset, ensure we show the fresh active shift for today
 if ($is_reset_request && !$is_incomplete_shift) {
     // Force refresh of today's data
-    $freshCheckStmt = $pdo->prepare("SELECT time_in, time_out, log_date, status FROM time_logs WHERE employee_id = ? AND log_date = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
+    $freshStatusWhere = $has_time_log_status ? "AND status = 'active'" : "AND time_out IS NULL";
+    $freshCheckStmt = $pdo->prepare("SELECT time_in, time_out, log_date $time_log_status_select FROM time_logs WHERE employee_id = ? AND log_date = ? $freshStatusWhere ORDER BY id DESC LIMIT 1");
     $freshCheckStmt->execute([$employee_id, $today]);
     $freshLog = $freshCheckStmt->fetch(PDO::FETCH_ASSOC);
     
