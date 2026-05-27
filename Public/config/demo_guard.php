@@ -300,3 +300,247 @@ function demo_render_admin_locked_page(string $title, string $message = ''): voi
     <?php
     exit;
 }
+
+function demo_admin_sample_employees(int $count = 12): array
+{
+    $firstNames = ['Alex', 'Jordan', 'Taylor', 'Casey', 'Riley', 'Morgan', 'Quinn', 'Avery', 'Skyler', 'Dakota'];
+    $lastNames = ['Reyes', 'Santos', 'Garcia', 'Lim', 'Cruz', 'Rivera', 'Navarro', 'Torres', 'DelaRosa', 'Ortega'];
+    $positions = ['HR Associate', 'Operations Analyst', 'IT Specialist', 'Finance Coordinator', 'Support Lead', 'Marketing Assistant'];
+    $departments = ['Operations', 'HR', 'Finance', 'IT', 'Marketing', 'Support'];
+
+    $employees = [];
+    for ($i = 0; $i < $count; $i++) {
+        $fname = $firstNames[$i % count($firstNames)];
+        $lname = $lastNames[($i + 2) % count($lastNames)];
+        $employees[] = [
+            'id' => 1000 + $i,
+            'fname' => $fname,
+            'lname' => $lname,
+            'email' => strtolower($fname . '.' . $lname) . '@demo.local',
+            'contact' => '09' . str_pad((string)(100000000 + ($i * 7)), 9, '0', STR_PAD_LEFT),
+            'position' => $positions[$i % count($positions)],
+            'department' => $departments[$i % count($departments)],
+            'status' => $i % 5 === 0 ? 'Inactive' : 'Active',
+            'Emp_Type' => $i % 2 === 0 ? 'Regular' : 'Probationary',
+            'profile_picture' => null,
+        ];
+    }
+
+    return $employees;
+}
+
+function demo_admin_sample_leave_requests(bool $history = false, int $count = 10): array
+{
+    $employees = demo_admin_sample_employees($count);
+    $types = ['vacation_leave', 'sick_leave', 'emergency_leave', 'maternity_leave', 'paternity_leave'];
+    $reasons = ['Medical appointment', 'Family event', 'Rest and recovery', 'Personal errand', 'Travel'];
+
+    $rows = [];
+    for ($i = 0; $i < $count; $i++) {
+        $employee = $employees[$i % count($employees)];
+        $start = date('Y-m-d', strtotime("+" . ($i + 1) . " days"));
+        $end = date('Y-m-d', strtotime("+" . ($i + 2) . " days"));
+        $rows[] = [
+            'id' => 2000 + $i,
+            'leave_type' => $types[$i % count($types)],
+            'start_date' => $start,
+            'end_date' => $end,
+            'reason' => $reasons[$i % count($reasons)],
+            'status' => $history ? ($i % 3 === 0 ? 'approved' : 'rejected') : 'pending',
+            'attachment_lr' => null,
+            'created_at' => date('Y-m-d H:i:s', strtotime("-" . ($i + 1) . " days")),
+            'explanation' => $history ? 'Reviewed in demo mode.' : '',
+            'employee_id' => $employee['id'],
+            'fname' => $employee['fname'],
+            'lname' => $employee['lname'],
+        ];
+    }
+
+    return $rows;
+}
+
+function demo_admin_sample_time_adjustments(bool $history = false, int $count = 8): array
+{
+    $employees = demo_admin_sample_employees($count);
+    $reasons = ['Missed time out', 'System delay', 'Approved correction', 'Network issue'];
+
+    $rows = [];
+    for ($i = 0; $i < $count; $i++) {
+        $employee = $employees[$i % count($employees)];
+        $logDate = date('Y-m-d', strtotime("-" . ($i + 1) . " days"));
+        $rows[] = [
+            'id' => 3000 + $i,
+            'employee_id' => $employee['id'],
+            'log_date' => $logDate,
+            'current_time_in' => '08:00:00',
+            'current_time_out' => $history ? '17:00:00' : null,
+            'requested_time_in' => '08:05:00',
+            'requested_time_out' => '17:10:00',
+            'reason' => $reasons[$i % count($reasons)],
+            'status' => $history ? ($i % 2 === 0 ? 'approved' : 'rejected') : 'pending',
+            'attachment' => null,
+            'submitted_at' => date('Y-m-d H:i:s', strtotime("-" . ($i + 1) . " days")),
+            'created_at' => date('Y-m-d H:i:s', strtotime("-" . ($i + 1) . " days")),
+            'fname' => $employee['fname'],
+            'lname' => $employee['lname'],
+        ];
+    }
+
+    return $rows;
+}
+
+function demo_admin_sample_overtime_requests(bool $history = false, int $count = 8): array
+{
+    $employees = demo_admin_sample_employees($count);
+    $types = ['Regular OT', 'Rest Day OT', 'Holiday OT'];
+    $reasons = ['Project deadline', 'Client request', 'System maintenance'];
+
+    $rows = [];
+    for ($i = 0; $i < $count; $i++) {
+        $employee = $employees[$i % count($employees)];
+        $logDate = date('Y-m-d', strtotime("-" . ($i + 1) . " days"));
+        $rows[] = [
+            'id' => 4000 + $i,
+            'employee_id' => $employee['id'],
+            'time_log_id' => 5000 + $i,
+            'time_in' => '17:30:00',
+            'time_out' => '20:00:00',
+            'ot_duration' => 2.5,
+            'ot_type' => $types[$i % count($types)],
+            'reason' => $reasons[$i % count($reasons)],
+            'status' => $history ? ($i % 2 === 0 ? 'approved' : 'declined') : 'pending',
+            'attachment' => null,
+            'created_at' => date('Y-m-d H:i:s', strtotime("-" . ($i + 1) . " days")),
+            'approved_at' => $history ? date('Y-m-d H:i:s', strtotime("-" . ($i) . " days")) : null,
+            'approved_by' => $history ? 'Demo Admin' : null,
+            'fname' => $employee['fname'],
+            'lname' => $employee['lname'],
+            'log_date' => $logDate,
+            'current_schedule' => [
+                'schedule_id' => 5,
+                'time_in' => '8:00 AM',
+                'time_out' => '5:00 PM',
+            ],
+        ];
+    }
+
+    return $rows;
+}
+
+function demo_admin_sample_schedule_requests(string $view, int $count = 6): array
+{
+    $employees = demo_admin_sample_employees($count);
+    $rows = [];
+
+    for ($i = 0; $i < $count; $i++) {
+        $employee = $employees[$i % count($employees)];
+        $createdAt = date('Y-m-d H:i:s', strtotime("-" . ($i + 1) . " days"));
+
+        if ($view === 'monthly') {
+            $rows[] = [
+                'id' => 6000 + $i,
+                'reason' => 'Monthly schedule adjustment',
+                'status' => $i % 3 === 0 ? 'approved' : 'pending',
+                'year' => date('Y'),
+                'month' => date('m'),
+                'created_at' => $createdAt,
+                'sunday_schedule_id' => 0,
+                'sunday_is_rest_day' => 1,
+                'monday_schedule_id' => 5,
+                'monday_is_rest_day' => 0,
+                'tuesday_schedule_id' => 5,
+                'tuesday_is_rest_day' => 0,
+                'wednesday_schedule_id' => 5,
+                'wednesday_is_rest_day' => 0,
+                'thursday_schedule_id' => 5,
+                'thursday_is_rest_day' => 0,
+                'friday_schedule_id' => 5,
+                'friday_is_rest_day' => 0,
+                'saturday_schedule_id' => 0,
+                'saturday_is_rest_day' => 1,
+                'attachment_path' => null,
+                'processed_at' => null,
+                'processed_by' => null,
+                'admin_notes' => null,
+                'employee_id' => $employee['id'],
+                'fname' => $employee['fname'],
+                'lname' => $employee['lname'],
+            ];
+        } elseif ($view === 'swap') {
+            $rows[] = [
+                'id' => 7000 + $i,
+                'employee_id' => $employee['id'],
+                'source_date' => date('Y-m-d', strtotime("+" . ($i + 2) . " days")),
+                'target_date' => date('Y-m-d', strtotime("+" . ($i + 6) . " days")),
+                'reason' => 'Schedule swap for demo',
+                'attachment_path' => null,
+                'status' => $i % 2 === 0 ? 'pending' : 'approved',
+                'created_at' => $createdAt,
+                'processed_at' => $i % 2 === 0 ? null : date('Y-m-d H:i:s', strtotime("-" . $i . " days")),
+                'processed_by' => $i % 2 === 0 ? null : 'Demo Admin',
+                'admin_notes' => null,
+                'fname' => $employee['fname'],
+                'lname' => $employee['lname'],
+            ];
+        } else {
+            $status = $view === 'history' ? ($i % 2 === 0 ? 'approved' : 'forfeited') : 'pending';
+            $rows[] = [
+                'id' => 8000 + $i,
+                'reason' => 'Schedule change request',
+                'status' => $status,
+                'start_date' => date('Y-m-d', strtotime("+" . ($i + 1) . " days")),
+                'end_date' => date('Y-m-d', strtotime("+" . ($i + 2) . " days")),
+                'created_at' => $createdAt,
+                'work_schedule_id' => 5,
+                'current_work_schedule_id' => 4,
+                'attachment_scr' => null,
+                'explanation' => $status !== 'pending' ? 'Reviewed in demo mode.' : '',
+                'approved_at' => $status !== 'pending' ? date('Y-m-d H:i:s', strtotime("-" . $i . " days")) : null,
+                'employee_id' => $employee['id'],
+                'is_rest_day' => 0,
+                'fname' => $employee['fname'],
+                'lname' => $employee['lname'],
+                'time_in' => '08:00:00',
+                'time_out' => '17:00:00',
+                'current_time_in' => '07:00:00',
+                'current_time_out' => '16:00:00',
+            ];
+        }
+    }
+
+    return $rows;
+}
+
+function demo_admin_sample_announcements(int $count = 4): array
+{
+    $rows = [];
+    for ($i = 0; $i < $count; $i++) {
+        $rows[] = [
+            'announcement_id' => 9000 + $i,
+            'title' => 'Demo Update #' . ($i + 1),
+            'content' => 'This is a demo announcement preview used for admin mode display.',
+            'admin_name' => 'Demo Admin',
+            'created_at' => date('Y-m-d H:i:s', strtotime("-" . ($i + 1) . " days")),
+            'image' => null,
+        ];
+    }
+
+    return $rows;
+}
+
+function demo_admin_sample_leave_credits(int $employeeId): array
+{
+    $types = ['vacation', 'sick', 'emergency'];
+    $rows = [];
+    foreach ($types as $index => $type) {
+        $rows[] = [
+            'employee_id' => $employeeId,
+            'leave_type' => $type,
+            'balance' => $type === 'vacation' ? 7.5 : ($type === 'sick' ? 5.0 : 2.0),
+            'carry_over' => $type === 'vacation' ? 1.5 : null,
+            'updated_at' => date('Y-m-d H:i:s', strtotime('-5 days')),
+        ];
+    }
+
+    return $rows;
+}

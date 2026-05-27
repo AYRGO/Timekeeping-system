@@ -1177,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </button>
 
   <!-- Switch to Admin Form (Conditional) -->
-  <?php if (isset($employee_role) && $employee_role === 'internal'): ?>
+    <?php if (isset($employee_role) && $employee_role === 'internal' && empty($_SESSION['demo_mode'])): ?>
     <form method="POST" class="w-full">
       <button type="submit" name="switch_to_admin" 
               class="flex items-center w-full px-4 py-3 text-blue-600 hover:bg-blue-50 transition duration-150 ease-in-out border-b border-gray-100">
