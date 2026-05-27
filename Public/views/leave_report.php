@@ -30,6 +30,8 @@ if (!isset($_SESSION['csrf_token'])) {
 }
 
 include('../config/db.php');
+require_once __DIR__ . '/../config/demo_guard.php';
+demo_render_admin_locked_page('Leave Report', 'Leave exports are disabled in admin demo mode to protect real employee data.');
 
 // Get current year for default values
 $currentYear = date('Y');

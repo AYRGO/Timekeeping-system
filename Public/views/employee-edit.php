@@ -1,6 +1,8 @@
 <?php
 session_start();
 include('../config/db.php');
+require_once __DIR__ . '/../config/demo_guard.php';
+demo_render_admin_locked_page('Employee Details', 'Employee profiles are hidden in admin demo mode to protect real employee records.');
 
 // Get employee ID
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {

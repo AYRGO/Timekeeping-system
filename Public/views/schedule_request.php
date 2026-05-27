@@ -3,9 +3,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
-
-// Auto-forfeit expired pending requests
-include(__DIR__ . '/../cron/auto_forfeit_expired_requests.php');
+require_once __DIR__ . '/../config/demo_guard.php';
 
 // Check which view to display (single requests, monthly, history, or swap)
 $view = isset($_GET['view']) ? $_GET['view'] : 'single';
@@ -14,6 +12,10 @@ $isMonthlyView = ($view === 'monthly');
 $isSwapView = ($view === 'swap');
 
 $pageTitle = $isMonthlyView ? 'Monthly Schedule Requests' : ($isSwapView ? 'Schedule Swap Requests' : ($isHistoryView ? 'Schedule Changes & Day Off History' : 'Single Day Schedule Requests'));
+demo_render_admin_locked_page($pageTitle);
+
+// Auto-forfeit expired pending requests
+include(__DIR__ . '/../cron/auto_forfeit_expired_requests.php');
 
 // Pagination settings
 $records_per_page = 10;

@@ -1,6 +1,8 @@
 <?php
 require '../../vendor/autoload.php';
 require '../config/db.php';
+require_once __DIR__ . '/../config/demo_guard.php';
+demo_block_admin_mutation('Overtime report export is disabled in admin demo mode.');
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;

@@ -2,6 +2,7 @@
 
 session_start();
 include '../config/db.php';
+require_once __DIR__ . '/../config/demo_guard.php';
 
 // Handle switch to employee view
 if (isset($_POST['switch_to_employee'])) {
@@ -18,6 +19,84 @@ if (
 ) {
     // Unauthorized, redirect to employee view
     header("Location: ../module/time_log_create.php");
+    exit;
+}
+
+if (demo_is_admin_mode()) {
+    $pageTitle = 'Admin Demo';
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+        <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+        <title>Admin Demo</title>
+    </head>
+    <body class="bg-gray-50">
+        <div x-data="{ open: false }" class="flex h-screen bg-gray-50 overflow-hidden">
+            <?php include('sidebar.php'); ?>
+            <div class="flex-1 flex flex-col min-w-0">
+                <?php include('header.php'); ?>
+                <main class="flex-1 p-6 overflow-y-auto">
+                    <div class="max-w-5xl mx-auto space-y-6">
+                        <section class="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
+                            <div class="flex items-start gap-5">
+                                <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                                    <i class="fas fa-shield-halved text-2xl"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold uppercase tracking-wide text-blue-600">Protected Demo Mode</p>
+                                    <h1 class="mt-1 text-3xl font-bold text-gray-900">Admin demo is active</h1>
+                                    <p class="mt-3 text-gray-600">
+                                        This admin demo is intentionally locked from real employee records, approvals, payroll data, and announcements.
+                                        You can view the admin navigation, but sensitive modules display protected demo notices.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <?php
+                            $cards = [
+                                ['Employee Data', 'Hidden', 'Real employee records are not shown in the admin demo.', 'fa-users'],
+                                ['Approvals', 'Disabled', 'Leave, OT, schedule, and adjustment actions cannot update real requests.', 'fa-lock'],
+                                ['Announcements', 'Hidden', 'Internal announcements are not visible in demo mode.', 'fa-bullhorn'],
+                            ];
+                            ?>
+                            <?php foreach ($cards as [$label, $status, $description, $icon]): ?>
+                                <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                                    <div class="flex items-center justify-between">
+                                        <div class="text-sm font-semibold text-gray-500"><?= htmlspecialchars($label) ?></div>
+                                        <i class="fas <?= htmlspecialchars($icon) ?> text-gray-400"></i>
+                                    </div>
+                                    <div class="mt-3 text-2xl font-bold text-gray-900"><?= htmlspecialchars($status) ?></div>
+                                    <p class="mt-2 text-sm text-gray-600"><?= htmlspecialchars($description) ?></p>
+                                </div>
+                            <?php endforeach; ?>
+                        </section>
+
+                        <section class="rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+                            <div class="flex gap-3">
+                                <i class="fas fa-circle-info mt-1"></i>
+                                <div>
+                                    <h2 class="font-bold">Database safety</h2>
+                                    <p class="mt-1 text-sm">
+                                        Admin demo sessions are blocked from approval, delete, employee edit, report export, and announcement write actions.
+                                        Employee demo actions remain scoped to dedicated demo accounts.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
     exit;
 }
 

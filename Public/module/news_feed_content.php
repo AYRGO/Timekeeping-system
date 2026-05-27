@@ -1,6 +1,7 @@
 <?php
 
 $current_user_id = $_SESSION['employee']['id'] ?? null;
+$isDemoMode = !empty($_SESSION['demo_mode']);
 
 function newsFeedTableExists(PDO $pdo, string $table): bool {
     static $tableCache = [];
@@ -38,9 +39,13 @@ function newsFeedTableColumnExists(PDO $pdo, string $table, string $column): boo
     return isset($columnsByTable[$table][$column]);
 }
 
-// Fetch announcements
-$stmt = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDER BY created_at DESC");
-$announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Fetch announcements. Demo mode intentionally hides internal announcements.
+if ($isDemoMode) {
+    $announcements = [];
+} else {
+    $stmt = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDER BY created_at DESC");
+    $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 $upcomingEvents = [];
 $today = date('Y-m-d');

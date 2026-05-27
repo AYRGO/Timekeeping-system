@@ -693,6 +693,11 @@ if (isset($_POST['submit_schedule_change'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment') {
+    if (!empty($_SESSION['demo_mode'])) {
+        header("Location: time_log_create.php#newsFeedView");
+        exit;
+    }
+
     $csrf_token = $_POST['csrf_token'] ?? '';
     $announcement_id = intval($_POST['announcement_id'] ?? 0);
     $comment_content = trim($_POST['comment'] ?? '');
@@ -1228,8 +1233,12 @@ $initialView = isset($_GET['view']) && $_GET['view'] === 'schedule' ? 'schedule'
 <div id="dashboardView" class="<?= $initialView === 'dashboard' ? 'mt-20' : 'hidden' ?>">
 <?php
 // Fetch the number of announcements
-$stmt = $pdo->query("SELECT COUNT(announcement_id) AS total_announcements FROM announcements");
-$announcementCount = $stmt->fetchColumn();
+if (!empty($_SESSION['demo_mode'])) {
+    $announcementCount = 0;
+} else {
+    $stmt = $pdo->query("SELECT COUNT(announcement_id) AS total_announcements FROM announcements");
+    $announcementCount = $stmt->fetchColumn();
+}
 ?>
 <?php include 'welcome_banner.php'; ?>
 

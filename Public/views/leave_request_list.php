@@ -3,6 +3,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
+require_once __DIR__ . '/../config/demo_guard.php';
 
 $pageTitle = 'Leave Request List';
 // Check which view to display (current requests or history)
@@ -10,6 +11,7 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'current';
 $isHistoryView = ($view === 'history');
 
 $pageTitle = $isHistoryView ? 'Leave Requests History' : 'Leave Requests';
+demo_render_admin_locked_page($pageTitle);
 
 // Fetch leave requests with employee names and attachments 
 

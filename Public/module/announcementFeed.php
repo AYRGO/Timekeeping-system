@@ -5,8 +5,12 @@ date_default_timezone_set('Asia/Manila'); // ✅ Use Manila time
 include('../config/db.php');
 
 $current_user_id = $_SESSION['employee']['id'] ?? null;
-$stmt = $pdo->query("SELECT * FROM announcements ORDER BY created_at DESC");
-$announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+if (!empty($_SESSION['demo_mode'])) {
+    $announcements = [];
+} else {
+    $stmt = $pdo->query("SELECT * FROM announcements ORDER BY created_at DESC");
+    $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 ?>
 
 <!DOCTYPE html>

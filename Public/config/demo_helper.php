@@ -3,6 +3,9 @@
 const DEMO_EMPLOYEE_USERNAME = 'demo.harley';
 const DEMO_EMPLOYEE_PASSWORD = 'demo123';
 const DEMO_EMPLOYEE_EMAIL = 'demo.harley@example.com';
+const DEMO_ADMIN_USERNAME = 'demo.admin';
+const DEMO_ADMIN_PASSWORD = 'demo123';
+const DEMO_ADMIN_EMAIL = 'demo.admin@example.com';
 
 function demo_table_exists(PDO $pdo, string $table): bool
 {
@@ -122,6 +125,39 @@ function demo_ensure_employee(PDO $pdo): array
         'company' => 'Demo Workspace',
         'official_sched' => $scheduleId,
         'role' => 'employee',
+        'admin_rights_hdesk' => null,
+    ];
+
+    $employeeId = demo_write_employee($pdo, $employeeId, $values);
+
+    $stmt = $pdo->prepare("SELECT * FROM employees WHERE id = ? LIMIT 1");
+    $stmt->execute([$employeeId]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+function demo_ensure_admin_employee(PDO $pdo): array
+{
+    $scheduleId = demo_select_schedule_id($pdo);
+
+    $stmt = $pdo->prepare("SELECT * FROM employees WHERE username = ? LIMIT 1");
+    $stmt->execute([DEMO_ADMIN_USERNAME]);
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+    $employeeId = $existing ? (int)$existing['id'] : null;
+
+    $values = [
+        'fname' => 'Demo',
+        'lname' => 'Admin',
+        'email' => DEMO_ADMIN_EMAIL,
+        'personal_email' => DEMO_ADMIN_EMAIL,
+        'contact' => 'N/A',
+        'position' => 'Demo Administrator',
+        'status' => 'active',
+        'Emp_Type' => 'Regular',
+        'username' => DEMO_ADMIN_USERNAME,
+        'password' => DEMO_ADMIN_PASSWORD,
+        'company' => 'Demo Workspace',
+        'official_sched' => $scheduleId,
+        'role' => 'internal',
         'admin_rights_hdesk' => null,
     ];
 
@@ -310,6 +346,20 @@ function demo_prepare_account(PDO $pdo, bool $resetData = true): array
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
+function demo_prepare_admin_account(PDO $pdo): array
+{
+    $employee = demo_ensure_admin_employee($pdo);
+    $employeeId = (int)$employee['id'];
+
+    demo_ensure_checklist($pdo, $employeeId);
+    demo_ensure_leave_credits($pdo, $employeeId);
+    demo_ensure_default_schedule($pdo, $employeeId);
+
+    $stmt = $pdo->prepare("SELECT * FROM employees WHERE id = ? LIMIT 1");
+    $stmt->execute([$employeeId]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
 function demo_login_employee(array $employee): void
 {
     session_regenerate_id(true);
@@ -326,5 +376,25 @@ function demo_login_employee(array $employee): void
     $_SESSION['user_id'] = (int)$employee['id'];
     $_SESSION['view_mode'] = 'employee';
     $_SESSION['demo_mode'] = true;
+    $_SESSION['demo_started_at'] = time();
+}
+
+function demo_login_admin(array $employee): void
+{
+    session_regenerate_id(true);
+
+    $_SESSION['employee'] = [
+        'id' => (int)$employee['id'],
+        'username' => $employee['username'] ?? DEMO_ADMIN_USERNAME,
+        'fname' => $employee['fname'] ?? 'Demo',
+        'lname' => $employee['lname'] ?? 'Admin',
+        'position' => $employee['position'] ?? 'Demo Administrator',
+        'role' => 'internal',
+    ];
+
+    $_SESSION['user_id'] = (int)$employee['id'];
+    $_SESSION['view_mode'] = 'admin';
+    $_SESSION['demo_mode'] = true;
+    $_SESSION['demo_admin_mode'] = true;
     $_SESSION['demo_started_at'] = time();
 }

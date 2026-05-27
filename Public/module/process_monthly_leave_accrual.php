@@ -1,6 +1,8 @@
 <?php
 session_start();
 include('../config/db.php');
+require_once __DIR__ . '/../config/demo_guard.php';
+demo_block_mutation('Monthly leave accrual processing is disabled in demo mode.');
 
 // Check if user is logged in - removed strict admin check since this page is admin-only anyway
 if (!isset($_SESSION['employee'])) {

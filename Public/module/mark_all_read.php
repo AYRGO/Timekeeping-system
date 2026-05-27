@@ -2,6 +2,8 @@
 
 session_start();
 include('../config/db.php');
+require_once __DIR__ . '/../config/demo_guard.php';
+demo_block_mutation('Announcement read tracking is disabled in demo mode.');
 
 header('Content-Type: application/json');
 
