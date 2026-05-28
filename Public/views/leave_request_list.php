@@ -49,6 +49,7 @@ if ($isDemoAdmin) {
         ORDER BY lr.start_date DESC
     ";
 }
+if (!$isDemoAdmin) {
     $stmt = $pdo->prepare($sql);
     $stmt->execute();
     $leave_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
