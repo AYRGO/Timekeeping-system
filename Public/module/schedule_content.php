@@ -164,6 +164,7 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
           AND edd.day_of_week = ? 
           AND edd.effective_from <= ? 
           AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+        ORDER BY edd.effective_from DESC, edd.id DESC
         LIMIT 1
     ");
     $weeklyStmt->execute([$employee_id, $dayOfWeek, $date, $date]);

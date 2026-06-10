@@ -32,8 +32,8 @@ function simulateMonthlyAccrual($pdo, $leaveRates, $currentYear, $simulatedMonth
         echo "🔄 SIMULATING ACCRUAL FOR MONTH {$simulatedMonth}\n";
         echo str_repeat("-", 50) . "\n";
         
-        // Get all active employees
-        $employees = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
+        // Only regular employment types are eligible for automatic accrual.
+        $employees = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular')")->fetchAll(PDO::FETCH_ASSOC);
         
         $processedCount = 0;
         $employeeUpdates = [];

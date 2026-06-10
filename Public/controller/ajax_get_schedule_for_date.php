@@ -94,10 +94,14 @@ try {
         SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
         FROM employee_default_schedules edd
         LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
-        WHERE edd.employee_id = ? AND edd.day_of_week = ?
+        WHERE edd.employee_id = ?
+          AND edd.day_of_week = ?
+          AND edd.effective_from <= ?
+          AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+        ORDER BY edd.effective_from DESC, edd.id DESC
         LIMIT 1
     ");
-    $stmt->execute([$employee_id, $dayOfWeek]);
+    $stmt->execute([$employee_id, $dayOfWeek, $date, $date]);
     $default = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($default) {

@@ -29,8 +29,8 @@ echo str_repeat("=", 60) . "\n\n";
 // Function to process leave accrual
 function processLeaveAccrual($pdo, $leaveRates, $currentYear) {
     try {
-        // Get all active employees
-        $employees = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
+        // Only regular employment types are eligible for automatic accrual.
+        $employees = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular')")->fetchAll(PDO::FETCH_ASSOC);
         
         $processedCount = 0;
         

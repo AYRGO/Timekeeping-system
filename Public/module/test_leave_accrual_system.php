@@ -61,17 +61,17 @@ try {
     echo "<div class='error'>✗ Error checking table structure: " . $e->getMessage() . "</div>";
 }
 
-// Test 3: Check Active Employees
-echo "<h2>3. Active Employees</h2>";
+// Test 3: Check accrual-eligible employees.
+echo "<h2>3. Accrual-Eligible Employees</h2>";
 try {
-    $stmt = $pdo->query("SELECT COUNT(*) as count FROM employees WHERE status = 'active'");
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular')");
     $count = $stmt->fetchColumn();
     
     if ($count > 0) {
-        echo "<div class='success'>✓ Found {$count} active employees</div>";
+        echo "<div class='success'>✓ Found {$count} accrual-eligible employees</div>";
         
         // Show sample employees
-        $stmt = $pdo->query("SELECT id, fname, lname, status FROM employees WHERE status = 'active' LIMIT 5");
+        $stmt = $pdo->query("SELECT id, fname, lname, status FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular') LIMIT 5");
         $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         echo "<table><tr><th>ID</th><th>Name</th><th>Status</th></tr>";
@@ -80,7 +80,7 @@ try {
         }
         echo "</table>";
     } else {
-        echo "<div class='error'>✗ No active employees found</div>";
+        echo "<div class='error'>✗ No accrual-eligible employees found</div>";
     }
 } catch (Exception $e) {
     echo "<div class='error'>✗ Error checking employees: " . $e->getMessage() . "</div>";
@@ -169,8 +169,8 @@ echo "<div class='info'>ℹ This simulates accrual without making changes</div>"
 try {
     $leaveRates = ['sick' => 0.42, 'vacation' => 1.25];
     
-    // Get first active employee
-    $stmt = $pdo->query("SELECT id, fname, lname FROM employees WHERE status = 'active' LIMIT 1");
+    // Get the first employee eligible for automatic accrual.
+    $stmt = $pdo->query("SELECT id, fname, lname FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular') LIMIT 1");
     $testEmployee = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($testEmployee) {

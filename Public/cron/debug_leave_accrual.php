@@ -10,9 +10,9 @@ try {
     // Check database connection
     echo "✅ Database connection successful\n";
     
-    // Check employees table
-    $employees = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active' LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
-    echo "👥 Found " . count($employees) . " active employees (showing first 5):\n";
+    // Check employees eligible for automatic accrual.
+    $employees = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular') LIMIT 5")->fetchAll(PDO::FETCH_ASSOC);
+    echo "👥 Found " . count($employees) . " accrual-eligible employees (showing first 5):\n";
     foreach ($employees as $emp) {
         echo "   - ID: {$emp['id']}, Name: {$emp['full_name']}\n";
     }

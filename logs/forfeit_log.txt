@@ -87,3 +87,11 @@
 [2026-01-01 14:28:02] Auto-forfeit executed: 0 schedule changes, 0 swaps, 0 monthly schedules. Total: 0 requests forfeited.
 [2026-01-01 14:28:04] Auto-forfeit executed: 0 schedule changes, 0 swaps, 0 monthly schedules. Total: 0 requests forfeited.
 [2026-01-02 00:17:17] Auto-forfeit executed: 0 schedule changes, 0 swaps, 0 monthly schedules. Total: 0 requests forfeited.
+[2026-06-07 01:38:50] MIGRATION: schedule_change_requests.status changed from ENUM to VARCHAR(50), fixed empty status records
+[2026-06-07 01:38:50] Auto-forfeit executed: 16 schedule changes, 2 swaps, 0 monthly schedules. Total: 18 requests forfeited.
+[2026-06-07 02:05:01] MIGRATION: schedule_change_requests.status changed from ENUM to VARCHAR(50), fixed empty status records
+[2026-06-07 02:05:01] Auto-forfeit executed: 0 schedule changes, 0 swaps, 0 monthly schedules. Total: 0 requests forfeited.
+[2026-06-07 02:05:02] MIGRATION: schedule_change_requests.status changed from ENUM to VARCHAR(50), fixed empty status records
+[2026-06-07 02:05:02] Auto-forfeit executed: 0 schedule changes, 0 swaps, 0 monthly schedules. Total: 0 requests forfeited.
+[2026-06-07 02:05:09] MIGRATION: schedule_change_requests.status changed from ENUM to VARCHAR(50), fixed empty status records
+[2026-06-07 02:05:09] Auto-forfeit executed: 0 schedule changes, 0 swaps, 0 monthly schedules. Total: 0 requests forfeited.

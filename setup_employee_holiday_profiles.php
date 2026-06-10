@@ -5,6 +5,7 @@
  * Usage:
  *   setup_employee_holiday_profiles.php
  *   setup_employee_holiday_profiles.php?confirm=yes
+ *   setup_employee_holiday_profiles.php?confirm=yes&profiles_only=yes
  *
  * The script is safe to run in dry-run mode first.
  */
@@ -406,6 +407,7 @@ $profiles = [
 
 $confirm = strtolower($_GET['confirm'] ?? 'no');
 $isConfirm = in_array($confirm, ['yes', 'true', '1'], true);
+$profilesOnly = in_array(strtolower($_GET['profiles_only'] ?? 'no'), ['yes', 'true', '1'], true);
 
 $profileStmt = $pdo->prepare("\n    INSERT INTO employee_holiday_profiles (profile_code, profile_name, description, is_active)\n    VALUES (?, ?, ?, 1)\n    ON DUPLICATE KEY UPDATE\n        profile_name = VALUES(profile_name),\n        description = VALUES(description),\n        is_active = VALUES(is_active),\n        updated_at = CURRENT_TIMESTAMP\n");
 
@@ -416,7 +418,7 @@ $assignmentStmt = $pdo->prepare("\n    INSERT INTO employee_holiday_profile_assi
 
 $effectiveFrom = date('Y-m-d');
 
-echo "Mode: " . ($isConfirm ? 'LIVE' : 'DRY RUN') . "\n\n";
+echo "Mode: " . ($isConfirm ? 'LIVE' : 'DRY RUN') . ($profilesOnly ? ' (PROFILES ONLY)' : '') . "\n\n";
 
 foreach ($profiles as $profile) {
     echo "Profile: {$profile['profile_code']}\n";
@@ -443,6 +445,11 @@ foreach ($profiles as $profile) {
     }
 
     echo "  Employees: " . count($profile['employees']) . "\n";
+    if ($profilesOnly) {
+        echo "    - Skipped; employee assignments will be imported from the Holidays page.\n\n";
+        continue;
+    }
+
     foreach ($profile['employees'] as $employeeName) {
         $match = find_best_employee($pdo, $employeeName);
 
@@ -467,7 +474,14 @@ foreach ($profiles as $profile) {
     echo "\n";
 }
 
-echo "Summary: " . ($isConfirm ? 'Applied assignments and profile holidays.' : 'Dry run only. Append ?confirm=yes to write changes.') . "\n";
+if (!$isConfirm) {
+    $summary = 'Dry run only. Append ?confirm=yes to write changes.';
+} elseif ($profilesOnly) {
+    $summary = 'Applied holiday profiles and holiday dates without employee assignments.';
+} else {
+    $summary = 'Applied assignments and profile holidays.';
+}
+echo "Summary: $summary\n";
 echo "========================================\n";
 echo "Done\n";
 echo "========================================\n";

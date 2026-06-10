@@ -236,14 +236,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $position = $_POST['position'] ?? '';
         $status = $_POST['status'] ?? '';
         $company = $_POST['company'] ?? '';
+        $allowedEmpTypes = ['Probationary', 'Floating', 'Regular', 'Old_Regular'];
         $empType = $_POST['emp_type'] ?? 'Probationary';
+        if (!in_array($empType, $allowedEmpTypes, true)) {
+            $empType = 'Probationary';
+        }
         
         // Get previous Emp_Type to detect regularization
         $stmt = $pdo->prepare("SELECT Emp_Type FROM employees WHERE id = ?");
         $stmt->execute([$employeeId]);
         $previousEmpType = $stmt->fetchColumn();
         
-        $wasRegularized = ($previousEmpType === 'Probationary' && $empType === 'Regular');
+        $wasRegularized = (
+            in_array($previousEmpType, ['Probationary', 'Floating'], true) &&
+            $empType === 'Regular'
+        );
 
         if ($fname && $lname && $email) {
             $stmt = $pdo->prepare("UPDATE employees SET fname = ?, lname = ?, email = ?, contact = ?, position = ?, status = ?, company = ?, Emp_Type = ? WHERE id = ?");
@@ -1030,6 +1037,12 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                 if ($empType === 'Regular') {
                                     $colorClass = 'text-blue-600 font-semibold';
                                     $displayText = 'Regular';
+                                } elseif ($empType === 'Old_Regular') {
+                                    $colorClass = 'text-blue-600 font-semibold';
+                                    $displayText = 'Old Regular';
+                                } elseif ($empType === 'Floating') {
+                                    $colorClass = 'text-purple-600 font-semibold';
+                                    $displayText = 'Floating';
                                 } elseif ($empType === 'Probationary') {
                                     $colorClass = 'text-orange-600';
                                     $displayText = 'Probationary';
@@ -1085,12 +1098,17 @@ uasort($sortedScheduleOptions, function($a, $b) {
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Employment Type 
-                                <span class="text-xs text-gray-500">(Regular gets 7.5 VL + 5 SL immediately)</span>
+                                <span class="text-xs text-gray-500">(Probationary and Floating do not accrue leave credits)</span>
                             </label>
                             <select id="empTypeSelect" name="emp_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="Probationary" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Probationary' ? 'selected' : '' ?>>Probationary</option>
+                                <option value="Floating" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Floating' ? 'selected' : '' ?>>Floating (No leave accrual)</option>
                                 <option value="Regular" <?= ($employee['Emp_Type'] ?? 'Probationary') === 'Regular' ? 'selected' : '' ?>>Regular</option>
+                                <?php if (($employee['Emp_Type'] ?? '') === 'Old_Regular'): ?>
+                                    <option value="Old_Regular" selected>Old Regular (Legacy)</option>
+                                <?php endif; ?>
                             </select>
+                            <p id="empTypeHelp" class="mt-1 text-xs text-gray-500"></p>
                         </div>
 
                         <div class="md:col-span-2 flex justify-between items-center pt-4">
@@ -2759,12 +2777,33 @@ function initializeEmpTypeConfirmation() {
         const newSelect = empTypeSelect.cloneNode(true);
         empTypeSelect.parentNode.replaceChild(newSelect, empTypeSelect);
         
+        const updateEmpTypeHelp = (value) => {
+            const helpText = document.getElementById('empTypeHelp');
+            if (!helpText) {
+                return;
+            }
+
+            if (value === 'Floating') {
+                helpText.textContent = 'Floating employees keep existing balances but receive no future automatic leave accrual.';
+                helpText.className = 'mt-1 text-xs font-medium text-purple-600';
+            } else if (value === 'Probationary') {
+                helpText.textContent = 'Probationary employees receive no automatic leave accrual.';
+                helpText.className = 'mt-1 text-xs font-medium text-orange-600';
+            } else {
+                helpText.textContent = 'Regular employees are eligible for leave credits and monthly VL accrual.';
+                helpText.className = 'mt-1 text-xs text-gray-500';
+            }
+        };
+
+        updateEmpTypeHelp(originalEmpType);
+
         // Add change event listener
         document.getElementById('empTypeSelect').addEventListener('change', function(e) {
             const newValue = this.value;
+            updateEmpTypeHelp(newValue);
             
-            // Only show confirmation when changing FROM Probationary TO Regular
-            if (originalEmpType === 'Probationary' && newValue === 'Regular') {
+            // Confirm regularization from either non-accruing employment type.
+            if (['Probationary', 'Floating'].includes(originalEmpType) && newValue === 'Regular') {
                 const confirmed = confirm(
                     '⚠️ REGULARIZATION CONFIRMATION\n\n' +
                     'You are about to regularize this employee.\n\n' +
@@ -2778,6 +2817,19 @@ function initializeEmpTypeConfirmation() {
                 if (!confirmed) {
                     // Revert to original value if not confirmed
                     this.value = originalEmpType;
+                    updateEmpTypeHelp(originalEmpType);
+                }
+            } else if (newValue === 'Floating' && originalEmpType !== 'Floating') {
+                const confirmed = confirm(
+                    'FLOATING STATUS CONFIRMATION\n\n' +
+                    'This employee will receive no future automatic leave accrual.\n' +
+                    'Existing leave balances will remain unchanged.\n\n' +
+                    'Do you want to continue?'
+                );
+
+                if (!confirmed) {
+                    this.value = originalEmpType;
+                    updateEmpTypeHelp(originalEmpType);
                 }
             }
         });
@@ -2788,11 +2840,15 @@ function initializeEmpTypeConfirmation() {
         editForm.setAttribute('data-listener-added', 'true');
         editForm.addEventListener('submit', function(e) {
             const empTypeSelect = document.getElementById('empTypeSelect');
-            if (empTypeSelect && originalEmpType === 'Probationary' && empTypeSelect.value === 'Regular') {
+            if (
+                empTypeSelect &&
+                ['Probationary', 'Floating'].includes(originalEmpType) &&
+                empTypeSelect.value === 'Regular'
+            ) {
                 const confirmed = confirm(
                     '🎯 FINAL CONFIRMATION\n\n' +
                     'Employee Name: <?= htmlspecialchars($employee["fname"] . " " . $employee["lname"]) ?>\n' +
-                    'Action: Probationary → Regular\n\n' +
+                    'Action: ' + originalEmpType + ' → Regular\n\n' +
                     '✅ 7.5 days Vacation Leave will be granted\n' +
                     '✅ 5 days Sick Leave will be granted\n' +
                     '✅ Monthly VL accrual (1.25 days) will begin\n\n' +

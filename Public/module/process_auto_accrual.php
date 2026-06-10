@@ -114,7 +114,7 @@ try {
     // 3. Process the accrual
     // ACCRUAL POLICY:
     // - Regular & Old_Regular: Gets ONLY VL (1.25/month) — NO sick leave accrual
-    // - PROBATIONARY: No automatic accrual
+    // - PROBATIONARY & FLOATING: No automatic accrual
     
     $stmt = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name, Emp_Type FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular')");
     $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);

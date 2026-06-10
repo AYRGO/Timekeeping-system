@@ -54,8 +54,8 @@ function processMonthlyAccrual($pdo, $monthlyRates, $currentYear, $currentMonth)
         echo "🔄 PROCESSING MONTHLY ACCRUAL...\n";
         echo str_repeat("-", 50) . "\n";
         
-        // Get all active employees
-        $stmt = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active'");
+        // Only regular employment types are eligible for automatic accrual.
+        $stmt = $pdo->query("SELECT id, CONCAT(fname, ' ', lname) as full_name FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular')");
         $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         if (empty($employees)) {

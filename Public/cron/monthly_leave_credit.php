@@ -11,8 +11,8 @@ $logMessages = [];
 echo "🔄 Starting monthly leave credit accrual process at {$executionTime}\n";
 echo "📅 Processing for year: {$currentYear}\n\n";
 
-// Step 1: Fetch all active employees
-$employees = $pdo->query("SELECT id FROM employees WHERE status = 'active'")->fetchAll(PDO::FETCH_ASSOC);
+// Step 1: Fetch active employees who are eligible for automatic accrual.
+$employees = $pdo->query("SELECT id FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular')")->fetchAll(PDO::FETCH_ASSOC);
 
 // Step 2: Define leave types with their monthly increments and annual limits
 $leaveTypes = [

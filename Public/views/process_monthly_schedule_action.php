@@ -114,18 +114,40 @@ try {
         
         error_log("MONTHLY APPROVAL: Processing request ID $request_id for employee $employee_id, month $year-$month");
         error_log("MONTHLY APPROVAL: Date range: $startDate to $lastDayOfMonth");
+
+        $nextScheduleStmt = $pdo->prepare("
+            SELECT MIN(effective_from)
+            FROM employee_default_schedules
+            WHERE employee_id = ?
+              AND effective_from > ?
+        ");
+        $nextScheduleStmt->execute([$employee_id, $startDate]);
+        $nextEffectiveFrom = $nextScheduleStmt->fetchColumn();
+        $newEffectiveUntil = $nextEffectiveFrom
+            ? date('Y-m-d', strtotime($nextEffectiveFrom . ' -1 day'))
+            : null;
+
+        $pdo->beginTransaction();
         
         // STEP 1: UPDATE employee_default_schedules (Weekly Pattern)
-        // End the current weekly schedule by setting effective_until
+        // End the current weekly schedule and make the approved monthly pattern the new default.
         $endPreviousStmt = $pdo->prepare("
             UPDATE employee_default_schedules 
             SET effective_until = ?
             WHERE employee_id = ? 
+              AND effective_from < ?
               AND (effective_until IS NULL OR effective_until >= ?)
         ");
         $previousEndDate = date('Y-m-d', strtotime($startDate . ' -1 day'));
-        $endPreviousStmt->execute([$previousEndDate, $employee_id, $startDate]);
+        $endPreviousStmt->execute([$previousEndDate, $employee_id, $startDate, $startDate]);
         error_log("MONTHLY APPROVAL: Ended previous schedules with effective_until = $previousEndDate");
+
+        $deleteSameStartStmt = $pdo->prepare("
+            DELETE FROM employee_default_schedules
+            WHERE employee_id = ?
+              AND effective_from = ?
+        ");
+        $deleteSameStartStmt->execute([$employee_id, $startDate]);
         
         // Insert new weekly schedule pattern (7 days)
         $weeklySchedule = [
@@ -151,7 +173,7 @@ try {
                 $daySchedule['schedule_id'],
                 $daySchedule['is_rest_day'],
                 $startDate,
-                $lastDayOfMonth  // Set to end of month so it only applies for this month
+                $newEffectiveUntil
             ]);
             $insertedCount++;
             error_log("MONTHLY APPROVAL: Inserted schedule for day $dayOfWeek (schedule_id: {$daySchedule['schedule_id']}, is_rest: {$daySchedule['is_rest_day']})");
@@ -159,7 +181,23 @@ try {
         error_log("MONTHLY APPROVAL: Inserted $insertedCount weekly schedule rows");
         
         // STEP 2: REBUILD employee_daily_schedule_cache for the affected date range
-        // Clear existing cache entries for this date range
+        // Clear stale default/monthly cache rows from the start date forward so future months
+        // fall through to the new permanent default schedule.
+        $clearFutureDefaultsStmt = $pdo->prepare("
+            DELETE FROM employee_daily_schedule_cache
+            WHERE employee_id = ?
+              AND schedule_date >= ?
+              AND (
+                  source IN ('default', 'weekly_default', 'approved_monthly_request')
+                  OR source LIKE '%|weekly_default'
+              )
+        ");
+        $clearFutureDefaultsStmt->execute([$employee_id, $startDate]);
+        $clearedFutureRows = $clearFutureDefaultsStmt->rowCount();
+        error_log("MONTHLY APPROVAL: Cleared $clearedFutureRows future default/monthly cache rows");
+
+        // Clear remaining cache entries for this requested month so the approved monthly
+        // schedule is visible immediately for the approved dates.
         $deleteStmt = $pdo->prepare("
             DELETE FROM employee_daily_schedule_cache 
             WHERE employee_id = ? 
@@ -250,6 +288,8 @@ try {
         $admin_id = $_SESSION['user_id'] ?? $_SESSION['employee']['id'] ?? null;
         $updateStmt->execute([$admin_id, $request_id]);
         error_log("MONTHLY APPROVAL: Request marked as approved and processed");
+
+        $pdo->commit();
         
         // Send email notification
         error_log("MONTHLY APPROVAL: Attempting to send email notification for request ID $request_id");
@@ -342,7 +382,7 @@ try {
             error_log("MONTHLY APPROVAL: Stack trace: " . $e->getTraceAsString());
         }
         
-        header("Location: schedule_request.php?view=monthly&message=" . urlencode("Monthly schedule approved! Weekly pattern updated for $year-$month."));
+        header("Location: schedule_request.php?view=monthly&message=" . urlencode("Monthly schedule approved! Weekly pattern updated permanently from $startDate."));
         
     } else if ($action === 'decline') {
         $explanation = $_POST['explanation'] ?? '';
@@ -450,7 +490,10 @@ try {
         header("Location: schedule_request.php?view=monthly&error=" . urlencode("Invalid action"));
     }
     
-} catch (PDOException $e) {
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log("Monthly schedule action error: " . $e->getMessage());
     header("Location: schedule_request.php?view=monthly&error=" . urlencode("Database error: " . $e->getMessage()));
 }

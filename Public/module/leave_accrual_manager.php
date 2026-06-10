@@ -21,8 +21,8 @@ $stmt = $pdo->query("SELECT MAX(updated_at) as last_accrual FROM leave_credits W
 $lastAccrual = $stmt->fetchColumn();
 $lastAccrualFormatted = $lastAccrual ? date('F j, Y g:i A', strtotime($lastAccrual)) : 'Never';
 
-// Get total active employees
-$stmt = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'active'");
+// Get total active employees eligible for automatic leave accrual.
+$stmt = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'active' AND Emp_Type IN ('Regular', 'Old_Regular')");
 $totalEmployees = $stmt->fetchColumn();
 
 // Get employees with leave credits
@@ -111,7 +111,7 @@ $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                     <h3 class="text-2xl font-bold text-slate-800"><?= $totalEmployees ?></h3>
-                    <p class="text-slate-500 text-sm mt-1">Active Employees</p>
+                    <p class="text-slate-500 text-sm mt-1">Accrual-Eligible Employees</p>
                 </div>
 
                 <!-- Employees with Credits -->
@@ -146,7 +146,7 @@ $recentActivity = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             Process Monthly Leave Accrual
                         </h2>
                         <p class="text-slate-600 mb-4">
-                            This will add monthly leave credits to all active employees:
+                            This will add monthly leave credits to active Regular and Old Regular employees:
                         </p>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                             <div class="bg-white rounded-lg p-4 border border-emerald-200 shadow-sm">

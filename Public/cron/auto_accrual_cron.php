@@ -102,7 +102,7 @@ try {
     // 3. Process the accrual
     // ACCRUAL POLICY (Updated - No Sick Leave Accrual):
     // - Regular & Old_Regular: ONLY VL (1.25/month = 15/year)
-    // - Probationary: No automatic accrual
+    // - Probationary & Floating: No automatic accrual
     $leaveType = 'vacation';
     $monthlyIncrement = 1.25;
     

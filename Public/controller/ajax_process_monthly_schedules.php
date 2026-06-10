@@ -1,8 +1,8 @@
 <?php
 // Process approved monthly schedule requests
-// This applies the weekly schedule from PRESENT DAY to END OF MONTH only
+// This applies the approved weekly schedule as the employee's default from the approval start date onward.
 session_start();
-require_once '../config/connection.php';
+require_once '../config/db.php';
 
 header('Content-Type: application/json');
 
@@ -77,6 +77,65 @@ try {
                     'is_rest_day' => $request['saturday_is_rest_day']
                 ]
             ];
+
+            $pdo->beginTransaction();
+
+            $nextScheduleStmt = $pdo->prepare("
+                SELECT MIN(effective_from)
+                FROM employee_default_schedules
+                WHERE employee_id = ?
+                  AND effective_from > ?
+            ");
+            $nextScheduleStmt->execute([$employee_id, $startDate]);
+            $nextEffectiveFrom = $nextScheduleStmt->fetchColumn();
+            $newEffectiveUntil = $nextEffectiveFrom
+                ? date('Y-m-d', strtotime($nextEffectiveFrom . ' -1 day'))
+                : null;
+
+            $previousEndDate = date('Y-m-d', strtotime($startDate . ' -1 day'));
+            $endPreviousStmt = $pdo->prepare("
+                UPDATE employee_default_schedules
+                SET effective_until = ?
+                WHERE employee_id = ?
+                  AND effective_from < ?
+                  AND (effective_until IS NULL OR effective_until >= ?)
+            ");
+            $endPreviousStmt->execute([$previousEndDate, $employee_id, $startDate, $startDate]);
+
+            $deleteSameStartStmt = $pdo->prepare("
+                DELETE FROM employee_default_schedules
+                WHERE employee_id = ?
+                  AND effective_from = ?
+            ");
+            $deleteSameStartStmt->execute([$employee_id, $startDate]);
+
+            $insertDefaultStmt = $pdo->prepare("
+                INSERT INTO employee_default_schedules
+                (employee_id, day_of_week, work_schedule_id, is_rest_day, effective_from, effective_until, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ");
+
+            foreach ($weeklySchedule as $dayOfWeek => $daySchedule) {
+                $insertDefaultStmt->execute([
+                    $employee_id,
+                    $dayOfWeek,
+                    $daySchedule['schedule_id'],
+                    $daySchedule['is_rest_day'],
+                    $startDate,
+                    $newEffectiveUntil
+                ]);
+            }
+
+            $clearFutureDefaultsStmt = $pdo->prepare("
+                DELETE FROM employee_daily_schedule_cache
+                WHERE employee_id = ?
+                  AND schedule_date >= ?
+                  AND (
+                      source IN ('default', 'weekly_default', 'approved_monthly_request')
+                      OR source LIKE '%|weekly_default'
+                  )
+            ");
+            $clearFutureDefaultsStmt->execute([$employee_id, $startDate]);
             
             // Loop through each date from startDate to endDate
             $currentDate = strtotime($startDate);
@@ -149,10 +208,15 @@ try {
                 WHERE id = ?
             ");
             $updateStmt->execute([$request['id']]);
+
+            $pdo->commit();
             
             $processedCount++;
             
         } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             $errors[] = "Error processing request ID {$request['id']}: " . $e->getMessage();
             error_log("Monthly schedule processing error: " . $e->getMessage());
         }
