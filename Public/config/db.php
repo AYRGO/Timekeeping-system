@@ -10,14 +10,16 @@ if (class_exists('EnvLoader')) {
 
 // Database configuration from environment variables
 // Auto-detect environment: use different database for local vs production
-$isLocal = ($_SERVER['SERVER_NAME'] === 'localhost' || 
-            $_SERVER['SERVER_ADDR'] === '127.0.0.1' || 
-            strpos($_SERVER['SERVER_NAME'], 'localhost') !== false);
+$serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
+$serverAddr = $_SERVER['SERVER_ADDR'] ?? '127.0.0.1';
+$isLocal = ($serverName === 'localhost' ||
+            $serverAddr === '127.0.0.1' ||
+            strpos($serverName, 'localhost') !== false);
 
 if ($isLocal) {
     // Local XAMPP settings
     $host = EnvLoader::get('DB_HOST', 'localhost');
-    $dbname = EnvLoader::get('DB_NAME', 'rss');
+    $dbname = EnvLoader::get('DB_NAME', 'u816220874_calendartype');
     $username = EnvLoader::get('DB_USER', 'root');
     $password = EnvLoader::get('DB_PASS', '');
 } else {

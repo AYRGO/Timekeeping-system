@@ -310,7 +310,7 @@ date_default_timezone_set('Asia/Manila');
         <li><a href="#creator" class="animated-underline hover:text-gray-900 transition-colors duration-300 text-lg">Team</a></li>
       </ul>
 
-      <a href="hhttps://harley.resourcestaffonline.com/Public/employee/login.php"
+      <a href="Public/employee/login.php"
         class="hidden md:inline-block px-8 py-3 btn-gradient text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 pulse-glow">
         Login
       </a>
@@ -330,7 +330,7 @@ date_default_timezone_set('Asia/Manila');
         <li><a href="#guide" class="block hover:text-gray-900 text-lg transition-colors duration-300">Guide</a></li>
         <li><a href="#about" class="block hover:text-gray-900 text-lg transition-colors duration-300">About</a></li>
         <li><a href="#creator" class="block hover:text-gray-900 text-lg transition-colors duration-300">Team</a></li>
-        <li><a href="https://harley.resourcestaffonline.com/Public/employee/login.php"
+        <li><a href="Public/employee/login.php"
             class="block px-6 py-3 btn-gradient text-white rounded-full text-center font-semibold hover:shadow-lg transition-all duration-300">
             Get Started
           </a></li>
@@ -350,7 +350,7 @@ date_default_timezone_set('Asia/Manila');
           Experience the future of time tracking with our cutting-edge system designed for modern professionals
         </p>
         <div class="flex flex-col sm:flex-row gap-6 justify-center items-center animate__animated animate__fadeInUp animate__delay-2s">
-          <a href="https://harley.resourcestaffonline.com/Public/employee/login.php"
+          <a href="Public/employee/login.php"
             class="inline-block px-12 py-4 btn-gradient text-white font-semibold rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 text-lg">
             Start Time in
           </a>
@@ -670,7 +670,7 @@ date_default_timezone_set('Asia/Manila');
             <li><a href="#guide" class="text-gray-300 hover:text-white transition-colors duration-300 hover:translate-x-2 inline-block">How It Works</a></li>
             <li><a href="#about" class="text-gray-300 hover:text-white transition-colors duration-300 hover:translate-x-2 inline-block">About</a></li>
             <li><a href="#creator" class="text-gray-300 hover:text-white transition-colors duration-300 hover:translate-x-2 inline-block">Our Team</a></li>
-            <li><a href="https://timekeeping-system.resourcestaffonline.com/employee/login" class="text-gray-300 hover:text-white transition-colors duration-300 hover:translate-x-2 inline-block">Login</a></li>
+            <li><a href="Public/employee/login.php" class="text-gray-300 hover:text-white transition-colors duration-300 hover:translate-x-2 inline-block">Login</a></li>
           </ul>
         </div>
 

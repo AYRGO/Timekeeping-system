@@ -1,4 +1,5 @@
 <!-- header.php -->
+<link rel="stylesheet" href="../css/responsive.css">
 <header class="bg-white shadow-md p-4 flex justify-between items-center w-full">
     <div class="flex items-center">
         <!-- Slide Toggle Button for mobile -->

@@ -864,8 +864,8 @@ button:hover {
 }
 </style>
 
-<div id="overtimeView" class="hidden animate-fade-in-up overtime-management-container">
-  <div class="w-full">
+<div id="overtimeView" class="hidden animate-fade-in-up overtime-management-container w-full max-w-full overflow-hidden">
+  <div class="w-full min-w-0">
     
     <!-- Modern Header Section - Monday.com/Sprout Style -->
     <div class="bg-white border-b border-gray-200">
@@ -3172,5 +3172,101 @@ function validateOvertimeHours() {
     ring-width: 2px;
     ring-color: rgb(16, 185, 129);
     border-color: rgb(16, 185, 129);
+}
+
+.overtime-management-container,
+.overtime-management-container > .w-full {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.overtime-management-container .overflow-x-auto {
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.overtime-management-container table {
+    width: 100%;
+}
+
+@media (max-width: 767px) {
+    .overtime-management-container .px-8 {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    .overtime-management-container .py-6,
+    .overtime-management-container .p-8 {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+
+    .overtime-management-container .text-xl {
+        font-size: 1.125rem !important;
+        line-height: 1.5rem !important;
+    }
+
+    .overtime-management-container .text-2xl {
+        font-size: 1.25rem !important;
+        line-height: 1.75rem !important;
+    }
+
+    .overtime-management-container .gap-8 {
+        gap: 1rem !important;
+    }
+
+    .overtime-management-container .flex.items-center.gap-8 {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .overtime-management-container .bg-white.border-b.border-gray-200.px-8 > div {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .overtime-management-container #submitTab,
+    .overtime-management-container #historyTab {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        padding-left: 0.875rem !important;
+        padding-right: 0.875rem !important;
+    }
+
+    .overtime-management-container #submitContent .flex.items-center.justify-between.mb-6 {
+        align-items: flex-start !important;
+        flex-direction: column !important;
+        gap: 1rem;
+    }
+
+    .overtime-management-container #submitContent .flex.items-center.gap-4.text-xs {
+        flex-wrap: wrap;
+        gap: 0.75rem !important;
+    }
+
+    .overtime-management-container .rounded-t-lg.flex.items-center.justify-between,
+    .overtime-management-container #historyContent .flex.flex-col.lg\:flex-row {
+        align-items: flex-start !important;
+        gap: 0.75rem;
+    }
+
+    .overtime-management-container .rounded-t-lg.flex.items-center.justify-between {
+        flex-wrap: wrap;
+    }
+
+    .overtime-management-container #timeLogsTable {
+        min-width: 760px;
+    }
+
+    .overtime-management-container #historyContent table {
+        min-width: 920px;
+    }
+
+    .overtime-management-container th,
+    .overtime-management-container td {
+        white-space: normal;
+    }
 }
 </style>

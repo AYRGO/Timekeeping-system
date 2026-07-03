@@ -9,5 +9,3 @@ AddType video/ogg .ogv
     Header set Accept-Ranges bytes
 </FilesMatch>
 
-# Enable range requests for video streaming
-AcceptRanges bytes

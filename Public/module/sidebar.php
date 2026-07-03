@@ -1,5 +1,5 @@
 <!-- Sidebar -->
-       <aside id="sidebar" class="w-64 bg-white shadow-lg flex flex-col fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out h-screen">
+       <aside id="sidebar" class="w-64 bg-white shadow-lg flex flex-col fixed md:relative z-[60] transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out h-screen">
 
             <!-- Logo -->
             <div class="p-6 pt-8 flex justify-center">
@@ -80,7 +80,7 @@
         <div class="flex-1 flex flex-col overflow-hidden">
 
             <!-- Fixed Header -->
-            <header class="fixed top-0 left-0 md:left-64 w-full md:w-[calc(100%-16rem)] bg-white shadow z-50 flex items-center justify-between px-4 md:px-8 py-4">
+            <header class="fixed top-0 left-0 md:left-64 w-full md:w-[calc(100%-16rem)] bg-white shadow z-40 flex items-center justify-between px-4 md:px-8 py-4">
     <div class="flex items-center space-x-4">
         <!-- Hamburger button -->
     <!-- Hamburger only on mobile -->
@@ -89,10 +89,10 @@
 </button>
 
 
-        <h1 class="text-2xl font-semibold text-gray-800">Employee Dashboard</h1>
+        <h1 class="text-lg sm:text-2xl font-semibold text-gray-800">Employee Dashboard</h1>
     </div>
 
- <div class="flex items-center space-x-6">
+ <div class="flex items-center space-x-3 sm:space-x-6">
       <button class="relative text-gray-600 hover:text-gray-800 focus:outline-none notification-button" onclick="toggleModal()">
         <i class="fas fa-bell text-xl"></i>
         <span class="absolute -top-1 -right-1 inline-block w-2 h-2 bg-red-500 rounded-full"></span>

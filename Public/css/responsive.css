@@ -1,0 +1,136 @@
+/* Shared responsive improvements for admin and employee screens. */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100%;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+main,
+.tab-content,
+.overflow-x-auto,
+.flex-1 {
+  min-width: 0;
+}
+
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+table {
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .flex.h-screen {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+
+  main {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  header {
+    gap: 0.75rem;
+  }
+
+  header h1 {
+    font-size: 1rem !important;
+    line-height: 1.35 !important;
+    overflow-wrap: anywhere;
+  }
+
+  .tab-button {
+    flex: 0 0 auto;
+    min-width: max-content;
+    padding-left: 0.875rem !important;
+    padding-right: 0.875rem !important;
+    white-space: nowrap;
+  }
+
+  .tab-content > .bg-white,
+  main > .bg-white,
+  .card {
+    border-radius: 0.75rem !important;
+  }
+
+  .grid {
+    min-width: 0;
+  }
+
+  .overflow-x-auto table {
+    min-width: 720px;
+  }
+
+  .mobile-stack,
+  .mobile-stack > .flex,
+  .filters-row,
+  .action-row {
+    flex-wrap: wrap;
+  }
+
+  .mobile-full,
+  .filters-row > *,
+  .action-row > * {
+    width: 100%;
+  }
+
+  .responsive-card,
+  main > .bg-white,
+  .tab-content > .bg-white {
+    padding: 1rem !important;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    max-width: 100%;
+  }
+
+  .fixed.inset-0,
+  [id$="Modal"] {
+    padding: 1rem;
+  }
+
+  .flatpickr-calendar {
+    max-width: calc(100vw - 2rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .md\:grid-cols-2,
+  .md\:grid-cols-3,
+  .md\:grid-cols-4,
+  .lg\:grid-cols-2,
+  .lg\:grid-cols-3,
+  .lg\:grid-cols-4,
+  .lg\:grid-cols-5 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .md\:flex-row,
+  .lg\:flex-row {
+    flex-direction: column !important;
+  }
+
+  .md\:items-center,
+  .lg\:items-center {
+    align-items: stretch !important;
+  }
+}

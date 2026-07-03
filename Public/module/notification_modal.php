@@ -11,6 +11,7 @@ include('../config/db.php');
 
 $current_user_id = $_SESSION['employee']['id'] ?? null;
 $notifications = [];
+$sendEmailNotificationsDuringPageLoad = false;
 
 // Helper function to get ACTUAL current schedule from calendar (matches schedule_content.php logic)
 function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) {
@@ -110,7 +111,7 @@ function sendEmail($to, $name, $subject, $body) {
     $mail = new PHPMailer(true);
     try {
         // Enable debug logging
-        $mail->SMTPDebug = 2;
+        $mail->SMTPDebug = 0;
         $mail->Debugoutput = function($str, $level) {
             error_log("PHPMailer debug: [$level] $str");
         };
@@ -123,6 +124,7 @@ function sendEmail($to, $name, $subject, $body) {
         $mail->Password   = 'plpe ycwj ztqb kxqk';  
         $mail->SMTPSecure = 'tls';
         $mail->Port       = 587;
+        $mail->Timeout    = 10;
 
         // Ensure proper SSL verification
         $mail->SMTPOptions = [
@@ -237,7 +239,7 @@ foreach ($leave_results as $leave) {
     ];
 
     // Send email notifications for both pending and post table entries that haven't been notified
-    if (in_array($raw_status, ['approved', 'rejected', 'declined']) && !$leave['notified']) {
+    if ($sendEmailNotificationsDuringPageLoad && in_array($raw_status, ['approved', 'rejected', 'declined']) && !$leave['notified']) {
         $subject = "Leave Request {$status}";
         $body = "<p>Hi {$employee['fname']},<br>Your leave request from <strong>$range</strong> for <strong>{$leave['leave_type']}</strong> was <strong>$status</strong>.</p>";
 
@@ -401,7 +403,7 @@ foreach ($schedule_results as $sched) {
     ];
 
     // Send email notifications for both pending and post table entries that haven't been notified
-    if (in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified']) {
+    if ($sendEmailNotificationsDuringPageLoad && in_array(strtolower($sched['status']), ['approved', 'declined']) && !$sched['notified']) {
         $emailSubject = $isRestDay ? "Day Off Request {$status}" : "Schedule Change Request {$status}";
         $subject = $emailSubject;
         
@@ -567,7 +569,7 @@ foreach ($adjust_results as $adjustment) {
     ];
 
     // Send email notifications for both pending and post table entries that haven't been notified
-    if (in_array($raw_status, ['approved', 'declined', 'rejected']) && !$adjustment['notified']) {
+    if ($sendEmailNotificationsDuringPageLoad && in_array($raw_status, ['approved', 'declined', 'rejected']) && !$adjustment['notified']) {
         $subject = "Time Adjustment Request {$status}";
         $body = "<p>Hi {$employee['fname']},<br>Your time adjustment request for <strong>$date</strong> was <strong>$status</strong>.</p>";
 
@@ -739,7 +741,7 @@ foreach ($pending_ot_results as $ot) {
     ];
 
     // Send email notifications for overtime requests that haven't been notified
-    if (in_array($raw_status, ['approved', 'declined', 'rejected'])) {
+    if ($sendEmailNotificationsDuringPageLoad && in_array($raw_status, ['approved', 'declined', 'rejected'])) {
         $subject = "Overtime Request {$status}";
         $date_str = date('F j, Y', strtotime($ot['created_at']));
         $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$date_str}</strong> ({$duration}) was <strong>{$status}</strong>.</p>";
@@ -920,7 +922,7 @@ foreach ($ot_results as $ot) {
     ];
 
     // Send email notifications for post overtime requests that haven't been notified
-    if (in_array($raw_status, ['approved', 'declined', 'rejected']) && !$ot['notified']) {
+    if ($sendEmailNotificationsDuringPageLoad && in_array($raw_status, ['approved', 'declined', 'rejected']) && !$ot['notified']) {
         $subject = "Overtime Request {$status}";
         $date_str = $log_date ? date('F j, Y', strtotime($log_date)) : 'Unknown Date';
         $body = "<p>Hi {$employee['fname']},<br>Your overtime request for <strong>{$ot_type}</strong> on <strong>{$date_str}</strong> ({$duration}) was <strong>{$status}</strong>.</p>";
@@ -1032,6 +1034,7 @@ $switch_stmt = $pdo->prepare("
     FROM schedule_switch_requests 
     WHERE employee_id = ?
     ORDER BY created_at DESC
+    LIMIT 10
 ");
 $switch_stmt->execute([$current_user_id]);
 $switch_requests = $switch_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1080,6 +1083,7 @@ $monthly_stmt = $pdo->prepare("
     FROM month_weekly_schedule 
     WHERE employee_id = ?
     ORDER BY created_at DESC
+    LIMIT 10
 ");
 $monthly_stmt->execute([$current_user_id]);
 $monthly_requests = $monthly_stmt->fetchAll(PDO::FETCH_ASSOC);

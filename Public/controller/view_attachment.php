@@ -16,60 +16,88 @@ if (empty($attachmentPath)) {
     exit;
 }
 
-// Security: Sanitize the file path to prevent directory traversal
-// Allow schedule_attachments subdirectory but prevent traversal attacks
-$attachmentPath = str_replace(['../', '..\\'], '', $attachmentPath);
+// Normalize the requested path while preventing directory traversal.
+$attachmentPath = trim(str_replace('\\', '/', $attachmentPath));
+$attachmentPath = preg_replace('#(^|/)\.\.(?=/|$)#', '', $attachmentPath);
+$attachmentPath = ltrim($attachmentPath, '/');
+$fileNameOnly = basename($attachmentPath);
 
-// Determine full path - check multiple possible locations based on file naming pattern
-$possiblePaths = [];
+$uploadsRoot = realpath(__DIR__ . '/../uploads');
+if (!$uploadsRoot || $fileNameOnly === '' || $fileNameOnly === '.' || $fileNameOnly === '..') {
+    http_response_code(404);
+    echo "Attachment file is missing or unavailable.";
+    exit;
+}
 
-// Check if it's a leave attachment (starts with lr_)
-if (preg_match('/^lr_/', basename($attachmentPath))) {
-    $possiblePaths[] = '../uploads/leave_attachments/' . basename($attachmentPath);
-    $possiblePaths[] = '../uploads/' . $attachmentPath;  // In case path includes directory
+// Prefer the likely folder first, then fall back through all supported upload folders.
+$candidateRelativePaths = [];
+$addCandidate = function ($path) use (&$candidateRelativePaths) {
+    $normalized = trim(str_replace('\\', '/', $path), '/');
+    if ($normalized !== '' && !in_array($normalized, $candidateRelativePaths, true)) {
+        $candidateRelativePaths[] = $normalized;
+    }
+};
+
+if (preg_match('/^lr_/', $fileNameOnly)) {
+    $addCandidate('leave_attachments/' . $fileNameOnly);
+} elseif (preg_match('/^ot_/', $fileNameOnly)) {
+    $addCandidate('overtime_attachments/' . $fileNameOnly);
+} elseif (preg_match('/^attach_/', $fileNameOnly)) {
+    $addCandidate('time_adjustment_attachments/' . $fileNameOnly);
+    $addCandidate($fileNameOnly);
+} elseif (preg_match('/^switch_/', $fileNameOnly)) {
+    $addCandidate('schedule_switch/' . $fileNameOnly);
+} elseif (preg_match('/^monthly_/', $fileNameOnly)) {
+    $addCandidate('monthly_schedule/' . $fileNameOnly);
+} else {
+    $addCandidate('schedule_attachments/' . $fileNameOnly);
 }
-// Check if it's an overtime attachment (starts with ot_)
-elseif (preg_match('/^ot_/', basename($attachmentPath))) {
-    $possiblePaths[] = '../uploads/overtime_attachments/' . basename($attachmentPath);
-    $possiblePaths[] = '../uploads/' . $attachmentPath;
+
+if (strpos($attachmentPath, 'uploads/') === 0) {
+    $addCandidate(substr($attachmentPath, strlen('uploads/')));
+} else {
+    $addCandidate($attachmentPath);
 }
-// Check if it's a time adjustment attachment (starts with attach_)
-elseif (preg_match('/^attach_/', basename($attachmentPath)) || preg_match('/uploads\/attach_/', $attachmentPath)) {
-    $possiblePaths[] = '../' . $attachmentPath;  // For paths like uploads/attach_680e21cd91505.JPG
-    $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
-    $possiblePaths[] = '../uploads/time_adjustment_attachments/' . basename($attachmentPath);
-}
-// Check if it's a schedule swap attachment (starts with switch_)
-elseif (preg_match('/^switch_/', basename($attachmentPath)) || preg_match('/schedule_switch/', $attachmentPath)) {
-    $possiblePaths[] = '../uploads/schedule_switch/' . basename($attachmentPath);
-    $possiblePaths[] = '../' . $attachmentPath;  // For paths like uploads/schedule_switch/switch_...
-    $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
-}
-// Check if it's a monthly schedule attachment (starts with monthly_)
-elseif (preg_match('/^monthly_/', basename($attachmentPath)) || preg_match('/monthly_schedule/', $attachmentPath)) {
-    $possiblePaths[] = '../uploads/monthly_schedule/' . basename($attachmentPath);
-    $possiblePaths[] = '../' . $attachmentPath;  // For paths like uploads/monthly_schedule/monthly_...
-    $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
-}
-// Schedule attachments or default
-else {
-    $possiblePaths[] = '../uploads/schedule_attachments/' . basename($attachmentPath);
-    $possiblePaths[] = '../uploads/' . $attachmentPath;  // Direct in uploads
-    $possiblePaths[] = '../uploads/' . basename($attachmentPath);  // Just filename in uploads root
-}
+
+$addCandidate($fileNameOnly);
+$addCandidate('schedule_attachments/' . $fileNameOnly);
+$addCandidate('schedule_requests/' . $fileNameOnly);
+$addCandidate('schedule_switch/' . $fileNameOnly);
+$addCandidate('monthly_schedule/' . $fileNameOnly);
+$addCandidate('leave_attachments/' . $fileNameOnly);
+$addCandidate('overtime_attachments/' . $fileNameOnly);
+$addCandidate('time_adjustments/' . $fileNameOnly);
+$addCandidate('time_adjustment_attachments/' . $fileNameOnly);
 
 $fullPath = null;
-foreach ($possiblePaths as $path) {
-    if (file_exists($path)) {
-        $fullPath = $path;
+foreach ($candidateRelativePaths as $relativePath) {
+    $candidate = realpath($uploadsRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath));
+    if ($candidate && strpos($candidate, $uploadsRoot . DIRECTORY_SEPARATOR) === 0 && is_file($candidate)) {
+        $fullPath = $candidate;
         break;
+    }
+}
+
+// Last resort: find the basename anywhere under Public/uploads for older records saved in a legacy folder.
+if (!$fullPath) {
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($uploadsRoot, FilesystemIterator::SKIP_DOTS)
+    );
+    foreach ($iterator as $file) {
+        if ($file->isFile() && hash_equals($fileNameOnly, $file->getFilename())) {
+            $candidate = $file->getRealPath();
+            if ($candidate && strpos($candidate, $uploadsRoot . DIRECTORY_SEPARATOR) === 0) {
+                $fullPath = $candidate;
+                break;
+            }
+        }
     }
 }
 
 // Check if file exists
 if (!$fullPath) {
     http_response_code(404);
-    echo "File not found. Searched paths: " . implode(', ', $possiblePaths);
+    echo "Attachment file is missing or unavailable. It may have been deleted or not copied to this environment.";
     exit;
 }
 

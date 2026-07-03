@@ -370,6 +370,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['update_credits']) && isset($_POST['credits'])) {
         // Get admin username for audit trail
         $adminUser = $_SESSION['username'] ?? $_SESSION['admin_username'] ?? 'Admin';
+        $adminReason = trim($_POST['leave_credit_edit_reason'] ?? '');
+        $creditUpdates = [];
+        $hasCreditChanges = false;
         
         foreach ($_POST['credits'] as $leaveType => $data) {
             $balance = is_numeric($data['balance']) ? floatval($data['balance']) : null;
@@ -394,49 +397,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // Calculate changes for audit
-            $oldBalance = $currentCredit['balance'] ?? 0;
+            $oldBalance = floatval($currentCredit['balance'] ?? 0);
+            $oldMonthlyIncrement = floatval($currentCredit['monthly_increment'] ?? 0);
+            $oldCarryOver = $leaveType === 'vacation' ? floatval($currentCredit['carry_over'] ?? 0) : null;
+            $newCarryOver = $leaveType === 'vacation' ? floatval($carryOver ?? 0) : null;
             $balanceChange = $balance - $oldBalance;
+            $monthlyIncrementChanged = $monthlyIncrement != $oldMonthlyIncrement;
+            $carryOverChanged = $leaveType === 'vacation' && $newCarryOver != $oldCarryOver;
+            $rowChanged = $balanceChange != 0 || $monthlyIncrementChanged || $carryOverChanged;
+            $hasCreditChanges = $hasCreditChanges || $rowChanged;
             
             // Determine change type
             if ($balanceChange > 0) {
                 $changeType = 'ADMIN_INCREASE';
-                $changeReason = "Admin manually increased balance by " . abs($balanceChange);
             } elseif ($balanceChange < 0) {
                 $changeType = 'ADMIN_DECREASE';
-                $changeReason = "Admin manually decreased balance by " . abs($balanceChange);
             } else {
                 $changeType = 'ADMIN_UPDATE';
-                $changeReason = "Admin updated leave credit settings";
             }
 
+            $changeDetails = [];
+            if ($balanceChange != 0) {
+                $changeDetails[] = "balance {$oldBalance} to {$balance}";
+            }
+            if ($monthlyIncrementChanged) {
+                $changeDetails[] = "monthly increment {$oldMonthlyIncrement} to {$monthlyIncrement}";
+            }
+            if ($carryOverChanged) {
+                $changeDetails[] = "carry over {$oldCarryOver} to {$newCarryOver}";
+            }
+
+            $creditUpdates[] = [
+                'leave_type' => $leaveType,
+                'balance' => $balance,
+                'monthly_increment' => $monthlyIncrement,
+                'carry_over' => $newCarryOver,
+                'current_credit' => $currentCredit,
+                'old_balance' => $oldBalance,
+                'balance_change' => $balanceChange,
+                'old_monthly_increment' => $oldMonthlyIncrement,
+                'change_type' => $changeType,
+                'change_details' => $changeDetails,
+                'row_changed' => $rowChanged,
+            ];
+        }
+
+        if ($hasCreditChanges && $adminReason === '') {
+            $_SESSION['error_message'] = 'Please enter a reason for editing leave credits.';
+            header("Location: employee-edit.php?id=$employeeId#leave-credits");
+            exit;
+        }
+
+        foreach ($creditUpdates as $update) {
             // Update with new values
             $stmt = $pdo->prepare("UPDATE leave_credits SET balance = ?, monthly_increment = ?, carry_over = ?, updated_at = NOW() WHERE employee_id = ? AND year = ? AND leave_type = ?");
             $stmt->execute([
-                $balance,
-                $monthlyIncrement,
-                $leaveType === 'vacation' ? $carryOver : null,
+                $update['balance'],
+                $update['monthly_increment'],
+                $update['leave_type'] === 'vacation' ? $update['carry_over'] : null,
                 $employeeId,
                 date('Y'),
-                $leaveType
+                $update['leave_type']
             ]);
             
             // Log to audit table if balance changed or any value changed
-            if ($balanceChange != 0 || $monthlyIncrement != ($currentCredit['monthly_increment'] ?? 0)) {
+            if ($update['row_changed']) {
                 try {
+                    $changeReason = $adminReason;
+                    if (!empty($update['change_details'])) {
+                        $changeReason .= ' | Changes: ' . implode('; ', $update['change_details']);
+                    }
+
                     $auditStmt = $pdo->prepare("INSERT INTO leave_credits_history 
                         (leave_credit_id, employee_id, leave_type, old_balance, new_balance, balance_change, 
                          old_monthly_increment, new_monthly_increment, change_type, change_reason, changed_by, year)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     $auditStmt->execute([
-                        $currentCredit['id'],
+                        $update['current_credit']['id'],
                         $employeeId,
-                        $leaveType,
-                        $oldBalance,
-                        $balance,
-                        $balanceChange,
-                        $currentCredit['monthly_increment'] ?? 0,
-                        $monthlyIncrement,
-                        $changeType,
+                        $update['leave_type'],
+                        $update['old_balance'],
+                        $update['balance'],
+                        $update['balance_change'],
+                        $update['old_monthly_increment'],
+                        $update['monthly_increment'],
+                        $update['change_type'],
                         $changeReason,
                         $adminUser,
                         date('Y')
@@ -797,16 +842,143 @@ uasort($sortedScheduleOptions, function($a, $b) {
     return strcmp(timeToSortable($a['in']), timeToSortable($b['in']));
 });
 
+function renderLeaveCreditHistoryTable(array $historyData): void {
+    if (empty($historyData)): ?>
+        <div class="text-center py-8 text-gray-500">
+            <i class="fas fa-clipboard-list text-4xl mb-4 opacity-50"></i>
+            <p>No leave credit history found for <?= date('Y') ?></p>
+            <p class="text-xs mt-2">History tracking starts from the first update after enabling this feature.</p>
+        </div>
+    <?php else: ?>
+        <div class="overflow-x-auto">
+            <table class="w-full table-auto text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Leave Type</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Change</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Old to New</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">By</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <?php foreach ($historyData as $history):
+                        $changeColor = 'text-gray-600';
+                        $changeIcon = 'fa-minus';
+                        $change = floatval($history['balance_change']);
+
+                        if ($change > 0) {
+                            $changeColor = 'text-green-600';
+                            $changeIcon = 'fa-arrow-up';
+                        } elseif ($change < 0) {
+                            $changeColor = 'text-red-600';
+                            $changeIcon = 'fa-arrow-down';
+                        }
+
+                        $typeBadge = 'bg-gray-100 text-gray-800';
+                        switch($history['change_type']) {
+                            case 'ACCRUAL':
+                                $typeBadge = 'bg-blue-100 text-blue-800';
+                                break;
+                            case 'DEDUCTION':
+                            case 'LEAVE_USED':
+                                $typeBadge = 'bg-red-100 text-red-800';
+                                break;
+                            case 'ADMIN_INCREASE':
+                            case 'ADJUSTMENT':
+                                $typeBadge = 'bg-green-100 text-green-800';
+                                break;
+                            case 'ADMIN_DECREASE':
+                                $typeBadge = 'bg-orange-100 text-orange-800';
+                                break;
+                            case 'CARRY_OVER':
+                                $typeBadge = 'bg-purple-100 text-purple-800';
+                                break;
+                            case 'FORFEITURE':
+                                $typeBadge = 'bg-red-100 text-red-800';
+                                break;
+                        }
+                    ?>
+                    <?php $historyDate = !empty($history['changed_at']) ? date('Y-m-d', strtotime($history['changed_at'])) : ''; ?>
+                    <tr class="hover:bg-gray-50 leave-credit-history-row" data-date-values="<?= htmlspecialchars($historyDate) ?>">
+                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">
+                            <?= $history['formatted_date'] ?>
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                                <?= ucwords(str_replace('_', ' ', $history['leave_type'])) ?>
+                            </span>
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap <?= $changeColor ?> font-semibold">
+                            <i class="fas <?= $changeIcon ?> mr-1"></i>
+                            <?= $change >= 0 ? '+' : '' ?><?= number_format($change, 2) ?>
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap text-gray-600">
+                            <?= number_format($history['old_balance'] ?? 0, 2) ?> to <?= number_format($history['new_balance'] ?? 0, 2) ?>
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium <?= $typeBadge ?>">
+                                <?= str_replace('_', ' ', $history['change_type']) ?>
+                            </span>
+                        </td>
+                        <td class="px-3 py-2 text-gray-600 max-w-xs truncate" title="<?= htmlspecialchars($history['change_reason'] ?? '') ?>">
+                            <?= htmlspecialchars($history['change_reason'] ?? '-') ?>
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap text-gray-500">
+                            <?= htmlspecialchars($history['changed_by'] ?? 'System') ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-gray-200">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <?php
+                $summaryCounts = ['ACCRUAL' => 0, 'DEDUCTION' => 0, 'ADMIN_INCREASE' => 0, 'ADMIN_DECREASE' => 0];
+                foreach ($historyData as $h) {
+                    $type = $h['change_type'];
+                    if (isset($summaryCounts[$type])) {
+                        $summaryCounts[$type]++;
+                    }
+                }
+                ?>
+                <div>
+                    <div class="text-lg font-semibold text-blue-600"><?= $summaryCounts['ACCRUAL'] ?></div>
+                    <div class="text-xs text-gray-500">Accruals</div>
+                </div>
+                <div>
+                    <div class="text-lg font-semibold text-red-600"><?= $summaryCounts['DEDUCTION'] ?></div>
+                    <div class="text-xs text-gray-500">Deductions</div>
+                </div>
+                <div>
+                    <div class="text-lg font-semibold text-green-600"><?= $summaryCounts['ADMIN_INCREASE'] ?></div>
+                    <div class="text-xs text-gray-500">Admin Increases</div>
+                </div>
+                <div>
+                    <div class="text-lg font-semibold text-orange-600"><?= $summaryCounts['ADMIN_DECREASE'] ?></div>
+                    <div class="text-xs text-gray-500">Admin Decreases</div>
+                </div>
+            </div>
+        </div>
+    <?php endif;
+}
+
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Employee Profile - <?= htmlspecialchars($employee['fname'] . ' ' . $employee['lname']) ?></title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+  <link rel="stylesheet" href="../css/responsive.css">
   <style>
     /* Hide all tab content by default */
     .tab-content {
@@ -830,13 +1002,13 @@ uasort($sortedScheduleOptions, function($a, $b) {
 <div class="flex h-screen">
     <?php include('sidebar.php'); ?>
 
-    <div class="flex-1 flex flex-col">
+    <div class="flex-1 flex flex-col min-w-0">
         <?php 
         $pageTitle = "Employee Profile - " . htmlspecialchars($employee['fname'] . ' ' . $employee['lname']);
         include('../views/header.php'); 
         ?>
         
-        <main class="flex-1 p-6 overflow-y-auto">
+        <main class="flex-1 p-4 md:p-6 overflow-y-auto">
             <?php if (isset($_SESSION['success_message'])): ?>
                 <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 rounded-md shadow-md" role="alert">
                     <div class="flex items-center">
@@ -847,6 +1019,18 @@ uasort($sortedScheduleOptions, function($a, $b) {
                     </div>
                 </div>
                 <?php unset($_SESSION['success_message']); ?>
+            <?php endif; ?>
+
+            <?php if (isset($_SESSION['error_message'])): ?>
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-md shadow-md" role="alert">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle mr-3 text-xl"></i>
+                        <div>
+                            <p class="font-medium"><?= htmlspecialchars($_SESSION['error_message']) ?></p>
+                        </div>
+                    </div>
+                </div>
+                <?php unset($_SESSION['error_message']); ?>
             <?php endif; ?>
             
             <!-- Profile Header -->
@@ -1755,12 +1939,14 @@ uasort($sortedScheduleOptions, function($a, $b) {
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-xl font-semibold text-gray-800">Leave Credits (<?= date('Y') ?>)</h2>
-                        <button type="button" onclick="toggleHistoryPanel()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md transition text-sm">
-                            <i class="fas fa-history mr-2"></i>View History
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" id="editLeaveCreditsBtn" onclick="enableLeaveCreditEdit()" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2 rounded-md transition text-sm">
+                                <i class="fas fa-edit mr-2"></i>Edit Leave Credits
+                            </button>
+                        </div>
                     </div>
 
-                    <form method="post">
+                    <form method="post" id="leaveCreditsForm">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <?php
                             $stmt = $pdo->prepare("SELECT * FROM leave_credits WHERE employee_id = ? AND year = ?");
@@ -1794,7 +1980,9 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                     step="0.01" 
                                     name="credits[<?= $leaveType ?>][balance]" 
                                     value="<?= $credit['balance'] ?>" 
-                                    class="w-full mb-2 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    class="w-full mb-2 px-3 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed" 
+                                    data-leave-credit-field
+                                    disabled
                                 />
 
                                 <label class="text-xs block mb-1 text-gray-600">Monthly Increment</label>
@@ -1803,7 +1991,9 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                     step="0.01" 
                                     name="credits[<?= $leaveType ?>][monthly_increment]" 
                                     value="<?= $credit['monthly_increment'] ?? 0 ?>" 
-                                    class="w-full mb-2 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    class="w-full mb-2 px-3 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed" 
+                                    data-leave-credit-field
+                                    disabled
                                 />
 
                                 <?php if ($leaveType === 'vacation'): ?>
@@ -1813,14 +2003,34 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                     step="0.01" 
                                     name="credits[<?= $leaveType ?>][carry_over]" 
                                     value="<?= $credit['carry_over'] ?? 0 ?>" 
-                                    class="w-full px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    class="w-full px-3 py-1 border border-gray-300 rounded bg-gray-100 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed" 
+                                    data-leave-credit-field
+                                    disabled
                                 />
                                 <?php endif; ?>
                             </div>
                             <?php endforeach; ?>
                         </div>
 
-                        <div class="flex justify-end mt-6">
+                        <div class="mt-6">
+                            <label for="leave_credit_edit_reason" class="block text-sm font-medium text-gray-700 mb-1">
+                                Reason for Editing
+                            </label>
+                            <textarea
+                                id="leave_credit_edit_reason"
+                                name="leave_credit_edit_reason"
+                                rows="3"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed"
+                                placeholder="Enter the admin reason for this leave credit adjustment."
+                                disabled
+                            ></textarea>
+                            <p class="text-xs text-gray-500 mt-1">Required when any balance, monthly increment, or carry over value is changed.</p>
+                        </div>
+
+                        <div id="leaveCreditEditActions" class="hidden justify-end gap-2 mt-6">
+                            <button type="button" onclick="cancelLeaveCreditEdit()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-md transition">
+                                Cancel
+                            </button>
                             <button type="submit" name="update_credits" value="1" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition">
                                 <i class="fas fa-save mr-2"></i>Update Leave Credits
                             </button>
@@ -1988,7 +2198,19 @@ uasort($sortedScheduleOptions, function($a, $b) {
               <!-- Leave Requests Tab -->
             <div id="leave-requests" class="tab-content">
                 <div class="bg-white rounded-lg shadow-md p-6">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-6">Leave Requests</h2>
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">Leave Requests</h2>
+                        <div class="flex items-center gap-2">
+                            <label for="leaveRequestDateFilter" class="text-sm font-medium text-gray-600">Date</label>
+                            <input type="date" id="leaveRequestDateFilter" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button type="button" onclick="filterRowsByDate('leaveRequestDateFilter', '.leave-request-row')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm transition">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <button type="button" onclick="clearDateFilter('leaveRequestDateFilter', '.leave-request-row')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm transition">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
                     <?php if (empty($leaveRequests)): ?>
                         <div class="text-center py-8 text-gray-500">
                             <i class="fas fa-calendar-alt text-4xl mb-4 opacity-50"></i>
@@ -2012,8 +2234,12 @@ uasort($sortedScheduleOptions, function($a, $b) {
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    <?php foreach ($leaveRequests as $request): ?>
-                                    <tr class="hover:bg-gray-50">
+                                    <?php foreach ($leaveRequests as $request): 
+                                        $leaveStartDate = !empty($request['start_date']) ? date('Y-m-d', strtotime($request['start_date'])) : '';
+                                        $leaveEndDate = !empty($request['end_date']) ? date('Y-m-d', strtotime($request['end_date'])) : '';
+                                        $leaveCreatedDate = !empty($request['created_at']) ? date('Y-m-d', strtotime($request['created_at'])) : '';
+                                    ?>
+                                    <tr class="hover:bg-gray-50 leave-request-row" data-date-values="<?= htmlspecialchars(trim("$leaveStartDate $leaveEndDate $leaveCreatedDate")) ?>">
                                         <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                             #<?= $request['id'] ?>
                                         </td>
@@ -2105,6 +2331,43 @@ uasort($sortedScheduleOptions, function($a, $b) {
                             </div>
                         </div>
                     <?php endif; ?>
+
+                    <div class="mt-8 pt-6 border-t border-gray-200">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-history mr-2 text-blue-600"></i>Leave Credit History
+                            </h3>
+                            <div class="flex items-center gap-2">
+                                <label for="leaveCreditHistoryDateFilter" class="text-sm font-medium text-gray-600">Date</label>
+                                <input type="date" id="leaveCreditHistoryDateFilter" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <button type="button" onclick="filterRowsByDate('leaveCreditHistoryDateFilter', '.leave-credit-history-row')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm transition">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                                <button type="button" onclick="clearDateFilter('leaveCreditHistoryDateFilter', '.leave-credit-history-row')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm transition">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                        <?php
+                        $leaveCreditHistoryData = [];
+                        try {
+                            $historyStmt = $pdo->prepare("
+                                SELECT h.*,
+                                       DATE_FORMAT(h.changed_at, '%b %d, %Y %h:%i %p') as formatted_date
+                                FROM leave_credits_history h
+                                WHERE h.employee_id = ? AND h.year = ?
+                                ORDER BY h.changed_at DESC
+                                LIMIT 50
+                            ");
+                            $historyStmt->execute([$employeeId, date('Y')]);
+                            $leaveCreditHistoryData = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
+                        } catch (PDOException $e) {
+                            $leaveCreditHistoryData = [];
+                        }
+
+                        renderLeaveCreditHistoryTable($leaveCreditHistoryData);
+                        ?>
+                    </div>
                 </div>
             </div>
  <!-- Schedule Changes Tab -->
@@ -2956,6 +3219,43 @@ function cancelEdit(scheduleId) {
     document.getElementById('timein-edit-' + scheduleId).classList.add('hidden');
     document.getElementById('timeout-edit-' + scheduleId).classList.add('hidden');
     document.getElementById('actions-edit-' + scheduleId).classList.add('hidden');
+}
+
+function enableLeaveCreditEdit() {
+    document.querySelectorAll('[data-leave-credit-field], #leave_credit_edit_reason').forEach(field => {
+        field.disabled = false;
+        field.classList.remove('bg-gray-100', 'text-gray-600');
+        field.classList.add('bg-white', 'text-gray-900');
+    });
+
+    document.getElementById('editLeaveCreditsBtn')?.classList.add('hidden');
+    const actions = document.getElementById('leaveCreditEditActions');
+    if (actions) {
+        actions.classList.remove('hidden');
+        actions.classList.add('flex');
+    }
+}
+
+function cancelLeaveCreditEdit() {
+    window.location.reload();
+}
+
+function filterRowsByDate(inputId, rowSelector) {
+    const selectedDate = document.getElementById(inputId)?.value || '';
+    document.querySelectorAll(rowSelector).forEach(row => {
+        const dateValues = row.dataset.dateValues || '';
+        row.style.display = !selectedDate || dateValues.includes(selectedDate) ? '' : 'none';
+    });
+}
+
+function clearDateFilter(inputId, rowSelector) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.value = '';
+    }
+    document.querySelectorAll(rowSelector).forEach(row => {
+        row.style.display = '';
+    });
 }
 
 function saveSchedule(scheduleId) {

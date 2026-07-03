@@ -304,26 +304,26 @@ try {
 }
 ?>
 
-<div class="bg-white rounded-2xl shadow-lg border border-gray-100">
+<div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
     <!-- Modern Header Section -->
-    <div class="px-8 py-7 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-5">
-                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                    <i class="fas fa-calendar-check text-white text-2xl"></i>
+    <div class="px-4 md:px-8 py-5 md:py-7 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-3 md:gap-5 min-w-0">
+                <div class="w-11 h-11 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 flex-shrink-0">
+                    <i class="fas fa-calendar-check text-white text-xl md:text-2xl"></i>
                 </div>
-                <div>
-                    <h2 class="text-3xl font-bold text-gray-900 tracking-tight">Schedule Management</h2>
+                <div class="min-w-0">
+                    <h2 class="text-xl md:text-3xl font-bold text-gray-900 tracking-tight">Schedule Management</h2>
                     <p class="text-sm text-gray-600 mt-1">View and manage your work schedule</p>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
                 <button onclick="window.location.href='?view=schedule&ym=<?= date('Y-n') ?>'" 
-                        class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow">
+                        class="flex-1 sm:flex-none px-4 md:px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow">
                     <i class="fas fa-calendar-day mr-2 text-gray-400"></i>Today
                 </button>
                 <button onclick="openScheduleChangeModal()"
-                        class="px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40">
+                        class="flex-1 sm:flex-none px-4 md:px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40">
                     <i class="fas fa-plus mr-2"></i>New Request
                 </button>
             </div>
@@ -472,18 +472,18 @@ try {
     ?>
 
     <!-- Calendar Navigation -->
-    <div class="px-8 py-5 border-b border-gray-100 bg-white">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
+    <div class="px-4 md:px-8 py-4 md:py-5 border-b border-gray-100 bg-white">
+        <div class="flex items-center justify-center sm:justify-between">
+            <div class="flex items-center gap-2 md:gap-4">
                 <button onclick="window.location.href='?view=schedule&ym=<?= h_schedule($nav_schedule['prev']) ?>'" 
-                   class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow">
+                   class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow">
                     <i class="fas fa-chevron-left"></i>
                 </button>
-                <h3 class="text-2xl font-bold text-gray-900 min-w-[200px] text-center tracking-tight">
+                <h3 class="text-lg md:text-2xl font-bold text-gray-900 min-w-[150px] md:min-w-[200px] text-center tracking-tight">
                     <?= date('F Y', strtotime("$year_schedule-$month_schedule-01")) ?>
                 </h3>
                 <button onclick="window.location.href='?view=schedule&ym=<?= h_schedule($nav_schedule['next']) ?>'" 
-                   class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow">
+                   class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-gray-50 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-900 transition-all duration-200 shadow-sm hover:shadow">
                     <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
@@ -491,10 +491,10 @@ try {
     </div>
 
     <!-- Calendar Grid Container -->
-    <div class="bg-white">
+    <div class="bg-white schedule-calendar-scroll overflow-x-auto">
 
             <!-- Calendar Grid -->
-            <div class="grid grid-cols-7 gap-0 border-l border-t border-gray-100">
+            <div class="schedule-calendar-grid grid grid-cols-7 gap-0 border-l border-t border-gray-100 min-w-[840px] md:min-w-0">
                 <!-- Weekday Headers -->
                 <?php $weekdays_schedule = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; 
                       foreach($weekdays_schedule as $idx => $wd): 
@@ -509,7 +509,7 @@ try {
                 <?php foreach($matrix_schedule as $week): ?>
                     <?php foreach($week as $cellDate): ?>
                         <?php if (!$cellDate): ?>
-                            <div class="min-h-[140px] bg-gray-50/30 border-r border-b border-gray-100"></div>
+                            <div class="min-h-[120px] md:min-h-[140px] bg-gray-50/30 border-r border-b border-gray-100"></div>
                         <?php else: 
                               $cell = getScheduleCell_schedule($pdo, $employee_id, $cellDate);
                               $isToday = $cellDate === date('Y-m-d');
@@ -528,7 +528,7 @@ try {
                                   $bgClass .= ' opacity-60';
                               }
                         ?>
-                            <div class="min-h-[140px] p-4 <?= $bgClass ?> <?= $borderClass ?> transition-all duration-200 relative group cursor-pointer" 
+                            <div class="min-h-[120px] md:min-h-[140px] p-2.5 md:p-4 <?= $bgClass ?> <?= $borderClass ?> transition-all duration-200 relative group cursor-pointer" 
                                  data-date="<?= $cellDate ?>"
                                  onclick="<?= !$isPast ? 'handleDateClick(\'' . $cellDate . '\')' : '' ?>">
                               
@@ -594,7 +594,7 @@ try {
 
                               <!-- Schedule Card (if exists) -->
                               <?php if ($cell['is_rest_day'] || $cell['is_holiday']): ?>
-                                <div class="p-3.5 rounded-xl <?= $cell['is_holiday'] ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200' : 'bg-gradient-to-br from-slate-50 to-gray-100 border-2 border-slate-200' ?> shadow-sm">
+                                <div class="schedule-day-card p-2.5 md:p-3.5 rounded-xl <?= $cell['is_holiday'] ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200' : 'bg-gradient-to-br from-slate-50 to-gray-100 border-2 border-slate-200' ?> shadow-sm">
                                   <div class="flex items-center gap-3 mb-1">
                                     <div class="w-1.5 h-12 rounded-full <?= $cell['is_holiday'] ? 'bg-gradient-to-b from-amber-400 to-amber-600' : 'bg-gradient-to-b from-slate-400 to-slate-600' ?>"></div>
                                     <div class="flex-1 min-w-0">
@@ -625,7 +625,7 @@ try {
                                       $cardColor = 'blue';
                                   }
                                 ?>
-                                <div class="p-3.5 rounded-xl bg-gradient-to-br from-<?= $cardColor ?>-50 to-<?= $cardColor ?>-100/50 border-2 border-<?= $cardColor ?>-200 hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
+                                <div class="schedule-day-card p-2.5 md:p-3.5 rounded-xl bg-gradient-to-br from-<?= $cardColor ?>-50 to-<?= $cardColor ?>-100/50 border-2 border-<?= $cardColor ?>-200 hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                                   <div class="flex items-start gap-3">
                                     <div class="w-1.5 h-full rounded-full bg-gradient-to-b from-<?= $cardColor ?>-400 to-<?= $cardColor ?>-600"></div>
                                     <div class="flex-1 min-w-0">
@@ -1208,8 +1208,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Auto-process approved schedule changes when calendar loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Only run if we're on the schedule view
-    if (document.getElementById('scheduleView')) {
+    // Only run when the schedule view is explicitly opened.
+    const pageParams = new URLSearchParams(window.location.search);
+    const isScheduleView = pageParams.get('view') === 'schedule' || window.location.hash === '#scheduleView';
+    if (isScheduleView && document.getElementById('scheduleView')) {
         console.log('📅 Schedule view loaded - checking for approved schedule changes to process...');
         
         // Process single-day schedule changes
@@ -1333,6 +1335,19 @@ document.addEventListener('DOMContentLoaded', function() {
 /* Calendar grid consistency - ONLY inside schedule view */
 #scheduleView .grid.grid-cols-7 > div {
     position: relative;
+}
+
+#scheduleView .schedule-calendar-scroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+#scheduleView .schedule-calendar-grid {
+    width: 100%;
+}
+
+#scheduleView .schedule-day-card {
+    min-width: 0;
 }
 
 /* Vertical accent line in schedule cards - ONLY inside schedule view */
@@ -1467,6 +1482,55 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .animate-bounce-in {
     animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@media (max-width: 767px) {
+    #scheduleView {
+        padding: 0 !important;
+    }
+
+    #scheduleView .schedule-calendar-scroll {
+        border-top: 1px solid #f3f4f6;
+    }
+
+    #scheduleView .schedule-calendar-scroll::after {
+        content: 'Swipe to see all days';
+        position: sticky;
+        left: 0;
+        display: block;
+        padding: 0.5rem 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        background: linear-gradient(to right, #f8fafc, rgba(248, 250, 252, 0));
+        pointer-events: none;
+    }
+
+    #scheduleView .schedule-calendar-grid {
+        min-height: auto;
+    }
+
+    #scheduleView .schedule-calendar-grid > div {
+        min-width: 120px;
+    }
+
+    #scheduleView .schedule-day-card .text-sm {
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+
+    #scheduleView .schedule-day-card .w-1\.5 {
+        height: 2.5rem;
+    }
+
+    #scheduleView .absolute.top-2.right-2 {
+        top: 0.375rem;
+        right: 0.375rem;
+    }
+
+    #scheduleView .group-hover\:block {
+        display: block;
+    }
 }
 
 /* OT Eligible Icon Pulse Animation (Green - No Request Yet) */

@@ -899,6 +899,7 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
   <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link rel="stylesheet" href="../css/responsive.css">
   <style>
   body {
     font-family: 'Poppins', sans-serif;
@@ -1093,6 +1094,11 @@ function showSection(sectionId) {
   if (targetSection) {
     targetSection.classList.remove('hidden');
   }
+
+  const mainContent = document.querySelector('main');
+  if (mainContent) {
+    mainContent.scrollLeft = 0;
+  }
   
   // Update active states in sidebar
   document.querySelectorAll('.nav-link').forEach(link => {
@@ -1161,7 +1167,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         <div class="flex items-center space-x-3 relative">
             <div class="w-px h-6 bg-gray-300 mx-2"></div>
-            <span class="text-gray-700 font-medium"><?= htmlspecialchars($fname . ' ' . $lname) ?></span>
+            <span class="hidden sm:inline text-gray-700 font-medium truncate max-w-40"><?= htmlspecialchars($fname . ' ' . $lname) ?></span>
             <!-- Dropdown Button -->
             <button onclick="toggleUserDropdown()" class="ml-2 text-gray-600 hover:text-gray-800 focus:outline-none">
                 <i class="fas fa-chevron-down"></i>
@@ -1237,8 +1243,8 @@ function closeDropdownOnClickOutside(e) {
 $initialView = isset($_GET['view']) && $_GET['view'] === 'schedule' ? 'schedule' : 'dashboard';
 ?>
 
-<main class="flex-1 pt-20 px-8 overflow-auto">
-<div id="dashboardView" class="<?= $initialView === 'dashboard' ? 'mt-20' : 'hidden' ?>">
+<main class="flex-1 pt-16 md:pt-20 px-4 md:px-8 overflow-auto min-w-0">
+<div id="dashboardView" class="<?= $initialView === 'dashboard' ? 'mt-12 md:mt-20' : 'hidden' ?>">
 <?php
 // Fetch the number of announcements
 if (!empty($_SESSION['demo_mode'])) {
@@ -1251,7 +1257,7 @@ if (!empty($_SESSION['demo_mode'])) {
 <?php include 'welcome_banner.php'; ?>
 
 <!-- Stat Cards -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 mt-[-2.5rem] relative z-10">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 mt-[-1.5rem] md:mt-[-2.5rem] relative z-10">
     <?php 
         include 'stats/available_leave.php';
         include 'stats/upcoming_payday.php';
@@ -1260,7 +1266,7 @@ if (!empty($_SESSION['demo_mode'])) {
     ?>
 </div>
 
-    <div class="flex flex-col md:flex-row gap-6 items-start md:items-stretch">
+    <div class="flex flex-col md:flex-row gap-4 md:gap-6 items-stretch">
         <?php include 'today_attendance_card.php'; ?>
         <?php include 'recent_activity_card.php'; ?>
     </div>
@@ -1661,8 +1667,33 @@ function closeEditModal() {
         const sidebar = document.getElementById('sidebar');
 
         if (hamburgerBtn && sidebar) {
-            hamburgerBtn.addEventListener('click', () => {
+            const closeSidebar = () => sidebar.classList.add('-translate-x-full');
+            const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
+
+            hamburgerBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
                 sidebar.classList.toggle('-translate-x-full');
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!isMobile() || sidebar.classList.contains('-translate-x-full')) {
+                    return;
+                }
+
+                const clickedInsideSidebar = sidebar.contains(event.target);
+                const clickedHamburger = hamburgerBtn.contains(event.target);
+
+                if (!clickedInsideSidebar && !clickedHamburger) {
+                    closeSidebar();
+                }
+            });
+
+            sidebar.querySelectorAll('a.nav-link').forEach(link => {
+                link.addEventListener('click', () => {
+                    if (isMobile()) {
+                        closeSidebar();
+                    }
+                });
             });
         }
     });
