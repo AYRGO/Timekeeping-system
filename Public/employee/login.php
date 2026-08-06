@@ -23,7 +23,9 @@ function getMobileAccessAllowlist() {
     'christian.mar',  
     'nika.bacongallo',
     'trisha.mcgregor',
-    'Ria.Santiago'
+    'ria.santiago',
+    'johsua.dimla',
+    'bon.patacsil'
   ];
 }
 
