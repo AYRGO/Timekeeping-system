@@ -29,19 +29,9 @@ if (!class_exists('EnvLoader')) {
                 }
             }
             
-            // Debug: Log the path we're trying to load
-            error_log("Trying to load environment file from: " . ($envPath ?: 'none found'));
-            
             if (!$envPath) {
-                error_log("Environment file not found in any of these locations:");
-                foreach ($possiblePaths as $path) {
-                    error_log("  - " . $path);
-                }
-                // Fallback to default values or throw error
                 return false;
             }
-            
-            error_log("Successfully found environment file at: " . $envPath);
             
             $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             
@@ -68,12 +58,6 @@ if (!class_exists('EnvLoader')) {
                     $_ENV[$key] = $value;
                     putenv("$key=$value");
                     
-                    // Debug: Log loaded variables (but not sensitive ones)
-                    if (!in_array($key, ['SMTP_PASS', 'RECAPTCHA_SECRET_KEY', 'DB_PASS'])) {
-                        error_log("Loaded env variable: $key = $value");
-                    } else {
-                        error_log("Loaded env variable: $key = [HIDDEN]");
-                    }
                 }
             }
             
@@ -83,11 +67,6 @@ if (!class_exists('EnvLoader')) {
         
         public static function get($key, $default = null) {
             $value = $_ENV[$key] ?? getenv($key) ?: $default;
-            
-            // Log missing required environment variables
-            if ($value === null) {
-                error_log("Missing required environment variable: $key");
-            }
             
             return $value;
         }
@@ -109,11 +88,5 @@ if (!class_exists('EnvLoader')) {
 }
 
 // Load environment variables once
-$loadResult = EnvLoader::load();
-if ($loadResult) {
-    error_log("Environment variables loaded successfully");
-    error_log("DB_NAME value: " . EnvLoader::get('DB_NAME', 'NOT_FOUND'));
-} else {
-    error_log("Failed to load environment variables - using fallback values");
-}
+EnvLoader::load();
 ?>

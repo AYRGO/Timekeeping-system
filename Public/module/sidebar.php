@@ -10,19 +10,19 @@
 
             <!-- Navigation -->
             <nav class="flex-1 px-3 py-2 space-y-2 overflow-y-auto overflow-x-visible">
-                <a href="#" onclick="showSection('dashboardView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="dashboardView">
+                <a href="?view=dashboard" onclick="return showSection('dashboardView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="dashboardView">
                     <i class="fas fa-tachometer-alt text-lg"></i>
                     <span class="text-base font-medium">Home</span>
                 </a>
-                <a href="#" onclick="showSection('newsFeedView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="newsFeedView">
+                <a href="?view=news" onclick="return showSection('newsFeedView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="newsFeedView">
                     <i class="fas fa-newspaper text-lg"></i>
                     <span class="text-base font-medium">News Feed</span>
                 </a>
-                <a href="#" onclick="showSection('scheduleView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="scheduleView">
+                <a href="?view=schedule" onclick="return showSection('scheduleView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="scheduleView">
                     <i class="fas fa-calendar-check text-lg"></i>
                     <span class="text-base font-medium">Schedule Management</span>
                 </a>
-                <a href="#" onclick="showSection('overtimeView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="overtimeView">
+                <a href="?view=overtime" onclick="return showSection('overtimeView');" class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-green-50 text-gray-700 transition-colors" data-section="overtimeView">
                     <i class="fas fa-clock text-lg"></i>
                     <span class="text-base font-medium">Overtime</span>
                 </a>
@@ -35,10 +35,10 @@
         <i class="fas fa-chevron-down text-sm transition-transform" id="leaveMenuIcon"></i>
     </button>
     <div id="leaveSubmenu" class="pl-10 hidden space-y-1">
-        <a href="#" onclick="showSection('requestView');" class="nav-link block p-2 rounded-lg hover:bg-green-50 text-gray-700 text-sm transition-colors" data-section="requestView">
+        <a href="?view=request" onclick="return showSection('requestView');" class="nav-link block p-2 rounded-lg hover:bg-green-50 text-gray-700 text-sm transition-colors" data-section="requestView">
             Request Leave
         </a>
-        <a href="#" onclick="showSection('leaveCreditsView');" class="nav-link block p-2 rounded-lg hover:bg-green-50 text-gray-700 text-sm transition-colors" data-section="leaveCreditsView">
+        <a href="?view=leave_credits" onclick="return showSection('leaveCreditsView');" class="nav-link block p-2 rounded-lg hover:bg-green-50 text-gray-700 text-sm transition-colors" data-section="leaveCreditsView">
             Leave Credits
         </a>
     </div>

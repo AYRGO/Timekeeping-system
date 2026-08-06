@@ -360,8 +360,11 @@
                         <?php
                         // Get all work schedules for this day's dropdown
                         try {
-                          $schedStmt = $pdo->query("SELECT id, name, time_in, time_out FROM work_schedules ORDER BY time_in");
-                          while ($sched = $schedStmt->fetch(PDO::FETCH_ASSOC)) {
+                          $monthlyScheduleOptions = $work_schedules ?? [];
+                          usort($monthlyScheduleOptions, static function ($a, $b) {
+                              return strcmp($a['time_in'] ?? '', $b['time_in'] ?? '');
+                          });
+                          foreach ($monthlyScheduleOptions as $sched) {
                             $name = !empty($sched['name']) ? htmlspecialchars($sched['name']) : '';
                             $timeIn = !empty($sched['time_in']) ? $sched['time_in'] : '00:00:00';
                             $timeOut = !empty($sched['time_out']) ? $sched['time_out'] : '00:00:00';

@@ -6,17 +6,30 @@ require_once '../config/db.php';
 
 header('Content-Type: application/json');
 
+if (!isset($_SESSION['employee']['id'])) {
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
+
+$currentEmployeeId = (int)$_SESSION['employee']['id'];
+session_write_close();
+
 try {
-    // Get all approved but unprocessed monthly schedule requests
-    $stmt = $pdo->query("
+    // Process only the logged-in employee's approved requests.
+    $stmt = $pdo->prepare("
         SELECT * FROM month_weekly_schedule 
-        WHERE status = 'approved' AND processed_at IS NULL
+        WHERE employee_id = ? AND status = 'approved' AND processed_at IS NULL
         ORDER BY created_at ASC
     ");
-    
+    $stmt->execute([$currentEmployeeId]);
     $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $processedCount = 0;
     $errors = [];
+
+    $workScheduleMap = [];
+    foreach ($pdo->query("SELECT id, name, time_in, time_out FROM work_schedules")->fetchAll(PDO::FETCH_ASSOC) as $scheduleRow) {
+        $workScheduleMap[(int)$scheduleRow['id']] = $scheduleRow;
+    }
     
     foreach ($requests as $request) {
         try {
@@ -179,9 +192,7 @@ try {
                         ]);
                     } else {
                         // Work schedule
-                        $schedStmt = $pdo->prepare("SELECT name, time_in, time_out FROM work_schedules WHERE id = ?");
-                        $schedStmt->execute([$daySchedule['schedule_id']]);
-                        $schedInfo = $schedStmt->fetch(PDO::FETCH_ASSOC);
+                        $schedInfo = $workScheduleMap[(int)$daySchedule['schedule_id']] ?? null;
                         
                         if ($schedInfo) {
                             $insertStmt->execute([

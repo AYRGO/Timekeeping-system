@@ -57,11 +57,11 @@ try {
     
     <!-- Animated background elements -->
     <div class="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div class="absolute -top-10 -left-10 w-40 h-40 bg-white bg-opacity-10 rounded-full animate-pulse"></div>
-        <div class="absolute -bottom-10 -right-10 w-60 h-60 bg-white bg-opacity-5 rounded-full animate-bounce" style="animation-duration: 3s;"></div>
-        <div class="absolute top-1/2 left-1/4 w-20 h-20 bg-white bg-opacity-10 rounded-full animate-ping" style="animation-duration: 2s;"></div>
-        <div class="absolute top-1/4 right-1/3 w-16 h-16 bg-white bg-opacity-5 rounded-full animate-pulse" style="animation-duration: 4s;"></div>
-        <div class="absolute bottom-1/4 left-1/3 w-12 h-12 bg-white bg-opacity-10 rounded-full animate-ping" style="animation-duration: 3s;"></div>
+        <div class="absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full animate-pulse"></div>
+        <div class="absolute -bottom-10 -right-10 w-60 h-60 bg-white/5 rounded-full animate-bounce" style="animation-duration: 3s;"></div>
+        <div class="absolute top-1/2 left-1/4 w-20 h-20 bg-white/10 rounded-full animate-ping" style="animation-duration: 2s;"></div>
+        <div class="absolute top-1/4 right-1/3 w-16 h-16 bg-white/5 rounded-full animate-pulse" style="animation-duration: 4s;"></div>
+        <div class="absolute bottom-1/4 left-1/3 w-12 h-12 bg-white/10 rounded-full animate-ping" style="animation-duration: 3s;"></div>
     </div>
     
     <div class="relative z-10">
@@ -83,7 +83,7 @@ try {
                 <div class="flex flex-wrap gap-4">
                     <?php if ($unreadAnnouncements > 0): ?>
                         <button
-                            class="bg-white text-blue-800 px-7 py-3 rounded-xl font-semibold hover:bg-opacity-90 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl flex items-center space-x-3 group"
+                            class="bg-white text-blue-800 px-7 py-3 rounded-xl font-semibold hover:bg-white/90 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl flex items-center space-x-3 group"
                             onclick="handleUnreadClick(this)"
                             id="unreadBtn"
                         >
@@ -97,7 +97,7 @@ try {
                         </button>
                     <?php else: ?>
                         <button
-                            class="bg-white bg-opacity-20 text-white px-7 py-3 rounded-xl font-semibold hover:bg-opacity-30 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 border-2 border-white border-opacity-30"
+                            class="bg-white/20 text-white px-7 py-3 rounded-xl font-semibold hover:bg-white/30 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 border-2 border-white/30"
                             onclick="showSection('newsFeedView')"
                             id="caughtUpBtn"
                         >
@@ -109,7 +109,7 @@ try {
                     <!-- Recent Updates Button -->
                     <a href="../../Harley up/employee_manual.html" 
                        target="_blank"
-                       class="bg-white text-emerald-700 px-7 py-3 rounded-xl font-semibold hover:bg-opacity-90 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl flex items-center space-x-3 group"
+                       class="bg-white text-emerald-700 px-7 py-3 rounded-xl font-semibold hover:bg-white/90 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl flex items-center space-x-3 group"
                     >
                         <i class="fas fa-book-open text-lg group-hover:animate-pulse"></i>
                         <span class="text-base">See What's New</span>
@@ -121,7 +121,7 @@ try {
             <div class="hidden lg:flex items-center justify-center ml-12">
                 <div class="relative">
                     <!-- Main illustration -->
-                    <div class="relative bg-white bg-opacity-10 rounded-full p-6 backdrop-blur-sm border border-white border-opacity-20">
+                    <div class="relative bg-white/10 rounded-full p-6 backdrop-blur-sm border border-white/20">
                         <i class="fas fa-newspaper text-7xl text-white opacity-80"></i>
                         
                         <!-- Floating notification badge -->
@@ -179,11 +179,6 @@ try {
 /* Pulse animation for bell icon */
 .group:hover .group-hover\:animate-pulse {
     animation: pulse 1s ease-in-out infinite;
-}
-
-/* Smooth transitions */
-* {
-    transition: all 0.3s ease;
 }
 
 /* Loading state for mark all button */
@@ -313,7 +308,7 @@ function handleUnreadClick(btn) {
         if (data.success) {
             // Change button to caught up state
             btn.classList.remove('loading');
-            btn.className = "bg-white bg-opacity-20 text-white px-7 py-3 rounded-xl font-semibold hover:bg-opacity-30 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 border-2 border-white border-opacity-30";
+            btn.className = "bg-white/20 text-white px-7 py-3 rounded-xl font-semibold hover:bg-white/30 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 border-2 border-white/30";
             btn.innerHTML = `
                 <i class="fas fa-check-circle text-lg text-green-300"></i>
                 <span class="text-base">All caught up! View News Feed</span>

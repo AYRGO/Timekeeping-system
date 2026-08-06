@@ -79,6 +79,14 @@ try {
 
 $employee_role = $_SESSION['employee']['role'] ?? 'employee';
 
+// Render only the requested dashboard section. Previously every hidden section was
+// executed on every request, including its database queries and JavaScript.
+$allowed_views = ['dashboard', 'news', 'schedule', 'overtime', 'request', 'leave_credits', 'profile'];
+$current_view = $_GET['view'] ?? 'dashboard';
+if (!in_array($current_view, $allowed_views, true)) {
+    $current_view = 'dashboard';
+}
+
 if (isset($_POST['switch_to_admin']) && $employee_role === 'internal') {
     $_SESSION['view_mode'] = 'admin';
     header("Location: ../views/admin_homepage.php");
@@ -891,10 +899,11 @@ if ($todayLog && $todayLog['time_in'] && $todayLog['time_out']) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="icon" type="image/png" href="../asset/RSS-logo-colour.png">
   <meta charset="UTF-8" />
   <title>RSS Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="../css/output.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
@@ -1086,14 +1095,32 @@ nav {
 // These must be defined before the HTML that uses them
 
 function showSection(sectionId) {
+  const sectionRoutes = {
+    dashboardView: 'dashboard',
+    newsFeedView: 'news',
+    scheduleView: 'schedule',
+    overtimeView: 'overtime',
+    requestView: 'request',
+    leaveCreditsView: 'leave_credits',
+    profileView: 'profile'
+  };
+
+  const targetSection = document.getElementById(sectionId);
+  if (!targetSection) {
+    const view = sectionRoutes[sectionId] || 'dashboard';
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set('view', view);
+    url.hash = '';
+    window.location.assign(url.toString());
+    return false;
+  }
+
   // Hide all sections
   document.querySelectorAll('[id$="View"]').forEach(el => el.classList.add('hidden'));
 
   // Show the selected section
-  const targetSection = document.getElementById(sectionId);
-  if (targetSection) {
-    targetSection.classList.remove('hidden');
-  }
+  targetSection.classList.remove('hidden');
 
   const mainContent = document.querySelector('main');
   if (mainContent) {
@@ -1126,6 +1153,8 @@ function showSection(sectionId) {
       submenu.classList.remove('hidden');
     }
   }
+
+  return false;
 }
 
 function toggleLeaveMenu() {
@@ -1143,16 +1172,17 @@ function toggleMobileMenu() {
 
 // Set initial active state on page load
 document.addEventListener('DOMContentLoaded', function() {
-  // Check URL for view parameter
-  const urlParams = new URLSearchParams(window.location.search);
-  const viewParam = urlParams.get('view');
-  
-  // Show the requested view or default to dashboard
-  if (viewParam === 'schedule') {
-    showSection('scheduleView');
-  } else {
-    showSection('dashboardView');
-  }
+  const viewSections = {
+    dashboard: 'dashboardView',
+    news: 'newsFeedView',
+    schedule: 'scheduleView',
+    overtime: 'overtimeView',
+    request: 'requestView',
+    leave_credits: 'leaveCreditsView',
+    profile: 'profileView'
+  };
+  const viewParam = new URLSearchParams(window.location.search).get('view') || 'dashboard';
+  showSection(viewSections[viewParam] || 'dashboardView');
 });
 </script>
 
@@ -1231,20 +1261,16 @@ function closeUserDropdown() {
 }
 function closeDropdownOnClickOutside(e) {
     const dropdown = document.getElementById('userDropdown');
-    const btn = event.target.closest('button[onclick^="toggleUserDropdown"]');
+    const btn = e.target.closest('button[onclick^="toggleUserDropdown"]');
     if (!dropdown.contains(e.target) && !btn) {
         closeUserDropdown();
     }
 }
 </script>
 
-<?php
-// Determine initial view based on URL parameter to prevent flash
-$initialView = isset($_GET['view']) && $_GET['view'] === 'schedule' ? 'schedule' : 'dashboard';
-?>
-
 <main class="flex-1 pt-16 md:pt-20 px-4 md:px-8 overflow-auto min-w-0">
-<div id="dashboardView" class="<?= $initialView === 'dashboard' ? 'mt-12 md:mt-20' : 'hidden' ?>">
+<?php if ($current_view === 'dashboard'): ?>
+<div id="dashboardView" class="mt-12 md:mt-20">
 <?php
 // Fetch the number of announcements
 if (!empty($_SESSION['demo_mode'])) {
@@ -1272,19 +1298,22 @@ if (!empty($_SESSION['demo_mode'])) {
     </div>
     <?php include 'attendance-history.php'; ?>
 </div>
+<?php endif; ?>
 
-<?php include 'schedule_change_form.php'; ?>
-
-
-<?php include 'profile_section.php'; ?>
+<?php if ($current_view === 'profile'): ?>
+    <?php include 'profile_section.php'; ?>
+<?php endif; ?>
 
 <!-- News Feed View -->
-<div id="newsFeedView" class="hidden px-3 mt-10 space-y-10 max-w-[1500px] mx-auto">
+<?php if ($current_view === 'news'): ?>
+<div id="newsFeedView" class="px-3 mt-10 space-y-10 max-w-[1500px] mx-auto">
   <?php include 'news_feed_content.php'; ?>
 </div>
+<?php endif; ?>
 
 
 <!-- Comments Modal -->
+<?php if ($current_view === 'news'): ?>
 <div id="commentsModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center px-4">
     <div class="bg-white rounded-lg shadow-lg max-w-xl w-full max-h-[90vh] flex flex-col">
         <!-- Header -->
@@ -1318,20 +1347,31 @@ if (!empty($_SESSION['demo_mode'])) {
         </form>
     </div>
 </div>
+<?php endif; ?>
 
-<div id="leaveCreditsView" class="hidden">
+<?php if ($current_view === 'leave_credits'): ?>
+<div id="leaveCreditsView">
     <?php include 'leave_credits.php'; ?>
 </div>
+<?php endif; ?>
 
 <!-- Schedule Management View -->
-<div id="scheduleView" class="<?= $initialView === 'schedule' ? 'mt-20' : 'hidden' ?>">
+<?php if ($current_view === 'schedule'): ?>
+<?php include 'schedule_change_form.php'; ?>
+<div id="scheduleView" class="mt-20">
     <?php include 'schedule_content.php'; ?>
 </div>
+<?php endif; ?>
 
+<?php if ($current_view === 'request'): ?>
 <?php include 'leave_request_form.php'; ?>
+<?php endif; ?>
 
+<?php if ($current_view === 'overtime'): ?>
 <?php include 'new_overtime.php'; ?>
+<?php endif; ?>
 
+<?php if ($current_view === 'request'): ?>
 <?php
 // PHP: Load leave credits for current user
 $leaveCredits = [];
@@ -1371,13 +1411,15 @@ echo "<script>
 </script>";
 }
 ?>
+<?php endif; ?>
 
-
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    const leaveTypeSelect = document.getElementById("leaveType");
+    const dateRangeInput = document.getElementById("date_range");
+    if (!leaveTypeSelect || !dateRangeInput) return;
+
     // Initialize flatpickr for date range
     flatpickr("#date_range", {
         mode: "range",
@@ -1395,10 +1437,8 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // Leave credit checking functionality
-    const leaveTypeSelect = document.getElementById("leaveType");
     const leaveBalanceDisplay = document.getElementById("leaveBalanceDisplay");
     const submitBtn = document.getElementById("leaveSubmitBtn");
-    const dateRangeInput = document.getElementById("date_range");
 
     function checkLeaveCredits() {
         const selectedType = leaveTypeSelect.value;
@@ -1699,6 +1739,7 @@ function closeEditModal() {
     });
 </script>
 
+<?php if ($current_view === 'dashboard'): ?>
 <script>
 // Auto-Accrual Background Processor (runs on employee dashboard too)
 document.addEventListener('DOMContentLoaded', function() {
@@ -1728,6 +1769,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(processAutoAccrual, 3600000);
 });
 </script>
+<?php endif; ?>
 
 </main>
 </body>

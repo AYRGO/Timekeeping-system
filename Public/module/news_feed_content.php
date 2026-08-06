@@ -40,11 +40,75 @@ function newsFeedTableColumnExists(PDO $pdo, string $table, string $column): boo
 }
 
 // Fetch announcements. Demo mode intentionally hides internal announcements.
+$newsPage = max(1, (int)($_GET['news_page'] ?? 1));
+$newsPerPage = 15;
+$newsTotal = 0;
+$newsTotalPages = 1;
 if ($isDemoMode) {
     $announcements = [];
 } else {
-    $stmt = $pdo->query("SELECT * FROM announcements WHERE deleted = 0 ORDER BY created_at DESC");
+    $newsTotal = (int)$pdo->query("SELECT COUNT(*) FROM announcements WHERE deleted = 0")->fetchColumn();
+    $newsTotalPages = max(1, (int)ceil($newsTotal / $newsPerPage));
+    $newsPage = min($newsPage, $newsTotalPages);
+    $newsOffset = ($newsPage - 1) * $newsPerPage;
+    $stmt = $pdo->prepare("SELECT * FROM announcements WHERE deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?");
+    $stmt->bindValue(1, $newsPerPage, PDO::PARAM_INT);
+    $stmt->bindValue(2, $newsOffset, PDO::PARAM_INT);
+    $stmt->execute();
     $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Batch-load reactions and comments for the current page. Previously each post
+// issued three additional queries while rendering.
+$type_to_emoji = [
+    'like' => '👍', 'love' => '❤️', 'laugh' => '😂',
+    'wow' => '😮', 'sad' => '😢', 'angry' => '😡'
+];
+$reactionsByAnnouncement = [];
+$userReactionByAnnouncement = [];
+$commentsByAnnouncement = [];
+$announcementIds = array_values(array_map('intval', array_column($announcements, 'announcement_id')));
+if ($announcementIds) {
+    $announcementPlaceholders = implode(',', array_fill(0, count($announcementIds), '?'));
+
+    $reactionStmt = $pdo->prepare("
+        SELECT announcement_id, reaction_type, COUNT(*) AS reaction_count
+        FROM post_reactions
+        WHERE announcement_id IN ({$announcementPlaceholders})
+        GROUP BY announcement_id, reaction_type
+    ");
+    $reactionStmt->execute($announcementIds);
+    foreach ($reactionStmt->fetchAll(PDO::FETCH_ASSOC) as $reactionRow) {
+        $announcementId = (int)$reactionRow['announcement_id'];
+        $emoji = $type_to_emoji[$reactionRow['reaction_type']] ?? '👍';
+        $reactionsByAnnouncement[$announcementId][$emoji] = (int)$reactionRow['reaction_count'];
+    }
+
+    if ($current_user_id) {
+        $userReactionStmt = $pdo->prepare("
+            SELECT announcement_id, reaction_type
+            FROM post_reactions
+            WHERE employee_id = ? AND announcement_id IN ({$announcementPlaceholders})
+        ");
+        $userReactionStmt->execute(array_merge([(int)$current_user_id], $announcementIds));
+        foreach ($userReactionStmt->fetchAll(PDO::FETCH_ASSOC) as $reactionRow) {
+            $userReactionByAnnouncement[(int)$reactionRow['announcement_id']] =
+                $type_to_emoji[$reactionRow['reaction_type']] ?? '👍';
+        }
+    }
+
+    $commentsDeletedWhere = newsFeedTableColumnExists($pdo, 'comments', 'deleted') ? 'AND c.deleted = 0' : '';
+    $commentsStmt = $pdo->prepare("
+        SELECT c.*, e.fname, e.lname
+        FROM comments c
+        JOIN employees e ON e.id = c.employee_id
+        WHERE c.announcement_id IN ({$announcementPlaceholders}) {$commentsDeletedWhere}
+        ORDER BY c.created_at ASC
+    ");
+    $commentsStmt->execute($announcementIds);
+    foreach ($commentsStmt->fetchAll(PDO::FETCH_ASSOC) as $commentRow) {
+        $commentsByAnnouncement[(int)$commentRow['announcement_id']][] = $commentRow;
+    }
 }
 
 $upcomingEvents = [];
@@ -699,66 +763,9 @@ if (empty($upcomingEvents) && newsFeedTableExists($pdo, 'company_holidays')) {
                 <?php foreach ($announcements as $a):
                     $aid = $a['announcement_id'];
 
-                    // Get reactions using new table
-                    try {
-                        $reaction_stmt = $pdo->prepare("
-                            SELECT reaction_type, COUNT(*) as count 
-                            FROM post_reactions 
-                            WHERE announcement_id = ? 
-                            GROUP BY reaction_type
-                        ");
-                        $reaction_stmt->execute([$aid]);
-                        $reaction_data = $reaction_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                        // Convert to emoji format
-                        $type_to_emoji = [
-                            'like' => '👍',
-                            'love' => '❤️', 
-                            'laugh' => '😂',
-                            'wow' => '😮',
-                            'sad' => '😢',
-                            'angry' => '😡'
-                        ];
-
-                        $reactions = [];
-                        foreach ($reaction_data as $row) {
-                            $emoji = $type_to_emoji[$row['reaction_type']] ?? '👍';
-                            $reactions[$emoji] = (int)$row['count'];
-                        }
-
-                        // Get user's reaction
-                        $user_reaction_stmt = $pdo->prepare("SELECT reaction_type FROM post_reactions WHERE announcement_id = ? AND employee_id = ? LIMIT 1");
-                        $user_reaction_stmt->execute([$aid, $current_user_id]);
-                        $user_reaction_type = $user_reaction_stmt->fetchColumn();
-                        $user_reaction = $user_reaction_type ? $type_to_emoji[$user_reaction_type] : null;
-
-                    } catch (PDOException $e) {
-                        $reactions = [];
-                        $user_reaction = null;
-                    }
-
-                    // Get comments
-                    try {
-                        $comment_stmt = $pdo->prepare("
-                            SELECT c.*, e.fname, e.lname 
-                            FROM comments c 
-                            JOIN employees e ON c.employee_id = e.id 
-                            WHERE c.announcement_id = ? AND c.deleted = 0 
-                            ORDER BY c.created_at ASC
-                        ");
-                        $comment_stmt->execute([$aid]);
-                        $comments = $comment_stmt->fetchAll(PDO::FETCH_ASSOC);
-                    } catch (PDOException $e) {
-                        $comment_stmt = $pdo->prepare("
-                            SELECT c.*, e.fname, e.lname 
-                            FROM comments c 
-                            JOIN employees e ON c.employee_id = e.id 
-                            WHERE c.announcement_id = ? 
-                            ORDER BY c.created_at ASC
-                        ");
-                        $comment_stmt->execute([$aid]);
-                        $comments = $comment_stmt->fetchAll(PDO::FETCH_ASSOC);
-                    }
+                    $reactions = $reactionsByAnnouncement[(int)$aid] ?? [];
+                    $user_reaction = $userReactionByAnnouncement[(int)$aid] ?? null;
+                    $comments = $commentsByAnnouncement[(int)$aid] ?? [];
                     $commentCount = count($comments);
                     
                     // Check if content is long
@@ -855,7 +862,8 @@ if (empty($upcomingEvents) && newsFeedTableExists($pdo, 'company_holidays')) {
                                     // Get file size if possible
                                     $fullPath = $_SERVER['DOCUMENT_ROOT'] . $fileUrl;
                                     $fileSize = '';
-                                    if (file_exists($fullPath)) {
+                                    $fileExists = is_file($fullPath);
+                                    if ($fileExists) {
                                         $size = filesize($fullPath);
                                         if ($size !== false) {
                                             if ($size > 1024 * 1024) {
@@ -868,9 +876,17 @@ if (empty($upcomingEvents) && newsFeedTableExists($pdo, 'company_holidays')) {
                                         }
                                     }
                                 ?>
-                                    <?php if ($isVideo): ?>
+                                    <?php if (!$fileExists): ?>
+                                        <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border text-gray-500">
+                                            <i class="fas fa-file-circle-xmark text-gray-400 text-xl"></i>
+                                            <div>
+                                                <p class="text-sm font-medium"><?= htmlspecialchars($originalName) ?></p>
+                                                <p class="text-xs">Attachment is no longer available on the server.</p>
+                                            </div>
+                                        </div>
+                                    <?php elseif ($isVideo): ?>
                                         <div class="rounded-lg overflow-hidden border border-gray-200 bg-black">
-                                            <video controls class="w-full" style="max-height: 500px;"
+                                            <video controls preload="metadata" class="w-full" style="max-height: 500px;"
                                                    onerror="console.error('Video failed to load:', this.querySelector('source').src); this.nextElementSibling.style.display='block';"
                                                    onloadeddata="console.log('Video loaded successfully');">
                                                 <source src="<?= htmlspecialchars($fileUrl) ?>" type="video/<?= $ext === 'mov' ? 'quicktime' : ($ext === 'avi' ? 'x-msvideo' : ($ext === 'wmv' ? 'x-ms-wmv' : $ext)) ?>">
@@ -896,7 +912,8 @@ if (empty($upcomingEvents) && newsFeedTableExists($pdo, 'company_holidays')) {
                                         </div>
                                     <?php elseif ($isImage): ?>
                                         <div class="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                                            <img src="<?= htmlspecialchars($fileUrl) ?>" 
+                                            <img src="<?= htmlspecialchars($fileUrl) ?>"
+                                                 loading="lazy" decoding="async"
                                                  alt="<?= htmlspecialchars($originalName) ?>" 
                                                  class="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity" 
                                                  onclick="openLightbox('<?= htmlspecialchars($fileUrl) ?>')"
@@ -1112,6 +1129,20 @@ if (empty($upcomingEvents) && newsFeedTableExists($pdo, 'company_holidays')) {
                 <?php endforeach; ?>
             </div>
 
+            <?php if ($newsTotalPages > 1): ?>
+                <nav class="flex items-center justify-center gap-2 mt-6" aria-label="Announcement pages">
+                    <?php if ($newsPage > 1): ?>
+                        <a class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                           href="?view=news&news_page=<?= $newsPage - 1 ?>">Previous</a>
+                    <?php endif; ?>
+                    <span class="px-3 py-2 text-sm text-gray-600">Page <?= $newsPage ?> of <?= $newsTotalPages ?></span>
+                    <?php if ($newsPage < $newsTotalPages): ?>
+                        <a class="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                           href="?view=news&news_page=<?= $newsPage + 1 ?>">Next</a>
+                    <?php endif; ?>
+                </nav>
+            <?php endif; ?>
+
             <?php if (empty($announcements)): ?>
                 <div class="text-center py-12">
                     <i class="fas fa-bullhorn text-6xl text-gray-300 mb-4"></i>
@@ -1304,7 +1335,7 @@ async function loadWeather() {
     }
 }
 
-async function loadQuote() {
+function loadQuote() {
     const fallbackQuotes = [
         { content: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
         { content: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
@@ -1313,24 +1344,13 @@ async function loadQuote() {
         { content: "Excellence is never an accident. It is always the result of high intention, sincere effort, and intelligent execution.", author: "Aristotle" }
     ];
 
-    try {
-        const data = await fetchJsonWithTimeout('https://api.quotable.io/random?minLength=50&maxLength=150', 5000);
-        document.getElementById('quote-content').innerHTML = `
-            <div class="pl-1">
-                <p class="quote-text text-gray-800 text-sm mb-4">"${escapeHtml(data.content)}"</p>
-                <p class="text-xs text-gray-500 text-center">— ${escapeHtml(data.author)}</p>
-            </div>
-        `;
-    } catch (error) {
-        console.error('Quote loading error:', error);
-        const randomQuote = fallbackQuotes[new Date().getDate() % fallbackQuotes.length];
-        document.getElementById('quote-content').innerHTML = `
-            <div class="pl-1">
-                <p class="quote-text text-gray-800 text-sm mb-4">"${escapeHtml(randomQuote.content)}"</p>
-                <p class="text-xs text-gray-500 text-center">— ${escapeHtml(randomQuote.author)}</p>
-            </div>
-        `;
-    }
+    const randomQuote = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)];
+    document.getElementById('quote-content').innerHTML = `
+        <div class="pl-1">
+            <p class="quote-text text-gray-800 text-sm mb-4">"${escapeHtml(randomQuote.content)}"</p>
+            <p class="text-xs text-gray-500 text-center">— ${escapeHtml(randomQuote.author)}</p>
+        </div>
+    `;
 }
 
 async function loadNews() {

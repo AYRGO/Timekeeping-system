@@ -22,6 +22,10 @@ if (!isset($_SESSION['employee']['id'])) {
     die(json_encode(['success' => false, 'error' => 'Not logged in']));
 }
 
+// No code below mutates session state. Release the PHP session lock before doing
+// database work so other dashboard AJAX requests are not serialized behind it.
+session_write_close();
+
 header('Content-Type: application/json');
 
 try {

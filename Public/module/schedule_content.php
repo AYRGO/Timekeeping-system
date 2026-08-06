@@ -21,25 +21,21 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
     $ot_request_id = null;
     $ot_request_data = null;
     
-    // Query the pre-computed cache table - THIS IS THE EMPLOYEE'S PERSONAL CALENDAR DATA
-    $stmt = $pdo->prepare("
-        SELECT 
-            schedule_date,
-            employee_id,
-            work_schedule_id,
-            is_rest_day,
-            is_holiday,
-            schedule_name,
-            time_in,
-            time_out,
-            holiday_name,
-            source
-        FROM employee_daily_schedule_cache
-        WHERE employee_id = ? AND schedule_date = ?
-        LIMIT 1
-    ");
-    $stmt->execute([$employee_id, $date]);
-    $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+    // The month renderer primes these maps once. Keep the direct-query fallback so
+    // this helper remains safe if reused elsewhere.
+    if (!empty($GLOBALS['scheduleCellBulkLoaded'])) {
+        $cache = $GLOBALS['scheduleCellCacheByDate'][$date] ?? null;
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT schedule_date, employee_id, work_schedule_id, is_rest_day,
+                   is_holiday, schedule_name, time_in, time_out, holiday_name, source
+            FROM employee_daily_schedule_cache
+            WHERE employee_id = ? AND schedule_date = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$employee_id, $date]);
+        $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
     
     // Only check past dates (not today or future)
     if ($date < date('Y-m-d')) {
@@ -47,27 +43,35 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
         $days_ago = (strtotime(date('Y-m-d')) - strtotime($date)) / 86400;
         
         if ($days_ago <= 7) {
-            $log_stmt = $pdo->prepare("
-                SELECT id, time_in, time_out 
-                FROM time_logs 
-                WHERE employee_id = ? AND log_date = ? AND time_out IS NOT NULL
-                LIMIT 1
-            ");
-            $log_stmt->execute([$employee_id, $date]);
-            $log = $log_stmt->fetch(PDO::FETCH_ASSOC);
+            if (!empty($GLOBALS['scheduleCellBulkLoaded'])) {
+                $log = $GLOBALS['scheduleCellLogsByDate'][$date] ?? null;
+            } else {
+                $log_stmt = $pdo->prepare("
+                    SELECT id, time_in, time_out
+                    FROM time_logs
+                    WHERE employee_id = ? AND log_date = ? AND time_out IS NOT NULL
+                    LIMIT 1
+                ");
+                $log_stmt->execute([$employee_id, $date]);
+                $log = $log_stmt->fetch(PDO::FETCH_ASSOC);
+            }
             
             if ($log) {
                 $time_log_id = $log['id'];
                 
                 // Check if ANY OT request already exists and get its status
-                $ot_check = $pdo->prepare("
-                    SELECT id, status, ot_duration, reason, created_at, time_in, time_out, ot_type
-                    FROM post_ot_requests 
-                    WHERE time_log_id = ?
-                    LIMIT 1
-                ");
-                $ot_check->execute([$time_log_id]);
-                $ot_request = $ot_check->fetch(PDO::FETCH_ASSOC);
+                if (!empty($GLOBALS['scheduleCellBulkLoaded'])) {
+                    $ot_request = $GLOBALS['scheduleCellOtByLogId'][(int)$time_log_id] ?? null;
+                } else {
+                    $ot_check = $pdo->prepare("
+                        SELECT id, status, ot_duration, reason, created_at, time_in, time_out, ot_type
+                        FROM post_ot_requests
+                        WHERE time_log_id = ?
+                        LIMIT 1
+                    ");
+                    $ot_check->execute([$time_log_id]);
+                    $ot_request = $ot_check->fetch(PDO::FETCH_ASSOC);
+                }
                 
                 if ($ot_request) {
                     // OT request exists - store its details
@@ -78,14 +82,12 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
                 } else {
                     // Check if there are actually OT hours available
                     // Get the employee's schedule for this date to calculate OT
-                    $schedule_check = $pdo->prepare("
-                        SELECT work_schedule_id, time_in as sched_time_in, time_out as sched_time_out, is_rest_day
-                        FROM employee_daily_schedule_cache
-                        WHERE employee_id = ? AND schedule_date = ?
-                        LIMIT 1
-                    ");
-                    $schedule_check->execute([$employee_id, $date]);
-                    $schedule = $schedule_check->fetch(PDO::FETCH_ASSOC);
+                    $schedule = $cache ? [
+                        'work_schedule_id' => $cache['work_schedule_id'] ?? null,
+                        'sched_time_in' => $cache['time_in'] ?? null,
+                        'sched_time_out' => $cache['time_out'] ?? null,
+                        'is_rest_day' => $cache['is_rest_day'] ?? 0,
+                    ] : null;
                     
                     // Calculate if OT hours are available
                     $has_ot_hours = false;
@@ -156,19 +158,29 @@ function getScheduleCell_schedule($pdo, $employee_id, $date) {
     
     // Fallback for past/present/future dates: Check employee_default_schedules
     $dayOfWeek = date('w', strtotime($date)); // 0=Sunday, 6=Saturday
-    $weeklyStmt = $pdo->prepare("
-        SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
-        FROM employee_default_schedules edd
-        LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
-        WHERE edd.employee_id = ? 
-          AND edd.day_of_week = ? 
-          AND edd.effective_from <= ? 
-          AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
-        ORDER BY edd.effective_from DESC, edd.id DESC
-        LIMIT 1
-    ");
-    $weeklyStmt->execute([$employee_id, $dayOfWeek, $date, $date]);
-    $weekly = $weeklyStmt->fetch(PDO::FETCH_ASSOC);
+    $weekly = null;
+    if (!empty($GLOBALS['scheduleCellBulkLoaded'])) {
+        foreach ($GLOBALS['scheduleCellDefaultRows'] as $defaultRow) {
+            if ((int)$defaultRow['day_of_week'] !== (int)$dayOfWeek) continue;
+            if ($defaultRow['effective_from'] > $date) continue;
+            if (!empty($defaultRow['effective_until']) && $defaultRow['effective_until'] < $date) continue;
+            $weekly = $defaultRow;
+            break;
+        }
+    } else {
+        $weeklyStmt = $pdo->prepare("
+            SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
+            FROM employee_default_schedules edd
+            LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+            WHERE edd.employee_id = ? AND edd.day_of_week = ?
+              AND edd.effective_from <= ?
+              AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+            ORDER BY edd.effective_from DESC, edd.id DESC
+            LIMIT 1
+        ");
+        $weeklyStmt->execute([$employee_id, $dayOfWeek, $date, $date]);
+        $weekly = $weeklyStmt->fetch(PDO::FETCH_ASSOC);
+    }
     
     if ($weekly) {
         if ($weekly['is_rest_day']) {
@@ -295,6 +307,69 @@ $month_schedule = (int)$month_schedule;
 $year_schedule = (int)$year_schedule;
 $nav_schedule = getMonthsNav_schedule($year_schedule, $month_schedule);
 $matrix_schedule = monthMatrix_schedule($year_schedule, $month_schedule);
+
+// Bulk-load the whole calendar month. This replaces the previous 1-4 database
+// round trips for every calendar cell.
+$calendarStart = sprintf('%04d-%02d-01', $year_schedule, $month_schedule);
+$calendarEnd = date('Y-m-t', strtotime($calendarStart));
+$scheduleCellCacheByDate = [];
+$scheduleCellLogsByDate = [];
+$scheduleCellOtByLogId = [];
+$scheduleCellDefaultRows = [];
+
+$calendarCacheStmt = $pdo->prepare("
+    SELECT schedule_date, employee_id, work_schedule_id, is_rest_day, is_holiday,
+           schedule_name, time_in, time_out, holiday_name, source
+    FROM employee_daily_schedule_cache
+    WHERE employee_id = ? AND schedule_date BETWEEN ? AND ?
+");
+$calendarCacheStmt->execute([$employee_id, $calendarStart, $calendarEnd]);
+foreach ($calendarCacheStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $scheduleCellCacheByDate[$row['schedule_date']] = $row;
+}
+
+$calendarLogsStmt = $pdo->prepare("
+    SELECT id, log_date, time_in, time_out
+    FROM time_logs
+    WHERE employee_id = ? AND log_date BETWEEN ? AND ? AND time_out IS NOT NULL
+");
+$calendarLogsStmt->execute([$employee_id, $calendarStart, $calendarEnd]);
+foreach ($calendarLogsStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $scheduleCellLogsByDate[$row['log_date']] = $row;
+}
+
+$calendarLogIds = array_values(array_map('intval', array_column($scheduleCellLogsByDate, 'id')));
+if ($calendarLogIds) {
+    $calendarPlaceholders = implode(',', array_fill(0, count($calendarLogIds), '?'));
+    foreach (['post_ot_requests', 'post2_overtime_requests'] as $requestTable) {
+        $calendarOtStmt = $pdo->prepare("
+            SELECT id, time_log_id, status, ot_duration, reason, created_at, time_in, time_out, ot_type
+            FROM {$requestTable}
+            WHERE time_log_id IN ({$calendarPlaceholders})
+        ");
+        $calendarOtStmt->execute($calendarLogIds);
+        foreach ($calendarOtStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $logId = (int)$row['time_log_id'];
+            if (!isset($scheduleCellOtByLogId[$logId])) {
+                $scheduleCellOtByLogId[$logId] = $row;
+            }
+        }
+    }
+}
+
+$calendarDefaultsStmt = $pdo->prepare("
+    SELECT edd.day_of_week, edd.work_schedule_id, edd.is_rest_day,
+           edd.effective_from, edd.effective_until, ws.name, ws.time_in, ws.time_out
+    FROM employee_default_schedules edd
+    LEFT JOIN work_schedules ws ON ws.id = edd.work_schedule_id
+    WHERE edd.employee_id = ?
+      AND edd.effective_from <= ?
+      AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+    ORDER BY edd.effective_from DESC, edd.id DESC
+");
+$calendarDefaultsStmt->execute([$employee_id, $calendarEnd, $calendarStart]);
+$scheduleCellDefaultRows = $calendarDefaultsStmt->fetchAll(PDO::FETCH_ASSOC);
+$scheduleCellBulkLoaded = true;
 
 // Get work schedules for override form
 try {

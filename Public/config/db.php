@@ -1,12 +1,15 @@
 <?php
+// Reuse the existing connection when modules include this file repeatedly during
+// the same dashboard request.
+if (isset($pdo) && $pdo instanceof PDO) {
+    return;
+}
+
 // Set timezone to Manila time (UTC+8)
 date_default_timezone_set('Asia/Manila');
 
 // Load environment variables
 require_once __DIR__ . '/env.php';
-if (class_exists('EnvLoader')) {
-    EnvLoader::load();
-}
 
 // Database configuration from environment variables
 // Auto-detect environment: use different database for local vs production
@@ -31,7 +34,7 @@ if ($isLocal) {
 }
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
     // Set timezone for database connections to Manila time (UTC+8)

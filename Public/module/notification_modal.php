@@ -6,34 +6,63 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-require '../../vendor/autoload.php';
 include('../config/db.php');
 
 $current_user_id = $_SESSION['employee']['id'] ?? null;
 $notifications = [];
 $sendEmailNotificationsDuringPageLoad = false;
+if ($sendEmailNotificationsDuringPageLoad) {
+    require_once '../../vendor/autoload.php';
+}
+$notificationScheduleCacheByDate = [];
+
+function primeNotificationScheduleCache(PDO $pdo, int $employeeId, array $dates): void {
+    $dates = array_values(array_unique(array_filter($dates)));
+    $missingDates = array_values(array_filter($dates, static function ($date) {
+        return !array_key_exists($date, $GLOBALS['notificationScheduleCacheByDate']);
+    }));
+    if (!$missingDates) return;
+
+    foreach ($missingDates as $date) {
+        $GLOBALS['notificationScheduleCacheByDate'][$date] = null;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($missingDates), '?'));
+    $stmt = $pdo->prepare("
+        SELECT schedule_date, work_schedule_id, is_rest_day, schedule_name, time_in, time_out
+        FROM employee_daily_schedule_cache
+        WHERE employee_id = ? AND schedule_date IN ({$placeholders})
+    ");
+    $stmt->execute(array_merge([$employeeId], $missingDates));
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $GLOBALS['notificationScheduleCacheByDate'][$row['schedule_date']] = $row;
+    }
+}
 
 // Helper function to get ACTUAL current schedule from calendar (matches schedule_content.php logic)
 function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) {
     if (!$date) $date = date('Y-m-d');
+    static $requestCache = [];
+    $cacheKey = $employee_id . '|' . $date;
+    if (isset($requestCache[$cacheKey])) {
+        return $requestCache[$cacheKey];
+    }
     
     // PRIORITY 1: Check employee_daily_schedule_cache (what the calendar actually displays)
     try {
-        $stmt = $pdo->prepare("
-            SELECT work_schedule_id, is_rest_day, schedule_name, time_in, time_out
-            FROM employee_daily_schedule_cache 
-            WHERE employee_id = ? AND schedule_date = ?
-            LIMIT 1
-        ");
-        $stmt->execute([$employee_id, $date]);
-        $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (array_key_exists($date, $GLOBALS['notificationScheduleCacheByDate'])) {
+            $cache = $GLOBALS['notificationScheduleCacheByDate'][$date];
+        } else {
+            primeNotificationScheduleCache($pdo, (int)$employee_id, [$date]);
+            $cache = $GLOBALS['notificationScheduleCacheByDate'][$date] ?? null;
+        }
         
         if ($cache) {
             if ($cache['is_rest_day'] == 1) {
-                return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
+                return $requestCache[$cacheKey] = ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
             }
             if ($cache['time_in'] && $cache['time_out']) {
-                return [
+                return $requestCache[$cacheKey] = [
                     'time_in' => date('g:i A', strtotime($cache['time_in'])),
                     'time_out' => date('g:i A', strtotime($cache['time_out'])),
                     'is_rest_day' => false
@@ -62,10 +91,10 @@ function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) 
         
         if ($weekly) {
             if ($weekly['is_rest_day'] == 1 || !$weekly['work_schedule_id']) {
-                return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
+                return $requestCache[$cacheKey] = ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
             }
             if ($weekly['time_in'] && $weekly['time_out']) {
-                return [
+                return $requestCache[$cacheKey] = [
                     'time_in' => date('g:i A', strtotime($weekly['time_in'])),
                     'time_out' => date('g:i A', strtotime($weekly['time_out'])),
                     'is_rest_day' => false
@@ -79,7 +108,7 @@ function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) 
     // PRIORITY 3: Check if weekend (Saturday or Sunday)
     $dayOfWeek = date('w', strtotime($date));
     if ($dayOfWeek == 0 || $dayOfWeek == 6) {
-        return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
+        return $requestCache[$cacheKey] = ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
     }
     
     // PRIORITY 4: Fall back to employee's official schedule
@@ -94,7 +123,7 @@ function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) 
         $employee = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($employee && $employee['time_in'] && $employee['time_out']) {
-            return [
+            return $requestCache[$cacheKey] = [
                 'time_in' => date('g:i A', strtotime($employee['time_in'])),
                 'time_out' => date('g:i A', strtotime($employee['time_out'])),
                 'is_rest_day' => false
@@ -104,7 +133,7 @@ function getActualCurrentScheduleFromCalendar($pdo, $employee_id, $date = null) 
         error_log("Official schedule lookup failed: " . $e->getMessage());
     }
     
-    return ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => false];
+    return $requestCache[$cacheKey] = ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => false];
 }
 
 function sendEmail($to, $name, $subject, $body) {
@@ -153,6 +182,18 @@ function sendEmail($to, $name, $subject, $body) {
 }
 
 function getScheduleOutForDate(PDO $pdo, int $employeeId, string $date): string {
+    static $requestCache = [];
+    $cacheKey = $employeeId . '|' . $date;
+    if (isset($requestCache[$cacheKey])) {
+        return $requestCache[$cacheKey];
+    }
+
+    if (array_key_exists($date, $GLOBALS['notificationScheduleCacheByDate'])) {
+        $cachedSchedule = $GLOBALS['notificationScheduleCacheByDate'][$date];
+        if (!empty($cachedSchedule['time_out'])) {
+            return $requestCache[$cacheKey] = $cachedSchedule['time_out'];
+        }
+    }
     // First check for approved schedule changes from post_schedule_change_requests
     $stmt = $pdo->prepare("
         SELECT ws.time_out
@@ -168,7 +209,7 @@ function getScheduleOutForDate(PDO $pdo, int $employeeId, string $date): string 
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($result && $result['time_out']) {
-        return $result['time_out'];
+        return $requestCache[$cacheKey] = $result['time_out'];
     }
     
     // Fallback to employee's official schedule
@@ -181,7 +222,7 @@ function getScheduleOutForDate(PDO $pdo, int $employeeId, string $date): string 
     $stmt->execute([$employeeId]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    return $result['time_out'] ?? '17:00:00'; // Default fallback
+    return $requestCache[$cacheKey] = ($result['time_out'] ?? '17:00:00');
 }
 
 if ($current_user_id) {
@@ -352,6 +393,11 @@ $schedule_stmt = $pdo->prepare("
 ");
 $schedule_stmt->execute([$current_user_id, $current_user_id]);
 $schedule_results = $schedule_stmt->fetchAll(PDO::FETCH_ASSOC);
+primeNotificationScheduleCache(
+    $pdo,
+    (int)$current_user_id,
+    array_column($schedule_results, 'start_date')
+);
 
 foreach ($schedule_results as $sched) {
     $status = ucfirst($sched['status']);
@@ -679,7 +725,7 @@ foreach ($adjust_results as $adjustment) {
 $pending_ot_stmt = $pdo->prepare("
     SELECT id, employee_id, time_in as start_time, time_out as end_time, reason, ot_duration as duration_hours, status, created_at, attachment, ot_type, 'post_ot_requests' as source_table
     FROM post_ot_requests
-    WHERE employee_id = ? AND LOWER(status) = 'pending'
+    WHERE employee_id = ? AND status = 'pending'
     UNION ALL
     SELECT id, employee_id, start_time, end_time, reason, duration_hours, status, created_at, attachment_ot as attachment, 'Regular OT' as ot_type, 'overtime_requests' as source_table
     FROM overtime_requests
@@ -692,18 +738,21 @@ $pending_ot_results = $pending_ot_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Then get processed overtime requests from both post tables
 $ot_stmt = $pdo->prepare("
-    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, attachment, 'post_ot_requests' as source_table
-    FROM post_ot_requests
-    WHERE employee_id = ? AND LOWER(status) != 'pending'
+    SELECT ot.id, ot.time_log_id, ot.time_in, ot.time_out, ot.ot_duration, ot.ot_type, ot.reason, ot.status, ot.created_at, ot.approved_at, ot.approved_by, ot.notified, ot.attachment, tl.log_date, 'post_ot_requests' as source_table
+    FROM post_ot_requests ot
+    LEFT JOIN time_logs tl ON tl.id = ot.time_log_id
+    WHERE ot.employee_id = ? AND ot.status != 'pending'
     UNION ALL
-    SELECT id, time_log_id, time_in, time_out, ot_duration, ot_type, reason, status, created_at, approved_at, approved_by, notified, attachment, 'post2_overtime_requests' as source_table
-    FROM post2_overtime_requests
-    WHERE employee_id = ?
+    SELECT ot.id, ot.time_log_id, ot.time_in, ot.time_out, ot.ot_duration, ot.ot_type, ot.reason, ot.status, ot.created_at, ot.approved_at, ot.approved_by, ot.notified, ot.attachment, tl.log_date, 'post2_overtime_requests' as source_table
+    FROM post2_overtime_requests ot
+    LEFT JOIN time_logs tl ON tl.id = ot.time_log_id
+    WHERE ot.employee_id = ?
     ORDER BY COALESCE(approved_at, created_at) DESC
     LIMIT 20
 ");
 $ot_stmt->execute([$current_user_id, $current_user_id]);
 $ot_results = $ot_stmt->fetchAll(PDO::FETCH_ASSOC);
+primeNotificationScheduleCache($pdo, (int)$current_user_id, array_column($ot_results, 'log_date'));
 
 // Process pending overtime requests
 foreach ($pending_ot_results as $ot) {
@@ -863,18 +912,10 @@ foreach ($ot_results as $ot) {
     // Compute Start OT and End OT using schedule logic (similar to new_overtime)
     $actual_time_in = $ot['time_in'] ?? null;
     $actual_time_out = $ot['time_out'] ?? null;
-    $log_date = null;
+    $log_date = $ot['log_date'] ?? null;
     $start_ot = null;
     $end_ot = null;
 
-    // Get log_date from time_logs table if time_log_id exists
-    if (!empty($ot['time_log_id'])) {
-        $log_stmt = $pdo->prepare("SELECT log_date FROM time_logs WHERE id = ?");
-        $log_stmt->execute([$ot['time_log_id']]);
-        $log_result = $log_stmt->fetch(PDO::FETCH_ASSOC);
-        $log_date = $log_result['log_date'] ?? null;
-    }
-    
     // Fallback: derive log_date from time_in if available
     if (!$log_date && $actual_time_in) {
         $log_date = date('Y-m-d', strtotime($actual_time_in));
@@ -1038,6 +1079,12 @@ $switch_stmt = $pdo->prepare("
 ");
 $switch_stmt->execute([$current_user_id]);
 $switch_requests = $switch_stmt->fetchAll(PDO::FETCH_ASSOC);
+$switchScheduleDates = [];
+foreach ($switch_requests as $switchRequest) {
+    $switchScheduleDates[] = $switchRequest['source_date'];
+    $switchScheduleDates[] = $switchRequest['target_date'];
+}
+primeNotificationScheduleCache($pdo, (int)$current_user_id, $switchScheduleDates);
 
 foreach ($switch_requests as $switch) {
     $status = ucfirst(strtolower($switch['status']));
@@ -1088,6 +1135,17 @@ $monthly_stmt = $pdo->prepare("
 $monthly_stmt->execute([$current_user_id]);
 $monthly_requests = $monthly_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+$notificationScheduleMap = [];
+if (isset($work_schedules) && is_array($work_schedules)) {
+    foreach ($work_schedules as $scheduleRow) {
+        $notificationScheduleMap[(int)$scheduleRow['id']] = $scheduleRow;
+    }
+} else {
+    foreach ($pdo->query("SELECT id, time_in, time_out FROM work_schedules")->fetchAll(PDO::FETCH_ASSOC) as $scheduleRow) {
+        $notificationScheduleMap[(int)$scheduleRow['id']] = $scheduleRow;
+    }
+}
+
 foreach ($monthly_requests as $monthly) {
     $status = ucfirst(strtolower($monthly['status']));
     $month_name = date('F Y', strtotime("{$monthly['year']}-{$monthly['month']}-01"));
@@ -1103,10 +1161,7 @@ foreach ($monthly_requests as $monthly) {
         if ($is_rest_day == 1 || empty($schedule_id)) {
             $weekly_schedules[$day] = ['time_in' => '—', 'time_out' => '—', 'is_rest_day' => true];
         } else {
-            // Get schedule from work_schedules table
-            $sched_stmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
-            $sched_stmt->execute([$schedule_id]);
-            $sched = $sched_stmt->fetch(PDO::FETCH_ASSOC);
+            $sched = $notificationScheduleMap[(int)$schedule_id] ?? null;
             
             if ($sched) {
                 $weekly_schedules[$day] = [

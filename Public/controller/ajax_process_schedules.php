@@ -14,35 +14,23 @@ require_once __DIR__ . '/../config/db.php';
 header('Content-Type: application/json');
 
 // Check if user is logged in
-if (!isset($_SESSION['employee'])) {
+if (empty($_SESSION['employee']['id']) || !is_numeric($_SESSION['employee']['id'])) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
 
+$currentEmployeeId = (int)($_SESSION['employee']['id'] ?? 0);
+session_write_close();
+
 try {
-    // Check if processed_to_calendar column exists
-    $checkColumn = $pdo->query("
-        SELECT COLUMN_NAME 
-        FROM INFORMATION_SCHEMA.COLUMNS 
-        WHERE TABLE_SCHEMA = DATABASE() 
-        AND TABLE_NAME = 'post_schedule_change_requests' 
-        AND COLUMN_NAME = 'processed_to_calendar'
-    ")->fetch();
-    
-    if (!$checkColumn) {
-        $pdo->exec("
-            ALTER TABLE post_schedule_change_requests 
-            ADD COLUMN processed_to_calendar TINYINT(1) DEFAULT 0 AFTER status,
-            ADD COLUMN processed_at DATETIME NULL AFTER processed_to_calendar
-        ");
-    }
-    
     // Get approved requests that need processing
-    // Note: Using LOWER() to handle both 'approved' and 'Approved' status values
+    // The status column uses a case-insensitive collation, so the direct comparison
+    // remains indexable while accepting the existing status casing.
     $stmt = $pdo->prepare("
         SELECT id, employee_id, work_schedule_id, start_date, end_date
         FROM post_schedule_change_requests 
-        WHERE LOWER(status) = 'approved' 
+        WHERE employee_id = ?
+        AND status = 'approved'
         AND (processed_to_calendar IS NULL OR processed_to_calendar = 0)
         AND start_date IS NOT NULL 
         AND end_date IS NOT NULL
@@ -50,7 +38,7 @@ try {
         ORDER BY created_at ASC
         LIMIT 50
     ");
-    $stmt->execute();
+    $stmt->execute([$currentEmployeeId]);
     $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $processed = 0;

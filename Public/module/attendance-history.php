@@ -63,7 +63,41 @@ $cache_source_select = attendanceHistoryTableColumnExists($pdo, $cacheTable, 'so
 // Removed: Fetching employee's default schedule and hardcoded schedule_times array
 // Now using employee_daily_schedule_cache for all schedule lookups
 
-// Fetch all logs for July 1, 2025 onwards - Updated to include status and log_out_date columns
+// Build and paginate the display dates before querying. The old implementation
+// fetched the employee's entire history and then displayed only five dates.
+$start = new DateTime('2025-07-01');
+$end = new DateTime();
+$interval = new DateInterval('P1D');
+$dateRange = new DatePeriod($start, $interval, $end);
+$allDates = array_reverse(iterator_to_array($dateRange));
+
+$searchDate = $_GET['search'] ?? '';
+$filteredDates = $allDates;
+if ($searchDate !== '') {
+    $filteredDates = array_values(array_filter($allDates, function ($dateObj) use ($searchDate) {
+        $logDate = $dateObj->format('Y-m-d');
+        $formattedDate = $dateObj->format('d M Y');
+        $dayName = $dateObj->format('l');
+
+        return stripos($logDate, $searchDate) !== false
+            || stripos($formattedDate, $searchDate) !== false
+            || stripos($dayName, $searchDate) !== false;
+    }));
+}
+
+$itemsPerPage = 5;
+$currentPage = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$totalItems = count($filteredDates);
+$totalPages = max(1, (int)ceil($totalItems / $itemsPerPage));
+$currentPage = min($currentPage, $totalPages);
+$offset = ($currentPage - 1) * $itemsPerPage;
+$currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
+$currentPageDateStrings = array_map(static fn($dateObj) => $dateObj->format('Y-m-d'), $currentPageDates);
+$queryStartDate = $currentPageDateStrings ? min($currentPageDateStrings) : date('Y-m-d');
+$queryEndDate = $currentPageDateStrings ? max($currentPageDateStrings) : date('Y-m-d');
+
+// Fetch only the five dates on the current page and constrain the adjustment
+// aggregate to this employee/date window.
 $allLogsStmt = $pdo->prepare("
     SELECT 
         t.log_date, t.time_in, t.time_out, $time_log_out_date_select, $time_log_status_select,
@@ -75,38 +109,68 @@ $allLogsStmt = $pdo->prepare("
         INNER JOIN (
             SELECT employee_id, log_date, MAX(id) AS latest_id 
             FROM post_time_adjustment_requests 
-            WHERE LOWER(status) = 'approved' 
+            WHERE employee_id = ?
+              AND status = 'approved'
+              AND log_date BETWEEN ? AND ?
             GROUP BY employee_id, log_date
         ) r2 ON r1.id = r2.latest_id
     ) r ON t.employee_id = r.employee_id AND t.log_date = r.log_date
-    WHERE t.employee_id = ? AND t.log_date >= '2025-07-01'
+    WHERE t.employee_id = ? AND t.log_date BETWEEN ? AND ?
     ORDER BY t.log_date DESC
 ");
-$allLogsStmt->execute([$employee_id]);
+$allLogsStmt->execute([
+    $employee_id, $queryStartDate, $queryEndDate,
+    $employee_id, $queryStartDate, $queryEndDate
+]);
 $logs = $allLogsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch overtime requests for the same period
+// Fetch OT statuses directly from the request tables. Avoid DATE() joins against
+// time_logs, which caused scans and could multiply rows.
 $otRequestsStmt = $pdo->prepare("
-    SELECT 
-        DATE(tl.log_date) as log_date,
-        COALESCE(por.status, or_table.status) as ot_status
-    FROM time_logs tl
-    LEFT JOIN overtime_requests or_table ON tl.employee_id = or_table.employee_id AND DATE(tl.log_date) = DATE(or_table.created_at)
-    LEFT JOIN post_ot_requests por ON tl.employee_id = por.employee_id AND DATE(tl.log_date) = DATE(por.created_at)
-    WHERE tl.employee_id = ? AND tl.log_date >= '2025-07-01'
+    SELECT DATE(created_at) AS log_date, status AS ot_status
+    FROM post_ot_requests
+    WHERE employee_id = ? AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)
+    UNION ALL
+    SELECT DATE(created_at) AS log_date, status AS ot_status
+    FROM post2_overtime_requests
+    WHERE employee_id = ? AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)
+    UNION ALL
+    SELECT DATE(created_at) AS log_date, status AS ot_status
+    FROM overtime_requests
+    WHERE employee_id = ? AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)
 ");
-$otRequestsStmt->execute([$employee_id]);
+$otRequestsStmt->execute([
+    $employee_id, $queryStartDate, $queryEndDate,
+    $employee_id, $queryStartDate, $queryEndDate,
+    $employee_id, $queryStartDate, $queryEndDate
+]);
 $otRequests = $otRequestsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch approved leave requests for the same period
+// Fetch only approved leave periods that overlap the displayed dates.
 $leaveRequestsStmt = $pdo->prepare("
     SELECT start_date, end_date, leave_type
     FROM post_leave_requests 
-    WHERE employee_id = ? AND LOWER(status) = 'approved'
-    AND end_date >= '2025-07-01'
+    WHERE employee_id = ? AND status = 'approved'
+      AND start_date <= ? AND end_date >= ?
 ");
-$leaveRequestsStmt->execute([$employee_id]);
+$leaveRequestsStmt->execute([$employee_id, $queryEndDate, $queryStartDate]);
 $approvedLeaves = $leaveRequestsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Bulk-load schedule cache rows for the current page instead of querying once
+// per rendered date.
+$scheduleCacheMap = [];
+$scheduleCacheStmt = $pdo->prepare("
+    SELECT schedule_date, employee_id, $cache_work_schedule_id_select,
+           $cache_is_rest_day_select, $cache_is_holiday_select,
+           $cache_schedule_name_select, $cache_time_in_select, $cache_time_out_select,
+           $cache_holiday_name_select, $cache_holiday_type_select, $cache_source_select
+    FROM employee_daily_schedule_cache
+    WHERE employee_id = ? AND schedule_date BETWEEN ? AND ?
+");
+$scheduleCacheStmt->execute([$employee_id, $queryStartDate, $queryEndDate]);
+foreach ($scheduleCacheStmt->fetchAll(PDO::FETCH_ASSOC) as $scheduleCacheRow) {
+    $scheduleCacheMap[$scheduleCacheRow['schedule_date']] = $scheduleCacheRow;
+}
 
 // Create OT status map
 $otStatusMap = [];
@@ -162,43 +226,6 @@ foreach ($logs as $log) {
     $logMap[$log['log_date']] = $log;
 }
 
-// Build complete date range (all dates from July 1 to today)
-$start = new DateTime('2025-07-01');
-$end = new DateTime();
-$interval = new DateInterval('P1D');
-$dateRange = new DatePeriod($start, $interval, $end);
-
-// Convert to array and reverse (most recent first)
-$allDates = array_reverse(iterator_to_array($dateRange));
-
-// Search functionality
-$searchDate = $_GET['search'] ?? '';
-$filteredDates = $allDates;
-
-if (!empty($searchDate)) {
-    $filteredDates = array_filter($allDates, function($dateObj) use ($searchDate) {
-        $logDate = $dateObj->format('Y-m-d');
-        $formattedDate = $dateObj->format('d M Y');
-        $dayName = $dateObj->format('l');
-        
-        // Search in date, formatted date, or day name
-        return (
-            stripos($logDate, $searchDate) !== false ||
-            stripos($formattedDate, $searchDate) !== false ||
-            stripos($dayName, $searchDate) !== false
-        );
-    });
-}
-
-// Pagination setup
-$itemsPerPage = 5;
-$currentPage = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$totalItems = count($filteredDates);
-$totalPages = max(1, ceil($totalItems / $itemsPerPage));
-$offset = ($currentPage - 1) * $itemsPerPage;
-
-// Get current page items
-$currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 ?>
 
 <div class="bg-white rounded-lg shadow p-6 mt-6">
@@ -297,25 +324,7 @@ $currentPageDates = array_slice($filteredDates, $offset, $itemsPerPage);
 
                             // Fetch schedule using the same logic as schedule_content.php calendar
                             // Query the pre-computed cache table - THIS IS THE EMPLOYEE'S PERSONAL CALENDAR DATA
-                            $cacheStmt = $pdo->prepare("
-                                SELECT 
-                                    schedule_date,
-                                    employee_id,
-                                    $cache_work_schedule_id_select,
-                                    $cache_is_rest_day_select,
-                                    $cache_is_holiday_select,
-                                    $cache_schedule_name_select,
-                                    $cache_time_in_select,
-                                    $cache_time_out_select,
-                                    $cache_holiday_name_select,
-                                    $cache_holiday_type_select,
-                                    $cache_source_select
-                                FROM employee_daily_schedule_cache
-                                WHERE employee_id = ? AND schedule_date = ?
-                                LIMIT 1
-                            ");
-                            $cacheStmt->execute([$employee_id, $logDate]);
-                            $scheduleCache = $cacheStmt->fetch(PDO::FETCH_ASSOC);
+                            $scheduleCache = $scheduleCacheMap[$logDate] ?? null;
                             
                             // Initialize default values
                             $isRestDay = false;

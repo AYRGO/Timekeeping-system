@@ -47,60 +47,50 @@ include_once 'stats/schedule_tracker.php';
 // Function to move approved/declined overtime requests to archive table
 function moveCompletedOTRequests($pdo) {
     try {
-        // Start transaction
         $pdo->beginTransaction();
-        
-        // Get all approved, declined, or rejected requests from post_ot_requests
-        $selectStmt = $pdo->prepare("
-            SELECT * FROM post_ot_requests 
-            WHERE LOWER(status) IN ('approved', 'declined', 'rejected')
+
+        // Archive in one set-based statement instead of loading every row into PHP.
+        // The upsert makes concurrent requests idempotent because both tables use
+        // the request id as their primary key, while keeping the archived copy in
+        // sync before the active row is removed.
+        $insertStmt = $pdo->prepare("
+            INSERT INTO post2_overtime_requests
+                (id, employee_id, time_log_id, time_in, time_out, ot_duration, ot_type,
+                 attachment, reason, status, created_at, approved_at, approved_by, notified)
+            SELECT id, employee_id, time_log_id, time_in, time_out, ot_duration, ot_type,
+                   attachment, reason, status, created_at, approved_at, approved_by, notified
+            FROM post_ot_requests
+            WHERE status IN ('approved', 'declined', 'rejected')
+            ON DUPLICATE KEY UPDATE
+                employee_id = VALUES(employee_id),
+                time_log_id = VALUES(time_log_id),
+                time_in = VALUES(time_in),
+                time_out = VALUES(time_out),
+                ot_duration = VALUES(ot_duration),
+                ot_type = VALUES(ot_type),
+                attachment = VALUES(attachment),
+                reason = VALUES(reason),
+                status = VALUES(status),
+                created_at = VALUES(created_at),
+                approved_at = VALUES(approved_at),
+                approved_by = VALUES(approved_by),
+                notified = VALUES(notified)
         ");
-        $selectStmt->execute();
-        $completedRequests = $selectStmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (!empty($completedRequests)) {
-            // Insert completed requests into post2_overtime_requests
-            $insertStmt = $pdo->prepare("
-                INSERT INTO post2_overtime_requests 
-                (id, employee_id, time_log_id, time_in, time_out, ot_duration, ot_type, attachment, reason, status, created_at, approved_at, approved_by, notified)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            
-            $movedCount = 0;
-            foreach ($completedRequests as $request) {
-                $insertStmt->execute([
-                    $request['id'],
-                    $request['employee_id'],
-                    $request['time_log_id'],
-                    $request['time_in'],
-                    $request['time_out'],
-                    $request['ot_duration'],
-                    $request['ot_type'],
-                    $request['attachment'],
-                    $request['reason'],
-                    $request['status'],
-                    $request['created_at'],
-                    $request['approved_at'],
-                    $request['approved_by'],
-                    $request['notified']
-                ]);
-                $movedCount++;
-            }
-            
-            // Delete moved requests from original table
-            $deleteStmt = $pdo->prepare("
-                DELETE FROM post_ot_requests 
-                WHERE LOWER(status) IN ('approved', 'declined', 'rejected')
-            ");
-            $deleteStmt->execute();
-            
-            $pdo->commit();
-            error_log("Successfully moved {$movedCount} completed OT requests to archive table");
-            return $movedCount;
-        }
-        
+        $insertStmt->execute();
+        $movedCount = $insertStmt->rowCount();
+
+        // Delete only rows proven to exist in the archive, preventing data loss if a
+        // row could not be copied for any reason.
+        $deleteStmt = $pdo->prepare("
+            DELETE active
+            FROM post_ot_requests active
+            INNER JOIN post2_overtime_requests archived ON archived.id = active.id
+            WHERE active.status IN ('approved', 'declined', 'rejected')
+        ");
+        $deleteStmt->execute();
+
         $pdo->commit();
-        return 0;
+        return $movedCount;
         
     } catch (Exception $e) {
         $pdo->rollBack();
@@ -427,22 +417,28 @@ function getOvertimeCalculationDetails($time_in, $time_out, $log_date, $employee
 
 // Function to get schedule for a specific date (historical accuracy)
 function getScheduleForDate($employee_id, $date, $pdo) {
-    // PRIORITY 1: Check employee_daily_schedule_cache for pre-computed schedule
-    $stmt = $pdo->prepare("
-        SELECT 
-            work_schedule_id,
-            schedule_name,
-            time_in,
-            time_out,
-            is_rest_day,
-            is_holiday,
-            source
-        FROM employee_daily_schedule_cache
-        WHERE employee_id = ? AND schedule_date = ?
-        LIMIT 1
-    ");
-    $stmt->execute([$employee_id, $date]);
-    $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+    static $requestCache = [];
+    $cacheKey = $employee_id . '|' . $date;
+    if (isset($requestCache[$cacheKey])) {
+        return $requestCache[$cacheKey];
+    }
+
+    // PRIORITY 1: Check employee_daily_schedule_cache for pre-computed schedule.
+    // The overtime page primes the full set of visible dates before rendering.
+    if (!empty($GLOBALS['overtimeScheduleBulkLoaded'])) {
+        $cache = $GLOBALS['overtimeScheduleCacheByDate'][$date] ?? null;
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT work_schedule_id, schedule_name, time_in, time_out,
+                   is_rest_day, is_holiday, source
+            FROM employee_daily_schedule_cache
+            WHERE employee_id = ? AND schedule_date = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$employee_id, $date]);
+        $cache = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    $weekly = null;
     
     if ($cache && $cache['time_in'] && $cache['time_out']) {
         // Found in cache with valid times
@@ -452,18 +448,28 @@ function getScheduleForDate($employee_id, $date, $pdo) {
     } else {
         // FALLBACK: Check employee_default_schedules + work_schedules
         $dayOfWeek = date('w', strtotime($date)); // 0=Sunday, 6=Saturday
-        $stmt = $pdo->prepare("
-            SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
-            FROM employee_default_schedules edd
-            LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
-            WHERE edd.employee_id = ? 
-              AND edd.day_of_week = ? 
-              AND edd.effective_from <= ? 
-              AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
-            LIMIT 1
-        ");
-        $stmt->execute([$employee_id, $dayOfWeek, $date, $date]);
-        $weekly = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!empty($GLOBALS['overtimeScheduleBulkLoaded'])) {
+            foreach ($GLOBALS['overtimeDefaultScheduleRows'] as $defaultRow) {
+                if ((int)$defaultRow['day_of_week'] !== (int)$dayOfWeek) continue;
+                if ($defaultRow['effective_from'] > $date) continue;
+                if (!empty($defaultRow['effective_until']) && $defaultRow['effective_until'] < $date) continue;
+                $weekly = $defaultRow;
+                break;
+            }
+        } else {
+            $stmt = $pdo->prepare("
+                SELECT edd.work_schedule_id, edd.is_rest_day, ws.name, ws.time_in, ws.time_out
+                FROM employee_default_schedules edd
+                LEFT JOIN work_schedules ws ON edd.work_schedule_id = ws.id
+                WHERE edd.employee_id = ? AND edd.day_of_week = ?
+                  AND edd.effective_from <= ?
+                  AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+                ORDER BY edd.effective_from DESC, edd.id DESC
+                LIMIT 1
+            ");
+            $stmt->execute([$employee_id, $dayOfWeek, $date, $date]);
+            $weekly = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
         
         if ($weekly && $weekly['time_in'] && $weekly['time_out']) {
             $schedule_in = $weekly['time_in'];
@@ -471,15 +477,20 @@ function getScheduleForDate($employee_id, $date, $pdo) {
             $schedule_id = $weekly['work_schedule_id'];
         } else {
             // Final fallback: Use employee's official schedule
-            $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
-            $stmt->execute([$employee_id]);
-            $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-            $schedule_id = $employee['official_sched'] ?? 4;
-            
-            // Get times from work_schedules table
-            $stmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
-            $stmt->execute([$schedule_id]);
-            $ws = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!empty($GLOBALS['overtimeScheduleBulkLoaded'])) {
+                $official = $GLOBALS['overtimeOfficialSchedule'] ?? [];
+                $schedule_id = $official['official_sched'] ?? 4;
+                $ws = $official;
+            } else {
+                $stmt = $pdo->prepare("SELECT official_sched FROM employees WHERE id = ?");
+                $stmt->execute([$employee_id]);
+                $employee = $stmt->fetch(PDO::FETCH_ASSOC);
+                $schedule_id = $employee['official_sched'] ?? 4;
+
+                $stmt = $pdo->prepare("SELECT time_in, time_out FROM work_schedules WHERE id = ?");
+                $stmt->execute([$schedule_id]);
+                $ws = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
             
             $schedule_in = $ws['time_in'] ?? '07:00:00';
             $schedule_out = $ws['time_out'] ?? '16:00:00';
@@ -518,7 +529,7 @@ function getScheduleForDate($employee_id, $date, $pdo) {
         $was_changed = false;
     }
     
-    return [
+    return $requestCache[$cacheKey] = [
         'time_in' => $formatted_in,
         'time_out' => $formatted_out,
         'schedule_id' => $schedule_id,
@@ -561,6 +572,24 @@ $stmt->bindValue(3, $offset, PDO::PARAM_INT);
 $stmt->execute();
 $time_logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Load OT request statuses for the whole page in two queries. The previous row
+// renderer queried both request tables for every time log.
+$otRequestStatusByLogId = [];
+$timeLogIds = array_values(array_filter(array_map('intval', array_column($time_logs, 'id'))));
+if ($timeLogIds) {
+    $placeholders = implode(',', array_fill(0, count($timeLogIds), '?'));
+    foreach (['post_ot_requests', 'post2_overtime_requests'] as $requestTable) {
+        $statusStmt = $pdo->prepare("SELECT time_log_id, status FROM {$requestTable} WHERE time_log_id IN ({$placeholders})");
+        $statusStmt->execute($timeLogIds);
+        foreach ($statusStmt->fetchAll(PDO::FETCH_ASSOC) as $requestRow) {
+            $logId = (int)$requestRow['time_log_id'];
+            if (!array_key_exists($logId, $otRequestStatusByLogId)) {
+                $otRequestStatusByLogId[$logId] = $requestRow['status'];
+            }
+        }
+    }
+}
+
 // Get overtime request history (from both active and archived tables)
 $history_sql = "
     (SELECT ot.*, tl.log_date, tl.time_in, tl.time_out,
@@ -588,6 +617,54 @@ $history_stmt->bindValue(1, $employee_id, PDO::PARAM_INT);
 $history_stmt->bindValue(2, $employee_id, PDO::PARAM_INT);
 $history_stmt->execute();
 $overtime_history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Prime schedule information for every visible time-log and history date. This
+// avoids the remaining date-by-date schedule lookups during overtime calculations.
+$overtimeScheduleDates = array_values(array_unique(array_filter(array_merge(
+    array_column($time_logs, 'log_date'),
+    array_column($overtime_history, 'log_date')
+))));
+$overtimeScheduleCacheByDate = [];
+$overtimeDefaultScheduleRows = [];
+$overtimeOfficialSchedule = [];
+if ($overtimeScheduleDates) {
+    $schedulePlaceholders = implode(',', array_fill(0, count($overtimeScheduleDates), '?'));
+    $bulkScheduleStmt = $pdo->prepare("
+        SELECT schedule_date, work_schedule_id, schedule_name, time_in, time_out,
+               is_rest_day, is_holiday, source
+        FROM employee_daily_schedule_cache
+        WHERE employee_id = ? AND schedule_date IN ({$schedulePlaceholders})
+    ");
+    $bulkScheduleStmt->execute(array_merge([(int)$employee_id], $overtimeScheduleDates));
+    foreach ($bulkScheduleStmt->fetchAll(PDO::FETCH_ASSOC) as $scheduleRow) {
+        $overtimeScheduleCacheByDate[$scheduleRow['schedule_date']] = $scheduleRow;
+    }
+
+    $earliestScheduleDate = min($overtimeScheduleDates);
+    $latestScheduleDate = max($overtimeScheduleDates);
+    $bulkDefaultsStmt = $pdo->prepare("
+        SELECT edd.day_of_week, edd.work_schedule_id, edd.is_rest_day,
+               edd.effective_from, edd.effective_until, ws.name, ws.time_in, ws.time_out
+        FROM employee_default_schedules edd
+        LEFT JOIN work_schedules ws ON ws.id = edd.work_schedule_id
+        WHERE edd.employee_id = ?
+          AND edd.effective_from <= ?
+          AND (edd.effective_until IS NULL OR edd.effective_until >= ?)
+        ORDER BY edd.effective_from DESC, edd.id DESC
+    ");
+    $bulkDefaultsStmt->execute([$employee_id, $latestScheduleDate, $earliestScheduleDate]);
+    $overtimeDefaultScheduleRows = $bulkDefaultsStmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+$officialScheduleStmt = $pdo->prepare("
+    SELECT e.official_sched, ws.time_in, ws.time_out
+    FROM employees e
+    LEFT JOIN work_schedules ws ON ws.id = e.official_sched
+    WHERE e.id = ?
+");
+$officialScheduleStmt->execute([$employee_id]);
+$overtimeOfficialSchedule = $officialScheduleStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$overtimeScheduleBulkLoaded = true;
 
 // Get default schedule from session (set by schedule_tracker.php)
 $default_sched = $_SESSION['current_schedule'] ?? [
@@ -1028,9 +1105,6 @@ button:hover {
                     // Get Start OT and End OT times with detailed breakdown
                     $otDetails = getOvertimeTimesAndHours($log['time_in'], $log['time_out'], $log['log_date'], $employee_id, $pdo);
                     
-                    // Debug logging for button logic
-                    error_log("BUTTON DEBUG for {$log['log_date']}: Eligible={$isOTEligible}, OT Hours={$overtimeHours}, Reason=" . $detailedCalc['reason']);
-                    
                     // Fallback to old calculation if detailed calc fails
                     if ($overtimeHours <= 0) {
                         $isOTEligible = false;
@@ -1042,7 +1116,7 @@ button:hover {
                     $actualHours = $isRestDayCalc 
                         ? calculateActualHoursWorked($log['time_in'], $log['time_out']) 
                         : calculateActualHoursWorked($log['time_in'], $log['time_out'], $scheduleInTime, $log['log_date']);
-                    $requestStatus = hasExistingOTRequest($log['id']); // Returns status or false
+                    $requestStatus = $otRequestStatusByLogId[(int)$log['id']] ?? false;
                     $hasRequest = ($requestStatus !== false); // True if any request exists
                     $timeIn = new DateTime($log['time_in']);
                     $timeOut = new DateTime($log['time_out']);
