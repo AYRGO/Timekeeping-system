@@ -179,7 +179,7 @@ $profiles = [
             ['2026-04-09', 'Araw ng Kagitingan', 'regular'],
             ['2026-05-01', 'Labor Day', 'regular'],
             ['2026-06-12', 'Independence Day', 'regular'],
-            ['2026-08-25', 'Ninoy Aquino Day', 'special_non_working'],
+            ['2026-08-21', 'Ninoy Aquino Day', 'special_non_working'],
             ['2026-08-31', 'National Heroes Day', 'regular'],
             ['2026-11-01', 'All Saints\' Day', 'special_non_working'],
             ['2026-11-30', 'Bonifacio Day', 'regular'],
