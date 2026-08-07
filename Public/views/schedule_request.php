@@ -3,9 +3,6 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
-
-$isDemoAdmin = demo_is_admin_mode();
 
 // Check which view to display (single requests, monthly, history, or swap)
 $view = isset($_GET['view']) ? $_GET['view'] : 'single';
@@ -16,9 +13,7 @@ $isSwapView = ($view === 'swap');
 $pageTitle = $isMonthlyView ? 'Monthly Schedule Requests' : ($isSwapView ? 'Schedule Swap Requests' : ($isHistoryView ? 'Schedule Changes & Day Off History' : 'Single Day Schedule Requests'));
 
 // Auto-forfeit expired pending requests
-if (!$isDemoAdmin) {
-    include(__DIR__ . '/../cron/auto_forfeit_expired_requests.php');
-}
+include(__DIR__ . '/../cron/auto_forfeit_expired_requests.php');
 
 // Pagination settings
 $records_per_page = 10;
@@ -26,25 +21,7 @@ $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($page - 1) * $records_per_page;
 
 // Fetch schedule change requests with employee names, attachments, and current schedule
-if ($isDemoAdmin) {
-    if ($isMonthlyView) {
-        $monthly_requests = demo_admin_sample_schedule_requests('monthly', 6);
-        $totalMonthlyCount = count($monthly_requests);
-        $totalMonthlyPages = 1;
-    } elseif ($isSwapView) {
-        $swap_requests = demo_admin_sample_schedule_requests('swap', 6);
-        $totalSwapCount = count($swap_requests);
-        $totalSwapPages = 1;
-    } elseif ($isHistoryView) {
-        $schedule_requests = demo_admin_sample_schedule_requests('history', 6);
-        $totalHistoryCount = count($schedule_requests);
-        $totalHistoryPages = 1;
-    } else {
-        $schedule_requests = demo_admin_sample_schedule_requests('single', 6);
-        $totalSingleCount = count($schedule_requests);
-        $totalSinglePages = 1;
-    }
-} elseif ($isMonthlyView) {
+if ($isMonthlyView) {
     // Count total monthly requests
     $totalMonthlyCount = $pdo->query("SELECT COUNT(*) FROM month_weekly_schedule")->fetchColumn();
     $totalMonthlyPages = ceil($totalMonthlyCount / $records_per_page);
@@ -161,9 +138,7 @@ if ($isDemoAdmin) {
     $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
 }
-if (!$isDemoAdmin) {
-    $schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+$schedule_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get pending counts for each tab
 $pendingCurrentCount = $pdo->query("

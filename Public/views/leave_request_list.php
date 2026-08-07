@@ -3,7 +3,6 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
 
 $pageTitle = 'Leave Request List';
 // Check which view to display (current requests or history)
@@ -11,13 +10,10 @@ $view = isset($_GET['view']) ? $_GET['view'] : 'current';
 $isHistoryView = ($view === 'history');
 
 $pageTitle = $isHistoryView ? 'Leave Requests History' : 'Leave Requests';
-$isDemoAdmin = demo_is_admin_mode();
 
-// Fetch leave requests with employee names and attachments 
+// Fetch leave requests with employee names and attachments
 
-if ($isDemoAdmin) {
-    $leave_requests = demo_admin_sample_leave_requests($isHistoryView, 10);
-} elseif ($isHistoryView) {
+if ($isHistoryView) {
     // Fetch all from both tables - use created_at for sorting history
     $sql = "
         SELECT id, leave_type, start_date, end_date, reason, status, attachment_lr, created_at, explanation, employee_id, fname, lname
@@ -49,11 +45,9 @@ if ($isDemoAdmin) {
         ORDER BY lr.start_date DESC
     ";
 }
-if (!$isDemoAdmin) {
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute();
-    $leave_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+$stmt = $pdo->prepare($sql);
+$stmt->execute();
+$leave_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Function to get status badge
 function getStatusBadge($status) {
@@ -202,7 +196,6 @@ function getLeaveTypeBadge($type) {
                 // Prepare leave requests data for JS
                 let leaveRequests = <?php echo json_encode($leave_requests); ?>;
                 const isHistoryView = <?php echo json_encode($isHistoryView); ?>;
-                const isDemoAdmin = <?php echo json_encode($isDemoAdmin); ?>;
                 
                 // Sort by created_at descending (newest first) for history view, or by ID for current view
                 if (isHistoryView) {
@@ -348,9 +341,6 @@ function getLeaveTypeBadge($type) {
                     return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}">${displayName}</span>`;
                 }
                 function renderCurrentAction(lr) {
-                    if (isDemoAdmin) {
-                        return `<span class="text-gray-400 italic">Demo preview</span>`;
-                    }
                     if (lr.status === 'pending') {
                         return `<div class="flex space-x-2">
                             <button type="button" onclick="approveLeave(${lr.id})" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition-colors" id="approve-btn-${lr.id}"><i class="fas fa-check mr-1"></i>Approve</button>
@@ -361,9 +351,6 @@ function getLeaveTypeBadge($type) {
                     }
                 }
                 function renderHistoryAction(lr) {
-                    if (isDemoAdmin) {
-                        return `<span class="text-gray-400 italic">Demo preview</span>`;
-                    }
                     if (lr.status === 'approved') {
                         const today = new Date();
                         const startDate = new Date(lr.start_date);

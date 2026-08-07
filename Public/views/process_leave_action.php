@@ -2,8 +2,6 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
-demo_block_admin_mutation('Leave approval actions are disabled in admin demo mode.');
 
 $message = "";
 

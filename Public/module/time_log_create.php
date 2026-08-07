@@ -701,11 +701,6 @@ if (isset($_POST['submit_schedule_change'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'comment') {
-    if (!empty($_SESSION['demo_mode'])) {
-        header("Location: time_log_create.php#newsFeedView");
-        exit;
-    }
-
     $csrf_token = $_POST['csrf_token'] ?? '';
     $announcement_id = intval($_POST['announcement_id'] ?? 0);
     $comment_content = trim($_POST['comment'] ?? '');
@@ -1213,7 +1208,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </button>
 
   <!-- Switch to Admin Form (Conditional) -->
-    <?php if (isset($employee_role) && $employee_role === 'internal' && empty($_SESSION['demo_mode'])): ?>
+    <?php if (isset($employee_role) && $employee_role === 'internal'): ?>
     <form method="POST" class="w-full">
       <button type="submit" name="switch_to_admin" 
               class="flex items-center w-full px-4 py-3 text-blue-600 hover:bg-blue-50 transition duration-150 ease-in-out border-b border-gray-100">
@@ -1223,14 +1218,6 @@ document.addEventListener('DOMContentLoaded', function() {
       
     </form>
   <?php endif; ?>
-
-    <?php if (!empty($_SESSION['demo_mode'])): ?>
-        <a href="../../demo/admin/" 
-             class="flex items-center w-full px-4 py-3 text-indigo-600 hover:bg-indigo-50 transition duration-150 ease-in-out border-b border-gray-100">
-            <i class="fas fa-user-shield mr-3 text-indigo-500 w-4 text-center"></i>
-            <span>Open Admin Demo</span>
-        </a>
-    <?php endif; ?>
 
   <!-- Logout Form -->
   <form method="POST" class="w-full">
@@ -1273,12 +1260,8 @@ function closeDropdownOnClickOutside(e) {
 <div id="dashboardView" class="mt-12 md:mt-20">
 <?php
 // Fetch the number of announcements
-if (!empty($_SESSION['demo_mode'])) {
-    $announcementCount = 0;
-} else {
-    $stmt = $pdo->query("SELECT COUNT(announcement_id) AS total_announcements FROM announcements");
-    $announcementCount = $stmt->fetchColumn();
-}
+$stmt = $pdo->query("SELECT COUNT(announcement_id) AS total_announcements FROM announcements");
+$announcementCount = $stmt->fetchColumn();
 ?>
 <?php include 'welcome_banner.php'; ?>
 

@@ -1,7 +1,5 @@
 <?php
 require_once '../config/db.php'; // Use your PDO connection file
-require_once __DIR__ . '/../config/demo_guard.php';
-demo_block_admin_mutation('Employee creation is disabled in admin demo mode.');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fname     = trim($_POST['fname']);

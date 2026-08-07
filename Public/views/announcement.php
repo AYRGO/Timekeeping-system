@@ -2,8 +2,6 @@
 
 session_start();
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
-demo_render_admin_locked_page('Announcements', 'Internal announcements are hidden in demo mode.');
 
 $pageTitle = 'News Feed';
 

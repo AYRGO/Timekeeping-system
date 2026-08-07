@@ -4,7 +4,6 @@ session_start();
 include '../config/db.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../config/ScheduleCacheRebuilder.php';
-require_once __DIR__ . '/../config/demo_guard.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -605,9 +604,6 @@ $importError = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'import_holidays') {
     try {
-        if (demo_is_admin_mode()) {
-            throw new RuntimeException('Holiday imports are disabled in admin demo mode.');
-        }
         if (!empty($missingTables)) {
             throw new RuntimeException('Holiday profiles are not ready. Run the holiday profile seeder in profiles-only mode first.');
         }

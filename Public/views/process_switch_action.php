@@ -7,8 +7,6 @@ error_log("Session employee: " . json_encode($_SESSION['employee'] ?? 'NOT SET')
 error_log("Session view_mode: " . ($_SESSION['view_mode'] ?? 'NOT SET'));
 
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
-demo_block_admin_mutation('Schedule swap approval actions are disabled in admin demo mode.');
 require_once '../../vendor/autoload.php';
 
 use PHPMailer\PHPMailer\PHPMailer;

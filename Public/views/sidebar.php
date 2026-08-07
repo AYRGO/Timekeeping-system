@@ -4,37 +4,29 @@
 if (!isset($pdo)) {
     include('../config/db.php');
 }
-require_once __DIR__ . '/../config/demo_guard.php';
 
 // Fetch pending counts for each request type
 try {
-    if (demo_is_admin_mode()) {
-        $pendingLeaveCount = 0;
-        $pendingScheduleCount = 0;
-        $pendingOvertimeCount = 0;
-        $pendingTimeAdjustmentCount = 0;
-    } else {
-        // Leave Requests
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'");
-        $stmt->execute();
-        $pendingLeaveCount = $stmt->fetchColumn();
+    // Leave Requests
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'");
+    $stmt->execute();
+    $pendingLeaveCount = $stmt->fetchColumn();
 
-        // Schedule Change Requests - Sum all pending from single, monthly, and swap requests
-        $pendingSingleSchedule = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE LOWER(TRIM(status)) = 'pending'")->fetchColumn();
-        $pendingMonthlySchedule = $pdo->query("SELECT COUNT(*) FROM month_weekly_schedule WHERE LOWER(status) = 'pending'")->fetchColumn();
-        $pendingSwapSchedule = $pdo->query("SELECT COUNT(*) FROM schedule_switch_requests WHERE LOWER(status) = 'pending'")->fetchColumn();
-        $pendingScheduleCount = $pendingSingleSchedule + $pendingMonthlySchedule + $pendingSwapSchedule;
+    // Schedule Change Requests - Sum all pending from single, monthly, and swap requests
+    $pendingSingleSchedule = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE LOWER(TRIM(status)) = 'pending'")->fetchColumn();
+    $pendingMonthlySchedule = $pdo->query("SELECT COUNT(*) FROM month_weekly_schedule WHERE LOWER(status) = 'pending'")->fetchColumn();
+    $pendingSwapSchedule = $pdo->query("SELECT COUNT(*) FROM schedule_switch_requests WHERE LOWER(status) = 'pending'")->fetchColumn();
+    $pendingScheduleCount = $pendingSingleSchedule + $pendingMonthlySchedule + $pendingSwapSchedule;
 
-        // Overtime Requests - Updated to use post_ot_requests table and only count pending
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM post_ot_requests WHERE status = 'Pending'");
-        $stmt->execute();
-        $pendingOvertimeCount = $stmt->fetchColumn();
+    // Overtime Requests - Updated to use post_ot_requests table and only count pending
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM post_ot_requests WHERE status = 'Pending'");
+    $stmt->execute();
+    $pendingOvertimeCount = $stmt->fetchColumn();
 
-        // Time Adjustment Requests
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM time_adjustment_requests WHERE status = 'pending'");
-        $stmt->execute();
-        $pendingTimeAdjustmentCount = $stmt->fetchColumn();
-    }
+    // Time Adjustment Requests
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM time_adjustment_requests WHERE status = 'pending'");
+    $stmt->execute();
+    $pendingTimeAdjustmentCount = $stmt->fetchColumn();
 
 } catch (PDOException $e) {
     // Handle errors gracefully

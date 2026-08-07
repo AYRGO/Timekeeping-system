@@ -2,8 +2,6 @@
 
 session_start();
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
-demo_block_mutation('Announcement comments are disabled in demo mode.');
 date_default_timezone_set('Asia/Manila');
 
 header('Content-Type: application/json');

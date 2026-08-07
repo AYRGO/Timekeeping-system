@@ -2,8 +2,6 @@
 // File: toggle_accrual_mode.php
 // Toggle between testing and production accrual modes
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
-demo_block_mutation('Accrual mode settings are disabled in demo mode.');
 
 header('Content-Type: application/json');
 

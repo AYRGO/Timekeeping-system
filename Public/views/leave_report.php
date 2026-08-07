@@ -30,7 +30,6 @@ if (!isset($_SESSION['csrf_token'])) {
 }
 
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
 
 // Get current year for default values
 $currentYear = date('Y');

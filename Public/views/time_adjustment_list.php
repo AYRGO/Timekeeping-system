@@ -2,7 +2,10 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Check which view to display (current requests or history)
 $view = isset($_GET['view']) ? $_GET['view'] : 'current';
@@ -10,7 +13,6 @@ $isHistoryView = ($view === 'history');
 
 // Set page title for header
 $pageTitle = $isHistoryView ? 'Time Adjustment Requests History' : 'Time Adjustments';
-demo_render_admin_locked_page($pageTitle);
 
 date_default_timezone_set('Asia/Manila'); // or your preferred timezone
 

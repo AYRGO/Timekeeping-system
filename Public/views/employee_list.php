@@ -30,9 +30,6 @@ if (!isset($_SESSION['csrf_token'])) {
 }
 
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
-
-$isDemoAdmin = demo_is_admin_mode();
 
 // Search functionality
 $search = $_GET['search'] ?? '';
@@ -53,39 +50,33 @@ $limit = 15;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
 
-if ($isDemoAdmin) {
-    $employees = demo_admin_sample_employees(12);
-    $totalEmployees = count($employees);
-    $totalPages = 1;
-} else {
-    if (!empty($search)) {
-        $searchCondition = "WHERE CONCAT(fname, ' ', lname) LIKE :search OR email LIKE :search OR position LIKE :search OR contact LIKE :search";
-        $searchParams[':search'] = '%' . $search . '%';
-    }
-
-    // Total count with search
-    $totalQuery = "SELECT COUNT(*) FROM employees $searchCondition";
-    $totalStmt = $pdo->prepare($totalQuery);
-    foreach ($searchParams as $key => $value) {
-        $totalStmt->bindValue($key, $value);
-    }
-    $totalStmt->execute();
-    $totalEmployees = $totalStmt->fetchColumn();
-    $totalPages = ceil($totalEmployees / $limit);
-
-    // Employee list with search - updated to include profile_picture column
-    $orderClause = ($sort === 'fname') ? "ORDER BY fname $order, lname $order" : "ORDER BY $sort $order";
-    $query = "SELECT id, fname, lname, email, contact, position, status, profile_picture FROM employees $searchCondition $orderClause LIMIT :limit OFFSET :offset";
-
-    $stmt = $pdo->prepare($query);
-    foreach ($searchParams as $key => $value) {
-        $stmt->bindValue($key, $value);
-    }
-    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $stmt->execute();
-    $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+if (!empty($search)) {
+    $searchCondition = "WHERE CONCAT(fname, ' ', lname) LIKE :search OR email LIKE :search OR position LIKE :search OR contact LIKE :search";
+    $searchParams[':search'] = '%' . $search . '%';
 }
+
+// Total count with search
+$totalQuery = "SELECT COUNT(*) FROM employees $searchCondition";
+$totalStmt = $pdo->prepare($totalQuery);
+foreach ($searchParams as $key => $value) {
+    $totalStmt->bindValue($key, $value);
+}
+$totalStmt->execute();
+$totalEmployees = $totalStmt->fetchColumn();
+$totalPages = ceil($totalEmployees / $limit);
+
+// Employee list with search - updated to include profile_picture column
+$orderClause = ($sort === 'fname') ? "ORDER BY fname $order, lname $order" : "ORDER BY $sort $order";
+$query = "SELECT id, fname, lname, email, contact, position, status, profile_picture FROM employees $searchCondition $orderClause LIMIT :limit OFFSET :offset";
+
+$stmt = $pdo->prepare($query);
+foreach ($searchParams as $key => $value) {
+    $stmt->bindValue($key, $value);
+}
+$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
+$employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Sorting link helper
 function sort_link($column, $label) {
@@ -274,7 +265,7 @@ function sort_link($column, $label) {
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         <?php foreach ($employees as $emp): ?>
-                                            <tr class="table-row-hover <?= $isDemoAdmin ? 'cursor-default' : '' ?>" <?= $isDemoAdmin ? '' : "onclick=\"window.location.href='../views/employee-edit.php?id={$emp['id']}'\"" ?>>
+                                            <tr class="table-row-hover" onclick="window.location.href='../views/employee-edit.php?id=<?= $emp['id'] ?>'">
                                                 <!-- Employee Info with Profile Picture -->
                                                 <td class="px-6 py-4 whitespace-nowrap">
                                                     <div class="flex items-center">
@@ -332,33 +323,29 @@ function sort_link($column, $label) {
                                                 
                                                 <!-- Actions -->
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" onclick="event.stopPropagation()">
-                                                    <?php if ($isDemoAdmin): ?>
-                                                        <span class="text-gray-400 italic">Demo preview</span>
-                                                    <?php else: ?>
-                                                        <div class="flex items-center space-x-3">
-                                                            <a href="../views/employee-edit.php?id=<?= $emp['id'] ?>" 
-                                                               class="text-blue-600 hover:text-blue-900 transition-colors">
-                                                                <i class="fas fa-edit mr-1"></i>
-                                                                Edit
-                                                            </a>
-                                                            <a href="../views/time_log_list.php?employee_id=<?= $emp['id'] ?>" 
-                                                               class="text-green-600 hover:text-green-900 transition-colors">
-                                                                <i class="fas fa-clock mr-1"></i>
-                                                                Time Logs
-                                                            </a>
-                                                            <form method="POST" action="employee-delete.php" 
-                                                                  onsubmit="return confirm('Are you sure you want to delete this employee?');" 
-                                                                  class="inline">
-                                                                <input type="hidden" name="id" value="<?= $emp['id'] ?>">
-                                                                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                                                                <button type="submit" 
-                                                                        class="text-red-600 hover:text-red-900 transition-colors">
-                                                                    <i class="fas fa-trash mr-1"></i>
-                                                                    Delete
-                                                                </button>
-                                                            </form>
-                                                        </div>
-                                                    <?php endif; ?>
+                                                    <div class="flex items-center space-x-3">
+                                                        <a href="../views/employee-edit.php?id=<?= $emp['id'] ?>"
+                                                           class="text-blue-600 hover:text-blue-900 transition-colors">
+                                                            <i class="fas fa-edit mr-1"></i>
+                                                            Edit
+                                                        </a>
+                                                        <a href="../views/time_log_list.php?employee_id=<?= $emp['id'] ?>"
+                                                           class="text-green-600 hover:text-green-900 transition-colors">
+                                                            <i class="fas fa-clock mr-1"></i>
+                                                            Time Logs
+                                                        </a>
+                                                        <form method="POST" action="employee-delete.php"
+                                                              onsubmit="return confirm('Are you sure you want to delete this employee?');"
+                                                              class="inline">
+                                                            <input type="hidden" name="id" value="<?= $emp['id'] ?>">
+                                                            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                                                            <button type="submit"
+                                                                    class="text-red-600 hover:text-red-900 transition-colors">
+                                                                <i class="fas fa-trash mr-1"></i>
+                                                                Delete
+                                                            </button>
+                                                        </form>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>

@@ -1,7 +1,6 @@
 <?php
 
 $current_user_id = $_SESSION['employee']['id'] ?? null;
-$isDemoMode = !empty($_SESSION['demo_mode']);
 
 function newsFeedTableExists(PDO $pdo, string $table): bool {
     static $tableCache = [];
@@ -39,24 +38,18 @@ function newsFeedTableColumnExists(PDO $pdo, string $table, string $column): boo
     return isset($columnsByTable[$table][$column]);
 }
 
-// Fetch announcements. Demo mode intentionally hides internal announcements.
+// Fetch announcements
 $newsPage = max(1, (int)($_GET['news_page'] ?? 1));
 $newsPerPage = 15;
-$newsTotal = 0;
-$newsTotalPages = 1;
-if ($isDemoMode) {
-    $announcements = [];
-} else {
-    $newsTotal = (int)$pdo->query("SELECT COUNT(*) FROM announcements WHERE deleted = 0")->fetchColumn();
-    $newsTotalPages = max(1, (int)ceil($newsTotal / $newsPerPage));
-    $newsPage = min($newsPage, $newsTotalPages);
-    $newsOffset = ($newsPage - 1) * $newsPerPage;
-    $stmt = $pdo->prepare("SELECT * FROM announcements WHERE deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?");
-    $stmt->bindValue(1, $newsPerPage, PDO::PARAM_INT);
-    $stmt->bindValue(2, $newsOffset, PDO::PARAM_INT);
-    $stmt->execute();
-    $announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+$newsTotal = (int)$pdo->query("SELECT COUNT(*) FROM announcements WHERE deleted = 0")->fetchColumn();
+$newsTotalPages = max(1, (int)ceil($newsTotal / $newsPerPage));
+$newsPage = min($newsPage, $newsTotalPages);
+$newsOffset = ($newsPage - 1) * $newsPerPage;
+$stmt = $pdo->prepare("SELECT * FROM announcements WHERE deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?");
+$stmt->bindValue(1, $newsPerPage, PDO::PARAM_INT);
+$stmt->bindValue(2, $newsOffset, PDO::PARAM_INT);
+$stmt->execute();
+$announcements = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Batch-load reactions and comments for the current page. Previously each post
 // issued three additional queries while rendering.

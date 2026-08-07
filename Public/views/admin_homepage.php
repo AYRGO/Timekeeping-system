@@ -2,7 +2,6 @@
 
 session_start();
 include '../config/db.php';
-require_once __DIR__ . '/../config/demo_guard.php';
 
 // Handle switch to employee view
 if (isset($_POST['switch_to_employee'])) {
@@ -22,208 +21,157 @@ if (
     exit;
 }
 
-$isDemoAdmin = demo_is_admin_mode();
+// Get stats
+$totalEmployees = $pdo->query("SELECT COUNT(*) FROM employees")->fetchColumn();
+$activeEmployees = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'Active'")->fetchColumn();
+$inactiveEmployees = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'Inactive'")->fetchColumn();
+$pendingLeaves = $pdo->query("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'")->fetchColumn();
+$pendingSchedules = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')")->fetchColumn();
+$pendingOT = $pdo->query("SELECT COUNT(*) FROM post_ot_requests WHERE LOWER(status) = 'pending'")->fetchColumn();
+$pendingTimeAdjustments = $pdo->query("SELECT COUNT(*) FROM time_adjustment_requests WHERE status = 'pending'")->fetchColumn();
 
-if ($isDemoAdmin) {
-    $demoEmployees = demo_admin_sample_employees(12);
-    $totalEmployees = 72;
-    $activeEmployees = 66;
-    $inactiveEmployees = 6;
-    $pendingLeaves = 5;
-    $pendingSchedules = 4;
-    $pendingOT = 6;
-    $pendingTimeAdjustments = 3;
+// Get auto-accrual status
+$autoAccrualEnabled = false;
+$accrualMode = 'production'; // Default mode
+try {
+    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'auto_accrual_enabled'");
+    $stmt->execute();
+    $autoAccrualStatus = $stmt->fetchColumn();
+    $autoAccrualEnabled = ($autoAccrualStatus === '1' || $autoAccrualStatus === 1);
+    
+    // Get accrual mode (testing or production)
+    $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'accrual_mode'");
+    $stmt->execute();
+    $modeResult = $stmt->fetchColumn();
+    if ($modeResult) {
+        $accrualMode = $modeResult;
+    }
+} catch (Exception $e) {
+    // If table doesn't exist, assume disabled
     $autoAccrualEnabled = false;
     $accrualMode = 'production';
+}
 
-    $recentActivity = [];
-    $activityTypes = ['Leave Request', 'Overtime Request', 'Schedule Change', 'Time Adjustment'];
-    for ($i = 0; $i < 12; $i++) {
-        $employee = $demoEmployees[$i % count($demoEmployees)];
-        $recentActivity[] = [
-            'date' => date('Y-m-d', strtotime("-" . ($i + 1) . " days")),
-            'type' => $activityTypes[$i % count($activityTypes)],
-            'status' => 'Approved',
-            'employee_name' => $employee['fname'] . ' ' . $employee['lname'],
-            'details' => 'Demo activity',
-            'created_at' => date('Y-m-d H:i:s', strtotime("-" . ($i + 1) . " days")),
-        ];
-    }
+// Get recent activity from post tables
+$recentActivity = [];
 
-    $chartData = [
-        'pendingRequests' => [
-            'leaves' => $pendingLeaves,
-            'schedules' => $pendingSchedules,
-            'overtime' => $pendingOT,
-            'adjustments' => $pendingTimeAdjustments,
-        ],
-        'monthlyActivity' => []
+// Post Leave Requests
+$leaveActivity = $pdo->query("
+    SELECT 
+        plr.start_date as date,
+        'Leave Request' as type,
+        'Approved' as status,
+        CONCAT(e.fname, ' ', e.lname) as employee_name,
+        plr.leave_type as details,
+        plr.created_at
+    FROM post_leave_requests plr
+    JOIN employees e ON plr.employee_id = e.id
+    ORDER BY plr.created_at DESC
+    LIMIT 20
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// Post Overtime Requests
+$otActivity = $pdo->query("
+    SELECT 
+        por.date as date,
+        'Overtime Request' as type,
+        'Approved' as status,
+        CONCAT(e.fname, ' ', e.lname) as employee_name,
+        CONCAT(por.start_time, ' - ', por.end_time) as details,
+        por.created_at
+    FROM post_overtime_requests por
+    JOIN employees e ON por.employee_id = e.id
+    ORDER BY por.created_at DESC
+    LIMIT 20
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// Post Schedule Change Requests
+$scheduleActivity = $pdo->query("
+    SELECT 
+        pscr.start_date as date,
+        'Schedule Change' as type,
+        'Approved' as status,
+        CONCAT(e.fname, ' ', e.lname) as employee_name,
+        CONCAT('Schedule ID: ', pscr.work_schedule_id) as details,
+        pscr.created_at
+    FROM post_schedule_change_requests pscr
+    JOIN employees e ON pscr.employee_id = e.id
+    ORDER BY pscr.created_at DESC
+    LIMIT 20
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// Post Time Adjustment Requests
+$adjustmentActivity = $pdo->query("
+    SELECT 
+        ptar.log_date as date,
+        'Time Adjustment' as type,
+        'Approved' as status,
+        CONCAT(e.fname, ' ', e.lname) as employee_name,
+        'Time adjustment' as details,
+        ptar.created_at
+    FROM post_time_adjustment_requests ptar
+    JOIN employees e ON ptar.employee_id = e.id
+    ORDER BY ptar.created_at DESC
+    LIMIT 20
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// Combine and sort all activities
+$recentActivity = array_merge($leaveActivity, $otActivity, $scheduleActivity, $adjustmentActivity);
+usort($recentActivity, function($a, $b) {
+    return strtotime($b['created_at']) - strtotime($a['created_at']);
+});
+$recentActivity = array_slice($recentActivity, 0, 30); // Show latest 30 activities
+
+// Get chart data
+$chartData = [
+    'pendingRequests' => [
+        'leaves' => $pendingLeaves, 
+        'schedules' => $pendingSchedules,
+        'overtime' => $pendingOT,
+        'adjustments' => $pendingTimeAdjustments
+    ],
+    'monthlyActivity' => []
+];
+
+// Get monthly employee status data for the last 6 months
+for ($i = 5; $i >= 0; $i--) {
+    $month = date('Y-m', strtotime("-$i months"));
+    $monthName = date('M Y', strtotime("-$i months"));
+    $monthEnd = date('Y-m-t', strtotime("-$i months")); // Last day of the month
+    
+    // Count employees hired up to this month (cumulative)
+    $monthlyActive = $pdo->query("
+        SELECT COUNT(*) FROM employees 
+        WHERE DATE(created_at) <= '$monthEnd' 
+        AND status = 'Active'
+    ")->fetchColumn();
+    
+    // Count inactive employees (assuming they became inactive after being hired)
+    $monthlyInactive = $pdo->query("
+        SELECT COUNT(*) FROM employees 
+        WHERE DATE(created_at) <= '$monthEnd' 
+        AND status = 'Inactive'
+    ")->fetchColumn();
+    
+    // Total employees hired up to this month
+    $monthlyTotal = $pdo->query("
+        SELECT COUNT(*) FROM employees 
+        WHERE DATE(created_at) <= '$monthEnd'
+    ")->fetchColumn();
+    
+    // New hires for this specific month
+    $newHires = $pdo->query("
+        SELECT COUNT(*) FROM employees 
+        WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month'
+    ")->fetchColumn();
+    
+    $chartData['monthlyActivity'][] = [
+        'month' => $monthName,
+        'active' => (int)$monthlyActive,
+        'inactive' => (int)$monthlyInactive,
+        'total' => (int)$monthlyTotal,
+        'newHires' => (int)$newHires
     ];
-
-    for ($i = 5; $i >= 0; $i--) {
-        $monthName = date('M Y', strtotime("-$i months"));
-        $base = 60 + ((5 - $i) * 2);
-        $chartData['monthlyActivity'][] = [
-            'month' => $monthName,
-            'active' => $base,
-            'inactive' => 4 + ($i % 3),
-            'total' => $base + 4 + ($i % 3),
-            'newHires' => 2 + ($i % 2),
-        ];
-    }
-} else {
-    // Get stats
-    $totalEmployees = $pdo->query("SELECT COUNT(*) FROM employees")->fetchColumn();
-    $activeEmployees = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'Active'")->fetchColumn();
-    $inactiveEmployees = $pdo->query("SELECT COUNT(*) FROM employees WHERE status = 'Inactive'")->fetchColumn();
-    $pendingLeaves = $pdo->query("SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'")->fetchColumn();
-    $pendingSchedules = $pdo->query("SELECT COUNT(*) FROM schedule_change_requests WHERE status NOT IN ('Declined', 'Rejected', 'Approved', 'Forfeited', 'Cancelled')")->fetchColumn();
-    $pendingOT = $pdo->query("SELECT COUNT(*) FROM post_ot_requests WHERE LOWER(status) = 'pending'")->fetchColumn();
-    $pendingTimeAdjustments = $pdo->query("SELECT COUNT(*) FROM time_adjustment_requests WHERE status = 'pending'")->fetchColumn();
-
-    // Get auto-accrual status
-    $autoAccrualEnabled = false;
-    $accrualMode = 'production'; // Default mode
-    try {
-        $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'auto_accrual_enabled'");
-        $stmt->execute();
-        $autoAccrualStatus = $stmt->fetchColumn();
-        $autoAccrualEnabled = ($autoAccrualStatus === '1' || $autoAccrualStatus === 1);
-        
-        // Get accrual mode (testing or production)
-        $stmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'accrual_mode'");
-        $stmt->execute();
-        $modeResult = $stmt->fetchColumn();
-        if ($modeResult) {
-            $accrualMode = $modeResult;
-        }
-    } catch (Exception $e) {
-        // If table doesn't exist, assume disabled
-        $autoAccrualEnabled = false;
-        $accrualMode = 'production';
-    }
-
-    // Get recent activity from post tables
-    $recentActivity = [];
-
-    // Post Leave Requests
-    $leaveActivity = $pdo->query("
-        SELECT 
-            plr.start_date as date,
-            'Leave Request' as type,
-            'Approved' as status,
-            CONCAT(e.fname, ' ', e.lname) as employee_name,
-            plr.leave_type as details,
-            plr.created_at
-        FROM post_leave_requests plr
-        JOIN employees e ON plr.employee_id = e.id
-        ORDER BY plr.created_at DESC
-        LIMIT 20
-    ")->fetchAll(PDO::FETCH_ASSOC);
-
-    // Post Overtime Requests
-    $otActivity = $pdo->query("
-        SELECT 
-            por.date as date,
-            'Overtime Request' as type,
-            'Approved' as status,
-            CONCAT(e.fname, ' ', e.lname) as employee_name,
-            CONCAT(por.start_time, ' - ', por.end_time) as details,
-            por.created_at
-        FROM post_overtime_requests por
-        JOIN employees e ON por.employee_id = e.id
-        ORDER BY por.created_at DESC
-        LIMIT 20
-    ")->fetchAll(PDO::FETCH_ASSOC);
-
-    // Post Schedule Change Requests
-    $scheduleActivity = $pdo->query("
-        SELECT 
-            pscr.start_date as date,
-            'Schedule Change' as type,
-            'Approved' as status,
-            CONCAT(e.fname, ' ', e.lname) as employee_name,
-            CONCAT('Schedule ID: ', pscr.work_schedule_id) as details,
-            pscr.created_at
-        FROM post_schedule_change_requests pscr
-        JOIN employees e ON pscr.employee_id = e.id
-        ORDER BY pscr.created_at DESC
-        LIMIT 20
-    ")->fetchAll(PDO::FETCH_ASSOC);
-
-    // Post Time Adjustment Requests
-    $adjustmentActivity = $pdo->query("
-        SELECT 
-            ptar.log_date as date,
-            'Time Adjustment' as type,
-            'Approved' as status,
-            CONCAT(e.fname, ' ', e.lname) as employee_name,
-            'Time adjustment' as details,
-            ptar.created_at
-        FROM post_time_adjustment_requests ptar
-        JOIN employees e ON ptar.employee_id = e.id
-        ORDER BY ptar.created_at DESC
-        LIMIT 20
-    ")->fetchAll(PDO::FETCH_ASSOC);
-
-    // Combine and sort all activities
-    $recentActivity = array_merge($leaveActivity, $otActivity, $scheduleActivity, $adjustmentActivity);
-    usort($recentActivity, function($a, $b) {
-        return strtotime($b['created_at']) - strtotime($a['created_at']);
-    });
-    $recentActivity = array_slice($recentActivity, 0, 30); // Show latest 30 activities
-
-    // Get chart data
-    $chartData = [
-        'pendingRequests' => [
-            'leaves' => $pendingLeaves, 
-            'schedules' => $pendingSchedules,
-            'overtime' => $pendingOT,
-            'adjustments' => $pendingTimeAdjustments
-        ],
-        'monthlyActivity' => []
-    ];
-
-    // Get monthly employee status data for the last 6 months
-    for ($i = 5; $i >= 0; $i--) {
-        $month = date('Y-m', strtotime("-$i months"));
-        $monthName = date('M Y', strtotime("-$i months"));
-        $monthEnd = date('Y-m-t', strtotime("-$i months")); // Last day of the month
-        
-        // Count employees hired up to this month (cumulative)
-        $monthlyActive = $pdo->query("
-            SELECT COUNT(*) FROM employees 
-            WHERE DATE(created_at) <= '$monthEnd' 
-            AND status = 'Active'
-        ")->fetchColumn();
-        
-        // Count inactive employees (assuming they became inactive after being hired)
-        $monthlyInactive = $pdo->query("
-            SELECT COUNT(*) FROM employees 
-            WHERE DATE(created_at) <= '$monthEnd' 
-            AND status = 'Inactive'
-        ")->fetchColumn();
-        
-        // Total employees hired up to this month
-        $monthlyTotal = $pdo->query("
-            SELECT COUNT(*) FROM employees 
-            WHERE DATE(created_at) <= '$monthEnd'
-        ")->fetchColumn();
-        
-        // New hires for this specific month
-        $newHires = $pdo->query("
-            SELECT COUNT(*) FROM employees 
-            WHERE DATE_FORMAT(created_at, '%Y-%m') = '$month'
-        ")->fetchColumn();
-        
-        $chartData['monthlyActivity'][] = [
-            'month' => $monthName,
-            'active' => (int)$monthlyActive,
-            'inactive' => (int)$monthlyInactive,
-            'total' => (int)$monthlyTotal,
-            'newHires' => (int)$newHires
-        ];
-    }
 }
 ?>
 

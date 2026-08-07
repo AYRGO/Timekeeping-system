@@ -1,8 +1,6 @@
 <?php
 session_start();
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
-demo_block_mutation('Auto accrual settings are disabled in demo mode.');
 
 // Check if user is logged in and is admin
 if (!isset($_SESSION['employee']) || $_SESSION['employee']['role'] !== 'internal') {

@@ -7,8 +7,6 @@ ini_set('display_errors', 1);
 
 session_start();
 include('../config/db.php');
-require_once __DIR__ . '/../config/demo_guard.php';
-demo_block_admin_mutation('Monthly schedule approval actions are disabled in admin demo mode.');
 require_once '../../vendor/autoload.php';
 
 use PHPMailer\PHPMailer\PHPMailer;

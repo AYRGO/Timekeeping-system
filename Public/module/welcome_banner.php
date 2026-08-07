@@ -1,11 +1,6 @@
 <?php
 
 // Get announcement counts
-if (!empty($_SESSION['demo_mode'])) {
-    $totalAnnouncements = 0;
-    $readAnnouncements = 0;
-    $unreadAnnouncements = 0;
-} else {
 try {
     // Total announcements
     $totalStmt = $pdo->prepare("SELECT COUNT(*) FROM announcements WHERE deleted = 0");
@@ -48,7 +43,6 @@ try {
     $totalAnnouncements = 0;
     $readAnnouncements = 0;
     $unreadAnnouncements = 0;
-}
 }
 ?>
 

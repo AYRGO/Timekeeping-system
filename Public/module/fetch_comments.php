@@ -2,11 +2,6 @@
 session_start();
 include('../config/db.php');
 
-if (!empty($_SESSION['demo_mode'])) {
-    echo '<p class="text-gray-500">Comments are hidden in demo mode.</p>';
-    exit;
-}
-
 // Force timezone to Asia/Manila (UTC+8)
 date_default_timezone_set('Asia/Manila');
 
