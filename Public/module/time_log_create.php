@@ -1408,9 +1408,9 @@ document.addEventListener("DOMContentLoaded", function () {
         mode: "range",
         dateFormat: "Y-m-d",
         minDate: (() => {
-            // Allow backtrack for 10 days
+            // Allow backtrack for 15 days
             const today = new Date();
-            today.setDate(today.getDate() - 10);
+            today.setDate(today.getDate() - 15);
             return today;
         })(),
         // Remove any disabling/blocking of days before today
