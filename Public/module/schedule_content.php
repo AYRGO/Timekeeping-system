@@ -1011,38 +1011,6 @@ let sourceDateData = {};
 let isSelectingTargetDate = false;
 let swapSourceDate = null;
 
-// Open OT Request Form from Calendar
-function openOTRequestFromCalendar(date, timeLogId) {
-    console.log('⚡ Opening OT request form for date:', date, 'time log:', timeLogId);
-    
-    // Switch to overtime view
-    if (typeof switchView === 'function') {
-        switchView('overtime');
-    }
-    
-    // Wait for view to load, then find and click the OT button for this date
-    setTimeout(() => {
-        const otButton = document.querySelector(`button[data-log-date="${date}"][data-time-log-id="${timeLogId}"]`);
-        if (otButton) {
-            otButton.click();
-            // Scroll to the OT form
-            setTimeout(() => {
-                const modal = document.getElementById('overtimeModal');
-                if (modal) {
-                    modal.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            }, 300);
-        } else {
-            console.warn('⚠️ OT button not found for time log:', timeLogId);
-            // Fallback: try to open modal directly if function exists
-            if (typeof openOvertimeModal === 'function') {
-                // Get the time log data via AJAX or pass necessary data
-                showNotification('Opening overtime request form...', 'info');
-            }
-        }
-    }, 500);
-}
-
 function openScheduleSwapModal(date) {
     console.log('🔄 Opening schedule swap modal for date:', date);
     

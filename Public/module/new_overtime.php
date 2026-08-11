@@ -2092,10 +2092,18 @@ function initializeTimePicker(maxHours) {
     const validationInfo = document.getElementById('ot-validation-info');
     
     if (!hoursInput || !minutesInput) return;
-    
+
+    // Reset state from any previous open — a zero-max row used to leave these
+    // disabled and the submit button stuck at the prior row's state.
+    hoursInput.disabled = false;
+    minutesInput.disabled = false;
+    hoursInput.value = 0;
+    minutesInput.value = 0;
+
     if (maxHours <= 0) {
         hoursInput.disabled = true;
         minutesInput.disabled = true;
+        toggleSubmitButton(false, 'No overtime available');
         rangeInfo.textContent = 'No overtime available for this time log';
         validationInfo.textContent = 'Please select a different time log.';
         validationInfo.className = 'mt-0.5 text-xs text-red-500 truncate';
@@ -2156,20 +2164,21 @@ function initializeTimePicker(maxHours) {
         }
     }
     
-    // Input event listeners
-    hoursInput.addEventListener('input', function() {
+    // Assigned, not addEventListener: this runs on every modal open, and
+    // addEventListener would stack a new stale-maxHours closure each time.
+    hoursInput.oninput = function() {
         let value = parseInt(this.value);
         if (value < 0) this.value = 0;
         if (value > 99) this.value = 99;
         updateHiddenInput();
-    });
-    
-    minutesInput.addEventListener('input', function() {
+    };
+
+    minutesInput.oninput = function() {
         let value = parseInt(this.value);
         if (value < 0) this.value = 0;
         if (value > 59) this.value = 59;
         updateHiddenInput();
-    });
+    };
     
     // Initialize
     updateHiddenInput();
@@ -2190,8 +2199,6 @@ function formatMinutesToTime(totalMinutes) {
 
 // Open overtime modal with data
 function openOvertimeModal(button) {
-    console.log('openOvertimeModal called with button:', button);
-    
     const row = button.closest('tr');
     if (!row) {
         console.error('No table row found for button');
@@ -2208,8 +2215,6 @@ function openOvertimeModal(button) {
     const maxOTHours = parseFloat(row.dataset.maxOtHours) || 0;
     const scheduledStart = row.dataset.scheduledStart || '';
     const isRestDay = row.dataset.isRestDay === '1';
-    
-    console.log('Modal Data:', { timeLogId, timeIn, timeOut, otHours, date, startOT, endOT, maxOTHours }); // Debug log
     
     // Populate basic form fields
     document.getElementById('selected_time_log_id').value = timeLogId || '';
