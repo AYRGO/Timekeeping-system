@@ -1788,12 +1788,12 @@ button:hover {
 
 <!-- Overtime Request Modal -->
 <div id="overtimeModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div class="flex items-center justify-center min-h-screen px-4 py-8 text-center">
   <!-- Background overlay -->
   <div class="fixed inset-0 transition-opacity bg-black/40 backdrop-blur-sm" onclick="closeOvertimeModal()"></div>
 
   <!-- Modal content -->
-  <div class="inline-block w-full max-w-4xl px-0 pt-0 pb-0 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle border border-gray-200 animate-fade-in-up">
+  <div class="relative w-full max-w-4xl px-0 pt-0 pb-0 overflow-hidden text-left transition-all transform bg-white rounded-lg shadow-xl border border-gray-200 animate-fade-in-up">
             
             <!-- Modal Header -->
       <div class="bg-white border-b border-gray-200 px-6 py-4">
