@@ -1,5 +1,5 @@
 <!-- Schedule Change Modal -->
-<div id="scheduleChangeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50" style="display: none;">
+<div id="scheduleChangeModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" style="display: none;">
   <div class="flex items-center justify-center min-h-screen px-4">
     <div class="schedule-change-modal-container bg-white shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
 
